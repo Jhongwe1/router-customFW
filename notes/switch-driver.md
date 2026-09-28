@@ -753,7 +753,7 @@ between them and no reset**, and it costs nothing.
 `rtl819x-switch.c:375` and as prose in `docs/KNOWN-ISSUES.md` — **it was never
 in the parser**, and a frozen card's cell 8 asked for it. Typing it returns
 `-EINVAL`. 讀 `rtl819x-switch.c:588-661`, the parser accepts exactly nine
-forms and nothing else:
+forms and nothing else (1.0–1.3; since 1.4 the rest go to 1.4's forms, § 15.3, then 1.5's, § 17.2):
 
 ```
 unlock <token>   lock   snap <s>   diff <a> <b>
@@ -3230,3 +3230,98 @@ own instrument error and is retracted (`notes/nic-driver.md` § 30.6, `FW-152`).
   five `EnablePHYIf` bits is necessary; a second boot of arm II; anything about arm I or `D8`.
 * The standby failure's cause.
 * § 16.8, which is inference for arm I to test.
+
+# 17. 2026-09-28 (`R6b-8` 8d) — 1.5: `init`, typed by the standard `/init`, and `reset` refused while the CPU port's engine runs
+
+8d's desk landing (segment 116). Its scope is ruling 7 of the night
+(`$FWRE_WORK/rebuild/s115/read-night/RULINGS-night.md`) and § 16.8; its decisions are the main
+session's rulings on 8d (`$FWRE_WORK/rebuild/s116/RULINGS-8d.md`, not in this repository, cited as
+8d ruling *n*), which bind this section. Marks: 量 a capture, 讀 code or a document, 推 inferred.
+
+## 17.1 The decisions (8d rulings 1–6)
+
+* **Where `init` lives** (ruling 1): a verb, typed by the standard `/init` (`config/rlxfw-init.sh`)
+  between `unlock i-mean-it` and `start` — the image's boot policy, as P2-2's LAN bring-up already
+  is. The driver still writes nothing at boot on its own (its header's item 2), every quiet-`/init`
+  boot stays what it was, and the switch keeps one guarded write path. The owner's requirement that
+  the product not rely on a typed verb is about the operator, not about `/proc`.
+* **What it writes** (ruling 2): `EnablePHYIf` on `PCRP0`–`4`, through 1.4's `rtl819x_phyif_port()`,
+  and nothing else. No reset: § 16.3's R is not the loader's state, and a reset would leave about
+  ten register groups to take over (§ 16.8).
+* **The VLAN group is inherited as a unit** (ruling 3) — the table, `PVCR0`–`4`, `VCR0`, `PBVCR0`,
+  the netif table and `PLITIMR`, none written. Arm II pinged both ways on exactly that state plus
+  `EnablePHYIf` (`NET-164`); S0′'s 37 words were equal on 13 boots of the catch → upload → `J` path
+  (§ 16.1), while the tables were read on one (`M2-VV`, `M2-VN`). A take-over would need a table
+  writer and, for the loader's one-VLAN layout, values whose only source is the loader's reads; the
+  vendor's layout, which has two sources, is a two-VID design. So the bounded `TACI` writer the
+  `R6b-8` row lists is not built — no table write exists for it to bound — and its spec (clear
+  `STOP_TLU` on every refusal, read `SWTCR0` back) is the precondition of any future take-over.
+* **EEE and `QNUMCR`'s CPU field are inherited** (ruling 4): `EEECR` `294A5294` with PHY registers
+  17 and 26 as the loader leaves them, and field 0, with which the loader receives and arm II
+  delivered 14 of 14 frames to the CPU (量). Reopened by a link flap or stall on a `SWCORE=n` image,
+  and when a second CPU queue is wanted. This is `NET-28` 殘留's "what to write": nothing.
+* **`dumb` and `restore` are kept** (ruling 5), unchanged, and `/init` never types them. `dumb`'s §
+  8.10 loss is a partial take-over of the VLAN group (§ 16.8); its candidates are not separated and
+  no `R6b` step needs them.
+* **The reset guard** (ruling 6), § 17.2.
+
+## 17.2 The code
+
+`rtl819x-switch.c` 1.5 appends one block after 1.4's (`:1663`–`:1865`). Above it seven lines changed
+in place and none moved (FW-110; 量, `diff` of `HEAD`'s 1,662 lines against the new file's first
+1,662: `118c118`, `569c569`, `637c637`, `1592c1592`, `1617c1617`, `1643c1643`, `1661c1661`): the
+version string; three formerly blank lines hold prototypes; the reset branch of the switch's handler
+calls the guard; 1.4's handler hands the forms it does not take to 1.5 instead of returning
+`-EINVAL`; 1.4's page lines end with 1.5's line.
+
+* **`init`** needs the switch's own unlock and nothing else: locked, `-EPERM` before any register is
+  read, counted; the phyif class token is neither needed nor enough. Unlocked: the five per-port
+  results reset, then ports 0–4 in order, stopping at the first failure — `phyif all`'s loop, so its
+  per-port results are the `phyifN` lines and its stores count in the phyif line (only that line's
+  `ok` is phyif's own). The mark is `RLXFW-SW-INIT=`, `SW-PHYIF`'s packing: stored ports in bits
+  12:8, ports verified set in 4:0.
+* **The guard**: `reset full` and `reset vendor` return `-EBUSY`, counted in `reset_busy`, before
+  any write — `SSIR` and `SYS_CLK_MAG` untouched, 1.0's reset not entered — while `CPUICR` has
+  `TXCMD` or `RXCMD` set. Address and bits: B `rtl865xc_asicregs.h:491`–`:492` and `:527`–`:528`; 量
+  `C4000000` with rlxfw's NIC armed (`bench/2026-09-28/M6-VP5.log:8`, a `peek`; `AN-N2.log:6`,
+  `RLXFW-N-ENGON`) and `04000000` after `disarm` (`AR-NIC.log:49`, `AR-C0.log:8`). The test is the
+  two bits and not the word: bit 26 stays set after `disarm`. It is a direct KSEG1 load outside the
+  switch window, as `SYS_CLK_MAG`'s are, and a check at one instant, not a lock: the NIC's recovery
+  timer runs in softirq while the NIC is armed, so the state it protects is the one `disarm` leaves.
+* **The page** gains one line before the register table,
+  `init calls C ok K refused R rc D stored SS on OO reset_busy B`, from cached values (a `cat` reads
+  no register for it): 108 bytes at its widest, so 1.4's worst case of 2,483 of 4,096 becomes 2,591
+  (量 on the host: `mdiocheck` K46, and a whole-driver host render).
+* **`/init`** types `echo init > /proc/rtl819x-switch` between the unlock and `start`, with the
+  reason beside it; the rung-1 line and the quiet `/init` are unchanged, and
+  `config/rlxfw-initramfs.tsv`'s note for `/init` names `init`.
+
+What a standard boot now does (推, from the code; arm I reads it): on `SWCORE=n`, five stores,
+`n_writes` 1 → 6 after the boot, and one mark line, `RLXFW-SW-INIT=00001F1F`; on `SWCORE=y`, no
+store and `RLXFW-SW-INIT=0000001F`.
+
+## 17.3 What the desk measured
+
+* `mdiocheck`, 38 cases and 32 mutants before: **48 cases and 49 mutants, each mutant killed by the
+  case named for it** (K37–K46, M33–M49), the unmutated run first; `tools/ci-expected.tsv` 71 → 98
+  lines. K37–K46: `init` refused while locked with no register read; the post-`J` and vendor-set
+  states, access by access; a stop at an identity failure and at a read-back failure; the phyif
+  token neither needed nor enough over four lock states; ten malformed forms; the guard refusing on
+  `TXCMD`, `RXCMD` and `C4000000` with no store and no reset, and permitting at `04000000` and at 0;
+  the line's 108 bytes against the running total. The main session re-ran it
+  (`$FWRE_WORK/rebuild/s116/verify-sw15.sh`): rc 0, 48 and 49.
+* `mkinitramfs self-test` 43, `test-mkinitramfs-mutants` 27 and `sh -n` on the new `/init`: rc 0.
+  `bootbytes` 7 of 7; its `predict` lists `SW-INIT` at 24 bytes.
+
+## 17.4 What 1.5 does not establish
+
+* Anything on the silicon: that five stores bring the LAN up on a boot arm II did not run is arm
+  I's.
+* That the guard covers every path to a running engine: it is one load, and `start`, `dumb` and
+  `restore` are not guarded.
+* That `mdiocheck` drives the driver's reset branch: it is transcribed into the harness from
+  `:636`–`:640`, as the read and write paths above the cut are; the in-place lines outside the cut
+  were compiled by a whole-driver host build, and by the target's compiler only when an image is
+  built.
+* Anything about the VLAN group on a boot path on which the loader has not brought its network up
+  (autoboot from flash), which `R9`'s zero-write rule keeps unreachable.

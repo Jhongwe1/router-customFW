@@ -30,6 +30,13 @@ mount -t sysfs sysfs /sys
 #   /init without these lines.
 echo "rlxfw: lan bring-up"
 echo unlock i-mean-it > /proc/rtl819x-switch
+# `init` (R6b-8 8d, rtl819x-switch 1.5) is not one of those four: it sets
+# EnablePHYIf in PCRP0-PCRP4, the bit the loader's `J` clears, and writes
+# nothing else.  With the vendor's switch core out of the image (SWCORE=n)
+# nothing else sets it back, and arm II pinged neither way until it was
+# set; with the core in, the vendor's probe has set it before this line
+# and `init` stores nothing.
+echo init > /proc/rtl819x-switch
 echo start > /proc/rtl819x-switch
 echo unlock > /proc/rtl819x-nic
 echo netdev on > /proc/rtl819x-nic

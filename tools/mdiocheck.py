@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""mdiocheck -- rtl819x-switch 1.3's MDIO block and 1.4's `phyif` block,
-compiled and driven on the host.
+"""mdiocheck -- rtl819x-switch 1.3's MDIO block, 1.4's `phyif` block and 1.5's
+`init` verb and `reset` guard, compiled and driven on the host.
 
 WHAT IT CHECKS, AND WHY IT CAN
 ------------------------------
 `R6b-7` appended one block to `rtl819x-switch.c`: the bus's read and write
 ops, `probe`, `scan`, `pread`, `bound`, the gate, and /proc/rtl819x-mdio.
 `R6b-10` appended a second after it (1.4): arm II's one write class,
-`EnablePHYIf` set in PCRP0-PCRP4, behind its own token.  This tool cuts both
-out of the driver UNCHANGED (from the 1.3 banner to the end of the file) and
+`EnablePHYIf` set in PCRP0-PCRP4, behind its own token.  `R6b-8` 8d appended
+a third (1.5): `init`, 1.4's port loop under the switch's own unlock, and the
+guard that refuses `reset full`/`reset vendor` while CPUICR has TXCMD or
+RXCMD set.  This tool cuts all three out of the driver UNCHANGED (from the
+1.3 banner to the end of the file) and
 compiles them with the host's gcc in the kernel's dialect
 (`-std=gnu89 -Werror`) inside a generated harness that supplies, in place of
 the kernel:
@@ -33,7 +36,13 @@ the kernel:
     default is the post-`J` state (nn7F0038 on 0-4, 量 C9-SW0), with two
     faults per port -- bit 0 does not stick, or bit 3 flips on a store --
     and every PCRP access logged with whether IRQs were off and in which
-    section.
+    section;
+  * for 1.5: a CPUICR word at 0xB8010000 that only the direct KSEG1 load
+    reaches (every load logged, `C`, in the same access log), the switch
+    handler's `reset` branch as the driver writes it above the cut, and a
+    stub for rtl819x_sw_do_reset -- also above the cut -- that records each
+    call and its recipe (`X`) and returns a scripted rc.  Any store the
+    guard made would be a `W` in the log or a harness exit.
 
 Cases (each prints one `  ok`/`  FAIL` line with exactly two leading spaces):
 
@@ -87,8 +96,8 @@ Cases (each prints one `  ok`/`  FAIL` line with exactly two leading spaces):
        32, a doubled space, a trailing letter, a missing field, bound 10001,
        -1, 5x -- -EINVAL; `bound 0x10` reads 16; an unknown verb -EINVAL
   1.4, `phyif` (the write handler's fall-through and its page lines):
-  K24  boot: the six lines byte for byte (rc 1: never reached), and a cat
-       reads no register
+  K24  boot: the six lines, and 1.5's `init` line after them, byte for byte
+       (rc 1: never reached, never called), and a cat reads no register
   K25  the class token absent: `phyif all`, `phyif 0` -EPERM, counted, no
        PCRP access
   K26  the token: the switch's `unlock i-mean-it`, a near miss and a doubled
@@ -111,8 +120,31 @@ Cases (each prints one `  ok`/`  FAIL` line with exactly two leading spaces):
   K35  64 drawn pre-read words: the word stored is the word read with bit 0
        set, and nothing else differs
   K36  the lines at their widest against the block comment's figures
+  1.5, `init` and the `reset` guard (1.4's handler falls through to 1.5):
+  K37  the switch locked: `init` -EPERM, counted in the `init` line, no
+       register read -- also with the phyif class token unlocked
+  K38  `init` from the post-`J` state: R pre, W pre|1, R for ports 0..4 in
+       order, each port in one IRQs-off section of its own; the phyifN
+       lines, the phyif counters, the `init` line, the mark 00001F1F, no
+       MDIO store and no reset; a second cat reads nothing
+  K39  `init` on the vendor-set state (bit 0 set on all five): five reads,
+       no store, `already` 5, mark 0000001F
+  K40  a word without its port's ExtPHYID: `init` stops there (-EPROTO),
+       and the results of the `phyif all` before it do not survive
+  K41  a bit 0 that does not stick: `init` stops there (-EIO)
+  K42  the phyif token neither needed nor enough: over (switch, phyif)
+       locked/unlocked, `init` reaches the ports exactly when the switch is
+       unlocked
+  K43  ten malformed forms -EINVAL with no access, beside a permitted `init`
+  K44  the guard: CPUICR with TXCMD, RXCMD, both (C4000000) -- `reset full`
+       and `reset vendor` -EBUSY, counted, one CPUICR load each, no switch
+       read, no store, rtl819x_sw_do_reset never called
+  K45  the guard permits at 04000000 (after `disarm`) and at 0: one load,
+       then rtl819x_sw_do_reset with the verb's recipe, its rc returned
+  K46  the `init` line at its widest against the block comment's figures,
+       and the page's running total through 1.2, 1.4 and 1.5
 
-M0..M32 then mutate a COPY of the block, one defect each, and require the case
+M0..M49 then mutate a COPY of the block, one defect each, and require the case
 named for it to go red.  M0 is the unmutated copy through the same path: if it
 is not green, no kill is counted.  A mutant whose anchor does not occur
 exactly once, that does not compile, or whose named case stays green is a
@@ -129,7 +161,12 @@ sysfs, and whether rsdk's gcc 3.4.6 compiles the block -- the image build
 answers that.  For 1.4: the switch's read and write paths and its handler's
 CR/LF stripping are the harness's transcription of the driver above the cut,
 not the driver's own code; and what the silicon does with bit 0 -- whether
-it sticks, whether the link follows -- is the bench's.
+it sticks, whether the link follows -- is the bench's.  For 1.5: the
+`reset` branch of the switch's handler is transcribed, rtl819x_sw_do_reset
+is a stub, and CPUICR is a variable -- nothing here says what a reset does
+to a running DMA engine, or whether the NIC re-arms between the guard's
+load and the reset; and /init's `init` is config/rlxfw-init.sh's, which
+this tool does not read.
 
 Needs gcc and nothing else: no toolchain, no $FWRE_WORK, no device.
     mdiocheck.py [--source PATH] [--keep DIR] [--no-mutants]
@@ -184,6 +221,14 @@ typedef unsigned int u32;
 #define MII_BUS_ID_SIZE 17
 #define PHY_MAX_ADDR 32
 #define UNUSED __attribute__((unused))
+/* 1.5: the direct KSEG1 load's spelling, and three of the driver's own
+ * defines from above the cut, which only the mutants use (SSIR, FULL_RST
+ * and the switch window's physical base, rtl819x-switch.c:123-134). */
+#define __iomem
+#define KSEG1ADDR(a) ((unsigned long)(a) | 0xA0000000UL)
+#define RTL819X_SW_PHYS 0x1B800000
+#define RTL819X_SW_SSIR 0x4204
+#define RTL819X_SW_FULL_RST (1u << 2)
 
 /* ------------------------------------------------ the counted kernel */
 static unsigned long jiffies = 4242;
@@ -321,8 +366,19 @@ static void phy_init_model(void)
 	for (r = 0; r < 16; r++)
 		post_next[r] = -1;
 }
+/* 1.5: CPUICR, 0xB8010000, reached only by a direct KSEG1 load.  Every
+ * load goes into the PCRP access log as `C`, so its order against the
+ * switch's reads and stores is visible. */
+static u32 cpuicr;
+static int cpuicr_rd;
+static void pacc_log(char k, unsigned int off, u32 v);
 static u32 fake_readl(unsigned int off)
 {
+	if (off == 0xB8010000u) {
+		cpuicr_rd++;
+		pacc_log('C', off, cpuicr);
+		return cpuicr;
+	}
 	if (off != 0x4008) {
 		fprintf(stderr, "harness: read of %04X\n", off);
 		exit(9);
@@ -395,6 +451,7 @@ static u32 pcrp[9] = { 0x007F0038, 0x047F0038, 0x087F0038, 0x0C7F0038,
 		       0x107F0038, 0x00000000, 0x187F0038, 0x1C7F0038, 0 };
 static int pcrp_nostick[9], pcrp_flip[9];
 static int pcrp_rd, pcrp_rd_insec, pcrp_wr, pcrp_wr_insec, pcrp_illegal;
+static int sw_rd_calls;		/* every call of the switch's read path */
 static int rtl819x_sw_unlocked;
 static unsigned long sw_n_writes, sw_n_refused;
 struct pa { char k; unsigned int off; u32 v; int irq; int sec; };
@@ -415,6 +472,7 @@ static void pacc_log(char k, unsigned int off, u32 v)
 
 static UNUSED u32 rtl819x_sw_rd(unsigned int off)
 {
+	sw_rd_calls++;
 	if (off >= 0x4104 && off <= 0x4124 && !(off & 3)) {
 		u32 v = pcrp[(off - 0x4104) / 4];
 
@@ -461,6 +519,18 @@ static UNUSED int rtl819x_sw_wr(unsigned int off, u32 v)
 	if (pcrp_flip[p])
 		pcrp[p] ^= 0x8u;
 	return 0;
+}
+
+/* 1.5: rtl819x_sw_do_reset is above the cut (rtl819x-switch.c:382).  The
+ * stub writes nothing: it logs the call and its recipe as `X` and returns a
+ * scripted rc, so what the guard lets through is visible and nothing else
+ * is. */
+static int n_do_reset, do_reset_rc;
+static UNUSED int rtl819x_sw_do_reset(int vendor_recipe)
+{
+	n_do_reset++;
+	pacc_log('X', 0x4204, (u32)vendor_recipe);
+	return do_reset_rc;
 }
 
 /* ------------------------------------------------ phylib, 2.6.30's shape */
@@ -676,15 +746,26 @@ static void set_widest14(void)
 	}
 }
 
+/* 1.5's line with every field at its widest (32-bit longs, as the target) */
+static void set_widest15(void)
+{
+	rtl819x_sw_init_n = rtl819x_sw_init_n_ok = 0xFFFFFFFFUL;
+	rtl819x_sw_init_n_refused = rtl819x_sw_rst_n_busy = 0xFFFFFFFFUL;
+	rtl819x_sw_init_rc = INT_MIN;
+	rtl819x_sw_init_st = rtl819x_sw_init_on = 255;
+}
+
 static void pstat_line(void)
 {
 	printf("PSTAT rd=%d rd_insec=%d wr=%d wr_insec=%d illegal=%d "
 	       "sw_writes=%lu sw_refused=%lu sections=%d imbalance=%d depth=%d "
-	       "marks=%d mark=%s pcrp=%08X,%08X,%08X,%08X,%08X\n",
+	       "marks=%d mark=%s pcrp=%08X,%08X,%08X,%08X,%08X "
+	       "swrd=%d do_reset=%d cpuicr_rd=%d\n",
 	       pcrp_rd, pcrp_rd_insec, pcrp_wr, pcrp_wr_insec, pcrp_illegal,
 	       sw_n_writes, sw_n_refused, irq_sections, irq_imbalance,
 	       irq_depth, n_marks, last_mark[0] ? last_mark : "-", pcrp[0],
-	       pcrp[1], pcrp[2], pcrp[3], pcrp[4]);
+	       pcrp[1], pcrp[2], pcrp[3], pcrp[4], sw_rd_calls, n_do_reset,
+	       cpuicr_rd);
 }
 
 static void stat_line(void)
@@ -798,6 +879,26 @@ int main(void)
 			pstat_line();
 		} else if (!strcmp(line, "widest14")) {
 			set_widest14();
+		} else if (sscanf(line, "set cpuicr %li", &a) == 1) {
+			cpuicr = (u32)a;
+		} else if (sscanf(line, "set resetrc %ld", &a) == 1) {
+			do_reset_rc = (int)a;
+		} else if (!strncmp(line, "x ", 2)) {
+			/* the switch handler's reset branch, as
+			 * rtl819x-switch.c:636-640 writes it: two forms,
+			 * the recipe from buf[6], and count on success */
+			const char *b = line + 2;
+
+			if (!strcmp(b, "reset full") ||
+			    !strcmp(b, "reset vendor")) {
+				rc = rtl819x_sw_v15_reset(b[6] == 'v');
+				rc = rc ? rc : (int)strlen(b) + 1;
+			} else {
+				rc = -EINVAL;
+			}
+			printf("OP x %s -> %d\n", b, rc);
+		} else if (!strcmp(line, "widest15")) {
+			set_widest15();
 		} else {
 			printf("HARNESS unknown op: %s\n", line);
 			return 3;
@@ -940,7 +1041,7 @@ PAGE1 = 0x8000		# the fake's page-1 marker bit
 
 
 def boot_page(bound=10000):
-    lines = ["version rtl819x-switch 1.4", "unlocked 0", "bus 0 reg_rc 1",
+    lines = ["version rtl819x-switch 1.5", "unlocked 0", "bus 0 reg_rc 1",
              "bound %d" % bound, "mdio_rd 0", "mdio_wr 0",
              "mdio_to 0 busy 0 retry 0", "refused 0 wr_refused 0 again 0",
              "spin 0 0 0", "hi_or 00000000", "dirty 0", "scanned 00000000 j 0"]
@@ -980,7 +1081,7 @@ def cases(exe, block, version):
 
     # K1 boot
     r = track(Run(exe, ["init", "r", "stat"]))
-    ok = (r.rc == 0 and r.op(0) == 0 and version == "rtl819x-switch 1.4"
+    ok = (r.rc == 0 and r.op(0) == 0 and version == "rtl819x-switch 1.5"
           and r.pages[0][0] == boot_page() and r.stat(0, "nstores") == "0"
           and r.stat(0, "pde") == "1")
     yield "K1", ok, "boot page %s" % ("exact" if ok else repr(r.pages[:1])[:300])
@@ -1302,12 +1403,16 @@ def cases(exe, block, version):
 POSTJ = [0x007F0038, 0x047F0038, 0x087F0038, 0x0C7F0038, 0x107F0038]
 PHYUNLOCK = "v unlock phyif-i-mean-it"
 PERMIT = ["set swunlock 1", PHYUNLOCK]
+# 1.5 (R6b-8 8d): the `init` line before any call (rc 1: never called).
+INIT_BOOT = "calls 0 ok 0 refused 0 rc 1 stored 00 on 00 reset_busy 0"
 
 
 def lines14_boot():
+    """1.4's six boot lines, then the one 1.5 hooks after them."""
     return ("phyif unlocked 0 ok 0 stored 0 already 0 refused 0 idfail 0 "
             "rbfail 0\n" + "".join("phyif%d pre 00000000 rb 00000000 rc 1 st 0\n"
-                                   % n for n in range(5)))
+                                   % n for n in range(5))
+            + "init " + INIT_BOOT + "\n")
 
 
 def rwr(n, pre, rb=None, sec=None):
@@ -1539,17 +1644,259 @@ def cases14(exe, block):
     yield "K35", ok, "64 words, %s" % ("each stored as read with bit 0 set"
                                        if ok else "rcs/accesses differ")
 
-    # K36 the page's lines at their widest against the comment's figures
+    # K36 the page's lines at their widest against the comment's figures.
+    # 1.4's are the first six; 1.5's line after them is K46's.
     r = Run(exe, ["widest14", "l"])
     text, n = r.lines14[0] if r.lines14 else ("", -1)
     ls = text.split("\n")[:-1]
-    head = len(ls[0]) + 1 if ls else -1
-    per = {len(x) + 1 for x in ls[1:]}
+    l14 = ls[:6]
+    head = len(l14[0]) + 1 if l14 else -1
+    per = {len(x) + 1 for x in l14[1:]}
+    n14 = sum(len(x) + 1 for x in l14)
     fig = comment_figures14(block)
-    ok = (r.rc == 0 and len(ls) == 6 and len(per) == 1
-          and fig == (head, min(per) if per else -1, n) and n == len(text))
+    ok = (r.rc == 0 and len(l14) == 6
+          and all(x.startswith("phyif") for x in l14) and len(per) == 1
+          and fig == (head, min(per) if per else -1, n14) and n == len(text))
     yield "K36", ok, "comment %s, measured %d + 5 x %s = %d" % (
-        fig, head, sorted(per), n)
+        fig, head, sorted(per), n14)
+
+    # ---------------------------------------- 1.5: `init` and the guard
+    for item in cases15(exe, block):
+        yield item
+
+
+# 1.5 (R6b-8 8d).  The vendor-set state: bit 0 set on ports 0-4 by the
+# vendor's probe (量 bench/2026-09-28/AV-P03.log:9-13).
+VENDOR = [w | 1 for w in POSTJ]
+SWUNLOCK = "set swunlock 1"
+NINIT = len("init\n")
+CPUICR = 0xB8010000
+
+
+def line15(run, i):
+    """The rest of 1.5's `init` line in the i-th render."""
+    return run.line14(i, "init")
+
+
+def ld(v):
+    """The guard's CPUICR load, as the access log records it."""
+    return ("C", CPUICR, v)
+
+
+def rst(vendor):
+    """One call of the rtl819x_sw_do_reset stub, with its recipe."""
+    return ("X", 0x4204, vendor)
+
+
+def comment_figures15(block):
+    """(1.4's base, 1.4's total, 1.5's line, 1.5's base, 1.5's total) as the
+    two block comments state them, or None."""
+    body = " ".join(re.sub(r"^\s*/?\*+/?\s?", "", ln).strip()
+                    for ln in block.split("\n"))
+    m4 = re.search(r"1\.2's worst case of ([\d,]+) of 4,096 becomes ([\d,]+)",
+                   body)
+    m5 = re.search(r"(\d+) bytes \(tools/mdiocheck\.py K46 measures it\), so "
+                   r"1\.4's worst case of ([\d,]+) of 4,096 becomes ([\d,]+)",
+                   body)
+    if not (m4 and m5):
+        return None
+    return tuple(int(g.replace(",", "")) for g in m4.groups() + m5.groups())
+
+
+def cases15(exe, block):
+    """Yield (name, ok, detail) for K37..K46: 1.5's `init` and the guard."""
+    einval, eperm, ebusy = -ERRNO["EINVAL"], -ERRNO["EPERM"], -ERRNO["EBUSY"]
+    eproto, eio = -ERRNO["EPROTO"], -ERRNO["EIO"]
+    full = [a for n in range(5) for a in rwr(n, POSTJ[n])]
+    untried = "pre 00000000 rb 00000000 rc 1 st 0"
+
+    # K37 the switch locked: refused before any register read, counted in
+    # the `init` line and nowhere else -- and the phyif token does not open it
+    r = Run(exe, ["v init", "l", "pacc", "pstat", PHYUNLOCK, "v init", "l",
+                  "pacc", "pstat", "stat"])
+    ok = (r.rc == 0
+          and [x[1] for x in r.ops] == [eperm, len("unlock phyif-i-mean-it\n"),
+                                        eperm]
+          and line15(r, 0) == "calls 1 ok 0 refused 1 rc %d stored 00 on 00 "
+                              "reset_busy 0" % eperm
+          and line15(r, 1) == "calls 2 ok 0 refused 2 rc %d stored 00 on 00 "
+                              "reset_busy 0" % eperm
+          and acc(r, 0) == [] and acc(r, 1) == []
+          and r.pst(0, "swrd") == "0" and r.pst(1, "swrd") == "0"
+          and r.pst(1, "sw_refused") == "0" and r.pst(1, "wr") == "0"
+          and r.pst(0, "marks") == "0" and r.pst(1, "marks") == "1"
+          and r.pst(1, "mark") == "RLXFW-SW-PHYIF-UNLOCK"
+          and (r.line14(1, "phyif") or "").startswith("unlocked 1 ")
+          and all(r.line14(1, "phyif%d" % n) == untried for n in range(5))
+          and r.stat(0, "nstores") == "0")
+    yield "K37", ok, "ops %s, init %s" % ([x[1] for x in r.ops],
+                                          line15(r, 1))
+
+    # K38 init from the post-J state: exactly phyif all's accesses, one
+    # IRQs-off section a port; phyif's own token locked throughout
+    r = Run(exe, [SWUNLOCK, "v init", "pacc", "l", "l", "pstat", "stat"])
+    ports = all(r.line14(0, "phyif%d" % n) ==
+                "pre %08X rb %08X rc 0 st 1" % (POSTJ[n], POSTJ[n] | 1)
+                for n in range(5))
+    ok = (r.rc == 0 and r.op(0) == NINIT
+          and acc(r, 0) == full and one_section(r, 0, 3) and ports
+          and r.line14(0, "phyif") == "unlocked 0 ok 0 stored 5 already 0 "
+                                      "refused 0 idfail 0 rbfail 0"
+          and line15(r, 0) == "calls 1 ok 1 refused 0 rc 0 stored 1F on 1F "
+                              "reset_busy 0"
+          and len(r.lines14) == 2 and r.lines14[1] == r.lines14[0]
+          and r.pst(0, "rd") == "10" and r.pst(0, "wr") == "5"
+          and r.pst(0, "rd_insec") == "10" and r.pst(0, "wr_insec") == "5"
+          and r.pst(0, "swrd") == "10" and r.pst(0, "illegal") == "0"
+          and r.pst(0, "sw_writes") == "5" and r.pst(0, "imbalance") == "0"
+          and r.pst(0, "depth") == "0" and r.pst(0, "do_reset") == "0"
+          and r.pst(0, "cpuicr_rd") == "0" and r.pst(0, "marks") == "1"
+          and r.pst(0, "mark") == "RLXFW-SW-INIT=00001F1F"
+          and r.pst(0, "pcrp") == ",".join("%08X" % (v | 1) for v in POSTJ)
+          and r.stat(0, "nstores") == "0")
+    yield "K38", ok, "rc %s, %d accesses, mark %s" % (
+        r.op(0) if r.ops else "-", len(acc(r, 0) or []), r.pst(0, "mark"))
+
+    # K39 the vendor-set state: five reads, no store
+    r = Run(exe, [SWUNLOCK] + ["set pcrp %d 0x%08X" % (n, VENDOR[n])
+                               for n in range(5)]
+            + ["v init", "pacc", "l", "pstat"])
+    ok = (r.rc == 0 and r.op(0) == NINIT
+          and acc(r, 0) == [("R", 0x4104 + 4 * n, VENDOR[n]) for n in range(5)]
+          and one_section(r, 0, 1)
+          and all(r.line14(0, "phyif%d" % n) ==
+                  "pre %08X rb 00000000 rc 0 st 0" % VENDOR[n] for n in range(5))
+          and r.line14(0, "phyif") == "unlocked 0 ok 0 stored 0 already 5 "
+                                      "refused 0 idfail 0 rbfail 0"
+          and line15(r, 0) == "calls 1 ok 1 refused 0 rc 0 stored 00 on 1F "
+                              "reset_busy 0"
+          and r.pst(0, "wr") == "0" and r.pst(0, "sw_writes") == "0"
+          and r.pst(0, "mark") == "RLXFW-SW-INIT=0000001F"
+          and r.pst(0, "pcrp") == ",".join("%08X" % v for v in VENDOR))
+    yield "K39", ok, "accesses %s" % acc(r, 0)
+
+    # K40 port 2's word carries port 1's ExtPHYID: init stops there, and the
+    # `phyif all` before it leaves nothing in ports 3 and 4's lines
+    r = Run(exe, PERMIT + ["v phyif all"]
+            + ["set pcrp %d 0x%08X" % (n, POSTJ[n]) for n in range(5)]
+            + ["set pcrp 2 0x047F0038", "pacc", "v init", "pacc", "l", "pstat"])
+    want = rwr(0, POSTJ[0]) + rwr(1, POSTJ[1]) + [("R", 0x410C, 0x047F0038)]
+    ok = (r.rc == 0 and len(r.ops) == 3 and r.op(2) == eproto
+          and acc(r, 1) == want
+          and r.line14(0, "phyif0") == "pre %08X rb %08X rc 0 st 1"
+          % (POSTJ[0], POSTJ[0] | 1)
+          and r.line14(0, "phyif2") == "pre 047F0038 rb 00000000 rc %d st 0"
+          % eproto
+          and all(r.line14(0, "phyif%d" % n) == untried for n in (3, 4))
+          and r.line14(0, "phyif") == "unlocked 1 ok 1 stored 7 already 0 "
+                                      "refused 0 idfail 1 rbfail 0"
+          and line15(r, 0) == "calls 1 ok 0 refused 0 rc %d stored 03 on 03 "
+                              "reset_busy 0" % eproto
+          and r.pst(0, "mark") == "RLXFW-SW-INIT=00000303")
+    yield "K40", ok, "rc %s, accesses %d, phyif3 %s" % (
+        r.op(2) if len(r.ops) > 2 else "-", len(acc(r, 1) or []),
+        r.line14(0, "phyif3"))
+
+    # K41 bit 0 does not stick on port 1: init stops there
+    r = Run(exe, [SWUNLOCK, "set nostick 1 1", "v init", "pacc", "l", "pstat"])
+    want = rwr(0, POSTJ[0]) + rwr(1, POSTJ[1], rb=POSTJ[1])
+    ok = (r.rc == 0 and r.op(0) == eio and acc(r, 0) == want
+          and r.line14(0, "phyif1") == "pre %08X rb %08X rc %d st 1"
+          % (POSTJ[1], POSTJ[1], eio)
+          and all(r.line14(0, "phyif%d" % n) == untried for n in (2, 3, 4))
+          and r.line14(0, "phyif") == "unlocked 0 ok 0 stored 2 already 0 "
+                                      "refused 0 idfail 0 rbfail 1"
+          and line15(r, 0) == "calls 1 ok 0 refused 0 rc %d stored 03 on 01 "
+                              "reset_busy 0" % eio
+          and r.pst(0, "mark") == "RLXFW-SW-INIT=00000301")
+    yield "K41", ok, "rc %s phyif1 %s" % (r.op(0) if r.ops else "-",
+                                         r.line14(0, "phyif1"))
+
+    # K42 the phyif token is neither needed nor enough: (switch, phyif) over
+    # all four, from the post-J state each time
+    script = []
+    for sw, ph in ((0, 0), (0, 1), (1, 0), (1, 1)):
+        script += ["set swunlock %d" % sw,
+                   PHYUNLOCK if ph else "v lock phyif"]
+        script += ["set pcrp %d 0x%08X" % (n, POSTJ[n]) for n in range(5)]
+        script += ["pacc", "v init", "pacc"]
+    r = Run(exe, script + ["l"])
+    inits = [x[1] for x in r.ops if x[0] == "v init"]
+    ok = (r.rc == 0 and inits == [eperm, eperm, NINIT, NINIT]
+          and [acc(r, i) for i in (1, 3, 5, 7)] == [[], [], full, full]
+          and line15(r, 0) == "calls 4 ok 2 refused 2 rc 0 stored 1F on 1F "
+                              "reset_busy 0")
+    yield "K42", ok, "init rcs over (0,0) (0,1) (1,0) (1,1): %s" % inits
+
+    # K43 malformed forms: -EINVAL, no access, not an `init` call; then the
+    # permitted neighbour
+    bad = ["init ", " init", "INIT", "Init", "init all", "init 0", "initx",
+           "ini", "init\t", "init init"]
+    r = Run(exe, [SWUNLOCK] + ["v " + b for b in bad]
+            + ["pacc", "l", "v init", "pacc", "l"])
+    rcs = [x[1] for x in r.ops]
+    ok = (r.rc == 0 and rcs == [einval] * len(bad) + [NINIT]
+          and acc(r, 0) == [] and line15(r, 0) == INIT_BOOT
+          and acc(r, 1) == full
+          and line15(r, 1) == "calls 1 ok 1 refused 0 rc 0 stored 1F on 1F "
+                              "reset_busy 0")
+    yield "K43", ok, "%d refusals, rcs %s" % (
+        len(bad), rcs if rcs != [einval] * len(bad) + [NINIT] else "as written")
+
+    # K44 the guard refuses: TXCMD, RXCMD, both (C4000000, the armed word)
+    words = [0x80000000, 0x40000000, 0xC4000000]
+    script = [SWUNLOCK]
+    for w in words:
+        script += ["set cpuicr 0x%08X" % w, "x reset full", "x reset vendor"]
+    r = Run(exe, script + ["pacc", "pstat", "stat", "l"])
+    ok = (r.rc == 0 and [x[1] for x in r.ops] == [ebusy] * 6
+          and acc(r, 0) == [ld(w) for w in words for _ in (0, 1)]
+          and r.pst(0, "do_reset") == "0" and r.pst(0, "cpuicr_rd") == "6"
+          and r.pst(0, "swrd") == "0" and r.pst(0, "wr") == "0"
+          and r.pst(0, "sw_writes") == "0" and r.pst(0, "sw_refused") == "0"
+          and r.stat(0, "nstores") == "0"
+          and line15(r, 0) == "calls 0 ok 0 refused 0 rc 1 stored 00 on 00 "
+                              "reset_busy 6")
+    yield "K44", ok, "rcs %s, do_reset %s, init line %s" % (
+        [x[1] for x in r.ops], r.pst(0, "do_reset"), line15(r, 0))
+
+    # K45 the guard permits: 04000000 (after `disarm`) and 0; the recipe
+    # reaches rtl819x_sw_do_reset and its rc comes back
+    r = Run(exe, [SWUNLOCK, "set cpuicr 0x04000000", "x reset full",
+                  "x reset vendor", "set cpuicr 0", "x reset vendor",
+                  "x reset full", "set resetrc -1", "set cpuicr 0x04000000",
+                  "x reset vendor", "pacc", "pstat", "l"])
+    want = [ld(0x04000000), rst(0), ld(0x04000000), rst(1), ld(0), rst(1),
+            ld(0), rst(0), ld(0x04000000), rst(1)]
+    ok = (r.rc == 0
+          and [x[1] for x in r.ops] == [len("reset full\n"),
+                                        len("reset vendor\n"),
+                                        len("reset vendor\n"),
+                                        len("reset full\n"), eperm]
+          and acc(r, 0) == want
+          and r.pst(0, "do_reset") == "5" and r.pst(0, "cpuicr_rd") == "5"
+          and r.pst(0, "swrd") == "0"
+          and line15(r, 0) == INIT_BOOT)
+    yield "K45", ok, "rcs %s, accesses %s" % ([x[1] for x in r.ops],
+                                              acc(r, 0))
+
+    # K46 the `init` line at its widest against the block comment, and the
+    # page's running total: 1.2's base + 1.4's measured lines = 1.4's total
+    # = 1.5's base, + the measured line = 1.5's total, under the table's
+    # budget (3,600) and the page (4,096)
+    r = Run(exe, ["widest14", "widest15", "l"])
+    text, n = r.lines14[0] if r.lines14 else ("", -1)
+    ls = text.split("\n")[:-1]
+    n14 = sum(len(x) + 1 for x in ls[:6])
+    w15 = len(ls[6]) + 1 if len(ls) == 7 else -1
+    fig = comment_figures15(block)
+    ok = (r.rc == 0 and len(ls) == 7 and n == len(text)
+          and ls[6].startswith("init calls 4294967295 ok 4294967295 ")
+          and fig is not None
+          and fig[1] == fig[0] + n14 and fig[2] == w15
+          and fig[3] == fig[1] and fig[4] == fig[3] + w15
+          and fig[4] <= 3600 and fig[4] <= PAGE)
+    yield "K46", ok, "comment %s, measured 1.4 %d and 1.5 %d" % (fig, n14, w15)
 
 
 def build(block, version, work, tag):
@@ -1673,6 +2020,65 @@ MUTANTS = [
      "\t\t(void)rtl819x_sw_rd(RTL819X_SW_PCRP0 + 4 * n);\n"),
     ("M32", "a verb's results survive into the next verb's lines", "K28",
      "\t\trtl819x_phyif_res[n].rc = RTL819X_PHYIF_UNTRIED;\n", ""),
+    # 1.5 (R6b-8 8d): `init` and the reset guard
+    ("M33", "init without the lock check", "K37",
+     "\tif (!rtl819x_sw_unlocked) {\t/* the switch's unlock, and only it */",
+     "\tif (0) {"),
+    ("M34", "init reads a port before refusing", "K37",
+     "\trtl819x_sw_init_n++;\n\tif (!rtl819x_sw_unlocked) {",
+     "\trtl819x_sw_init_n++;\n\t(void)rtl819x_sw_rd(RTL819X_SW_PCRP0);\n"
+     "\tif (!rtl819x_sw_unlocked) {"),
+    ("M35", "the phyif token opens init", "K42",
+     "\tif (!rtl819x_sw_unlocked) {\t/* the switch's unlock, and only it */",
+     "\tif (!rtl819x_sw_unlocked && !rtl819x_phyif_unlocked) {"),
+    ("M36", "init asks the phyif token, not the switch's", "K42",
+     "\tif (!rtl819x_sw_unlocked) {\t/* the switch's unlock, and only it */",
+     "\tif (!rtl819x_phyif_unlocked) {"),
+    ("M37", "init goes on past a failed port", "K40",
+     "\t\tif (rc)\n\t\t\tbreak;\t\t/* the first port that fails ends it */\n"
+     "\t\ton |= 1u << p;",
+     "\t\tif (!rc)\n\t\t\ton |= 1u << p;"),
+    ("M38", "init leaves the last verb's results in the lines", "K40",
+     "\t\tr = &rtl819x_phyif_res[p];\n\t\tr->pre = r->rb = 0;\n"
+     "\t\tr->rc = RTL819X_PHYIF_UNTRIED;\n\t\tr->st = 0;\n",
+     "\t\tr = &rtl819x_phyif_res[p];\n\t\t(void)r;\n"),
+    ("M39", "a port already set is stored again, seen by init", "K39",
+     "\t} else if (r->pre & RTL819X_PCRP_ENPHYIF) {", "\t} else if (0) {"),
+    ("M40", "1.4 no longer hands `init` to 1.5", "K38",
+     "\t\treturn rtl819x_sw_v15_write(buf, count);\t/* 1.5 */",
+     "\t\t(void)rtl819x_sw_v15_write;\n\t\treturn -EINVAL;"),
+    ("M41", "the `init` line is not on the page", "K24",
+     "\treturn len + rtl819x_sw_v15_lines(page + len);\t/* 1.5 */",
+     "\t(void)rtl819x_sw_v15_lines;\n\treturn len;"),
+    ("M42", "the guard tests TXCMD alone", "K44",
+     "\tif (icr & (RTL819X_CPUICR_TXCMD | RTL819X_CPUICR_RXCMD)) {",
+     "\tif (icr & RTL819X_CPUICR_TXCMD) {"),
+    ("M43", "the guard tests RXCMD alone", "K44",
+     "\tif (icr & (RTL819X_CPUICR_TXCMD | RTL819X_CPUICR_RXCMD)) {",
+     "\tif (icr & RTL819X_CPUICR_RXCMD) {"),
+    ("M44", "the guard refuses on any CPUICR bit", "K45",
+     "\tif (icr & (RTL819X_CPUICR_TXCMD | RTL819X_CPUICR_RXCMD)) {",
+     "\tif (icr) {"),
+    ("M45", "the guard after a write: SSIR stored first", "K44",
+     "\tif (icr & (RTL819X_CPUICR_TXCMD | RTL819X_CPUICR_RXCMD)) {",
+     "\t(void)rtl819x_sw_wr(RTL819X_SW_SSIR, RTL819X_SW_FULL_RST);\n"
+     "\tif (icr & (RTL819X_CPUICR_TXCMD | RTL819X_CPUICR_RXCMD)) {"),
+    ("M46", "the reset entered before the guard's test", "K44",
+     "\tif (icr & (RTL819X_CPUICR_TXCMD | RTL819X_CPUICR_RXCMD)) {\n"
+     "\t\trtl819x_sw_rst_n_busy++;\n\t\treturn -EBUSY;\n\t}\n"
+     "\treturn rtl819x_sw_do_reset(vendor_recipe);",
+     "\tif (!rtl819x_sw_do_reset(vendor_recipe) &&\n"
+     "\t    (icr & (RTL819X_CPUICR_TXCMD | RTL819X_CPUICR_RXCMD))) {\n"
+     "\t\trtl819x_sw_rst_n_busy++;\n\t\treturn -EBUSY;\n\t}\n\treturn 0;"),
+    ("M47", "the guard loads CPUICR through rtl819x_sw_rd", "K44",
+     "\tu32 icr = __raw_readl((void __iomem *)KSEG1ADDR(RTL819X_CPUICR_PHYS));",
+     "\tu32 icr = rtl819x_sw_rd((unsigned int)RTL819X_CPUICR_PHYS -\n"
+     "\t\t\t\tRTL819X_SW_PHYS);"),
+    ("M48", "a refused reset is not counted", "K44",
+     "\t\trtl819x_sw_rst_n_busy++;\n\t\treturn -EBUSY;", "\t\treturn -EBUSY;"),
+    ("M49", "a refused init is not counted", "K37",
+     "\t\trtl819x_sw_init_n_refused++;\n\t\trtl819x_sw_init_rc = -EPERM;",
+     "\t\trtl819x_sw_init_rc = -EPERM;"),
 ]
 
 
@@ -1689,7 +2095,7 @@ def main():
     block, version = extract(open(a.source, encoding="utf-8").read())
     work = a.keep or tempfile.mkdtemp(prefix="mdiocheck-")
     os.makedirs(work, exist_ok=True)
-    print("mdiocheck 1.1")
+    print("mdiocheck 1.2")
     print("  source  %s  (block %d lines, version %r)"
           % (a.source, block.count("\n"), version))
     try:

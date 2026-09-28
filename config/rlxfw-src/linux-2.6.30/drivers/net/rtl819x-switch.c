@@ -115,7 +115,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_SW_VERSION	"rtl819x-switch 1.4"
+#define RTL819X_SW_VERSION	"rtl819x-switch 1.5"
 
 /* 0xBB800000 through KSEG1.  讀 `rtl865xc_asicregs.h:147,171`:
  * `REAL_SWCORE_BASE 0xBB800000`, and `SWCORE_BASE` takes it in every build
@@ -566,7 +566,7 @@ static int rtl819x_sw_read_proc(char *page, char **start, off_t off,
 	*eof = 1;
 	return len;
 }
-
+static int rtl819x_sw_v15_reset(int vendor_recipe);	/* 1.5, below */
 static int rtl819x_sw_verb_diff(int a, int b)
 {
 	unsigned int i, n = 0;
@@ -634,7 +634,7 @@ static int rtl819x_sw_write_proc(struct file *file, const char __user *ubuf,
 		return rc ? rc : (int)count;
 	}
 	if (!strcmp(buf, "reset full") || !strcmp(buf, "reset vendor")) {
-		int rc = rtl819x_sw_do_reset(buf[6] == 'v');
+		int rc = rtl819x_sw_v15_reset(buf[6] == 'v');	/* 1.5 */
 
 		return rc ? rc : (int)count;
 	}
@@ -1589,7 +1589,7 @@ static int rtl819x_phyif_port(unsigned int n)
 	r->rc = rc;
 	return rc;
 }
-
+static int rtl819x_sw_v15_write(const char *buf, unsigned long count); /* 1.5 */
 /* From the switch's write handler, which has stripped the trailing CR and
  * LF, for every write none of its own verbs took. */
 static int rtl819x_sw_v14_write(const char *buf, unsigned long count)
@@ -1614,7 +1614,7 @@ static int rtl819x_sw_v14_write(const char *buf, unsigned long count)
 		   buf[6] < '0' + RTL819X_PHYIF_NPORT && buf[7] == '\0') {
 		lo = hi = (unsigned int)(buf[6] - '0');
 	} else {
-		return -EINVAL;
+		return rtl819x_sw_v15_write(buf, count);	/* 1.5 */
 	}
 	if (!rtl819x_phyif_unlocked) {
 		rtl819x_phyif_n_refused++;
@@ -1640,7 +1640,7 @@ static int rtl819x_sw_v14_write(const char *buf, unsigned long count)
 	rlxfw_markx("SW-PHYIF", (stored << 8) | on);
 	return rc ? rc : (int)count;
 }
-
+static int rtl819x_sw_v15_lines(char *page);	/* 1.5, below */
 static int rtl819x_sw_v14_lines(char *page)
 {
 	const struct rtl819x_phyif_res *r;
@@ -1658,5 +1658,208 @@ static int rtl819x_sw_v14_lines(char *page)
 		len += sprintf(page + len, "phyif%u pre %08X rb %08X rc %d st %u\n",
 			       n, r->pre, r->rb, r->rc, (unsigned int)r->st);
 	}
-	return len;
+	return len + rtl819x_sw_v15_lines(page + len);	/* 1.5 */
+}
+
+/* ========================================================================
+ * 1.5 (R6b-8 8d): `init`, 1.4'S PORT LOOP UNDER THE SWITCH'S OWN UNLOCK,
+ * WHICH THE STANDARD /init TYPES; AND `reset` REFUSED WHILE THE CPU PORT'S
+ * DMA ENGINE IS ON.
+ *
+ * Appended, as 1.2, 1.3 and 1.4 were.  Above this block the version string,
+ * the reset branch of the switch's write handler and 1.4's two ends -- its
+ * handler's `return -EINVAL` and its page lines' `return len` -- changed in
+ * place, and three lines that were blank hold three prototypes, so no line
+ * above moves (FW-110).
+ *
+ * WHY `init`.  Arm II pinged neither way on the loader's switch state and
+ * both ways once `phyif all` had set EnablePHYIf in PCRP0-PCRP4 (量
+ * notes/switch-driver.md section 16.7, SPEC.md NET-164): the bit the
+ * loader's `J` clears (1.4's WHY), which no vendor probe sets again on a
+ * SWCORE=n image.  The product cannot rely on a typed verb, so the standard
+ * /init (config/rlxfw-init.sh) types `init` between `unlock i-mean-it` and
+ * `start`.  That is the image's boot policy, as the LAN bring-up already is
+ * (P2-2): `init` is a verb, so this driver still writes nothing at boot on
+ * its own, and the header's item 2 is a statement about the driver, not
+ * about /init.  Why not a store at subsys_initcall instead: every boot of
+ * the quiet /init, and of any image without the new /init, stays what it
+ * was, and the switch keeps one guarded write path.
+ *
+ * THE SOURCES FOR `init`.  It stores nothing 1.4 does not: the same bit,
+ * found the same way, through the same rtl819x_phyif_port() -- two sources
+ * and a measurement for EnablePHYIf and three for the ExtPHYID identity
+ * check (1.4's THE BIT and THE IDENTITY CHECK).  What it will read: on
+ * SWCORE=n the post-`J` word, nn7F0038 on ports 0-4 (量
+ * bench/2026-09-28/M2-SW.log:39-43, live equal to slot 0), so five stores;
+ * on SWCORE=y the word the vendor's probe left before /init runs, nn7F0039
+ * (量 AV-P03.log:9-13 in the same directory), so five `already` and no
+ * store.
+ *
+ * WHY THE `reset` GUARD.  `reset full` and `reset vendor` assert FULL_RST,
+ * "Reset all tables & queues" (this file's header), and the CPU port's DMA
+ * engine -- another block, CPU_IFACE at 0xB8010000 -- moves frames between
+ * those queues and descriptor rings in DRAM.  What a reset does to an
+ * engine that is running is unmeasured (推: frames lost at best, at worst an
+ * engine left on a descriptor the reset orphaned), and the `reset vendor` of
+ * notes/switch-driver.md section 16.3 was typed only after `disarm`, by
+ * hand.  So both verbs refuse -EBUSY, counted in `reset_busy`, before any
+ * write -- SSIR and SYS_CLK_MAG untouched, rtl819x_sw_do_reset() not
+ * entered -- while CPUICR has TXCMD or RXCMD set.
+ *
+ * THE SOURCES FOR CPUICR.  The address, 0xB8010000: B `:491`-`:492`
+ * (`CPU_IFACE_BASE (SYSTEM_BASE+0x10000)`, `CPUICR (0x000 +
+ * CPU_IFACE_BASE)`), with REAL_SYSTEM_BASE 0xB8000000 at `:148`.  The bits:
+ * B `:527`-`:528`, `TXCMD (1 << 31)` "Enable Tx" and `RXCMD (1 << 30)`
+ * "Enable Rx" -- the lines rtl819x-nic.c cites for NIC_TXCMD and NIC_RXCMD,
+ * in drivers/net/rtl819x/AsicDriver/ of the drop rlxfw-kbuild.sh stages.
+ * 量, the word on this die: C4000000 with rlxfw's NIC armed and its engine
+ * on (a `peek`, bench/2026-09-28/M6-VP5.log:8; the NIC's own mark
+ * RLXFW-N-ENGON=C4000000, AN-N2.log:6), and 04000000 after `disarm` (the
+ * NIC page's `now_icr`, AR-NIC.log:49; a `peek`, AR-C0.log:8).  So the test
+ * is the two bits and not the word: bit 26 (MBUF_2048BYTES, 4 << 24, B
+ * :537) stays set after `disarm`, and a guard on any set bit would never
+ * permit.  The load is a direct KSEG1 load, outside the switch window, as
+ * SYS_CLK_MAG's are in rtl819x_sw_do_reset(): rtl819x_sw_rd() reads
+ * 0xBB800000 + off, and `n_reads` counts the switch window's reads only.
+ *
+ * A CHECK, NOT A LOCK.  The load is one instant, and a reset lasts at least
+ * 300 ms of mdelay() with IRQs on.  What sets TXCMD and RXCMD is
+ * rtl819x-nic (讀): its /proc verbs and `ifconfig rlx0 up` run in process
+ * context and cannot run inside this verb (UP, PREEMPT_NONE: 1.2's #error);
+ * its s99a recovery timer runs in softirq and can, but only while the NIC
+ * is armed -- after `disarm`, nic_do_engine() refuses -ENXIO.  So the state
+ * this protects is the one `disarm` leaves.  `engine off` also clears the
+ * two bits (讀: it clears them alone) but leaves the NIC armed, so a reset
+ * after it is permitted and not protected from that timer.  On SWCORE=y the
+ * vendor's driver owns the engine, and what its timers do is not read here.
+ *
+ * THE VERBS, on /proc/rtl819x-switch.  1.4 hands this block every write
+ * none of its forms took; anything else is -EINVAL, as before.
+ *   init           the switch's own unlock (`unlock i-mean-it`) and
+ *                  nothing else: locked, -EPERM before any register is
+ *                  read, counted in `refused`; the phyif class token is
+ *                  neither needed nor enough.  Unlocked: the five per-port
+ *                  results reset, then rtl819x_phyif_port() for ports 0,
+ *                  1, 2, 3, 4 in that order, stopping at the first that
+ *                  fails -- `phyif all`'s loop.  Its per-port results are
+ *                  therefore the phyifN lines, and its stores, `already`s
+ *                  and failures count in the phyif line, as a `phyif`
+ *                  verb's do; only that line's `ok` is phyif's own.  The
+ *                  mark is RLXFW-SW-INIT=, the stored ports in bits 12:8
+ *                  and the ports verified set in 4:0, SW-PHYIF's packing.
+ *                  Nothing else: no reset, no VLAN-group write, no EEECR,
+ *                  QNUMCR or MSCR, no MDIO.
+ *   reset full     the switch's own verbs, unchanged but for the guard in
+ *   reset vendor   front of them: its handler calls rtl819x_sw_v15_reset().
+ *
+ * THE PAGE.  One line, after 1.4's and so before the register table, whose
+ * last line stays the page's last line:
+ *   init calls C ok K refused R rc D stored SS on OO reset_busy B
+ * every `init` (refused ones included), those that returned 0, those the
+ * lock refused, the last one's rc (1: never called; -1 for a refusal), the
+ * last one's stored and verified-set masks (00 after a refusal), and the
+ * resets the guard refused.  Cached values: a `cat` reads no register for
+ * it.  Walked from the format, every field at its widest (a 32-bit %lu 10
+ * digits, %d 11, a u8 mask 2): 108 bytes (tools/mdiocheck.py K46 measures
+ * it), so 1.4's worst case of 2,483 of 4,096 becomes 2,591, and the
+ * table's budget (3,600) still never ends the page.
+ *
+ * WHAT A STANDARD BOOT NOW DOES (推, from the code; arm I reads it).  On
+ * SWCORE=n /init's `init` reads PCRP0-PCRP4, stores five words and reads
+ * them back: `n_writes` after the boot goes from 1 (`start`'s store; 量
+ * `n_writes 1` on standard-/init boots, e.g. bench/2026-09-26b/X-SW1.log)
+ * to 6, `n_reads` gains 10, and the boot capture gains one mark line,
+ * RLXFW-SW-INIT=00001F1F -- 24 bytes in tools/bootbytes.py's model
+ * (17 + 7), if it does not interleave with /init's own output as SW-UNLOCK's
+ * does.  On SWCORE=y: no store, 5 reads, RLXFW-SW-INIT=0000001F.  The quiet
+ * /init types none of this.
+ *
+ * WHAT IT DOES NOT DO.  Write any other switch register or any table: the
+ * VLAN group, EEE and QNUMCR's CPU field stay as they were before /init --
+ * the loader's on SWCORE=n, the vendor's probe's on SWCORE=y
+ * (notes/switch-driver.md section 16.8 lists them).  Undo itself (nothing
+ * here clears the bit; `J` does).  Run at subsys_initcall.  The guard does
+ * not stop the NIC, does not wait for it, and covers neither `start`,
+ * `dumb` nor `restore`.  Nor does any of this say that five bits set bring
+ * the LAN up on a boot arm II did not run: that is arm I's to read.
+ */
+#define RTL819X_CPUICR_PHYS		0x18010000	/* B :491-:492 */
+#define RTL819X_CPUICR_TXCMD		(1u << 31)	/* B :527 */
+#define RTL819X_CPUICR_RXCMD		(1u << 30)	/* B :528 */
+
+static unsigned long rtl819x_sw_init_n, rtl819x_sw_init_n_ok;
+static unsigned long rtl819x_sw_init_n_refused, rtl819x_sw_rst_n_busy;
+static int rtl819x_sw_init_rc = RTL819X_PHYIF_UNTRIED;	/* 1: never called */
+static u8 rtl819x_sw_init_st, rtl819x_sw_init_on;	/* the last masks */
+
+/* `reset full` and `reset vendor`, from the switch's write handler: the
+ * test, then 1.0's reset.  Nothing is written before the test. */
+static int rtl819x_sw_v15_reset(int vendor_recipe)
+{
+	u32 icr = __raw_readl((void __iomem *)KSEG1ADDR(RTL819X_CPUICR_PHYS));
+
+	if (icr & (RTL819X_CPUICR_TXCMD | RTL819X_CPUICR_RXCMD)) {
+		rtl819x_sw_rst_n_busy++;
+		return -EBUSY;
+	}
+	return rtl819x_sw_do_reset(vendor_recipe);
+}
+
+/* `init`: 1.4's `phyif all` under the switch's own unlock. */
+static int rtl819x_sw_v15_init(void)
+{
+	struct rtl819x_phyif_res *r;
+	unsigned int p, stored = 0, on = 0;
+	int rc = 0;
+
+	rtl819x_sw_init_n++;
+	if (!rtl819x_sw_unlocked) {	/* the switch's unlock, and only it */
+		rtl819x_sw_init_n_refused++;
+		rtl819x_sw_init_rc = -EPERM;
+		rtl819x_sw_init_st = rtl819x_sw_init_on = 0;
+		return -EPERM;
+	}
+	/* The lines show this verb's results and no earlier verb's. */
+	for (p = 0; p < RTL819X_PHYIF_NPORT; p++) {
+		r = &rtl819x_phyif_res[p];
+		r->pre = r->rb = 0;
+		r->rc = RTL819X_PHYIF_UNTRIED;
+		r->st = 0;
+	}
+	for (p = 0; p < RTL819X_PHYIF_NPORT; p++) {
+		rc = rtl819x_phyif_port(p);
+		if (rtl819x_phyif_res[p].st)
+			stored |= 1u << p;
+		if (rc)
+			break;		/* the first port that fails ends it */
+		on |= 1u << p;
+	}
+	if (!rc)
+		rtl819x_sw_init_n_ok++;
+	rtl819x_sw_init_rc = rc;
+	rtl819x_sw_init_st = (u8)stored;
+	rtl819x_sw_init_on = (u8)on;
+	rlxfw_markx("SW-INIT", (stored << 8) | on);	/* SW-PHYIF's packing */
+	return rc;
+}
+
+/* From 1.4's handler, for every write none of 1.4's forms took. */
+static int rtl819x_sw_v15_write(const char *buf, unsigned long count)
+{
+	int rc;
+
+	if (strcmp(buf, "init"))
+		return -EINVAL;
+	rc = rtl819x_sw_v15_init();
+	return rc ? rc : (int)count;
+}
+
+static int rtl819x_sw_v15_lines(char *page)
+{
+	return sprintf(page, "init calls %lu ok %lu refused %lu rc %d "
+		       "stored %02X on %02X reset_busy %lu\n",
+		       rtl819x_sw_init_n, rtl819x_sw_init_n_ok,
+		       rtl819x_sw_init_n_refused, rtl819x_sw_init_rc,
+		       (unsigned int)rtl819x_sw_init_st,
+		       (unsigned int)rtl819x_sw_init_on, rtl819x_sw_rst_n_busy);
 }
