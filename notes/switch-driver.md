@@ -3075,7 +3075,7 @@ when either exists.
    offset.
 2. **Read-to-clear**, `AV-VM1` against `AV-VM2`: equal and all zero, so vacuous. **Instrument
    gap:** `viewdecode decode --one-boot` compares only a page's own counters (`COUNTS`,
-   `tools/viewdecode.py:490`; `one_boot`, `:809`–`:825`), never the MIB words, so it could not have
+   `tools/viewdecode.py:567`; `one_boot`, `:998`–`:1014`), never the MIB words, so it could not have
    shown `VM2` < `VM1`; and it voided the `VM2` → `AX` pair on a `jiffies` wrap.
 3. **The `…b` double reads**, 16 words: all equal (量). Blind to a side effect on a zero word.
 4. **The tables**: the design's prediction met exactly; 48 slot reads `t1 eq`, no `mis` and no
