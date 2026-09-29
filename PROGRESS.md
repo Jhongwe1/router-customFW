@@ -13,17 +13,17 @@ the work (house rule 6).
 
 | | |
 |---|---|
-| **Active gate** | **None.** **`R6b` closed 2026-09-28** in seven segments (110th–116th; `docs/GATE-RESULTS.md` entry 14); its step list, at the end of this file, is now a record. Booked, not opened: **`R1y`** (the record's maintainability, including this file's restructure). Which gate opens next is the owner's decision. Closed gates and their evidence are on § Gate board. |
-| **Active step** | None: no gate is open. `R6b`'s last two steps closed 2026-09-28 — `R6b-8` (8d, arm I, and 8g at `18c9068`) and `R6b-9` (entry 14). |
+| **Active gate** | **`R1y`** — the record's maintainability, desk only. **Opened 2026-09-30** by the owner; its step list, which owns each step's state, is at the end of this file. **`R6b` closed 2026-09-28** in seven segments (110th–116th; `docs/GATE-RESULTS.md` entry 14). Closed gates and their evidence are on § Gate board. |
+| **Active step** | `R1y-1`, `R1y-2`, `R1y-3` and `R1y-6`, run in parallel from 2026-09-30, each in its own throwaway clone; `R1y-0`, the list, is done. |
 | **Session history** | `LOG.md`, one dated entry per segment. What this table said until 2026-09-23 is archived verbatim in `docs/history/progress-now.md`. |
-| **Next after this** | 🔄 **2026-09-28（第一百一十六段）**: `R6b` closed. Entry 14's operating clause fires, so by its own words the next gate is the mechanism of `rlx0`'s transmit fault — its doable part is `M5`, one press and no image; opening it, recording it as not doable on this bench, or opening another gate (`R1y` is booked) is the owner's decision. The mainline builds `SWCORE=n` since 8g, so `R9` builds `quiet-swcore` (`docs/KNOWN-ISSUES.md`). <!-- C12: between gates, no step id --> |
-| **Blocked on** | Nothing. Waiting on the owner, blocking no step: `CLAUDE.md` § Flash has every press claim rlxfw's `n_writes`, which carries no information (`FW-142`); `MK6`, `MK7` and `MK9`'s witnesses cannot fail, nor `MK10`'s on a standard-`/init` image (`FW-143`); the no-unattended-standby rule is `NET-165`'s, not yet `CLAUDE.md`'s; `CLK-42` 殘留 waits for a gate; and the main session's rulings in `R6b` listed in entry 14 stand unless the owner overrides them. |
+| **Next after this** | 🔄 **2026-09-30（第一百一十七段）**: `R1y-4`, the move, once `R1y-1` has named what it breaks. Entry 14's operating clause still names the mechanism of `rlx0`'s transmit fault as the next gate by its own rule; the owner opened `R1y` first, and that gate is not opened. The mainline builds `SWCORE=n` since 8g, so `R9` builds `quiet-swcore` (`docs/KNOWN-ISSUES.md`). |
+| **Blocked on** | Nothing. Waiting on the owner, blocking no step: `CLAUDE.md` § Flash has every press claim rlxfw's `n_writes`, which carries no information (`FW-142`); `MK6`, `MK7` and `MK9`'s witnesses cannot fail, nor `MK10`'s on a standard-`/init` image (`FW-143`); `CLK-42` 殘留 waits for a gate; and the main session's rulings in `R6b` listed in entry 14 stand unless the owner overrides them. |
 
-**Step list for the active gate**: none is open. The next gate's list goes at
-the **end** of this file, after `R6b`'s, as `P2`'s and `R6b`'s did: an insertion
-above § Gate board moves line-number citations that frozen bench artefacts and
-`LOG.md` cannot have repaired (`SPEC.md` `FW-110`). Closed gates' step lists stay
-where they are until `R1y` moves them, verbatim, to files of their own.
+**Step list for the active gate**: `R1y`'s, at the **end** of this file, after
+`R6b`'s, as `P2`'s and `R6b`'s were: an insertion above § Gate board moves
+line-number citations that frozen bench artefacts and `LOG.md` cannot have
+repaired (`SPEC.md` `FW-110`). Closed gates' step lists stay where they are
+until `R1y-4` moves them, verbatim, to files of their own.
 
 **How to read § Now.** It holds current state only: a few sentences per row,
 rewritten each segment rather than appended to. What a row used to say is in
@@ -1812,7 +1812,7 @@ Status: `·` not started · `~` in progress · `✓` closed (needs an evidence l
 | **P4b-gate** 🆕 | 🔴 **The part of `P4b` that blocks tagging, pulled forward — and it exists because `CHARTER.md` §110's release obligations are owned by NO gate while `P4b` itself sits at v1.0.** Same split shape as `R1-gate` out of `R1`: only the part that blocks anything downstream moves. **Four things, and closing it means all four have a committed owner**, not that they are all done: ① version → contents has ONE committed owner (量 2026-09-01: `CHARTER.md` §88 and this file's Release clock disagree on **six of six** shared rows, and the authoritative one is in `plan/`, which is gitignored — so a public reader can follow neither); ② `v0.1` and `v0.2` each have a CHANGELOG section and a known-issues list, ready to tag; ③ `study/weekly-results.md` is READABLE from the public repository (量: `study/` is gitignored and `git ls-files study/` returns nothing, so §110 rule 3's artefact is invisible even when written) and holds one entry per closed gate; ④ non-text artefacts — the 60-second take — have a declared home, since video is not committed here. 🔴 **Tagging is NOT in this gate.** A tag is outward-facing and effectively irreversible; the owner has ruled that it waits for their word **and** for the take to be shot. **Opened 2026-09-01** on the owner's decision against `REL-0`. 🟡 **Three of the four DoD rows are met the same day** — `D1` for the released versions, `D3` and `D4` — and **`D2` is not**: the owner ruled that `study/` stays gitignored, which settles that row's visibility half and leaves four owed entries. 🔴 **A gate whose DoD has an unmet row is not closed**, and this one is not ✅ **CLOSED 2026-09-01**, and it closes on all four steps rather than on a stop-loss. The four things that had no owner have one: version → contents is `README.md`'s (`P4b-1`), the per-gate ledger is `docs/GATE-RESULTS.md` (`P4b-2`), the known-issues list is `docs/KNOWN-ISSUES.md` and the release exists (`P4b-3`), and the take's home is named in two committed files (`P4b-4`). 🔴 **Two of its DoD rows carry a recorded defect**: `D2` named a path (`study/weekly-results.md`) instead of a property, and the property was unreachable at that path; `D3` is met *per released version* and not *per version*, which is `REL-2`. 🔴 **And two items stay open UNDER this gate rather than being folded into its closure**: `REEL-1` (62.2 s against a 60 s spec) and `IMG-1` (the release ships no image) | 2 | **2** | **`✓`** | `docs/GATE-RESULTS.md` · `docs/KNOWN-ISSUES.md` · `README.md` § *Which gates make which version* · the step list above, read one row at a time · <https://github.com/Jhongwe1/router-customFW/releases/tag/v0.2> |
 | **P4b** | complete GPL release (corresponding source, written offer, per-file modification record) + release process | 2 | — | `·` | |
 | **R6b** ✅ | `rlx0`'s TX loss fixed first, then what `R6` left without an owner. **Booked 2026-09-23 by the owner to follow `P2`; opened 2026-09-25 beside it (`LOG.md` 第一百一十段)**, block 45 its first bench block; its step list is at the end of this file. ✅ **CLOSED 2026-09-28**, ten steps closed and the eleventh, `R6b-1`, ⊘ as a failed reproduction by the gate's own clause. `D1`–`D4` and `D6`–`D8` met, `D5` met with one ⊘, the 1,472-B rtt mdev (`NET-121`), by a ruling the owner may override. The loss was the descriptor lengths: the vendor's convention clears it at every length on the wire on two boots with 1.4's failing beside it, and `rtl819x-nic` 1.6 makes it the default; `rlx0` pings both ways on a `SWCORE=n` image, the mainline's configuration since 8g (`18c9068`; `R9` builds `quiet-swcore`). The fourteen-entry operating clause **fires**, on the mechanism of the transmit fault. ⚠️ No plan row, so no 小計 and no calibration point; seven segments, the 110th and 111th shared with `P2`, and nineteen power-ons | — | **7** | **`✓`** | `docs/GATE-RESULTS.md` 2026-09-28, the fourteenth entry · `notes/nic-driver.md` §§ 21–30 · `notes/switch-driver.md` §§ 9–18 · `docs/nic-vendor-diff.md` § 16 · `SPEC.md` `NET-119`–`NET-169`, `CLK-49`, `FW-142`–`FW-157` · `docs/KNOWN-ISSUES.md`, 8g's `R9` entry |
-| **R1y** 🆕 | **Booked 2026-09-23 by the owner, to follow `P2`; not opened.** The record's maintainability: `SPEC.md` § 17's owner column checked for liveness (`FW-111`); `cfcensus check` comparing the blocks it generates; the `FW-109` and cite-by-id enforcers; and `PROGRESS.md`/`SPEC.md` restructured into state, record and finding documents under a size ratchet, with closed step lists, history and closed rows moved verbatim and a resolver for frozen line citations. Desk only | — | — | `·` | |
+| **R1y** 🆕 | **Opened 2026-09-30 by the owner** (booked 2026-09-23, to follow `P2`); step list at the end of this file. The record's maintainability: `PROGRESS.md` restructured into state and record under a size ratchet, with closed step lists, history and closed rows moved verbatim and a resolver for frozen line citations; `TOOL-2`'s three instrument defects; `SPEC.md` § 17's owner column repaired once. The four enforcers the booking named are ⊘ by the owner's rule of 2026-09-26 (step list, *Scope*). Desk only; stop-loss three segments | — | — | `~` | |
 | | | **200** | | | |
 
 🔄 **198 → 200 on 2026-09-01**, and the ORDER matters: the number was written as 198+2 and then CHECKED by summing the column, which is backwards and is recorded that way. The sum is **200 over 18 rows**, with `R1h` deliberately uncosted (its budget lives in its own step list). The paragraphs below say why this column is not a quantity; that is a reason to delete it, not a reason to let its arithmetic drift.
@@ -2864,3 +2864,98 @@ Derived questions — the plan has no `R6b`:
   `port_status` and `eth4`.
 * `R6`'s third question returns — *`OWN` 位元的寫入順序錯了會怎樣，你怎麼測出來？*
   — and M3's descriptor read-back is its measurement.
+
+## `R1y`'s step list — opened 2026-09-30
+
+**Gate:** the record's maintainability (§ Gate board, row `R1y`), desk only.
+**Opened** 2026-09-30 by the owner (`LOG.md` 第一百一十七段). **Stop-loss: three
+segments** (117th–119th), the owner's, who expects one. The owner's relaxation
+of 2026-09-27 carries over (no frozen cards, predictions where they are
+needed); the flash rules do not relax, and no step touches the board.
+
+**This list is at the end of the file** (`FW-110`), and `R1y-4` moves every
+closed list above it into files of their own.
+
+### Scope, as booked and as ruled at opening
+
+The row booked on 2026-09-23 names four enforcers. The owner's rule of
+2026-09-26 — no new checker unless it blocks bricking, an `H601` leak or a
+misjudged result — came after the booking and decides them:
+
+* **⊘, each this sentence and not a tool:** the `FW-109` enforcer (a quoted
+  string beside a `FILE:NNN` must occur at that line); a cite-by-id enforcer;
+  a liveness check on `SPEC.md` § 17's owner column (`FW-111` ①); `cfcensus
+  check` comparing the blocks it generates (`FW-111` ②). None blocks one of
+  the three. What they would have enforced is repaired once instead: § 17 by
+  `R1y-6`, the generated block by `cfcensus write` at this gate's close.
+* **Kept:** `TOOL-2`'s three defects, repairs to existing instruments —
+  `FW-137` a misjudged result, `FW-138` an exemption wider than its reason in
+  the `H601` auditor, `FW-139` two comments; the resolver, which reads and does
+  not check; the restructure.
+* **`SPEC.md`: § 17's owner column only** (the owner, 2026-09-30). No row is
+  rewritten and § 19 is not re-sectioned in this gate.
+
+### What the gate starts from
+
+量 at `7c4c694`, by `awk` over the level-2 headings: `PROGRESS.md` is 1,018,554
+bytes — § Now with its preamble 5.5 K, the fourteen closed step lists about
+430 K, § Session ladder 199 K, § Carried forward 249 K, § Corrections 93 K,
+§ Gate board 30 K. `SPEC.md` is 1,410,196 bytes in 821 rows. `FW-110` counted 77
+line citations into `PROGRESS.md` at `f557873` — 15 in frozen bench artefacts,
+43 in `LOG.md`, 19 in files `citecheck` checks; `R1y-1` recounts them.
+
+### The steps
+
+| Step | | What it produces | DoD | Where it is most likely to be wrong |
+|---|---:|---|---|---|
+| **`R1y-0`** ✅ **2026-09-30** | desk | This list, § Now and the board's row | `C12`, `cfcensus` and `docsize` green on it | A scope that keeps a checker the 2026-09-26 rule excludes |
+| **`R1y-1`** | desk | The blast radius, measured by doing the move in a throwaway clone: a full `desk-sweep` of the unmoved and of the moved tree; every line citation into `PROGRESS.md` classed by citing file and by whether its line moves; every parser of this file's structure | Every step red in the moved tree and not in the control named with its cause | A step the sweep did not run read as green; an index heading holding *step list*, which `cfcensus` and `C12` parse as a step list |
+| **`R1y-2`** | desk | `TOOL-2`: `FW-137`, `FW-138` and `FW-139`, each as that row says it is settled | The row's three controls | Repairing `--probe`'s join so that the thirteen joins that already read move |
+| **`R1y-3`** | desk | A resolver for line citations in records: the cited text at the citing line's commit, and where it lives now | A fixture whose lines move to another file, with a mutant that reads `HEAD` killed; one `LOG.md` entry's `PROGRESS.md` citations resolved | A record line edited inside its own segment dates its citation late (`notes/record-integrity.md` § 5.6); short lines match everywhere |
+| **`R1y-4`** | desk | The move: the fourteen closed step lists to `docs/history/steps-<gate>.md`, § Session ladder and § Corrections to `docs/history/`, § Carried forward's closed and declined rows appended to `docs/history/progress-carried-forward.md`; the parsers `R1y-1` names adapted; every line citation into moved text in a file `citecheck` checks repaired and read against its sentence; `docsize`'s budgets lowered; `CLAUDE.md`'s *until `R1y`* sentence rewritten | `docmove` conserves every block; the moved tree's `desk-sweep` reads as the control's; no record's bytes change | `docs/GATE-RESULTS.md` is a record that `citecheck` checks, so its citations into moved lines cannot be repaired by editing |
+| **`R1y-5`** | desk | § Gate board: each closed gate's cells cut to what closing it meant and its evidence, the old cells moved verbatim to `docs/history/` | `docmove` conserves every block; `cfcensus` reads the same gate states | An evidence link lost in the cut |
+| **`R1y-6`** | desk | `SPEC.md` § 17: each open row whose owning gate is closed or absent re-owned by a live gate, or ⊘ with a category and a reason | `spec-check` green; no open row names only a closed gate | A row forced onto a gate that will not measure it, which is the defect being repaired |
+| **`R1y-7`** | desk | The write-up: `docs/GATE-RESULTS.md` entry 15; `cfcensus write`; `NET-165`'s no-unattended-standby rule into `CLAUDE.md`, restated by the owner on 2026-09-30 | The DoD read one row at a time, with what was not established | Calling the gate closed on a green sweep instead of on the DoD |
+
+### The DoD, split into what can be refuted
+
+* **D1** — `PROGRESS.md` holds state only — § Now, § Gate board, § Release
+  clock, the open rows of § Carried forward, the census block and the open
+  gate's list — and every block moved out is conserved verbatim (`docmove`,
+  0 missing), with `docsize`'s budgets at the measured size + 3 %.
+* **D2** — every line citation into moved text in a file `citecheck` checks is
+  repaired and read against its sentence, and `citecheck` reads 0 `ROT` and 0
+  suspended after the commit; no record's bytes change (`git diff` over
+  `LOG.md`, `bench/`, `CHANGELOG.md`, `docs/GATE-RESULTS.md` and the existing
+  `docs/history/` files shows appends only).
+* **D3** — every line citation of `PROGRESS.md` in `LOG.md` resolves to one
+  location, to several (listed), or to none, each none explained.
+* **D4** — `TOOL-2`'s three controls, as its row writes them.
+* **D5** — no open § 17 row names only a closed gate, or none.
+* **D6** — the final tree's full `desk-sweep` reads as `R1y-1`'s control, and CI
+  is green on the pushed head.
+
+### Refutation conditions, written now
+
+* A block `docmove` reports missing: the move lost text, and it does not land.
+* A checker's verdict on a population the move did not change moves —
+  `cfcensus`'s open rows, `spec-check`'s findings, `C12`'s ids: the move changed
+  meaning, not location.
+* The resolver's `HEAD`-reading mutant survives: the tool does not depend on the
+  citing commit and resolves nothing.
+* A citation in `docs/GATE-RESULTS.md` passes `citecheck` only once its entry is
+  edited: the record rule and the checker disagree, and the owner decides. No
+  entry is edited to make a check pass.
+
+### Stop-loss, written now
+
+* **Three segments**, the owner's. At the stop-loss the gate closes on what is
+  done, and entry 15 lists the rest.
+* **No record is edited.** A step that would need to stops and goes to the owner.
+* **`R1y-4` lands only on a sweep that reads as the control's.**
+
+### What this gate must be able to answer
+
+* *「`PROGRESS.md` 為什麼長到 1 MB？」* → `FW-112`'s chain, and `D1`.
+* *「舊紀錄引用的 `PROGRESS.md` 行號，那一行現在在哪裡？」* → the resolver, and
+  `D3`.
