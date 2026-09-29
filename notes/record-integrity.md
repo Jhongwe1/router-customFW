@@ -516,7 +516,8 @@ source) — and new text cites rows by id. `CLAUDE.md` was rewritten to rules on
 its former text moved verbatim to `docs/history/claude-md-2026-09-23.md`, and
 `tools/docmove.py` checks in CI that every block of it is still there. § Now was
 rewritten the same way (`docs/history/progress-now.md`). The rest of the
-restructure — closed step lists, the ladder, closed rows, `SPEC.md` — is `R1y`'s.
+restructure — closed step lists, the ladder, closed rows — landed with `R1y-4`
+(§ 5.8); `SPEC.md`'s rows stayed out of `R1y` by the owner's ruling of 2026-09-30.
 
 ## 5.6 A re-dated line certifies its own rot — 量 2026-09-23
 
@@ -595,3 +596,47 @@ What this does not establish: where a row that grew in place lives now — a
 row-identity reading, as `FW-110`'s, would find most of the 26; anything under
 `upstream/`, `src-vendor/` or `plan/`; extensionless files, a bare `:NNN`,
 fenced citations, or a thousands comma, which reads as two lines.
+
+## 5.8 The records moved out, and the checkers taught to follow them — 量 2026-09-30 (`R1y-4`, `R1y-5`)
+
+`PROGRESS.md` went from 2,961 lines and 1,011,442 bytes (after `R1y-5`'s board
+cut, `504ca55`) to 522 lines and 95,212 bytes (`b0850eb`): the fourteen closed
+step lists to `docs/history/steps-<gate>.md`, the session ladder and
+§ Corrections to `docs/history/`, and 87 closed or declined carried-forward rows
+appended to `docs/history/progress-carried-forward.md`; the 25 open rows stay.
+`docmove` conserves 1,064 of 1,064 blocks at `--min-chars 1`, and dropping one
+after-file is its negative control (7 missing). The landing clone's tree and the
+committed tree are the same object (`7012a63e`).
+
+What the move broke first, measured on a throwaway clone at `7c4c694`
+(`R1y-1`): six steps went red beside the control. `cfcensus` refused outright,
+because it built its step population only from `PROGRESS.md`'s step-list
+headings; `spec-check`'s C5 lost the values `FW-73` and `FW-75` name in their
+owner file, and C12 read an index heading holding *step list* as a list;
+`citecheck` found four citations past the new end of file and four onto a
+now-blank line; `docsize` fell under its floor. Two of the fourteen closed lists
+are headed *closed … kept as written*, without `✅ CLOSED`, so a selection on
+that mark finds twelve.
+
+How it landed: `cfcensus` and C12 read `docs/history/steps-*.md` as well as
+`PROGRESS.md` (`spec-check` owns the reader and `cfcensus` imports it), and
+`cfcensus`'s L11 reads `docs/history/progress-corrections.md`. On the same
+population their verdicts are unchanged — `cfcensus --self-test` 64 of 64,
+`ratchet` identical, `check` 0 findings with 15 live-owned before and after —
+and both run with no step list left in `PROGRESS.md`, the state between gates,
+shown on a variant where `e274ccb`'s tools refuse. C5's owner cells moved to the
+history files that now hold their values on four rows (`FW-73`, `FW-75`,
+`MEM-14`, `FLM-10`; the last two had matched a literal in the board's narrative
+that `R1y-5` cut). Twelve line citations in checked files were repaired to where
+the text they cited now lives. One of them, `FW-75`'s citation of `R1-pub`'s
+list, had named the wrong row since `f3c425d` renumbered its neighbour and not
+it, and `citecheck` read it `STABLE` throughout: the resolver, reading the text
+as written, is what found it. Nine stale baseline rows went and none were added.
+
+What this does not establish: `citecheck` no longer sees the citations inside
+moved text, which are records now; `spec-check`'s C11 checks 48 payload
+references, not 53; `cfcensus`'s L10 and L15 do not see the 87 archived rows,
+so a new row reusing an archived id would pass; no `cfcensus` self-test case
+exercises the archive — the evidence is the before-and-after comparison and the
+variants; `MEM-11` and `MEM-15` still name `PROGRESS.md`'s `C-17`, which now
+lives in history, and C5 does not fire on them.

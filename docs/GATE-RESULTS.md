@@ -2188,7 +2188,254 @@ listed. Each below is recorded where it is cited.
 
 ---
 
-## The operating clause, re-run at fourteen entries
+## 2026-09-30 — `R1y` (the record's maintainability: `PROGRESS.md` split into state and record, a resolver for the line citations records keep, and three instrument defects repaired)
+
+### One line
+
+**v0.5+, one desk segment (the 117th) of the three the owner's stop-loss allowed, no plan estimate
+to divide by, and zero power-ons.** `PROGRESS.md` holds state only: the fourteen closed
+step lists, § Session ladder, § Corrections and 87 closed or declined carried-forward
+rows left it verbatim for `docs/history/`, taking it from 1,018,554 bytes to
+95,212 bytes, and each closed gate's row on § Gate board is cut to what closing it
+meant and its evidence. A record's line citation into the moved text can still be followed:
+`tools/citeresolve.py` reads the cited file as it was at the commit that wrote the citing line, and
+of `LOG.md`'s 44 citations of `PROGRESS.md` it finds 15 at one place and 26 whose rows were
+rewritten or grew in place after the citation. `TOOL-2`'s three instrument defects are repaired,
+each against the control its row wrote before the repair, and every open row of `SPEC.md` § 17 names
+a live gate. **Five of the six DoD rows are met; `D6` is met in part: CI on the pushed head stands
+in for the final tree's full `desk-sweep`, at the owner's request.**
+
+**The weakest thing here is that the tree that landed was never swept against the control.** `R1y-1`
+swept a trial move of `7c4c694` beside that control; the move that landed is another tree, with its
+parsers adapted and its citations repointed, and what stands between it and the control is CI on the
+pushed head and the fifteen suites the move touches, all green, while `CLAUDE.md` § Closeout says targeted runs are no
+substitute for the sweep. And every number here is about this repository's record, not about the
+device.
+
+### Three claims that stand
+
+**① `D1` with `R1y-1` and `R1y-5` — `PROGRESS.md` holds state, and what left it is conserved where
+it went.** 量 first by doing the move in a throwaway clone of `7c4c694` (`R1y-1`): the fourteen
+closed step lists, § Session ladder, § Corrections and 86 closed or declined carried-forward rows
+took the file from 2,866 lines and 1,018,554 bytes to 434 and 104,241; `docmove` conserved 864 of
+864 blocks, and its negative control read 7 missing. A full `desk-sweep` of both trees — 116 steps
+declared, 114 run in each — read the control 111 green with one red that any clone reads red
+(`test-config-gates`, whose gitignored `build/` a clone lacks), the two census steps red at the desk
+by design in both, and the moved tree 105 green and 7 red, six of them green in the control and each
+named with its cause: `spec-check` (`C5` on `FW-73` and `FW-75`, `C12` on the trial's index
+heading), `citecheck` (8 new rotted citations, 9 baseline rows naming nothing, 4 citations past the
+end of their file, 4 onto a blank line), `test-citecheck`, `docsize`'s floor, and `cfcensus` and its
+ratchet, which refused a file with no step-list header. `R1y-4` adapted those parsers before the
+move landed (`b0850eb`): `docmove` conserved 1,064 of 1,064 blocks, 0 missing, and
+`PROGRESS.md` is 522 lines and 95,212 bytes. 量 `R1y-5`
+(`504ca55`): the sixteen closed rows of § Gate board are cut to what closing each meant and
+its evidence, their old cells moved verbatim to `docs/history/progress-gate-board.md` — `docmove`
+886 of 886 — with `cfcensus`'s parse of the board unchanged and no checked citation landing on a
+board line; the four record citations of the board's old line lead, through `citeresolve`, to that
+history file. Three old cells that were no longer true — `R1h`'s on the D side, `P4b-gate`'s on
+`REEL-1` and `IMG-1`, and `P2`'s on what `R6b` owns — are not in the cut rows. ⚠️ What this does not
+reach: the landed tree's full sweep (`D6`); the open carried-forward rows, which did not move; and
+`SPEC.md`, untouched but for § 17's owner column.
+
+**② `D3` with `R1y-3` — a record's line citation can be read the way the rule reads it, and the
+reader depends on the citing commit.** 量 `tools/citeresolve.py` (`e274ccb`; 1,614 lines, about 535
+of them its self-test, with a CI step and a `tools/ci-expected.tsv` row) takes the cited file as it
+was at the commit that wrote the citing line and looks for that text in today's tree, importing
+`citecheck`'s citation grammar and `docmove`'s normalisation rather than restating them. Two things
+were measured before it could: dating needs whole-file `git blame -C` — plain blame dates 9,659 of
+`LOG.md`'s 33,437 lines to `10b8fbc6`, a commit that only moved two entries to the end of the file,
+and against the oldest commit whose patch added each citing line plain blame agrees on 346 of 425
+and `-C` on 423 — and a cited path resolves in the citing commit's tree, since `citecheck`'s scan
+drops a citation of a file deleted since without a word. 21 cases; a mutant that dates every
+citation at `HEAD` is killed by 14 of them and kept in the tool as `R14`. On `LOG.md`'s 44 citations
+of `PROGRESS.md`: 15 at one place, 1 ambiguous, 2 refused and 26 nowhere, each class explained
+(`D3`; `FW-158`, `notes/record-integrity.md` § 5.7). ⚠️ What this does not reach: where a row that
+grew in place lives now — and the 26 are exactly that.
+
+**③ `D4` with `R1y-2` — three instrument defects repaired, each against the control its own row
+wrote before the repair.** 量 (`ccc6459`) `FW-137`: `boot-timeline --probe` prints the first host
+landmark past the capture's window on an `after` line with its distance; on seating B's twenty pairs
+every line the old tool printed is unchanged, and all eleven rlxfw rounds' `net.up` equal the `D8`
+values of `notes/boot-time.md` § 8.7 to the printed microsecond, seven through the `after` line and
+four inside the window — read by the step's script and by the main session's `verify137.py`, which
+share no code (the latter's first run read four `DIFFER`, its own regex expecting one space; the
+parse was fixed, not a tolerance). `FW-138`: `audit-bench-log` gains an `"exact"` scope and its
+control A3 — the twelve widening probes that passed silently now fire, the nine near-miss controls
+still fire, and the two real lines stay silent; the same probe on the nine other `"line"` entries
+moved three to `"exact"` and rewrote six reasons, and the CI corpus suppresses 39,093 before and
+after. `FW-139`: both comments name `N41`, which alone kills `U3`'s mutant on the repaired tree, the
+unmutated suite green at 77. On the real tree: `test-boot-timeline` 87, `test-console-capture` 77,
+`hostprobe` 109, `test-leakscan-mutants` 24 and `leakscan` 17, whose `L4` is red in any clone
+without `upstream/`, `HEAD`'s as well. ⚠️ `FW-137`'s control reads *七個 `--` 要讀出 `D8` join 的值到 1 µs*;
+the value is on the new line and the seven `--` lines are unchanged, which the main session ruled
+met. Seating A's rounds were not re-run through `--probe`.
+
+### The DoD, read one row at a time
+
+`R1y` has no row in the plan, so its DoD is the only one read.
+
+| the DoD says | verdict |
+|---|---|
+| **`D1`** `PROGRESS.md` holds state only — § Now, § Gate board, § Release clock, the open rows of § Carried forward, the census block and the open gate's list — and every block moved out is conserved verbatim (`docmove`, 0 missing), with `docsize`'s budgets at the measured size + 3 % | 🟢 **met** (claim ①). `docmove` 1,064 of 1,064, 0 missing, beside its negative control's 7 missing; `PROGRESS.md` at 95,212 bytes against a `docsize` budget of 98,100. ⚠️ Beside the row's six parts the file holds one index of where each moved block went, headed so that `C12` and `cfcensus` do not read it as a step list — the risk `R1y-1`'s row wrote, which its trial heading met. The open carried-forward rows stand as they were (below) |
+| **`D2`** every line citation into moved text in a file `citecheck` checks is repaired and read against its sentence, and `citecheck` reads 0 `ROT` and 0 suspended after the commit; no record's bytes change (`git diff` over `LOG.md`, `bench/`, `CHANGELOG.md`, `docs/GATE-RESULTS.md` and the existing `docs/history/` files shows appends only) | 🟢 **met.** Twelve checked citations of moved text point at the history line that holds what each cited as written, and every citation on every edited line was read against its sentence before the commit (`FW-119`'s reading). The reading found one, in `FW-75`, that had named the wrong row since `f3c425d`, a renumbering that re-dated its line, while `citecheck` called it `STABLE`; it now names the row its sentence is about. `citecheck` after the commit: 0 new, 0 suspended, 0 past the end of a file; its baseline lost the nine rows the move retired and gained none. `git diff` over the records across `R1y-4`'s and `R1y-5`'s commits: empty for `LOG.md`, `bench/`, `CHANGELOG.md`, `docs/GATE-RESULTS.md` and the three older history files, and `docs/history/progress-carried-forward.md` keeps its old bytes as a prefix with the 87 rows appended. ⚠️ For a citation the step repaired, `citecheck`'s 0 is met by construction — the repair re-dates its line, and from then on the oracle compares the new target with itself (`FW-119`) — so for those the reading is the check. Read over the whole gate, `docs/GATE-RESULTS.md` also changes by this entry and the clause's re-run below: an insertion above the clause, and edits to its heading, parenthetical and table, as at every re-run of the clause |
+| **`D3`** every line citation of `PROGRESS.md` in `LOG.md` resolves to one location, to several (listed), or to none, each none explained | 🟢 **met, with one class the row did not name** (claim ②). Of 44 citations on 43 lines, at `e274ccb`: 15 at one place, 3 still at the cited line and 12 moved within the file; 1 ambiguous, a table separator; 26 nowhere, each a labelled row whose text changed after the citation — § Now's `Next after this`, `Active step` and `Active gate`, rewritten every segment, the carried-forward rows `R1C-1`, `CF-1`, `WRAP-1`, `LOG-1`, `CITE-1`, `CITE-2` and `C-10`, and the step rows `R1-pub-2`, `-4`, `-6`, `-7` and `R5-5`, which grew in place; and 2 refused, one backwards range that the citing line itself records as a botched repair — a class the row did not write, explained by its own line. Second instruments: the cited text re-read with `git cat-file` matched 323 of 323, every reported location held its text at `HEAD` (509 of 509), single-line match counts agreed with `git grep -F` on 269 of 269, and the main session recomputed two examples with plain `git log -S` and `cat-file`. Its self-test reads 21 of 21 on the moved tree. ⚠️ `R1y-3`'s own population, one `2026-09-23` entry's citations, was empty — those entries cite `PROGRESS.md` nowhere — so all 44 were read |
+| **`D4`** `TOOL-2`'s three controls, as its row writes them | 🟢 **met, `FW-137`'s under a ruling** (claim ③; `SPEC.md` `FW-137`–`FW-139`, `notes/dev-loop.md` §§ 20.3–20.5). `FW-138`'s and `FW-139`'s read as written. `FW-137`'s — *七個 `--` 要讀出 `D8` join 的值到 1 µs，讀得到的十三個不動* — held with the value on an `after` line, because the repair left every line the old tool printed unchanged, the seven `--` among them; the main session ruled that met. ⚠️ Seating A's rounds were not re-run through `--probe`; no other case pointer in `tools/` was checked; and a future log that carries the needle of one of the six remaining `"line"` entries can hide a real hit on its line |
+| **`D5`** no open § 17 row names only a closed gate, or none | 🟢 **met** (`R1y-6`, `eac5ab2`). 37 rows given a disposition: 4 re-owned — `REG-13`, `REG-14` and `FLS-06`–`FLS-08` to `R8`, `FW-67` to `R9`; 22 ⊘, each with a category, a reason and a reopening condition; 8 marked ✅, answered by their own text or owner file; and 3 split into ✅ and ⊘, the id cell carrying the less settled half's mark. Nine rows stay open, each naming a live gate, `LDR-21` and `FW-68` through `C-13` (`R8`) and `VDR-1` (`R9`); `LDR-22`'s and `CPU-45`'s main rows lost leads that contradicted their owner files. Two parsers that share no code: the step's, and the main session's token parse of the owner cell, which fires on `7c4c694` as its control — 44 open rows, 41 of them naming no live gate — and at `HEAD` reads 9 open, 2 naming no gate by token, `LDR-21` and `FW-68`, resolved by hand. `spec-check` green before and after. ⚠️ The step's edit re-dated a citation that had already rotted, `CPU-04`'s into `SOURCES.json`, which sat on `citecheck`'s baseline: from that commit the oracle called it `STABLE` (`FW-119`) and its baseline row went stale, which `C4` read only after the commit, because a dirty `SPEC.md` suspends its baseline rows; `bbd442a` repaired the citation. Read with `citecheck`'s own oracle at the commit before the edit, the step's 42 edited lines carried 11 citations, 10 `STABLE` and that 1 `ROT`. The row holds at this close only (below) |
+| **`D6`** the final tree's full `desk-sweep` reads as `R1y-1`'s control, and CI is green on the pushed head | ⚠️ **met in part.** CI on the pushed head: `b0850eb`, success (run 36628136555). The final tree's full sweep was not run: on 2026-09-30 the owner asked for speed and let CI on the pushed head stand in. What that leaves unread is the comparison the row names — CI's green is each step's verdict on the pushed head, not a reading of the landed tree against `R1y-1`'s control. The sweeps that did run are `R1y-1`'s, of the control and of a trial move of `7c4c694` (claim ①) |
+
+### The refutation conditions, and what each came to
+
+Written with the step list and committed at `R1y-0` (`5063332`), before any step landed.
+
+* **A block `docmove` reports missing** did not fire: 1,064 of 1,064 blocks of the move and 886 of
+  886 of the board cut conserved, 0 missing, while the tool's negative control read
+  7 missing.
+* **A checker's verdict moving on a population the move did not change** moved in `R1y-1`'s trial,
+  which is what that step was for, and each move was a checker reading a location rather than a
+  meaning: `C12` took the trial's index heading for a step list, `spec-check`'s `C5` fired on
+  `FW-73` and `FW-75`, whose values were no longer in the file their owner cells named, and
+  `cfcensus` refused a file with no step-list header. `R1y-4` made the parsers read the moved lists
+  where they went (`cfcensus` and `spec-check`'s C12 now read `docs/history/steps-*.md` as well, and `cfcensus`'s L11 reads `docs/history/progress-corrections.md`) and repointed the owner cells (`FW-73`, `FW-75`, `MEM-14` and `FLM-10`);
+  on the landed move `cfcensus --self-test` reads 64 of 64, its `ratchet` and `check` read as on `e274ccb` — 0 findings, 15 live-owned — and `spec-check` is green.
+* **The resolver's `HEAD`-reading mutant survives** did not fire: 14 of its 21 cases kill it, and it
+  is kept in the tool as `R14`.
+* **A citation in `docs/GATE-RESULTS.md` passing `citecheck` only once its entry is edited** could
+  not fire: this file holds no line citation of `PROGRESS.md` — 0 in `R1y-1`'s census at `7c4c694`,
+  and 0 again at `e274ccb` (讀, by `grep`). No entry was edited.
+
+### The stop-loss, and what it came to
+
+* **Three segments**, the owner's, who expected one: closed in one, the 117th.
+* **No record is edited; a step that would need to stops and goes to the owner**:
+  none needed to; `git diff` over the records shows the one append and nothing else.
+* **`R1y-4` lands only on a sweep that reads as the control's**: replaced by the owner. On
+  2026-09-30 he asked for speed; the final tree's full sweep was not run, and CI on the pushed head
+  stands in (`b0850eb`, success (run 36628136555)). `R1y-4` landed on the fifteen suites the move touches, all green instead, and that is why `D6`
+  is met in part.
+
+### The questions this gate must be able to answer
+
+Written in the step list at `R1y-0`; the plan has no `R1y`.
+
+**① 「`PROGRESS.md` 為什麼長到 1 MB？」** Because the record of being wrong was kept inside a state
+document, and each link of a chain fed the next (`FW-112`, `notes/record-integrity.md` § 5.5). The
+rule that negative results stay in place, right for records, was applied to a file whose job is to
+say what is true now; frozen cards cited it by line, so no line could be added and new text went
+into old cells — over 39 commits it held at 2,434 lines while its bytes grew by 65,906; each session
+appended, because appending is locally safe; the checkers came to parse the accreted form; and
+nothing measured size. 量 at `7c4c694`, by `awk` over its level-2 headings: 1,018,554 bytes, of which
+§ Now with its preamble was 5.5 K, the fourteen closed step lists about 430 K (`R3`'s alone 124 K),
+§ Session ladder 199 K, § Carried forward 249 K, § Corrections 93 K and § Gate board 30 K. `D1`
+moved the records out: the file is 95,212 bytes under a `docsize` budget of
+98,100, which fails above the budget and below half of it. Not covered: `SPEC.md`,
+1,410,196 bytes in 821 rows at `7c4c694`, repaired here in one column.
+
+**② 「舊紀錄引用的 `PROGRESS.md` 行號，那一行現在在哪裡？」** Ask `tools/citeresolve.py`. It dates the citing line by
+whole-file `git blame -C`, reads the cited lines in that commit's tree, and looks for their text in
+today's: the answer is one place, several, none, or a refusal with its reason. Of `LOG.md`'s 44
+citations of `PROGRESS.md`, 15 have one place (`D3`), and the four record citations of the board's
+old line lead to `docs/history/progress-gate-board.md` (`R1y-5`). For the 26 whose rows were
+rewritten or grew in place, the answer is the cited text as it stood and no current location — and a
+record's line number is never repaired; it is read through the resolver.
+
+### What `R1y` did not establish
+
+🔴 **Where a row that grew in place lives now.** 26 of `LOG.md`'s 44 citations of `PROGRESS.md`
+resolve to the text they cited and to no current location: § Now's three rows were rewritten, and
+seven carried-forward rows and five step rows grew in place after the citation (`FW-158`). A
+row-identity reading, as `FW-110`'s, would find most of them, and none was built. `citeresolve` also
+reads nothing under `upstream/`, `src-vendor/` or `plan/`, and no extensionless file, bare line
+number, fenced citation or number written with a thousands comma (`notes/record-integrity.md`
+§ 5.7).
+
+🔴 **The tree that landed was not swept against the control** (`D6`, the stop-loss's third line, and
+the weakest thing above). CI on the pushed head stands in, at the owner's request of 2026-09-30; the
+step-by-step reading against a control was made for `R1y-1`'s trial move, not for the tree that
+landed.
+
+🔴 **Four things stay unchecked, because the four enforcers booked for them are ⊘** by the owner's
+rule of 2026-09-26, which admits a new checker only against bricking, an `H601` leak or a misjudged
+result: a citation wrong the day it was written, which `citecheck` reports `STABLE` (`FW-109`);
+citing by line where an id exists; § 17's owner column going dead when its gate closes (`FW-111` ①);
+and the census block `cfcensus` generates going stale (`FW-111` ②). Each was repaired once instead —
+§ 17 by `R1y-6`, the block by `cfcensus write` at this close — and nothing will say when either is
+wrong again.
+
+⚠️ **Records' line citations into moved text can be read, never repaired.** `LOG.md`'s 44, the 15 in
+frozen `bench/` artefacts and the 3 in `docs/history/progress-now.md` keep the numbers they were
+written with (`R1y-1`'s census at `7c4c694`); a reader who follows one into today's `PROGRESS.md`
+lands on whatever that line now holds, unless they ask the resolver.
+
+⚠️ **`FW-119`'s reading is a session's, not a tool's.** The reading it asks for before a commit —
+every citation on every edited line, read against its sentence — was done by scripts and readings
+kept outside the repository (`$FWRE_WORK/rebuild/s117/redate.sh`, and the landing's `repairs-FW119.txt`); nothing in the tree repeats it. `R1y-6`'s commit
+shows what that leaves: its edit re-dated `CPU-04`'s already-rotted citation into `SOURCES.json`,
+which `citecheck` saw only after the commit, and only because its baseline held that citation
+(`D5`). `notes/record-integrity.md` § 5.6 already says a tool could do the dating half and not the
+reading.
+
+⚠️ **Six `"line"`-scoped entries of `audit-bench-log` still exempt every pattern on their lines**
+(`FW-138`). The control MAC on a line holding the needle was silent under all nine `"line"` entries;
+three moved to `"exact"`, and the six that stay say in their reasons what they do not catch. A
+future log that carries one of those needles can hide a real hit on the same line.
+
+⚠️ **`SPEC.md` was repaired in § 17's owner column only**, the owner's scope for this gate: no row
+was rewritten and § 19 was not re-sectioned. At `7c4c694` it was 1,410,196 bytes in 821 rows, median
+row 1,345 B, the fifty largest rows 22 % of it, § 19 500 K, § 14 239 K and § 17 216 K.
+
+⚠️ **The open carried-forward rows were moved nowhere and not rewritten.** `D1` moved closed and
+declined rows only; the 25 open ones stand in § Carried forward as they were, and
+nothing measured how much of their text is state.
+
+⚠️ **Fourteen lines in ten files under `tools/` cite `PROGRESS.md` by line number** — comments,
+docstrings and one printed message — and eleven of them name the risk columns of `R1-pub-1` and
+`R1-pub-2`. 量 at `7c4c694`, before any step of this gate: the four targets they quote, which cover
+13 of the 14 lines, each stood on another line, so these were stale before `R1y`; `citecheck` reads
+`.md` files only, so nothing checks them, and this gate left them. One more sits in a `bench/`
+script, a record.
+
+⚠️ **`D4`'s edges.** `FW-137`'s control is met by a ruling, with the value on a line its words did
+not name; seating A's rounds were not re-run through `--probe`; and whether any other case pointer
+in `tools/` is right was not asked (`FW-139`).
+
+⚠️ **`D5` holds at this close.** When `R8` or `R9` closes, the rows naming it will name a closed
+gate, and no tool reads the column; and an owner question kept in a notes section rather than in
+§ 17 was outside the population, by the owner's scope.
+
+⚠️ **Flash.** No step touched the board — zero power-ons in the gate — so zero
+flash-write commands and zero `FLR`; the `FLR` bracket stays at 1,024 of 4,194,304 bytes =
+**0.0244 %**, and `FLS-26`'s ledger does not move.
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner's own rulings — opening `R1y` with a stop-loss of three segments, `R6b`'s relaxation
+carried over with the flash rules unchanged, `SPEC.md` limited to § 17's owner column, CI on the
+pushed head in place of the final tree's full sweep, and `NET-165`'s no-unattended-standby rule
+restated for `CLAUDE.md` — are not listed. Each below is recorded where it is cited.
+
+1. The four booked enforcers ⊘ under the owner's rule of 2026-09-26, which came after the booking
+   (the step list, *Scope*).
+2. `FW-137`'s control met with the value on an `after` line, not on the `--` line its wording
+   assumed (`FW-137`, `notes/dev-loop.md` § 20.3).
+3. `SPEC.md` § 17: all 37 dispositions as drafted; `CLK-15` 冷暖差 ⊘, not a retraction; `MEM-08` and
+   `BRD-01` ⊘ rather than re-owned to `P3`.
+4. `cfcensus` reads `docs/history/steps-*.md`, rather than owner cells being edited to dodge its
+   `L2` (`R1y-4`).
+5. `D3` read as met, its two refusals — one backwards range — a class the row did not write,
+   explained by the citing line itself.
+6. `D6` read as met in part, its CI conjunct holding, rather than not met.
+7. The census block regenerated in the move's commit, though `cfcensus check` never compares
+   it: it was already stale at `e274ccb`, `LIVE` 16 where the live census read 15.
+8. `FW-75`'s citation repointed to the row its sentence is about, `R1-pub-4`'s, rather than to the
+   line its digits named.
+9. `PROGRESS.md`'s one citation of a 2026-09-14 § Now row left as it is: its text is nowhere, and
+   the row it cites was neither moved nor shifted.
+10. The full `desk-sweep` dropped at the owner's request for speed, CI on the pushed head
+    standing in (`D6`).
+
+---
+
+## The operating clause, re-run at fifteen entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -2198,7 +2445,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on.)*
 
 | pair | shared? |
 |---|---|
@@ -2215,6 +2462,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R1z` → `P1` 🆕 | **no, and the reason is one no previous non-firing has used: the single item both entries carry, they carry because `P1` CLOSED it.** `R1z`'s last ⚠️ is *"`RECIPE_ID` moved … the next card must re-derive `RLXFW-ID0`"*; the next segment found the superseded `c433013b` in three places here, its own step row says *"The next card was about to predict `MT-ID` against it"*, and the board then printed `RLXFW-ID0=BB684EB0`. This file's own rule governs — *a residual that a later gate closes is removed from the clause's input by being closed, not by being edited out*. ⚠️ The rest of the two sets do not touch: `R1z`'s residuals are about this repository's record, `P1`'s about a design table that over-declares on three rows and a denominator its own does-not-establish list got wrong |
 | `R6` → `P2` 🆕 | **no — `P2` CLOSED three of `R6`'s residuals, each taken on in writing by one of its own steps, and the one subject both still carry is two different observations.** Closed: *"`D5`'s headline number needs a verb typed"* — `P2-2` compiled `recover` on, and `P1-N0` read `recov_mode 1` on both days with no verb typed; *"this project holds no vendor receive figure at all"* — `P2-3`'s `eth4` board-receive trials (`NET-114`), reproduced in seating B at 24.572 / 24.653 / 23.923 Mbit/s; and `NET-109 殘留`'s healthy baseline — `P2-3`'s pre-traffic pair, 294 = 294, and 414 = 414 in seating B. The other half of `NET-109 殘留`, its mechanism, has been `R6b`'s in the row's owner cell since the commit that opened `P2`, so `P2` never took it on. ⚠️ `rlx0`'s transmit path is in both sets: `R6` as `NET-67 殘留`, *why the engine stops retiring a TX descriptor*, and `P2` as frames the driver counts as sent that do not leave port 3 intact (`NET-112`, `NET-116`). What would join them is `R6b`'s candidate M8, and M8 is 推 — the same subject, not yet the same thing 🔄 **2026-09-28, decided at fourteen entries with `M8`'s result in view, as that run asked:** `M8` as written is refuted — block 46 stalled with no jabber — and one variable, `txlen`, removes both symptoms, the corruption (`D2`) and the stall (`D4`: 0 fires at the fix, 12 at 1.4 on the same boot). So the two were one fault at the level of the fix (量) and not of a mechanism (推). The verdict above is what that run could see, recorded and not re-scored (below, fourteen entries) |
 | `P2` → `R6b` 🆕 | **yes — the mechanism of `rlx0`'s transmit fault, as a cause.** `P2` carries it as *"rlxfw's own driver has no throughput figure at the n the DoD asks for, and why is `R6b`'s"* and, in the same paragraph, *"The mechanisms are eight candidates, all 推"*; `R6b`'s step list took the candidates on in writing (*"… read on silicon by `R6b-3`, with every mechanism"*), and its entry carries *"the mechanism of the transmit fault, as a cause"*: the stage a span with no component measured, `M1`-cover8 a fitted rule (`NET-129`, `NET-132`). ⚠️ Four more items sit in both lists and are declined, each for its reason below |
+| `R6b` → `R1y` 🆕 | **no — `R1y` did not take on the thing the fourteen-entry run fired on, and the rest of the two lists are about different objects.** `R6b`'s residuals are the device's and its bench record's: the transmit fault's and the stall's mechanisms, the fix on `SWCORE=n`, `D8`'s inherited switch state on one seating, the vendor-code scope, the reset guard, what `R6b-8` did not build, four DoD rows' edges, what `D5` set aside, the relaxed process's evidence, `C-19`'s night and the power ledger. `R1y`'s are this repository's record: rows that grew in place, records' citations that can only be read, four enforcers ⊘, a reading kept outside the tree, six exemptions as wide as their lines, `SPEC.md` and the open carried-forward rows left as they were, stale line numbers in `tools/`, a tree not swept. ⚠️ The nearest candidate, `CLK-42` 殘留's missing gate, the nearest resemblance, an instrument blind to its own subject, and the flash boundary are each declined below |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -2786,6 +3034,84 @@ fix typed as a verb; the image whose default is the fix ran afterwards, once, an
 was measured on that object in the typed setting, by the same cells as the unfixed setting; what the
 word *image* promised arrived one step later, inside the gate. It is `R6`'s verb shape — `recover`
 then — and not the artefact-for-property shape. ⚠️ **The weaker class stays at two.**
+
+### 🆕 At fifteen entries the clause does not fire, and the fourteen-entry firing was neither discharged nor carried
+
+**The thing the fourteen-entry run fired on is not in `R1y`'s list, because `R1y` did not take it
+on.** That run fired on `P2` → `R6b` — *the mechanism of `rlx0`'s transmit fault, as a cause* — and
+left to the owner where it goes. On 2026-09-30 the owner opened `R1y`, a desk gate on this
+repository's record, and § Now at `e274ccb` says so: *Entry 14's operating clause still names the
+mechanism of `rlx0`'s transmit fault as the next gate by its own rule; the owner opened `R1y` first,
+and that gate is not opened.* No step of `R1y` touches the device. The guard written at eight
+entries decides the pair — *a gate does not inherit its predecessor's residuals by default* — so the
+mechanism is not counted as `R1y`'s, and the fourteen-entry firing is neither discharged, as the
+twelve-entry firing was by a measurement of the property it named, nor repeated. 🔴 **The clause's
+rule — *that thing is the next gate* — was not followed at the first opening after it fired**, and
+this run records that rather than scoring it: the clause names a thing, not a gate, the precedent
+`CPU-45` set at five entries.
+
+**Item by item, the rest do not touch.** `R6b`'s entry lists sixteen things it did not establish and
+`R1y`'s twelve. `R6b`'s are about the silicon and the bench — a fault's mechanism and a stall's, a
+fix not re-tested on the mainline image, one seating, one image, one boot path; `R1y`'s are about
+text in this repository and the tools that read it. Nor did `R1y` close any of `R6b`'s: `R1y-6`'s
+population was § 17's open rows, and none of them named `R6b`.
+
+⚠️ **The nearest candidate is an owner no gate holds, and it is declined.** `R6b`'s *what `D5`
+carries* re-owned `CLK-42` 殘留's mechanism to `docs/interrupt-map.md` § 8.4, *whose row asks the
+owner to assign it a gate*, and 讀 at `e274ccb` that section still says *no open gate owns the
+question*. `R1y` repaired owners in `SPEC.md` § 17 only, by the owner's scope, and `CLK-42` has no
+row there (讀: no occurrence between § 17's heading and § 19's). `R1y`'s list does say that an owner
+question kept outside § 17 was outside its population — the class `CLK-42` belongs to — but the step
+list never took `CLK-42` on, and the guard written at eight entries decides it, as it decided
+`CLK-42` at fourteen entries.
+
+⚠️ **The nearest resemblance is an instrument blind to its own subject, and it is declined as a
+shape.** `R6b`'s read-back reads descriptor memory with the engine's fetch held, so it cannot show
+what the engine fetched; `R1y`'s `citecheck` calls a citation wrong the day it was written `STABLE`,
+and every repair re-dates its own line (`FW-109`, `FW-119`). Two instruments, two subjects; the
+ten-entry run's rule governs: *a clause that fires on a resemblance measures the reader, not the
+ledger.*
+
+⚠️ **The flash boundary** is in both lists — `R6b`'s with its maps, `R1y`'s with zero
+power-ons — and is not counted, for the reason the thirteen-entry run gave.
+
+### 🆕 The census re-run at fifteen entries — no sixth instance, and two candidates recorded
+
+量 2026-09-30 with the thirteen-entry script (`$FWRE_WORK/rebuild/s111/land/gate/census.py`, read
+only; sha256 `1e81ac1a…`) on `PROGRESS.md` at `e274ccb`, before `R1y-4` moved the closed lists out,
+with the same two control arms run from this segment's directory
+(`$FWRE_WORK/rebuild/s117/gr15/census15-ctl.sh`): on the real file it reproduced the twelve-entry
+figures — 44 clauses across eight gates — and exited 0, and on a copy with one of `P1`'s rows
+un-bolded it exited 1. The `D`-row form is now **66 clauses across eleven gates** — `R3` 5,
+`P4b-gate` 4, `R4` 4, `R5` 4, `R1-pub` 13, `R1z` 4, `P1` 4, `R6` 6, `P2` 8, `R6b` 8, **`R1y` 6** —
+with the four gates before the form carrying 13 more, carried rather than re-derived because those
+step lists are records. **79 clauses.** ⚠️ The script reads `PROGRESS.md` alone, and from `R1y-4` on
+the closed lists are in `docs/history/steps-<gate>.md`: 量 on `R1y-4`'s tree it finds `R1y`'s list
+only and refuses on its control (rc 1), so a sixteenth-entry run must hand it those files too. Its
+closing line still says *thirteen-entry*; what is read here is its per-gate lines.
+
+**No sixth instance.** Two candidates, recorded so a sixteenth entry does not find them and call
+either a sixth:
+
+* **`D4`, through `FW-137`'s control.** The row adopts `TOOL-2`'s controls as their rows write them,
+  and `FW-137`'s reads *七個 `--` 要讀出 `D8` join 的值到 1 µs* — the seven `--` must read out the `D8`
+  join's value. The repair put the value on a new `after` line and changed no old line, the seven
+  `--` among them; the control's other half, *讀得到的十三個不動*, asked that only of the thirteen joins that
+  already read. The main session ruled it met. Not counted: the same sentence names the property,
+  the value for those seven rounds, and the settlement written before it names the mechanism, *join
+  報窗之後的第一個事件與它的距離*. What the words assumed was where the value would print, not an artefact in place
+  of the property.
+* **`D6`'s full `desk-sweep`**, not run on the final tree with CI standing in, which reads like
+  entry 11's *capable and idle*. Not counted in the weaker class: the row is met in part, not met
+  through a substitute, and the choice was the owner's, made for time, not the row's wording.
+
+⚠️ **One clause is met by construction for part of what it counts.** `D2`'s *`citecheck` reads 0
+`ROT`* cannot fail for a citation the step repaired, since the repair re-dates its own line
+(`FW-119`); the row names beside it the reading that can fail. That is the shape the eleven-entry
+run found at entries 8 and 11 — *a bar met by construction* — and not this census's; at entries 8,
+11 and 15 no two are consecutive, so the widening declined at eleven entries would not fire on its
+own terms either. **The weaker class stays at two**, and `R6b`'s `D2` *on a fixed image*, the
+candidate the fourteen-entry run recorded, stays uncounted.
 
 ### Carried unchanged from the seven-entry run
 

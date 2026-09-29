@@ -221,8 +221,10 @@ agree: name the tool that could be lying and the second source that settles it.
   **last** row with `offset <= b` (`FW-35`). Take rates from slopes, not
   intercepts. Never compare hex addresses numerically in `awk` (`8001e714` reads
   as scientific notation).
-- The loader answers ARP, not ping; check its link with ARP. Retry a failed
-  `looprun` with `--attempt N`, never `--force`. Identify a booted image by the
+- The loader answers ARP, not ping, and only after `IPCONFIG` (`NET-95`): check
+  its link with ARP after `IPCONFIG`, before an upload. Never leave it at the
+  prompt unattended (`NET-165`). Retry a failed `looprun` with `--attempt N`,
+  never `--force`. Identify a booted image by the
   tool comparing `RLXFW-ID0` with the build's digest, never by a typed value.
 - A `read_proc_t` handler's output stays within one 4,096-byte page. Bump
   `console-capture`'s `tool_version` only when what it writes to the port changes.

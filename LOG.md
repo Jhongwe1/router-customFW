@@ -33435,3 +33435,94 @@ commit：`1f9ebf1`、`010fb1a`、`b173746`、`884b1b0`、`1fbd719`、`025b336`�
 - `CHANGELOG.md` 的 `v0.5` 一節（9/17 寫在 `## Unreleased` 下的 `R6-1` 內容歸入它）。🔴 `PROGRESS.md` 的 Release clock：`v0.4` 那一列從 9/17 發佈以來一直是「—」（量 `gh release list`：`v0.4` 2026-09-17T02:37:14Z）—— 與 `v0.5` 一起原地改。
 - 這些改動 9/28 深夜寫進工作樹，session 在提交之前斷了；9/29 20:55 重開時先量：HEAD＝origin＝`1c9b0d2`、它的 CI success、工作樹正是那些改動。發版日期因此寫 9/29，歷史檔也改名成 9/29。
 - `v0.5`：annotated tag 在 `0281139`，推上；GitHub release 2026-09-29T13:03:01Z，Latest。`0281139` 的 CI 在寫這一條時還在跑 —— 下一段開場看它的 conclusion。
+
+## 2026-09-30 — 第一百一十七段（00:29 開場，桌面，**不通電**，約 05:12 收工）：`R1y` 開也關 —— `PROGRESS.md` 拆成狀態與紀錄（1,018,554 → 86,031 bytes）、紀錄裡行號引用的 resolver、`TOOL-2` 三個儀器缺陷、`SPEC.md` § 17 的擁有者處置；預訂的四支 enforcer 依 2026-09-26 的規則 ⊘
+
+交接 `plan/handoff-s116.md`。開場量 repo：擁有者的簡報寫 HEAD `1c9b0d2`，實際是 `7c4c694`（之後還有 `0281139` v0.5 與 `7c4c694` 它的 LOG；handoff 的「收工之後」一節已記）。WSL 與 Windows 的 `git status` 一致，只有 `?? .claude/`。`gh run list`：`1c9b0d2`、`0281139`（兩個 run）、`7c4c694` 全部 success。
+
+### 一、擁有者這一段說的
+
+- 這一段做 `R1y`；2026-09-27 的放寬延續（不凍結、預測可省、邊做邊測）；flash 禁令照舊；上機的電源只在主 session 講。`R1y` 是純桌面，這一段沒有上機。
+- 問兩題（`AskUserQuestion`）：`SPEC.md` 做到多深 → **只做 § 17 處置**；停損 → **三段**，並說「但我覺得你一段應該做得完，因為我讓你開 subagent」。
+- 04:02：「感覺還要很久，你盡可能的加速，我想趕進度」→ 見 § 九。
+
+### 二、範圍裁決與 `R1y-0`（`5063332`）
+
+- 預訂（2026-09-23）的 `R1y` 有四支 enforcer：`FW-109` 的「引文要在被引行附近」、cite-by-id、§ 17 擁有者存活檢查、`cfcensus check` 比對生成區塊。擁有者 2026-09-26 的規則（新檢查器只為擋磚、H601 洩漏、誤判結果）在預訂之後，四支都不屬三類 → ⊘，各記一句；它們要擋的東西改成一次性處置（§ 17 由 `R1y-6`、區塊由 `cfcensus write`）。留下：`TOOL-2`（修既有儀器：`FW-137` 誤判結果、`FW-138` H601 稽核的豁免過寬、`FW-139` 兩行註解）、resolver（讀取工具不是檢查器）、搬移。
+- 量（`7c4c694`，awk 以二級標題切）：`PROGRESS.md` 1,018,554 bytes —— § Now 連前言 5.5 K、十四份已關步驟表約 430 K（`R3` 一份 124 K）、ladder 199 K、carried forward 249 K、Corrections 93 K、gate board 30 K；`SPEC.md` 1,410,196 bytes、821 列、中位數 1,345 bytes、前 50 大只佔 22 %。
+- 步驟表寫在 `PROGRESS.md` 檔尾（`FW-110`）。`citecheck` 在提交前抓到我在「What this gate must be able to answer」裡當例子寫的 `PROGRESS.md:1234` —— 它被當成真的引用（C3、C7 M3）；改寫成不含 `FILE:NNN` 的句子。
+
+### 三、平行的代理
+
+- 00:40–00:50 同時開出四支，各在自己的 ext4 clone、只交 patch：`R1y-1` blast radius、`R1y-2` `TOOL-2`、`R1y-3` resolver、`R1y-6` § 17 處置。02:25 再開 `R1y-5` gate board。主線只做規格、裁決、核對，每一份回來都用自己的腳本重算。
+
+### 四、`R1y-6`（`eac5ab2`），與被重新定年的引用（`bbd442a`）
+
+- `7c4c694` 時 § 17 開著 41 列（2026-09-23 是 70；`R6b` 收掉 29）。4 列改派（`REG-13`、`REG-14`、`FLS-06`–`FLS-08` 給 `R8`，`FW-67` 給 `R9`）、22 列 ⊘（每列有計畫 § 17 的類別、理由、「重新打開」條件）、8 列已被自己的內文或擁有者檔答了 → ✅、3 列拆成 ✅＋⊘；36 個 id 格補上最未定那一半的記號；`LDR-22` 與 `CPU-45` 主列過時的開頭劃掉（`LDR-22` 的名記號照同節 `LDR-21` 改成 `讀（機制）`）。三個低信心的照提案裁：`CLK-15` 冷暖差 ⊘ 而不撤回（`CLK-43` 一次是反讀數、不是機制），`MEM-08`、`BRD-01` ⊘ 而不硬塞給不量它們的 `P3`。
+- 核對：兩支不共用程式碼的解析器；我的那支在 `7c4c694` 上開火（44 開、41 不指活 gate）當控制。處置後開著 9 列，全部指活 gate —— `LDR-21` 經 `C-13` 到 `R8`、`FW-68` 經 `VDR-1` 到 `R9`，這兩個間接是我手動解的。
+- 提交後 `citecheck --rev HEAD`：`C4 1 stale` —— 代理改 `CPU-04` 那一列的擁有者格，把那一行重新定年，行上一個本來就錯的 `SOURCES.json:195` 被洗成 `STABLE`（`notes/record-integrity.md` § 5.6）。提交前在工作樹跑看不到：`SPEC.md` 是髒的，它的基線列被 suspend。寫了 `$FWRE_WORK/rebuild/s117/redate.sh`：用改動前那個 commit 自己樹裡的 `citecheck` oracle 列出改動行上改動前的判決 —— 42 行、11 個引用、10 `STABLE`、1 `ROT`（就是它）。句子引的是廠商的 RLX4181 說法 = `cpu_claim`，在第 201 行；只改數字、刪掉那列過時的基線（`bbd442a`）。之後每次提交前都先跑它。
+
+### 五、`R1y-2`（`ccc6459`）
+
+- `FW-137`：`--probe` 對窗內沒有的主機地標印 `after` 行（窗後第一個事件＋距離）。我的第二來源（`$FWRE_WORK/rebuild/s117/verify137.py`，不 import 代理的程式；HEAD 版工具在 `git archive` 的樹裡跑）：二十對裡 HEAD 印的每一行都保留；十一個 rlxfw 回合的 `net.up` 全等於 `notes/boot-time.md` § 8.7（七個經 `after`、四個在窗內）。值在 `after` 行、不在控制原文假設的 `--` 行 —— 我的裁決。
+- `FW-138`：新增 `"exact"` 範圍與控制 A3；十二個放寬探測開火、九個控制照開、兩條真行安靜。代理的延伸：控制 MAC 放在 needle 那一行，其餘九列 `"line"` 全部不開火 → 語料只有一種文字的三列（`Calibrating delay loop`、`RLXFW-S-MH601`、`MT-RFCAL`）改 `"exact"`，六列理由改寫成寫明不抓什麼；CI 語料前後都抑制 39,093 條、逐檔輸出相同。我查過：A3 的合成 MAC 與那個摘要本來就在已提交的樹裡。
+- `FW-139`：兩個註解改指 `N41`；U3 的 mutant 只被 `N41` 殺。
+- 真 repo 上：`test-boot-timeline` 87、`test-console-capture` 77、`hostprobe` 109、`leakscan` 17（`L4` 在任何沒有 `upstream/` 的 clone 都紅，HEAD 也是 —— 環境，不是 patch）、`test-leakscan-mutants` 24。
+
+### 六、`R1y-3`（`e274ccb`）；推 `7c4c694..e274ccb`（02:20），CI success
+
+- `tools/citeresolve.py`：1,614 行，其中約 535 行是自測；CI 步驟與 `ci-expected.tsv` 一列（21）。定年用整檔 `git blame -C`：一般 blame 把 `LOG.md` 33,437 行裡的 9,659 行定在 `10b8fbc6`（只把兩段搬到檔尾），對「最早加入那一行的 commit」一般 blame 425 行對 346、`-C` 對 423。大小偏大，但每個複雜處都有量到的理由，照收。
+- `LOG.md` 指向 `PROGRESS.md` 的 44 個引用：唯一 15、歧義 1、拒絕 2、哪裡都沒有 26 —— 26 個全是有標籤、之後被重寫或就地長大的列（§ Now 三列、七個 carried-forward 列、五個步驟列；我照被引文字的開頭分組看過）。`FW-158`、`notes/record-integrity.md` § 5.7。我用純 `git log -S` 與 `cat-file` 重算了兩個例子。
+
+### 七、`R1y-1`：blast radius（代理，`$FWRE_WORK/rebuild/s117/blast/`）
+
+- 在 `7c4c694` 的 clone 真的搬一次：十四份步驟表（我給的標題樣式只抓得到 12 份 —— `R1-gate`、`R2a/b/d` 寫的是 "closed …, kept as written"）、ladder、Corrections、86 個已關／放棄的 carried-forward 列；`PROGRESS.md` 2,866 → 434 行；`docmove` 864／864 守恆，負控制 missing 7。
+- desk-sweep 兩臂各 114 步：對照 1 個非預期紅（`test-config-gates`，clone 沒有 gitignored 的 `build/`），搬過的 7 個：`spec-check`（`FW-73`／`FW-75` 的 C5；我的索引標題含 "step list" 觸發 C12）、`citecheck`（C3 8、C4 9 stale、C5 M1 4、C7 M3 4）、`test-citecheck` 2、`docsize` 下限、`cfcensus` 與 ratchet 拒絕（沒有步驟表標題）。
+- 引用：`PROGRESS.md` 的行號引用 78 個，受檢檔 16（11 個指向會搬的行）、紀錄 62；`docs/GATE-RESULTS.md` 0 個。
+
+### 八、`R1y-5` 與 `R1y-4`（`504ca55`、`b0850eb`）
+
+- `R1y-5`（代理）：16 列已關 gate 縮成「關掉代表什麼」＋證據（第幾條、步驟表檔），舊列逐字進 `docs/history/progress-gate-board.md`；`docmove` 886／886；`cfcensus` 讀到的 gate 狀態前後一樣；沒有受檢引用落在這些行上。三個舊格子已經不對（`R1h` 的 D 側、`P4b-gate` 的 `REEL-1`／`IMG-1`、`P2` 的「`R6b` 擁有」），沒有照抄。它的連結指向 `R1y-4` 才產生的檔，所以兩者一起落地。
+- `R1y-4` 的裁決：`cfcensus` 改成也讀 `docs/history/steps-*.md`（不准改擁有者格去躲 `L2`；`R1y` 關掉之後 `PROGRESS.md` 會沒有步驟表），`L11` 改讀 `docs/history/progress-corrections.md`；`FW-73`／`FW-75` 的擁有者改指歷史檔；受檢引用用 resolver 找出當時引的文字、改指歷史檔的行；`docsize` 預算降到量值 ＋3 %；`CLAUDE.md` 改 Record 那句並加一句慣例。
+- 落地：代理在 ext4 clone 先套 `R1y-5`、再搬，交兩個提交；我用 `git apply` 套、自己提交，提交前 staged 的 tree 與代理 clone 的最終樹是同一個物件 `7012a63e`。`PROGRESS.md` 2,961 行／1,011,442 B → 522 行／95,212 B；`docmove` 1,064／1,064（`--min-chars 1`），少一個 after 檔的負控制 missing 7。代理自己推翻了我的三個裁決：已關的 carried-forward 列是 87 不是 86（`TOOL-2` 在 `R1y-2` 關了）；C5 要改的是四列（`FW-73`、`FW-75`、`MEM-14`、`FLM-10` —— 後兩列原本碰巧對上 board 敘事裡的字串，`R1y-5` 把它剪掉了）；C12 也要讀歸檔，否則「兩個 gate 之間」點名一個已關的步驟會讀成沒有步驟 —— 讀法放在 `spec-check`，`cfcensus` import。受檢檔的行號引用修了十二個：`FW-75` 那一個（引 `R1-pub` 步驟表）從 `f3c425d` 起就指錯列、`citecheck` 一直判 `STABLE`，resolver 讀當時的文字才發現；過時的基線列刪九、加零。沒修：`PROGRESS.md` 引一個 2026-09-14 的 § Now 列（文字哪裡都沒有，那一列沒有搬也沒有移）。`docsize` `PROGRESS.md:bytes` 98,100。`cfcensus` 在同一母體上判決不變（自測 64／64、`ratchet` 相同、`check` 0 finding、15 live-owned），也能在沒有步驟表的狀態下跑。紀錄的位元組除了 `progress-carried-forward.md` 的追加之外沒有變。受影響的 15 步（`desk-sweep --only`）15 綠。推 `e274ccb..b0850eb`（04:41）；它的 CI（run 36628136555）success —— 搬過的樹第一次跑完 `ci.yml` 的全部步驟。`FW-159`、`notes/record-integrity.md` § 5.8。
+
+### 九、加速（04:02）
+
+- 擁有者要求加速。砍掉 phase 2 的完整 desk-sweep（量過一次 73–86 分鐘），改跑受影響的 suite、推上去由 CI 跑完整的 `ci.yml`；`R1y-4` 與 `D6` 的 DoD 照實改寫並寫明理由。第十五條、study 檔同時交代理起草，phase 2 的數字留成 `{{…}}` 空格，提交前 grep 確認沒有留下。
+
+### 十、`R1y-7` 與 gate 關閉（收工的提交）
+
+- 第十五條由代理照事實清單起草、空格由我填（`fill-gr15.py`）：DoD 逐列、否證條件、停損、兩個問題、十二條「沒有建立的」、主 session 的十條裁決。在十五條上重跑 operating clause：`R6b` → `R1y` 不觸發（`R6b` 的殘留是裝置面、`R1y` 的是紀錄面；第十四條觸發的傳送故障機制沒有進 `R1y`，因為 `R1y` 沒有接它）；普查沒有第六個實例。程式與 TSV 註解裡指向舊 `PROGRESS.md` 行的是 10 個檔的 14 行，不是我寫的 11 行（代理量）。
+- `CLAUDE.md` § At the bench：loader 只在 `IPCONFIG` 之後回 ARP（`NET-95`），上傳前在 `IPCONFIG` 之後查；不准無人待機在提示字元（`NET-165`）。348 行、24,033 B。
+- `R1y` 的步驟表標 ✅ CLOSED、照 `R1y-4` 的新慣例在收工的提交裡搬進 `docs/history/steps-R1y.md`（`docmove` 234／234）；§ Now 改成兩個 gate 之間（`C12` 的宣告）；board 的 `R1y` 列 ✓、Actual 1。`PROGRESS.md` 428 行、86,031 B。`cfcensus write` 前後無差異。這是第一次 `PROGRESS.md` 裡一份步驟表都沒有：`cfcensus` 自測 64／64、`check` 25 列 0 finding。
+
+### 十一、我做錯的，與教訓
+
+- 簡報的 HEAD 落後兩個 commit —— 開場量 repo 抓到（記憶規則照做）。
+- 例子 `PROGRESS.md:1234` 被 `citecheck` 當成引用：散文裡不要寫 `FILE:NNN` 形狀的例子。
+- 給 blast 代理的標題樣式只抓得到 12 份、索引標題含 "step list"：代理量出來。教訓：選取規則要照 repo 自己的解析器（`cfcensus`／`C12` 都是「step list」＋不分大小寫的 closed）。
+- `R1y-6` 提交前沒有列出改動行上的每一個引用（`FW-119`）：重新定年藏住 `CPU-04` 的錯引用，提交後才被 `C4` 抓到。之後每次提交前跑 `redate.sh`。
+- 我自己核對 `FW-137` 的 regex 只容一個空白，讀出四個假的 DIFFER；改的是解析，不是門檻。
+- PowerShell 經 wsl 傳空引號與 `\|` 會壞，讀出 0 或什麼都沒有；照 `CLAUDE.md` 一律寫成腳本檔。一次把 `ci-expected.tsv` 整列印出來，浪費 context。
+- 收尾腳本的一個參數（§ Now 的一句）經 `wsl -- python3 … '…'` 傳進去，Linux 端的 shell 把反引號當命令替換，`` `R1y` ``、`` `R6b` `` 被吃掉；提交前讀 § Now 抓到、改回，docmove 的 before 檔同步修。帶反引號的文字只能寫在腳本檔裡，不能當命令列參數（記憶裡 `$(…)` 那一條的同一類）。
+
+### 十二、沒做的
+
+- 完整 desk-sweep（見 § 九）。
+- `SPEC.md` 的列重寫與 § 19 歸位（擁有者的範圍）；開著的 carried-forward 列沒有重寫。
+- 四支 enforcer（⊘）；列身分的引用解析（26 個就地長大的列只給得出當時的文字）。
+
+### 十三、不確立
+
+- 見第十五條 *What `R1y` did not establish* 的十二條；最要緊的三條：二十六個就地長大的列只讀得到當時的文字、完整 desk-sweep 沒有在最終的樹上跑（CI 代替）、`SPEC.md` 的列沒有重寫（第十五條的 *What `R1y` did not establish*）。
+
+### 十四、等擁有者的（不擋任何步驟）
+
+- 下一個 gate：第十四條的 operating clause 仍指向 `rlx0` 傳送故障的機制（`M5`，一次按壓、不用新映像）；開它、記成做不到、或改開別的。
+- `CLAUDE.md` § Flash 每次按壓仍宣稱 `n_writes`（`FW-142`）；`MK6`／`MK7`／`MK9`／`MK10` 的見證不會失敗（`FW-143`）；`CLK-42` 殘留要一個 gate。
+- 這一段主 session 的裁決（第十五條最後一節）。
+- 磁碟與 worktree 的清理（handoff-s116 第 5 點），刪除不可逆。
+
+### 十五、下一段
+
+- 沒有開著的 gate。下一個 gate 由擁有者決定；第十四條的 operating clause 仍指向 `rlx0` 傳送故障的機制（`M5`，一次按壓、不用新映像）。下一次開 gate 時要問擁有者是否延續 2026-09-27 的放寬。
