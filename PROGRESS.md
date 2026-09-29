@@ -1906,8 +1906,8 @@ version *contains* moved to `README.md` § *Which gates make which version* on
 | **`v0.1`** | — · never tagged; its contents completed 2026-08-26 |
 | `v0.2` | 🟢 **2026-09-01** |
 | `v0.3` | 🟢 **2026-09-11** |
-| `v0.4` | — |
-| `v0.5` | — |
+| `v0.4` | 🟢 **2026-09-17** |
+| `v0.5` | 🟢 **2026-09-29** |
 | `v0.6` | — |
 | `v1.0` | — |
 

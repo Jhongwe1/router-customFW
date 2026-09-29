@@ -1471,6 +1471,51 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+Nothing since `v0.5`.
+
+---
+
+## v0.5 — 2026-09-29
+
+**Contents, against [`README.md`'s version map](README.md#which-gates-make-which-version):**
+`R6` — an Ethernet driver of mine — plus **`P2`**, both firmwares' boot time through one
+script; and `R6b`, which `R6` left: its transmit fault fixed, and the vendor's Ethernet tree
+out of the image.
+
+🟢 **What `R6b` is, in two sentences.** `rlx0`'s transmit loss is a descriptor-length fault:
+with the vendor's convention — `m_len` = `m_extsize` = `ph_len` — E2's eleven lengths answered
+220 of 220 on two boots on which rlxfw's old convention answered 145 of 1,327 and 144 of 1,189,
+a sweep over every length from 60 to 1,514 moved `JabberErr` by 0, and `rtl819x-nic` 1.6 makes
+the convention its default. On an image with none of the vendor's Ethernet code, the standard
+`/init` brings the switch up with one write class and `rlx0` pings both ways after a cold
+power-on and after `busybox reboot -f`, the host resolving rlxfw's own locally administered
+address (`D8`, `SPEC.md` `NET-167`); since 8g the mainline builds that configuration, and
+`quiet-swcore` keeps the vendor tree for `R9`.
+
+🟢 **`R6`**: `rtl819x-nic` and `rtl819x-switch` bring the CPU port up and carry traffic — `rlx0`
+pings both ways with a positive discriminator, moves 17.03 / 17.76 / 17.09 Mbit/s of bulk TCP,
+and survives 31.66 minutes of flood with `drop 0/0`. 🟢 **`P2`**: `tools/boot-timeline.py`
+splits both firmwares' boots into segments on one host clock; on a second calendar day 134 of
+the 140 numbers the frozen contract called stable reproduced within ±10 %
+([`docs/boot-time-table.md`](docs/boot-time-table.md)).
+
+🔴 **The weakest thing in this release is that `D8` passes on switch state rlxfw did not
+write**: the VLAN group, `FFCR`'s traps, EEE and `QNUMCR` are the loader's, measured only on
+boots that followed a TFTP upload — never on the product's path, from flash. How a frame
+reaches the CPU is 推 on one source (`NET-169`), and the transmit fault's mechanism is unnamed:
+the operating clause at fourteen entries names it as the next gate.
+
+⚠️ **What a release's known-issues list is**: the copy of
+[`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md) at this tag, which is frozen; this release's own
+section there is *What `v0.5` does not establish*.
+
+**Zero flash-write commands in `R6b`'s seatings** — `cardcheck` refuses them — and every press
+bracketed by the on-device flash map, which read 31 of 32 groups identical to the 2026-08-16
+reference at every map; the group that differs holds the sectors `FLS-26` found changed before
+this release.
+
+### Written under *Unreleased* on 2026-09-17
+
 🔴 **This section said `R6` was "next and not opened" and that had been stale
 since 2026-09-17 morning**, when `R6` was opened in the same segment `v0.4` was
 tagged. Corrected here on the evening of the same day.
