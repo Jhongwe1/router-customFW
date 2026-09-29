@@ -38,7 +38,6 @@ ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/gpio/rtl819x-gpio.c	120	4141c4
 ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	476	6434cf036758c7c6	static int rtl819x_ack_proven; /* WE watched TC1IP go 1 -> 0 */
 ROT	SPEC.md	config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	471	c296bd9571bdf7ac	spin_lock_irqsave(&rtl819x_tc_lock, flags);
 ROT	SPEC.md	tools/rlxfw-kbuild.sh	412	327b72644d48cdd9	esac
-ROT	SPEC.md	SOURCES.json	195	c6d73b3361c318dd	"pinmux": "sec 6.1 Configuration upon Power-On Strapping, sec 6.2 Shar
 ROT	docs/FINDINGS.md	docs/FINDINGS.md	375	c91c9b040875e0fb	## It changed what this repository may claim about itself
 ROT	docs/KNOWN-ISSUES.md	notes/timer-driver.md	273	415d2c4eb64624a2	`kernel/time/jiffies.c:37` — `NSEC_PER_JIFFY` is `((u64)NSEC_PER_SEC <
 ROT	docs/blind-write-ledger.md	docs/FINDINGS.md	375	c91c9b040875e0fb	## It changed what this repository may claim about itself
