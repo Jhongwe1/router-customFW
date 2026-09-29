@@ -33426,3 +33426,12 @@ commit：`1b7c1fd`、`fb4226d`、`95dabac`（8c-code 十個）、`9107b20`（8b 
 - 磁碟：`r3-4/cells/r6b8i`、`r6b8i2` 各 483 MB；`s113`–`s116` 的 clone 與舊 cell，`R6b` 關了可清 （量 20:10：`r3-4/cells` 37 G、`r3-4/out` 426 M、`s113` 3.1 G、`s114` 2.3 G、`s115` 3.2 G、`s116` 1.1 G；ext4 還有 826 G；沒刪，等擁有者）。
 
 commit：`1f9ebf1`、`010fb1a`、`b173746`、`884b1b0`、`1fbd719`、`025b336`、`18c9068`、`5bef4d8`、本條。
+
+### 十四、README 與 `v0.5`（2026-09-29，擁有者的要求）
+
+- 擁有者：README 標 `R6b` 完成、開頭換成更亮的現況（三句）、在 GitHub 發 `v0.5`。`README.md` 自己的版本表：`v0.5` 由 `R6` + `P2` 定義，兩個都已關；這一版也帶 `R6b`。
+- README（`0281139`）：開頭 13 行換成三條加一行 `v0.2` 的重播影片，行數不變（`PROGRESS.md` `CI-4` 引 `README.md:772`）。`Status` 列開頭還是「`v0.2` … the firmware does not exist yet」，`Not measured` 列把 cache 幾何、pipeline hazard、DMA 一致性、`cache` 退休列為沒量過 —— 四件都早已量過；兩列改寫成現況，舊文逐字搬到 `docs/history/readme-2026-09-29.md`（`docmove` CONSERVED：70 個區塊保留、2 個原地改的以 `--allow-drop` 宣告）。「Where it is going」的 `R6b` 標 closed 2026-09-28。第三條原本寫「上面的數字都由不共用程式碼的讀者重算」—— 我確定不了 block 47／48 的數字是那樣重算的，提交前改成只對 arm I 這麼說。
+- `docs/KNOWN-ISSUES.md`：開頭那一格還說 `R3` 的 ping 走原廠的 `rtl819x` 驅動、`R6` 是會改這句的 gate —— `R6` 在 9/22 關了之後這句就錯了，六天沒人改；改成現值（網路是 rlxfw 的；還不是我的：loader 留下的交換器設定、WLAN 驅動）加一行指標。`rlx0` 丟訊框那一節標上 `R6b` 修好成預設；新增「`v0.5` 沒有建立的」一節。
+- `CHANGELOG.md` 的 `v0.5` 一節（9/17 寫在 `## Unreleased` 下的 `R6-1` 內容歸入它）。🔴 `PROGRESS.md` 的 Release clock：`v0.4` 那一列從 9/17 發佈以來一直是「—」（量 `gh release list`：`v0.4` 2026-09-17T02:37:14Z）—— 與 `v0.5` 一起原地改。
+- 這些改動 9/28 深夜寫進工作樹，session 在提交之前斷了；9/29 20:55 重開時先量：HEAD＝origin＝`1c9b0d2`、它的 CI success、工作樹正是那些改動。發版日期因此寫 9/29，歷史檔也改名成 9/29。
+- `v0.5`：annotated tag 在 `0281139`，推上；GitHub release 2026-09-29T13:03:01Z，Latest。`0281139` 的 CI 在寫這一條時還在跑 —— 下一段開場看它的 conclusion。
