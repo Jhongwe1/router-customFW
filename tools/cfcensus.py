@@ -83,7 +83,9 @@ exemptions -- not a heuristic.
               closed, `~` in progress, `·` not started, `⊘` declined) and
               CROSS-CHECKED against the `^## ...step list` section headers,
               which carry their own `CLOSED <date>`.  A gate the two sources
-              disagree about is `L5` and not a silent pick.
+              disagree about is `L5` and not a silent pick.  🔄 2026-09-30
+              (`R1y-4`): the headers and step rows of PROGRESS.md and of
+              `docs/history/steps-*.md`, where a closed gate's list lives.
 
   🔴 The population's own weakness, stated because it does not go away.  Both
   populations come from ONE file.  This is the record auditing itself, and it
@@ -278,8 +280,9 @@ GATE_RENAME = {
             'the same step list -- `R1-pub-0` reads "Every `R1a` instruction '
             'row and every `R1b` hazard row"'),
     'R5-3': ('R5-3a',
-             '`PROGRESS.md` § Session ladder: "`R5-3` 正式拆成 `R5-3a` … 與 '
-             '`R5-3b` …", and both are live step ids'),
+             '`docs/history/progress-ladder.md` (PROGRESS.md § Session ladder '
+             'until `R1y-4`): "`R5-3` 正式拆成 `R5-3a` … 與 `R5-3b` …", and '
+             'both are step ids of `docs/history/steps-R5.md`'),
 }
 
 # 🔴 `GATE_SHAPE` IS DELIBERATELY BROAD, SO SOME OF WHAT IT MATCHES IS NOT A
@@ -691,8 +694,13 @@ def board_gates(text):
     return out
 
 
-def header_gates(text):
+def header_gates(text, archived=()):
     """{gate: (closed?, header name)} from the `^## ...step list` headers.
+
+    🔄 2026-09-30 (`R1y-4`): of PROGRESS.md AND of every archived list
+    (`spec-check.archived_step_lists`), where a closed gate's list lives from
+    its closing commit on.  Between gates PROGRESS.md holds no step list at all,
+    and the archive is what keeps this from refusing then.
 
     The SECOND source for gate closure.  `L5` requires it to agree with the
     board; a gate whose header says CLOSED while the board says otherwise is
@@ -704,7 +712,7 @@ def header_gates(text):
     two as open, which is four of the nine unmarked steps left behind.
     """
     out = {}
-    for ln in text.split('\n'):
+    for ln in '\n'.join([text] + [t for _p, t in archived]).split('\n'):
         # 🔴 case-insensitive: the ACTIVE gate's section is `## Step list for
         # the active gate — `R1z`` with a capital S, and every closed gate's
         # is `` ## `R5`'s step list ``.  量 2026-09-16: a case-sensitive test
@@ -723,15 +731,10 @@ def header_gates(text):
     return out
 
 
-def step_state(text):
-    """{step id: closed?} through `spec-check`'s OWN parser, not a copy.
-
-    🟢 Importing rather than restating is deliberate and it buys a second
-    thing besides one owner for the rule: when `R1z-1` makes
-    `progress_step_state` stricter, this census gets stricter in the same
-    commit and the two tools cannot drift.  `tools/flashmap.py` importing
-    `flashwin.overlaps_forbidden` is this repository's precedent.
-    """
+def _speccheck():
+    """`tools/spec-check.py` as a module, loaded once per process."""
+    if _SC:
+        return _SC[0]
     import importlib.machinery
     import importlib.util
     p = os.path.join(HERE, 'spec-check.py')
@@ -748,19 +751,83 @@ def step_state(text):
                       % (sys.version_info[0], sys.version_info[1], e))
     except Exception as e:
         raise Refused('spec-check.py would not import: %r' % (e,))
+    _SC.append(sc)
+    return sc
+
+
+_SC = []
+
+
+def step_state(text, archived=()):
+    """{step id: closed?} through `spec-check`'s OWN parser, not a copy.
+
+    🟢 Importing rather than restating is deliberate and it buys a second
+    thing besides one owner for the rule: when `R1z-1` makes
+    `progress_step_state` stricter, this census gets stricter in the same
+    commit and the two tools cannot drift.  `tools/flashmap.py` importing
+    `flashwin.overlaps_forbidden` is this repository's precedent.
+
+    🔄 2026-09-30 (`R1y-4`): over PROGRESS.md and every archived list.  A step
+    id that two lists give to two DIFFERENT gates is refused: in one file the
+    first section won, and the archive has no file order to decide by.
+    """
+    sc = _speccheck()
     # 🔴 TWO QUESTIONS, ASKED SEPARATELY.  `marked` is *does this step row
     # carry its own ✅*; `state` is *is this step closed by anything*, which
     # from 2026-09-16 includes its section header saying CLOSED.  `L6`'s
     # subject is the DATA -- nine rows of two closed gates with no mark -- and
     # asking the wider question would have made `L6` go silent the hour
     # `spec-check` learned to read the header, with the rows unchanged.
-    return (sc.progress_step_state(text),
-            sc.progress_step_state(text, header_closes=False),
-            sc.progress_step_owner(text))
+    owner = sc.progress_step_owner(text)
+    for path, t in archived:
+        for sid, gate in sc.progress_step_owner(t).items():
+            if owner.get(sid, gate) != gate:
+                raise Refused('step `%s` sits under `%s` in one step list and '
+                              'under `%s` in %s -- two gates cannot own one '
+                              'step, and nothing orders the archive'
+                              % (sid, owner[sid], gate, path))
+            owner.setdefault(sid, gate)
+    return (sc.step_state_with(text, archived),
+            sc.step_state_with(text, archived, header_closes=False),
+            owner)
+
+
+def archived_lists():
+    """The closed gates' step lists under `docs/history/`, via spec-check."""
+    try:
+        return _speccheck().archived_step_lists(ROOT)
+    except OSError as e:
+        raise Refused('a step list under docs/history/ cannot be read: %s' % e)
+
+
+# 🔄 2026-09-30 (`R1y-4`): § Corrections is a record in `docs/history/` now,
+# heading and all.  `L11` reads it there as well as in PROGRESS.md, and the
+# live file is REFUSED when neither holds the section: the section leaving
+# PROGRESS.md made `L11` read nothing, silently, on the first measurement of
+# this move.
+CORRECTIONS = os.path.join(ROOT, 'docs', 'history', 'progress-corrections.md')
+
+
+def corrections_texts(text):
+    """[texts that may hold `## Corrections`] for the live file."""
+    out = [text]
+    if os.path.exists(CORRECTIONS):
+        with io.open(CORRECTIONS, encoding='utf-8') as fh:
+            out.append(fh.read())
+    if not any(ln.strip() == '## Corrections'
+               for t in out for ln in t.split('\n')):
+        raise Refused('no `## Corrections` section in PROGRESS.md or %s -- '
+                      '`L11` would read nothing' % os.path.relpath(CORRECTIONS,
+                                                                  ROOT))
+    return out
 
 
 def population(text=None):
-    text = read_progress() if text is None else text
+    """The live file (text=None) reads the archived step lists and the archived
+    § Corrections too; a fixture passed as `text` is the whole world."""
+    live = text is None
+    text = read_progress() if live else text
+    archived = archived_lists() if live else ()
     bad = heading_inside_table(text)
     if bad:
         raise Refused('a `## ` heading sits inside a table (%s) -- it '
@@ -771,11 +838,12 @@ def population(text=None):
                       % '; '.join('line %d: %s' % b for b in bad))
     rows, raw, skipped = cf_rows(text)
     board = board_gates(text)
-    hdr = header_gates(text)
-    steps, marked, owner = step_state(text)
+    hdr = header_gates(text, archived)
+    steps, marked, owner = step_state(text, archived)
     return {'rows': rows, 'raw': raw, 'skipped': skipped, 'board': board,
             'header': hdr, 'steps': steps, 'marked': marked,
             'step_owner': owner, 'text': text,
+            'corr': corrections_texts(text) if live else [text],
             'rowids': frozenset(r['id'] for r in rows)}
 
 
@@ -1141,7 +1209,11 @@ def check(pop=None, exempt=None):
     for r in rows:
         if r['state'] != 'OPEN':
             continue
-        where = corrections_closure(pop['text'], r['id'])
+        where = ''
+        for t in pop.get('corr', [pop['text']]):
+            where = corrections_closure(t, r['id'])
+            if where:
+                break
         if where:
             f.append('L11 %s: its first cell is open and § Corrections records '
                      'a closure for it (%s) -- the table that owns this row\'s '
@@ -1531,7 +1603,8 @@ def write_blocks(path=None):
     p = path or PROGRESS
     with io.open(p, encoding='utf-8') as fh:
         text = fh.read()
-    pop = population(text)
+    # the live file is censused as `check` censuses it -- with its archive
+    pop = population(None if path is None else text)
     rows = census(pop)
     body = {'counts': render_counts(rows, pop), 'debt': render_debt(rows)}
     for tag, new in body.items():

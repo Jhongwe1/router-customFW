@@ -808,7 +808,7 @@ cannot support. `R5`'s `否證 D3` already provides for exactly that.
 | `arch/mips/boot/dts/realtek/rtl8196e.dtsi` | name | **third-party (`shibajee`)** | 🟢 **the `cpu@0` node only**: `compatible = "lexra,rlx4181"`, `d-cache-size <8192>`, `i-cache-size <16384>`, both line sizes `<16>`, `tlb-entries <32>`. Fetched and read 2026-08-25 for `CPU-25`'s advance cache-geometry prediction (`notes/cache-model.md` § 386, § 488) |
 
 🟢 **The thing that would have spoiled the diff is recorded as absent, and it
-was recorded eight days before `R5` opened** — `PROGRESS.md:1353`, 2026-08-25:
+was recorded eight days before `R5` opened** — `docs/history/progress-ladder.md:78`, 2026-08-25:
 *"that file's register addresses are placeholders and `dtc` refuses to parse
 it"*. `driver-diff` compares register maps; the register map was not there to
 take.

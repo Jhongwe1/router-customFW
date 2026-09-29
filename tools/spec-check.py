@@ -1974,8 +1974,9 @@ def c12_blocks(row):
     return out
 
 
-def progress_findings(text, path='PROGRESS.md'):
-    """(findings, state, ids) for C12."""
+def progress_findings(text, path='PROGRESS.md', archived=()):
+    """(findings, state, ids) for C12.  `archived` is `archived_step_lists()`
+    for the live file and empty for a fixture."""
     row = None
     for ln in text.split('\n'):
         if ln.startswith(C12_ROW):
@@ -1993,7 +1994,7 @@ def progress_findings(text, path='PROGRESS.md'):
     newest_date = max(d for d, _b in blocks)
     tail = ' '.join(b for d, b in blocks if d == newest_date)
     tail = C12_DESCRIBED.sub(' ', tail)
-    steps = progress_step_state(text)
+    steps = step_state_with(text, archived)
     ids = sorted({i for i in C12_STEP.findall(tail) if i in steps})
     if not ids:
         if C12_NOSTEP in row:
@@ -2041,6 +2042,45 @@ def progress_step_owner(text):
         i = _step_row_id(ln.split('|')[1])
         if i is not None:
             out.setdefault(i, cur)
+    return out
+
+
+# 🔄 2026-09-30 (`R1y-4`): A CLOSED GATE'S STEP LIST LIVES IN `docs/history/`.
+# `R1y-4` moved the fourteen closed lists verbatim to
+# `docs/history/steps-<gate>.md`, and a later list moves there in its gate's
+# closing commit, so the step map -- which ids are steps, and which are
+# closed -- is PROGRESS.md's open list plus every archived one.  Read without
+# the archive, a closed step named in `Next after this` is no step at all:
+# C12 reads NO-STEP-ID where it read FIRE, and under the between-gates
+# declaration it reads nothing.  量 at `e274ccb`, before the move: 107 step
+# ids and none under two sections, so the merge reproduces the one-file map
+# in any order.  `tools/cfcensus.py` reads the same archive through here.
+STEP_ARCHIVE = 'docs/history'
+
+
+def archived_step_lists(root=ROOT):
+    """[(path, text)] for every `docs/history/steps-*.md`, by file name.
+    An unreadable list raises OSError; `main` turns that into a refusal."""
+    d = os.path.join(root, *STEP_ARCHIVE.split('/'))
+    try:
+        names = sorted(n for n in os.listdir(d)
+                       if n.startswith('steps-') and n.endswith('.md'))
+    except OSError:
+        return []
+    out = []
+    for n in names:
+        with io.open(os.path.join(d, n), encoding='utf-8') as fh:
+            out.append((STEP_ARCHIVE + '/' + n, fh.read()))
+    return out
+
+
+def step_state_with(text, archived, header_closes=True):
+    """`progress_step_state` over PROGRESS.md's text and every archived list;
+    a step is closed if any of them closes it, as within one file."""
+    out = progress_step_state(text, header_closes)
+    for _path, t in archived:
+        for i, shut in progress_step_state(t, header_closes).items():
+            out[i] = out.get(i, False) or shut
     return out
 
 
@@ -2145,9 +2185,9 @@ C12_CASES = [
 ]
 
 
-def progress_controls(verbose=True):
+def progress_controls(verbose=True, archived=()):
     """C12's controls: a fixture § Step list, one case per failure mode, and a
-    population control on the real file.
+    population control on the real file (`archived`: its step-list archive).
 
     The § Step list is a FIXTURE and not the real one, so these cases do not go
     red the next time a step closes -- which is the event C12 exists to catch,
@@ -2193,7 +2233,7 @@ def progress_controls(verbose=True):
     live = os.path.join(ROOT, 'PROGRESS.md')
     if os.path.exists(live):
         with io.open(live, encoding='utf-8') as f:
-            _f, state, ids = progress_findings(f.read())
+            _f, state, ids = progress_findings(f.read(), archived=archived)
         # 🔄 2026-09-16 (`R1z-1`): `NO-STEP-DECLARED` is a fourth legal state.
         # 量, before this: the only way to express *the gate closed and the
         # next is not chosen* was NO-STEP-ID, which this control calls "passing
@@ -2243,10 +2283,16 @@ def main(argv):
         print(f'no such file: {path}')
         return 2
 
+    try:
+        archived = archived_step_lists()
+    except OSError as e:
+        print(f'  REFUSING: a closed step list under {STEP_ARCHIVE}/ cannot be '
+              f'read ({e}), and C12 would read a map without it')
+        return 2
     failed = controls(path)
     failed += table_controls()
     failed += srcref_controls()
-    failed += progress_controls()
+    failed += progress_controls(archived=archived)
     if failed:
         print('  REFUSING to report on the file: a check that cannot fail would '
               'report it clean whatever it says')
@@ -2266,7 +2312,7 @@ def main(argv):
     print()
     with io.open(os.path.join(ROOT, 'PROGRESS.md'),
                  encoding='utf-8') as f:
-        pf, pstate, pids = progress_findings(f.read())
+        pf, pstate, pids = progress_findings(f.read(), archived=archived)
     return rc | report_progress(pf, pstate, pids)
 
 

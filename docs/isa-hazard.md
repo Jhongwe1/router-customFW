@@ -209,7 +209,7 @@ strictly more than *zero* ever said.
 
 **And the sign is inverted: for probe5, `hazlint` exiting 0 is a build failure.**
 A hazard payload with no violations has had its hazards compiled away, which is
-`PROGRESS.md:122`'s risk column in one sentence — *`-O` may insert the very `nop`
+`docs/history/steps-R1-pub-R2c.md:70`'s risk column in one sentence — *`-O` may insert the very `nop`
 the test exists to detect; the payload has to be read as built, not as written*.
 That inversion is the step's pass condition, and it is a refusal rather than a
 report.

@@ -86,10 +86,12 @@ agree: name the tool that could be lying and the second source that settles it.
   never append.** A wrong line is fixed where it stands and the fix is recorded in
   `LOG.md`.
 - **Record** — `LOG.md`; everything under `bench/` once committed; each
-  `docs/GATE-RESULTS.md` entry; `docs/history/`; `CHANGELOG.md`; and, until `R1y`
-  moves them out, `PROGRESS.md`'s closed step lists, § Session ladder and
-  § Corrections. A record is never edited after the segment that wrote it; a
-  correction is a new dated entry. The record of being wrong lives here.
+  `docs/GATE-RESULTS.md` entry; `CHANGELOG.md`; and `docs/history/`, which holds
+  `PROGRESS.md`'s closed step lists, session ladder and corrections. A closed
+  gate's step list moves to `docs/history/steps-<gate>.md` in its closing
+  commit, and a record's line citation is read with `tools/citeresolve.py`. A
+  record is never edited after the segment that wrote it; a correction is a new
+  dated entry. The record of being wrong lives here.
 - **Finding** — `SPEC.md` rows and the rest of `notes/` and `docs/`: the current
   value and where it came from. A superseded value keeps one line pointing at the
   file that owns the correction; the story of the correction lives there or in
