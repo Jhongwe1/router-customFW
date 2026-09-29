@@ -558,3 +558,40 @@ reading, because a citation can be wrong at its first commit too.
 
 What this does not establish: how many rotted citations are hidden this way
 today. Only lines this segment edited were read.
+
+## 5.7 A record's line citation, resolved as the rule reads it — 量 2026-09-30 (`R1y-3`)
+
+`tools/citeresolve.py` reads a line citation inside a record the way this
+repository says it resolves — against the cited file as it was at the commit
+that wrote the citing line — and then looks for that text in today's tree. It
+imports `citecheck`'s citation grammar and `docmove`'s normalisation rather than
+restating them, and changes neither tool. Two things had to be measured first:
+
+* **Dating needs `git blame -C` over the whole file.** Plain blame dates 9,659 of
+  `LOG.md`'s 33,437 lines to `10b8fbc6` (2026-09-02), a commit that only moved
+  two entries to the end of the file. Against a third source, the oldest commit
+  whose patch added the exact line, plain blame agrees on 346 of 425 citing
+  lines and `-C` on 423; restricting blame with `-L` changes what move detection
+  finds (10 of 425 differ), so whole files are blamed.
+* **A cited path resolves in the citing commit's tree**, not today's:
+  `citecheck`'s scan drops a citation of a file deleted since without a word.
+
+On `LOG.md`'s 44 citations of `PROGRESS.md`, on 43 lines: 15 resolve to one
+place (3 still at the cited line, 12 moved within the file), 1 is ambiguous (a
+table separator), 2 are refused (one backwards range, which the citing line
+itself records as a botched repair), and **26 cite text that exists nowhere
+today**. All 26 are labelled rows whose text changed after the citation: § Now's
+`Next after this`, `Active step` and `Active gate`, rewritten every segment;
+carried-forward rows (`R1C-1`, `CF-1`, `WRAP-1`, `LOG-1`, `CITE-1`, `CITE-2`,
+`C-10`) and step rows (`R1-pub-2`, `-4`, `-6`, `-7`, `R5-5`) that grew in place
+(§ 5.5). For those a reader gets the cited text as it stood and no current
+location. Second instruments: the cited text re-read with `git cat-file`
+matched 323 of 323, every reported location held its text at `HEAD` (509 of
+509), and single-line match counts agreed with `git grep -F` on 269 of 269 (the
+landing's); two examples recomputed by the main session with plain
+`git log -S` and `cat-file`.
+
+What this does not establish: where a row that grew in place lives now — a
+row-identity reading, as `FW-110`'s, would find most of the 26; anything under
+`upstream/`, `src-vendor/` or `plan/`; extensionless files, a bare `:NNN`,
+fenced citations, or a thousands comma, which reads as two lines.

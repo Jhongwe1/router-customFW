@@ -938,6 +938,10 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/docmove.py check --before e36acb4:CLAUDE.md --after docs/history/claude-md-2026-09-23.md 2>&1 | tee ci-out/docmove-claude.out; exit "${PIPESTATUS[0]}"
 
+      - name: citeresolve self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/citeresolve.py --self-test 2>&1 | tee ci-out/citeresolve.out; exit "${PIPESTATUS[0]}"
+
       - name: fetch-sources --list (offline; never fetches)
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/fetch-sources.sh --list
