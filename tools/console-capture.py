@@ -824,7 +824,7 @@ def capture(args) -> int:
                 # --seconds cap expired in has SEEN ITS EVENT, and that is the
                 # informative reading; "--seconds elapsed" on such a capture
                 # would read as "the window was too short", which is the exact
-                # misreading this flag exists to prevent. Case N35 pins it.
+                # misreading this flag exists to prevent. Case N41 pins it.
                 if until_at is not None:
                     stop_reason = f"--until matched at offset {until_at}"
                     break

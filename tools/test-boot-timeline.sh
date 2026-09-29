@@ -28,7 +28,8 @@
 #   B9  cold/warm inherited, and when it must not be -- since P2-4 a placed
 #       capture's gap is on REALTIME, never a RAW duration on a wallclock; B9b a report of this
 #       tool saved beside the captures is not a boot (2026-09-23).   B10  the host-probe
-#       join on either clock (P2-4), and the reason for every pair it refuses.
+#       join on either clock (P2-4), and the reason for every pair it refuses; a
+#       landmark past the capture's window is reported with its distance (R1y, FW-137).
 #   B11  TERM-1's silences.
 #   B12  the per-seating scale fit, with a positive and a negative control.
 #   B13  the retro's identity line and TSV.   B14  refusals.   B15  FW-124:
@@ -706,6 +707,10 @@ del old["t0_mono"]
 mk(FX + "/probe/old.log", rlxfw(), old)
 rt = dict(new, clock="CLOCK_REALTIME")
 mk(FX + "/probe/rt.log", rlxfw(), rt)
+# R1y (SPEC.md FW-137): the same capture with its window closing at 10 s,
+# before any planted host landmark arrives.
+mk(FX + "/probe/cap-short.log", rlxfw(),
+   dict(new, duration_s=10.0, end_mono=5010.0, end_real=1.0e9 + 10))
 with open(FX + "/probe/hp.events", "w", encoding="utf-8", newline="\n") as fh:
     fh.write("# hostprobe events -- synthetic\n"
              "4999.000000 start t_real=1.0\n"
@@ -1111,6 +1116,22 @@ ck "r8 a probe header contradicting its meta is MALFORMED by hostprobe's reader;
 m1="$(jn "$ROOT/bench/2026-09-23/M1-HP" "$ROOT/bench/2026-09-23/M1-BOOT.log")"
 ck "a real seating-A pair keeps HEAD's values (M1-HP, M1-BOOT)" "0 15.636799 26.058069 1076" \
    "$(printf '%s\n' "$m1" | head -1) $(printf '%s\n' "$m1" | netv) $(printf '%s\n' "$m1" | sed -n 's/.*event(s): \([0-9]*\) considered.*/\1/p')"
+# 🆕 R1y (SPEC.md FW-137): a landmark past the capture's window.  cap-short is
+# cap.log with its window closing at 10 s, before any planted landmark.
+# Written before the change ran -- REFUTED IF a `host`/`net` line reads a value
+# (they mean inside the window), if a landmark does not come back on an `after`
+# line with its planted time and its distance past the window's end (net.up
+# 12.740000 at +2.750000, net.http 15.240000 at +5.250000; icmp 12.75, neigh
+# 12.5, udp 16, tcp:80 15.25), if the NOTE is missing or the counts move -- or
+# if cap.log, whose window holds every first landmark while a reply at s = 41
+# lies past it, prints an `after` line or the NOTE.
+pw="$(jn "$P/hp" "$P/cap-short.log")"
+ck "a landmark past the window: '--' kept, an 'after' line with its distance" \
+   "0 -- -- 12.740000 +2.750000 15.240000 +5.250000 1" \
+   "$(printf '%s\n' "$pw" | head -1) $(printf '%s\n' "$pw" | netv) $(printf '%s\n' "$pw" | awk '$1 == "after" && $2 == "net.up" { a = $7 " " $8 } $1 == "after" && $2 == "net.http" { b = $7 " " $8 } END { print a, b }') $(printf '%s\n' "$pw" | grep -c "^  NOTE: the capture's window closed before 4 host landmark(s) arrived: ")"
+ck "each host landmark past it, in order; none when the window holds them" \
+   "12.750000 +2.750000 12.500000 +2.500000 16.000000 +6.000000 15.250000 +5.250000 3 1 0 0" \
+   "$(printf '%s\n' "$pw" | awk '$1 == "after" && $3 == "s" { printf "%s %s ", $4, $5 }')$(printf '%s\n' "$pw" | grep -c '^  host net\.[a-z]*_first *--$') $(printf '%s\n' "$pw" | grep -c '1 before sent_s, 3 considered, 8 outside the capture.s window') $(printf '%s\n' "$pj" | grep -c '^  after ') $(printf '%s\n' "$pj" | grep -c '^  NOTE: the capture.s window closed')"
 
 echo
 echo "=== B11: TERM-1 -- the longest silence ==="

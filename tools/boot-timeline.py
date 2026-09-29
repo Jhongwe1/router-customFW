@@ -1678,6 +1678,29 @@ def probe_malformed(prefix):
         raise Refused(str(exc))
 
 
+#: The host landmarks with one line each whether or not they were seen, in the
+#: order the join prints them; a `net.tcp:<port>_first` line follows only when
+#: that port succeeded.
+HOST_LINES = ("net.icmp_first", "net.neigh_first", "net.udp_first")
+
+
+def host_landmarks(events):
+    """-> {landmark: (s, what)}: the first of each host landmark in `events`,
+    a time-ordered list of (s, kind, {key: value}, line number)."""
+    host = {}
+    for s, kind, kv, n in events:
+        if kind == "icmp-reply":
+            host.setdefault("net.icmp_first", (s, "seq=%s line %d" % (kv.get("seq"), n)))
+        elif kind == "tcp" and kv.get("result") == "ok":
+            host.setdefault("net.tcp:%s_first" % kv.get("port"),
+                            (s, "port=%s line %d" % (kv.get("port"), n)))
+        elif kind == "neigh" and kv.get("state") in NUD_UP:
+            host.setdefault("net.neigh_first", (s, "state=%s line %d" % (kv.get("state"), n)))
+        elif kind == "udp":
+            host.setdefault("net.udp_first", (s, "port=%s line %d" % (kv.get("port"), n)))
+    return host
+
+
 def probe_join(log, prefix, force):
     corpus = Corpus()
     if not os.path.isfile(log):
@@ -1727,28 +1750,33 @@ def probe_join(log, prefix, force):
     out = kernel_lines(rec)
     window = (0.0, end - t0)
     counts = defaultdict(int)
-    considered = []
+    considered, past = [], []
     for t, kind, kv, n in sorted(events, key=lambda e: (e[0], e[3])):
         s = t - t0
         if s < window[0] or s > window[1]:
             counts["outside the capture's window"] += 1
+            if s > window[1]:
+                past.append((s, kind, kv, n))
             continue
         if sent_s is not None and s < sent_s:
             counts["before sent_s"] += 1
             continue
         counts["considered"] += 1
         considered.append((s, kind, kv, n))
-    host = {}
-    for s, kind, kv, n in considered:
-        if kind == "icmp-reply":
-            host.setdefault("net.icmp_first", (s, "seq=%s line %d" % (kv.get("seq"), n)))
-        elif kind == "tcp" and kv.get("result") == "ok":
-            host.setdefault("net.tcp:%s_first" % kv.get("port"),
-                            (s, "port=%s line %d" % (kv.get("port"), n)))
-        elif kind == "neigh" and kv.get("state") in NUD_UP:
-            host.setdefault("net.neigh_first", (s, "state=%s line %d" % (kv.get("state"), n)))
-        elif kind == "udp":
-            host.setdefault("net.udp_first", (s, "port=%s line %d" % (kv.get("port"), n)))
+    host = host_landmarks(considered)
+    # 🆕 R1y (SPEC.md FW-137): a landmark the window does not hold is `--`, and
+    # until this the `--` was all a reader got.  量 seating B (bench/2026-09-25):
+    # the first ICMP reply came after the `-boot` capture closed on its prompt in
+    # 7 of 11 rlxfw rounds, 1.3 ms to 0.642 s after it, while the probe ran on
+    # to 31-180 s into the capture's frame -- and no NOTE, because the probe did
+    # cover the window.  So the first of each such landmark past the window is
+    # reported on an `after` line, with its distance from the window's end, and
+    # so is each `net` segment it ends.  The `host` and `net` lines keep their
+    # meaning, inside the window, and stay `--`: one hostprobe record spans every
+    # round of a cell (P1-HP: seven), so for a boot that never answered, the
+    # first reply past its window would be the next boot's, and only the
+    # distance would say so.
+    later = {k: v for k, v in host_landmarks(past).items() if k not in host}
     # Every frame line prints the keys it read, so a reader sees which clock.
     psk, pek = "start_" + sfx, "end_" + sfx
     ps, pe = pmeta.get(psk), pmeta.get(pek)
@@ -1780,7 +1808,7 @@ def probe_join(log, prefix, force):
                    "every boot")
     out.append("  the channel offset between console and host is NOT applied: D8 measures "
                "it, this tool does not")
-    for name in ("net.icmp_first", "net.neigh_first", "net.udp_first"):
+    for name in HOST_LINES:
         if name in host:
             out.append("  host %-18s s %11.6f  (%s)" % (name, host[name][0], host[name][1]))
         else:
@@ -1793,6 +1821,23 @@ def probe_join(log, prefix, force):
         else:
             val = "--"
         out.append("  net  %-20s %-11s -> %-16s %-15s %s" % (s.id, s.a, s.b, s.cls, val))
+    if later:
+        out.append("  NOTE: the capture's window closed before %d host landmark(s) arrived: "
+                   "each `after` line is the first past the window, with its distance from "
+                   "the window's end.  The capture shows nothing past its end, so nothing "
+                   "here shows that the event is this boot's; the distance is the evidence"
+                   % len(later))
+        for name in HOST_LINES + tuple(sorted(k for k in later if k.startswith("net.tcp:"))):
+            if name in later:
+                s, what = later[name]
+                out.append("  after %-17s s %11.6f  +%.6f s past the window  (%s)"
+                           % (name, s, s - window[1], what))
+        for seg in NET_SEGMENTS:
+            if seg.a in rec["at"] and seg.b in later:
+                s = later[seg.b][0]
+                out.append("  after %-19s %-11s -> %-16s %-15s %.6f  +%.6f s past the window"
+                           % (seg.id, seg.a, seg.b, seg.cls, s - rec["at"][seg.a][1],
+                              s - window[1]))
     print("\n".join(out))
     return 0
 

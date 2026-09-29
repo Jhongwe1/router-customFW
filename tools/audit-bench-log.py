@@ -77,10 +77,23 @@ CONTROL = (
 #: Each entry is (scope, needle, reason).
 #:   scope "match" -- the matched text itself is benign wherever it appears.
 #:   scope "line"  -- the match is benign ONLY on a line containing `needle`.
-#: 🔴 The two scopes are not interchangeable. `Calib` and `Serial:` are matched
+#:   scope "exact" -- the match is benign ONLY on a line that IS `needle`, whole,
+#:                    once stripped of surrounding whitespace (a CRLF's CR too).
+#: 🔴 "match" and "line" are not interchangeable. `Calib` and `Serial:` are matched
 #: by patterns aimed at radio calibration and serial numbers; suppressing those
 #: two strings outright would hide a real calibration blob. They are allowlisted
 #: by the LINE that makes them benign, so `Calibration data: <hex>` still fires.
+#: 🔴 R1y (SPEC.md FW-138): "line" is a substring test on the whole line, and it
+#: exempts EVERY pattern's match on that line -- whatever else the line carries,
+#: and a line where the needle is only the start of a longer value.  量
+#: 2026-09-25: the two entries whose reasons said "Scoped to this exact line" and
+#: "... exact path" let 12 of 12 widening probes through (a MAC, a calibration
+#: word, an IP, a second home path, an SSID and a password on the needle's line;
+#: the needle as a prefix or mid-line; the path plus `.bak`).  They are "exact"
+#: now, and control A3 below holds every "exact" entry to that.  量 2026-09-30:
+#: the control MAC on a line holding the needle was silent under all nine "line"
+#: entries.  The three whose silenced lines are ONE text in the CI corpus are
+#: "exact" too; each of the other six says in its reason what it does not catch.
 ALLOW = [
     ("match", "10.1.1",
      "the bench-side network the operator chose: 10.1.1.1 is what IPCONFIG "
@@ -159,26 +172,43 @@ ALLOW = [
     ("match", "00:00:00:00:00:00",
      "the wlan0-wds interfaces. An all-zero MAC identifies nothing by "
      "construction, and it is the driver's unset value"),
-    ("line", "Calibrating delay loop",
+    ("exact", "[    0.060000] Calibrating delay loop... 398.95 BogoMIPS (lpj=1994752)",
      "Linux's CPU-speed calibration (BogoMIPS), which the `calib` pattern "
      "matches and which has nothing to do with radio calibration. Scoped to "
-     "this line so a real calibration blob still fires"),
+     "this line so a real calibration blob still fires. 🔄 R1y: \"exact\" on "
+     "the one text the entry silenced in the CI corpus (量 2026-09-30, 25 "
+     "lines, every one this printk time and value); as \"line\" on "
+     "`Calibrating delay loop` it also silenced a MAC before or after those "
+     "words (probe, rc 0). A boot that prints another time or value fires, "
+     "as a line to review"),
     ("line", "Serial: 8250/16550 driver",
      "the 8250 UART driver's registration banner, matched by the pattern aimed "
-     "at serial NUMBERS. Scoped to this line for the same reason"),
+     "at serial NUMBERS. What that pattern is for still fires on any other "
+     "line; on a line holding the banner nothing does -- a MAC before or "
+     "after it is silent (probe, 2026-09-30, rc 0). Not \"exact\": the "
+     "banner carries a printk time, and 量 2026-09-30 the CI corpus holds "
+     "two, 0.86 and 0.98 s, on its 25 lines"),
     ("line", "h601_skipped",
      "rtl819x-spi's /proc output prints the NAME of the region it refused to "
      "hash, followed by a byte COUNT -- `h601_skipped 8192`. The count is the "
      "whole point: it is how the driver reports that H601 stayed out of the "
-     "digest. 量 2026-09-08 (seating 16), 39 captures, two hits each. Scoped "
-     "to this line, so a line carrying H601 CONTENT still fires -- which is "
-     "the same distinction spec-check.py's REDACTION_ALLOWLIST draws for the "
-     "same two field names"),
+     "digest. 量 2026-09-08 (seating 16), 39 captures, two hits each. H601 "
+     "CONTENT on any other line still fires -- which is the same distinction "
+     "spec-check.py's REDACTION_ALLOWLIST draws for the same two field names "
+     "-- but not on a line holding the name: whatever shares that line is "
+     "exempt with it, a MAC before or after the name included (probe, "
+     "2026-09-30, rc 0), and flashwin scan is the byte check. Not \"exact\": "
+     "量 2026-09-30 it silences three texts in the CI corpus, `h601_skipped 0`, "
+     "`h601_skipped 8192` and `map_h601_skipped 8192` (107 lines)"),
     ("line", "h601_hashed",
      "the sibling field, `h601_hashed 0`. Its value being zero is the "
      "assertion D1 rests on, so it may not be renamed to please a scanner. "
-     "Scoped to the line for the same reason as h601_skipped"),
-    ("line", "RLXFW-S-MH601",
+     "It costs what h601_skipped's entry costs: whatever shares a line with "
+     "the name is exempt with it, a MAC included (probe, 2026-09-30, rc 0). "
+     "Not \"exact\": 量 2026-09-30 it silences four texts in the CI corpus "
+     "(120 lines) -- `h601_hashed 0`, `map_h601_hashed 0` and two mfgtest "
+     "MT-FLASH-3 result lines that carry `h601_hashed=0` beside other fields"),
+    ("exact", "RLXFW-S-MH601=00000000",
      "rtl819x-spi 1.1's boot-time MARK for the same quantity, and it is a "
      "THIRD string carrying the region's name that the two entries above do "
      "not cover: they are scoped to the /proc field lines, and this is a "
@@ -187,12 +217,17 @@ ALLOW = [
      "1.1's map had never run on silicon before. The line is "
      "`RLXFW-S-MH601=00000000` and that value IS map_h601_hashed: the mark "
      "the scanner objects to is the mark reporting that H601 stayed out of "
-     "the digest. Scoped to the line, so a line carrying H601 CONTENT still "
-     "fires. ⚠️ Whether the value is zero is NOT this tool's question -- "
-     "flashmap's F6 control refuses every reading when map_h601_hashed != 0, "
-     "and flashwin scan checks the bytes; this tool checks the topic keyword "
-     "and cannot tell a field name from a calibration blob, which is why it "
-     "is allowlisted by NAME and not by pattern"),
+     "the digest. Scoped to that exact line, so a line carrying H601 CONTENT "
+     "still fires, whether or not the tag is on it. 🔄 R1y: it was \"line\" on "
+     "`RLXFW-S-MH601`, which also silenced a MAC beside the tag (probe, "
+     "2026-09-30, rc 0); 量 the same day all 56 of its lines in the CI corpus "
+     "are this one text. ⚠️ Whether the value is zero is NOT this tool's "
+     "question -- flashmap's F6 control refuses every reading when "
+     "map_h601_hashed != 0, and flashwin scan checks the bytes; this tool "
+     "checks the topic keyword and cannot tell a field name from a "
+     "calibration blob, which is why it is allowlisted by NAME and not by "
+     "pattern. A nonzero value is no longer this line, so it fires here too, "
+     "as a line to review"),
     ("line", "S-H601=",
      "rtl819x-spi 1.2's `h601` VERB mark, a fourth string carrying the "
      "region's name and a sibling of RLXFW-S-MH601 above -- which does not "
@@ -229,17 +264,22 @@ ALLOW = [
      "/proc line, which none of them covers. 量 2026-09-25 (block 46), "
      "bench/2026-09-25c/R1-NW0 and R1-NW1 line 58 -- the first captures in "
      "bench/ of the whole 1.2 /proc file (no committed bench .log carried "
-     "`h601_ran` before them). Scoped to the line, so a line carrying H601 "
-     "CONTENT still fires; the needle is the format string's own text up to "
-     "the value. The cost is the one measured for S-H601=: whatever "
-     "interleaves into this line is exempt with it, one line wide, and "
-     "flashwin scan is the byte check"),
+     "`h601_ran` before them). H601 CONTENT on any other line still fires; "
+     "the needle is the format string's own text up to the value. The cost "
+     "is the one measured for S-H601=: whatever shares this line is exempt "
+     "with it, one line wide -- a MAC before or after the field is silent "
+     "(probe, 2026-09-30, rc 0) -- and flashwin scan is the byte check. Not "
+     "\"exact\": the value is 0 or 1 (量 2026-09-30, 22 lines in the CI "
+     "corpus)"),
     ("line", "h601_rc ",
      "the sibling field, `h601_rc %d` -- the verb's RETURN CODE, the same "
      "quantity S-H601= marks (rtl819x_spi_h601_rc, initialised -EAGAIN, so "
      "`-11` in a boot that never ran the verb). 讀 rtl819x-spi.c, the "
      "sprintf after h601_ran's. 量 2026-09-25, the same two captures, line "
-     "59. Scoped to the line for the same reason as h601_ran"),
+     "59. It costs what h601_ran's entry costs: whatever shares the line is "
+     "exempt with it, a MAC included (probe, 2026-09-30, rc 0). Not "
+     "\"exact\": 量 2026-09-30 the CI corpus holds `h601_rc -11` and "
+     "`h601_rc 0` (22 lines)"),
     ("match", "02:52:4C:58:46:57",
      "rtl819x-nic's OWN address, a constant compiled into "
      "config/rlxfw-src/.../rtl819x-nic.c: locally administered (0x02) plus "
@@ -281,7 +321,7 @@ ALLOW = [
      "an address -- \u91cf 2026-09-20, every occurrence in the corpus is the "
      "Bcast field of an ifconfig line -- but a genuine host there would be "
      "suppressed, and that is the cost"),
-    ("line", "MT-RFCAL",
+    ("exact", "ok    MT-RFCAL     hw_sum_ok=1 over 1166 body bytes",
      "the RF-calibration CHECK's id from docs/mfgtest.md 2's table, matched "
      "by the pattern aimed at radio calibration -- the same shape as "
      "`Calibrating delay loop` above, where a word means something else on "
@@ -289,24 +329,35 @@ ALLOW = [
      "`ok    MT-RFCAL     hw_sum_ok=1 over <n> body bytes`: a BOOLEAN and a "
      "length. Both are ruled on in docs/mfgtest.md 4 -- hw_len is "
      "sizeof(HW_SETTING_T)+1 and identical on every unit of this model, so it "
-     "identifies the MODEL and not this device. Scoped to the line, so a real "
-     "calibration blob still fires. Renaming the check to please a scanner "
+     "identifies the MODEL and not this device. Scoped to that exact line, "
+     "n = 1166, so a real calibration blob still fires, and so does a "
+     "failing check (`hw_sum_ok=0`) or another length. 🔄 R1y: it was "
+     "\"line\" on `MT-RFCAL`, which also silenced a MAC on the check's line "
+     "(probe, 2026-09-30, rc 0); 量 the same day all 13 of its lines in the "
+     "CI corpus are this one text. Renaming the check to please a scanner "
      "would desynchronise it from the table that defines it, which is the "
      "objection h601_hashed's entry already makes"),
-    ("line", "supports-eeprom-access: no",
+    ("exact", "supports-eeprom-access: no",
      "ethtool -i's capability line for the WORKSTATION's USB GbE adapter "
      "(bound to r8153_ecm), matched by the pattern aimed at calibration "
      "through its word `eeprom`. 量 2026-09-25, bench/2026-09-25b/D0-ETH, the "
      "first capture of `ethtool -i` in bench/: the line says the host adapter "
      "offers no EEPROM access, and names nothing of this unit. Scoped to this "
-     "exact line, so any other `eeprom` still fires"),
-    ("line", "/home/key/fwre-work/rebuild/s105-analysis/s105-d2.py",
+     "exact line, so any other `eeprom` still fires. 🔄 R1y: this entry was "
+     "\"line\" until SPEC.md FW-138, and then it exempted anything else on a "
+     "line holding the needle, and a longer value the needle only begins"),
+    ("exact", "b3711d235d01788eba669b088eed1623af887d3ba105c7b9800bccfd460acc92"
+              "  /home/key/fwre-work/rebuild/s105-analysis/s105-d2.py",
      "the D2 script's path as `sha256sum` prints it in Z9-D2A (cards B45 and "
      "B46, section 5), matched by the home-path pattern. 量 2026-09-25, "
      "bench/2026-09-25/Z9-D2A, the first bench log to print it. The same path "
      "is committed in both cards' `d2-script` cardnum row and $FWRE_WORK's in "
      "CLAUDE.md, so the line discloses nothing new. Scoped to this exact "
-     "path, so any other home path still fires"),
+     "line, so any other home path still fires. 🔄 R1y: the needle is now the "
+     "whole line, the script's digest included -- committed in the same log, "
+     "and its first 16 digits in both cards' row -- because an \"exact\" entry "
+     "equals the line; this path beside another digest, a `.bak`, or anything "
+     "else fires. It was \"line\" on the path alone until SPEC.md FW-138"),
 ]
 
 
@@ -316,6 +367,8 @@ def allowed(txt, line=""):
         if scope == "match" and needle in txt:
             return (needle, why)
         if scope == "line" and needle in line:
+            return (needle, why)
+        if scope == "exact" and needle == line.strip():
             return (needle, why)
     return None
 
@@ -367,6 +420,28 @@ def main(paths):
     print(f"  ok  no control hit is allowlisted, and a non-listed "
           f"address/MAC still fires ({len(ph)} hit(s))")
     print(f"  ok  {len(ALLOW)} allowlist entr(ies), each with a stated reason\n")
+
+    # 🆕 A3 (R1y, SPEC.md FW-138): an "exact" entry silences its own line -- by
+    # that entry -- and nothing wider.  The same line with the control's MAC
+    # after it, and before it, must fire: a substring test fails both, and a
+    # prefix or a suffix test fails one.
+    print("=== POSITIVE CONTROL 3: an \"exact\" entry covers its own line and nothing wider ===")
+    exact = [needle for scope, needle, _ in ALLOW if scope == "exact"]
+    mac = "00:E0:4C:11:22:33"
+    for needle in exact:
+        own = scan("control", needle + "\n")
+        if not own or any((allowed(h[2], h[3]) or (None,))[0] != needle for h in own):
+            print(f"  FAIL: {needle!r} as a whole line is not silenced by its own entry "
+                  f"({len(own)} hit(s)), so the entry does not do what its reason says")
+            return 2
+        for wide in (needle + " " + mac, mac + " " + needle):
+            if not any(h[2] == mac and not allowed(h[2], h[3])
+                       for h in scan("control", wide + "\n")):
+                print(f"  FAIL: a MAC on the line of {needle!r} is allowlisted -- the "
+                      f"entry is wider than the line it names")
+                return 2
+    print(f"  ok  {len(exact)} \"exact\" entr(ies): each silences its own line, and a MAC "
+          f"after or before it on that line still fires\n")
 
     print("=== THE ACTUAL LOGS ===")
     total = 0

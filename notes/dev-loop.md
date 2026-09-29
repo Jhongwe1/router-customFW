@@ -1702,11 +1702,21 @@ cycle against the moment the prompt's capture closes).
 
 Card B's `D8` rule has no window — *the first ICMP echo reply hostprobe records
 after the boot's jump* — so `--probe` is a second source for it only where it
-reads; `D8` itself is `notes/boot-time.md` § 8.7's. What would settle the tool
-(`R1y`): the join reports the first event after the window with its distance, or
-takes a declared end such as the round's `S9` end. The control is seating B: the
-seven `--` must read the `D8` join's values to 1 µs, and the thirteen that read
-must not move.
+reads; `D8` itself is `notes/boot-time.md` § 8.7's.
+
+Settled (`R1y-2`, 2026-09-30): for each host landmark the window does not hold,
+the join prints the first one past the window on an `after` line with its
+distance from the window's end, and an `after` line for each `net` segment that
+event ends, under a NOTE that the capture cannot show the event is this boot's;
+the `host` and `net` lines keep their meaning and still print `--`. A declared end
+was not taken: one probe record spans a cell's rounds, the stages file has no
+reader but `looprun`, and the vendor boots have none. The control, run by two
+scripts that share no code (`$FWRE_WORK/rebuild/s117/tool2/ctl137.py`,
+`s117/verify137.py`): in all twenty pairs every line the old tool printed is
+unchanged, and the seven rounds' `after net.up` equal § 8.7's `D8` values to the
+printed microsecond, the other four reading in the window as before. The value
+sits on the `after` line, not on the `--` line the control's wording assumed.
+`test-boot-timeline` 85 → 87.
 
 **What this does not establish:** anything about the board — every value the
 tool printed is right; that seating A's rounds would read the same way through
@@ -1734,10 +1744,22 @@ tracked files of four kinds) each needle sits on exactly one line of one file,
 `D0-ETH.log` and `Z9-D2A.log`, and suppresses one match: today the two rows are
 exactly as wide as those two lines.
 
-What would settle it (`R1y`, proposed only): a scope that must equal the whole
-stripped line, for entries whose reasons say "exact", or reasons that state the
-substring cost as `S-H601=`'s does. The widening probes are the control: under an
-exact-line scope they must fire, and the two real lines must stay silent.
+Settled (`R1y-2`, 2026-09-30): a third scope, `"exact"`, whose needle must equal
+the whole stripped line. Both entries use it — the path's needle is now the
+whole `sha256sum` line, whose digest is the D2 script's and is committed in
+`Z9-D2A.log` and both cards — and a new positive control, A3, holds every
+`"exact"` entry to its own line: the line alone is silenced by that entry, and
+the control's MAC before or after the needle fires. 量: the 12 widening probes
+fire, the 9 near-miss controls still fire, the two real lines stay silent, and
+A3 kills a substring, a prefix, a suffix and a never-matching mutant. The same
+probe, the control's MAC on the needle's line, was silent under all nine
+remaining `"line"` entries: the three whose corpus lines are one fixed text
+(`Calibrating delay loop`, `RLXFW-S-MH601`, `MT-RFCAL`) are `"exact"` now, and
+the six left on `"line"` say in their reasons what they do not catch. The CI
+corpus reads as before, 39,093 matches suppressed and every per-file line
+unchanged. Not established: the three new exact lines hold values a later boot
+can change (a printk time, BogoMIPS, a length), and a changed line fires and has
+to be read.
 
 **What this does not establish:** that a future log holding either needle will
 not hide a real hit on the same line; nothing in today's corpus is hidden.
@@ -1760,8 +1782,11 @@ that order (讀, its labels only).
 `--seconds`, found the unmutated suite green (77 cases) and the mutant **killed by
 `N41` alone**.
 
-The repair is two comments (`R1y`). No tool reads a comment's case pointer, so
-nothing caught this one and nothing will catch the next.
+Repaired (`R1y-2`, 2026-09-30): both comments name `N41`, and `tool_version` is
+unchanged, since a comment changes nothing written to the port. 量 again on the
+repaired tree: the unmutated suite green (77 cases) and U3's mutant killed by
+`N41` alone. No tool reads a comment's case pointer, so nothing caught this one
+and nothing will catch the next.
 
 **What this does not establish:** that any other case pointer in `tools/` is
 right (none was surveyed).

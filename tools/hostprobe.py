@@ -1764,7 +1764,7 @@ def _run(a, c, wake_r, seen):
             now = now_raw()
             # A signal is the operator; --until is tested before --seconds,
             # because a run whose event arrived in the window its cap expired
-            # in HAS seen its event (console-capture's N35, the same rule).
+            # in HAS seen its event (console-capture's N41, the same rule).
             if seen:
                 reason = seen[0]
                 break
