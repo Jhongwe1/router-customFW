@@ -1460,3 +1460,68 @@ not taken. No vendor sequence enters rlxfw from this reading: 8d's `init` writes
 | `drivers/net/rtl819x/l2Driver/rtl865x_fdb.c` | line | 🔴 **vendor** | 🆕 2026-09-28 (a second row; § 9.9's is the seam's). `_rtl865x_layer2_patch`'s static entries for broadcast `:93` and for `cpu_mac` `:98`, both `FDB_TYPE_TRAPCPU`, and `FDB_TYPE_TRAPCPU` giving `toCpu = TRUE` `:559-560`: **the vendor's route to the CPU, compared and not taken** — rlxfw inherits the loader's `FFCR` traps instead (`NET-169`) |
 | `drivers/net/rtl819x/common/mbuf.h` | line | 🔴 **vendor** | 🆕 2026-09-28. The packet header's `ph_extPortList` `:66`, with `PKTHDR_EXTPORT_LIST_CPU` 3 `:77`, the CPU bit `rx_ph1` `00400819` decodes to; and `ph_reason` `:107`, *"indicates wh[y] the packet is received by CPU"* — **the word that would settle `NET-37` 殘留**, which `rtl819x-nic`'s page does not print |
 | `drivers/net/rtl819x/AsicDriver/rtl865x_asicCom.h` | line | 🔴 **vendor** | 🆕 2026-09-28 (a third row). The rest of `rtl865xc_tblAsic_netifTable_t` `:171-226`, which § 17.6 cites whole: the little-endian arm `:192-217`, not built on this big-endian target, and the reserved words 4–7 `:218-226`. Nothing was taken beyond § 9.8's big-endian arm `:171-191` |
+
+## § 9.13 — `R7`: why the entropy pool is empty, and what reading that cost, 2026-09-30
+
+🔴 **Unlike § 9.11 and § 9.12, four of these paths ARE in `ledgerscan`'s scope** — `bsp`, `irq`,
+`keys`, `spi_mtd` — and `check` went RED on exactly those four before this section existed (量
+2026-09-30, naming each and its first citation). So this is not a hand declaration of paths the tool
+cannot see: it is the tool's own list, answered. And a driver changed:
+`config/rlxfw-src/**/drivers/char/rlxfw-entropy.c` is new and **its design decisions came out of the
+code below**, so per `CLAUDE.md` it leaves § 4.1 for a section of its own and its diff is never called
+blind. Every line was re-read in `src-vendor/rtl819x-toolchain/linux-2.6.30`, the tree that builds,
+before it was written here; `notes/entropy.md` §§ 1–2 owns the finding.
+
+⚠️ **What was taken, by kind.** Four gate conditions and one arithmetic expression — no register
+value, no initialisation sequence, no vendor code copied. Seven of the nine paths are **generic
+Linux**, not Realtek's, which is § 4.7's point and bounds what this costs. The decisive reading is one
+line of the port: `get_cycles()` returning 0, which is what makes `IRQF_SAMPLE_RANDOM` *useless* here
+rather than merely unset.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/char/random.c` | line | **generic** | 🆕 2026-09-30. `:524` `credit_entropy_bits` is the only function that RAISES `input_pool.entropy_count` (`:790`/`:792` debit, `:937` zeroes); its callers `:666`, `:753`, `:1127`, `:1142`, and that `:753` cannot credit `input_pool`, which has no `.pull` `:422-428`; the three `add_*` entries `:673`, `:689`, `:703`; and **`:629-632` with `:637-660`** — the sample is `get_cycles()` + `jiffies` and the credit is `min_t(int, fls(delta>>1), 11)` over the minimum of three orders of difference of **jiffies alone**. That last expression is why the fix is not a flag |
+| `kernel/irq/handle.c` | line | **generic** | 🆕 2026-09-30. `:428-429` in `handle_IRQ_event`: `add_interrupt_randomness(irq)` runs only `if (status & IRQF_SAMPLE_RANDOM)`, `status` being the OR of the flags of handlers that returned `IRQ_HANDLED` (`:416-418`). **The first gate**, and the one the object confirms (`andi v0,s2,0x40` then `beqz`) |
+| `kernel/irq/manage.c` | line | **generic** | 🆕 2026-09-30 (a second row; § 4.7's is `R5-3a`'s auto-enable). `:533` and `:542` in `__setup_irq`: `rand_initialize_irq()` is called only inside the same flag test, so `desc->timer_rand_state` — the second gate, `random.c:693-696` — is never allocated for a handler registered without it, and **setting the bit on an already-registered `irqaction` would not create it** |
+| `arch/rlx/include/asm/timex.h` | line | 🔴 **vendor** | 🆕 2026-09-30 (a second row; § 4.4's is `CLOCK_TICK_RATE`). `:34-39`: `typedef unsigned int cycles_t;` and a `get_cycles()` whose whole body is `return 0;` at `:38`. 🔴 **The decisive line**: with it the kernel's estimator mixes a constant where the jitter belongs, so the flag would have produced a number and not entropy |
+| `drivers/input/input.c` | line | **generic** | 🆕 2026-09-30. `:305-308` in `input_event`: `add_input_randomness()` is reached for any supported event type. **Read and NOT taken** — and it is why `notes/entropy.md` § 5 forbids a reset-button press for the whole seating: `rtl819x-keys` is a polled input device that reports keys, so this path is *idle, not absent*, and a press credits the pool for a reason that is not rlxfw's driver |
+| `block/genhd.c` | line | **generic** | 🆕 2026-09-30. `:1157` in `alloc_disk_node`: `rand_initialize_disk(disk)` is **unconditional**, with no rotational test anywhere in this tree. So "no rotating disk" is not the gate and the third `add_*` entry is live |
+| `drivers/mtd/mtd_blkdevs.c` | line | **generic** | 🆕 2026-09-30. `:122`, `end_request(req, res)`. **Read and NOT taken**, and § 5's second prohibition: with `CONFIG_MTD_BLOCK=y` any mtdblock request completion reaches `add_disk_randomness`. The image is quiet only because nothing issues mtdblock I/O; `/dev/mtdN` through mtdchar does not use the block layer |
+| `boards/rtl8196e/bsp/irq.c` | line | 🔴 **vendor** | 🆕 2026-09-30 (through the `arch/rlx/bsp` symlink, which `grep -r` does not follow). `:38-42` and `:122`: `irq_cascade` carries no `.flags` field, so the cascade registers with 0 — one of the seven compiled registrations whose flags make the **zero** `IRQF_SAMPLE_RANDOM` count a measurement rather than an assumption |
+| `arch/rlx/kernel/irq.c` | line | 🔴 **vendor** | 🆕 2026-09-30 (a fourth row; § 9.11's is 8c-cells'). `:161`: `/proc/interrupts` prints each action's raw `flags` as `(0x%lx)`. 🟢 **The one line here that becomes a live control** — `(0x40)` on the running image would mean the flag is set, so § 5's criterion 3b reads the zero on silicon instead of inferring it from the tree |
+
+### What this costs, stated rather than left to look like nothing
+
+🔴 **A vendor file now carries a call site rlxfw depends on, and that is new here.**
+`config/host-compat/0009` adds `rlxfw_random_add()` to `drivers/char/random.c`; every other patch in
+that directory either fixes a host-toolchain incompatibility or gates existing vendor code. This one
+adds a function rlxfw links against, so **a drop whose `random.c` differs needs 0009 re-derived**.
+⚠️ The containment is that it cannot fail quietly: the hunk's context is `:698-703` and
+`tools/rlxfw-kbuild.sh` stops with `host-compat patch FAILED` rather than skipping — and it adds 43
+lines, so every citation of that file at or past `:701` shifts by +43 in a staged tree while every
+number above is against the pristine drop.
+
+🔴 **Blindness, once lost, is not recoverable (§ 6).** Nothing was un-written — there was no rlxfw
+entropy driver before — but `rlxfw-entropy.c` is **born informed**, and any future change to it here is
+an informed contrast rather than a blind diff, the way § 4.10's watchdog section is. 🟢 What limits
+the cost is the origin column: seven of nine paths are generic Linux, so what was read is mostly *the
+kernel's own accounting*, not Realtek's engineering. The two that are the port's carry one `return 0;`
+and one `seq_printf`.
+
+🔴 **The credit policy is an argument, not a measurement.** One bit per 16 qualifying events with a
+one-bit-per-jiffy clamp is a 16× derating of a pessimistic floor (`notes/entropy.md` § 4.2); nothing
+in this section, and no value of `entropy_avail`, measures the source's min-entropy. It stays 推 until
+§ 5's card runs, and `RLXFW_ENT_PER_BIT` may have to be re-derived from the `dist` histogram after it.
+⚠️ **A first draft qualified an event on `phase != last_phase`, a test that cannot fail on a regular
+source** — a host sending every 7.1 ms walks the phase by a constant ~1,420 counts — and it was caught
+and replaced by the third-order form before any build. It is recorded because it is the shape this
+ledger exists to make visible: a number that looked like a reading.
+
+⚠️ **The driver also reads a timer register whose rate is 推**: `TC0CNT` is 量 live (`SPEC.md`
+`REG-07`), but `CLK-17` and the ~200 kHz Linux figure are both inferred and only the
+2,000-counts-per-jiffy ratio is 量 (`CLK-23`). No decision in the design uses the rate, which is what
+keeps that a caveat rather than a defect. **And what this reading does not establish**: not that no
+other credit path fired — § 5's three prohibitions are procedure, and nothing instruments the mtdblock
+one; not that `RLX4181` lacks a cycle counter, since `CPU-42` 量 that CP0 `Count` reads 0 and does not
+move and clock-gated is indistinguishable from absent; nothing about `loud` or `quiet-swcore`, which
+were not built; and not that the bits are strong — this section bounds a *reading*, not a source.

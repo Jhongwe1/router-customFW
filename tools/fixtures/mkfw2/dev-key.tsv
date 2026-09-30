@@ -1,0 +1,11 @@
+# The DEVELOPMENT key, in the tree on purpose (SPEC-R8a 3) so two
+# independently written implementations can be compared without a key
+# exchange.  It is NOT a secret and anyone who reads it can sign a
+# container this project's verifier accepts.  R8b needs a key that is
+# not here -- notes/update-chain.md 'Keys'.
+dev_seed_hex	4242424242424242424242424242424242424242424242424242424242424242
+dev_public_key_hex	2152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12
+dev_public_key_source	SPEC-R8a 3; cross-checked against OpenSSL 3.0.13 (rlxsign --self-test O1)
+sample_v3_sha256	d896a75acd932cd33f0294453eb73987b18bfce1074eeb8bcac05d123ecbf9e8
+sample_v3_bytes	416
+sample_payload_sha256	40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880

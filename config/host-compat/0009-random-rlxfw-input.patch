@@ -1,0 +1,147 @@
+Give `drivers/char/random.c` one narrow entropy input, so that rlxfw can own
+the credit policy.
+
+R7, 2026-09-30.  This is the ONLY vendor change the entropy fix needs.
+
+THE DEFECT, 量.  Image `r6b8i` (recipe `3685a3a4`), over the console on
+2026-09-30 (`bench/2026-09-30/SB-ENT.log`, `bench/2026-09-30/SB-RT1.log`):
+
+    # cat /proc/sys/kernel/random/entropy_avail /proc/sys/kernel/random/poolsize
+    0
+    4096
+    # cat /proc/uptime
+    768.26                       (and 1613.27 on the second reading)
+
+The pool is empty at 768 s and still empty at 1613 s.  The consequence is
+R7's, not the kernel's: the broker's LOGIN and PWSET are specified fail-closed
+(`NOENTROPY` until `entropy_avail >= 128` has been seen once), so as the
+kernel stands this board can never issue a session token or salt a password.
+
+THE MECHANISM, 讀, in the tree that builds
+(`src-vendor/rtl819x-toolchain/linux-2.6.30`, `2.6.30.9`):
+
+  * `drivers/char/random.c:524` `credit_entropy_bits()` is the only function
+    that *raises* `input_pool.entropy_count` -- `account()` (`:790`, `:792`)
+    debits it and `init_std_data()` (`:937`) zeroes it.  Its callers are `:666`
+    inside `add_timer_randomness()` (`:614`), `:753` inside
+    `xfer_secondary_pool()` -- which cannot credit `input_pool`, because
+    `input_pool` has no `.pull` (`:422-428`) -- and the two root-only ioctls
+    `RNDADDTOENTCNT` (`:1127`) and `RNDADDENTROPY` (`:1142`).
+  * Three functions reach `add_timer_randomness()`: `add_input_randomness()`
+    (`:673`), `add_interrupt_randomness()` (`:689`) and
+    `add_disk_randomness()` (`:703`, behind `CONFIG_BLOCK`).
+  * `add_interrupt_randomness()` is called from `kernel/irq/handle.c:429`,
+    gated at `:428` on `IRQF_SAMPLE_RANDOM`, and gated again in the callee on
+    `desc->timer_rand_state`, which only `rand_initialize_irq()` allocates --
+    from `kernel/irq/manage.c:542`, inside the same flag test in
+    `__setup_irq()`.  So setting the bit on an already-registered `irqaction`
+    would not create the state either.  量: 36 driver and arch call sites in
+    the drop set that flag and **zero of them is compiled into this image**;
+    the positive control on that sweep is that the same regex over the same
+    paths finds `IRQF_DISABLED` on 457 lines and `request_irq(` on 1,428.
+  * 🔴 THE OTHER TWO PATHS ARE IDLE, NOT ABSENT.  An earlier draft of this
+    header said "no keyboard, no mouse and no rotating disk"; both halves were
+    wrong.  `drivers/input/keyboard/rtl819x-keys.c` registers a polled input
+    device and calls `input_report_key()`, which reaches
+    `add_input_randomness()` through `drivers/input/input.c:308` -- a **reset
+    button press credits the pool**.  `add_disk_randomness()` is gated on
+    `disk->random`, set unconditionally by `rand_initialize_disk()` at
+    `block/genhd.c:1157` with no rotational test, so an mtdblock request
+    completion would credit it (`drivers/mtd/mtd_blkdevs.c:122` ->
+    `end_request` -> `block/blk-core.c:2011`); the image is quiet only because
+    nothing issues mtdblock I/O, and `/dev/mtdN` through mtdchar does not use
+    the block layer.  **Nothing credits the pool on an unattended boot** is the
+    accurate claim, and it is the one the measurement above supports.
+
+🔴 AND SETTING THE FLAG WOULD NOT HAVE BEEN A FIX.  `add_timer_randomness()`
+mixes `get_cycles()` as the high-resolution half of its sample and derives its
+credit from `jiffies` deltas alone -- and `arch/rlx/include/asm/timex.h`
+defines `get_cycles()` as `return 0;` for this Lexra core.  On this board the
+pool would receive a constant where the jitter belongs, and the credit would
+be `min_t(int, fls(delta>>1), 11)` over the minimum of three orders of
+difference of a 100 Hz counter, which is 0 for almost every pair of packets
+arriving faster than a jiffy.  The flag would have produced a number.
+
+WHAT THIS PATCH DOES, AND WHY IT IS THIS SHAPE.  `mix_pool_bytes()` and
+`credit_entropy_bits()` are `static` in this file and there is no other way
+in; `add_input_randomness()` is exported but drags the jiffies estimator and a
+`last_value` de-duplicator with it.  So this adds one function that mixes a
+buffer and credits a number, and makes **no estimate of its own**.  The
+estimate is the caller's, in `drivers/char/rlxfw-entropy.c`, where the
+derating is written down and reviewable -- because over-crediting is a
+security defect and it must not be possible to introduce one by changing a
+vendor file.
+
+WHAT IT DOES NOT DO.  It does not change any existing code path: no line is
+modified or removed, `add_interrupt_randomness()` and the three `add_*`
+functions behave exactly as before, and with no caller linked in the only
+effect on the image is ~40 bytes of `.text`.  It does not include
+`<linux/rlxfw-entropy.h>`, deliberately: a build without `--marks` stages no
+rlxfw sources, and this patch must still apply and compile there.  It does not
+make the bits cryptographically strong, and no value of `entropy_avail` can --
+see `notes/entropy.md`.
+
+⚠️ IT DOES MOVE EVERY LINE NUMBER IN THIS FILE.  The hunk adds 43 lines after
+`:700`, so every `random.c` citation at or past `:701` shifts by +43 once this
+patch is applied.  The citations in this header, in
+`drivers/char/rlxfw-entropy.c` and in `notes/entropy.md` are all against the
+PRISTINE drop, which is what `tools/citeresolve.py` and every other reading of
+the vendor tree use.
+
+REFUTED BY: a build in which `random.o` fails to compile; a `quiet` image in
+which `entropy_avail` still reads 0 after the card of `notes/entropy.md` § 5
+has driven traffic at the board; or any change in `/proc/interrupts` or in the
+three `add_*` functions' behaviour attributable to this hunk.
+
+--- a/drivers/char/random.c	2026-09-30 09:20:33.366066199 +0800
++++ b/drivers/char/random.c	2026-09-30 09:20:33.366066199 +0800
+@@ -698,6 +698,49 @@
+ 	DEBUG_ENT("irq event %d\n", irq);
+ 	add_timer_randomness(state, 0x100 + irq);
+ }
++/*
++ * rlxfw (R7, 2026-09-30): an entropy input whose credit policy is the
++ * CALLER's.
++ *
++ * 量 2026-09-30 on image r6b8i (recipe 3685a3a4):
++ * /proc/sys/kernel/random/entropy_avail reads 0 at 768 s of uptime and 0
++ * again at 1613 s, with poolsize 4096 (bench/2026-09-30/SB-ENT.log,
++ * SB-RT1.log).  讀, in this file: the only path an interrupt has into the
++ * pool is add_interrupt_randomness() above, which kernel/irq/handle.c calls
++ * only for a handler registered with IRQF_SAMPLE_RANDOM -- and no driver in
++ * this image registers that flag.  There is no keyboard, no mouse and no
++ * rotating disk, so add_input_randomness() and add_disk_randomness() never
++ * fire either.  Nothing credits the pool, so nothing ever will.
++ *
++ * 🔴 AND THE FLAG ALONE WOULD NOT HAVE FIXED IT.  add_timer_randomness()
++ * mixes get_cycles() for the sub-jiffy part and estimates its credit from
++ * jiffies deltas -- and arch/rlx/include/asm/timex.h defines get_cycles() as
++ * `return 0;` on this Lexra core.  The pool would receive a constant where
++ * the jitter belongs, and the estimate would come from a 100 Hz counter whose
++ * minimum first/second/third-order delta is 0 for almost every pair of
++ * packets.  It would produce a number, not entropy.
++ *
++ * So rlxfw supplies both the sample and the estimate.  mix_pool_bytes() and
++ * credit_entropy_bits() are static here, and that is the whole reason this
++ * function exists.  It deliberately makes NO estimate of its own: the one
++ * number that matters for security belongs in reviewed rlxfw code
++ * (drivers/char/rlxfw-entropy.c, whose header comment carries the policy and
++ * its derating), not in an estimator this board defeats.
++ *
++ * credit_bits <= 0 mixes without crediting, and mixing makes no claim.  Safe
++ * from hard-IRQ context: both callees take their own spin_lock_irqsave and
++ * neither sleeps.  Declared in <linux/rlxfw-entropy.h>, which is NOT included
++ * here on purpose -- this patch has to apply and compile on a tree where
++ * rlxfw's own sources were never staged (a build without --marks), and an
++ * unused non-static function costs that image ~40 bytes and nothing else.
++ */
++void rlxfw_random_add(const void *buf, unsigned int nbytes, int credit_bits)
++{
++	if (nbytes)
++		mix_pool_bytes(&input_pool, buf, (int)nbytes);
++	if (credit_bits > 0)
++		credit_entropy_bits(&input_pool, credit_bits);
++}
+ 
+ #ifdef CONFIG_BLOCK
+ void add_disk_randomness(struct gendisk *disk)

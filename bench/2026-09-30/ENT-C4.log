@@ -1,0 +1,3 @@
+ifconfig rlx0 | grep -E "RX pack|TX pack"
+/bin/sh: grep: not found
+# 

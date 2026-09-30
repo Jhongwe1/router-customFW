@@ -1,0 +1,4 @@
+cat /proc/sys/kernel/random/entropy_avail /proc/uptime
+0
+3307.36 3301.75
+# 

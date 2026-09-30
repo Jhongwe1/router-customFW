@@ -1,0 +1,4 @@
+cat /proc/sys/kernel/random/entropy_avail; grep -E "12:|8:" /proc/interrupts
+0
+/bin/sh: grep: not found
+# 

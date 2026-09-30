@@ -1036,4 +1036,5 @@ static int nic15_line(char *page, int *len);
 static void nic15_init(void);
 #endif
 
+#include <linux/rlxfw-entropy.h>
 #endif /* RTL819X_NIC_TX_H */

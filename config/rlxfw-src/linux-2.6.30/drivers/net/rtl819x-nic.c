@@ -1182,7 +1182,7 @@ static irqreturn_t nic_isr(int irq, void *dev_id)
 	nic_last_iisr = isr;
 	nic_seen_iisr |= isr;
 	nic_n_irq++;
-
+	rlxfw_entropy_event(RLXFW_ENT_SRC_NIC);	/* R7; notes/entropy.md 3.2 */
 	if (!isr)
 		nic_n_irq_spurious++;
 

@@ -1,0 +1,22 @@
+cat /proc/interrupts; cat /proc/sys/kernel/random/entropy_avail; ifconfig rlx0
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:       9320        RLX LOPI  serial (0x20)
+ 12:       1063        RLX LOPI  rtl819x-nic (0x20)
+ 13:     345257        RLX LOPI  rlx timer (0x620)
+ 25:     345229            ICTL  rtl819x-timer (0x20)
+
+ER0:          0
+ER1:          0
+ER2:          0
+0
+rlx0      Link encap:Ethernet  HWaddr 02:52:4C:58:46:57  
+          inet addr:10.1.1.3  Bcast:10.255.255.255  Mask:255.0.0.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:703 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:402 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:78026 (76.1 KiB)  TX bytes:39320 (38.3 KiB)
+          Interrupt:12 
+
+# 

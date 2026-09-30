@@ -1,0 +1,16 @@
+cat /proc/sys/kernel/random/entropy_avail /proc/sys/kernel/random/poolsize; ca
+t /proc/uptime; cat /proc/interrupts
+0
+4096
+768.26 762.75
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:        398        RLX LOPI  serial (0x20)
+ 12:          2        RLX LOPI  rtl819x-nic (0x20)
+ 13:      76827        RLX LOPI  rlx timer (0x620)
+ 25:      76799            ICTL  rtl819x-timer (0x20)
+
+ER0:          0
+ER1:          0
+ER2:          0
+# 
