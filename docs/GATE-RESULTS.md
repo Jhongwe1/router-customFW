@@ -2824,7 +2824,546 @@ recorded where it is cited.
 
 ---
 
-## The operating clause, re-run at fifteen entries
+## 2026-09-30 — `R7` (my userspace running on the silicon, and a pass condition that had to be re-specified because both of its named sources read 0 by construction)
+
+### One line
+
+**v0.5+, one segment (the 118th, shared with `R8a`), two boots and no power action.** § Gate board
+costs `R7` at 34 segments, the plan's own cost table at 40 and its prose at 38; the actual is **1**,
+and that ratio measures the scope that was cut and the parallelism of one segment, not the
+difficulty (below). Six programs of rlxfw's own — `init` as a compiled PID 1, `cfgstore`, `brokerd`,
+`httpd`, `dnsfwd`, `ifupd` — plus busybox rebuilt from the drop's 1.13.4 with an applet set chosen
+as a security decision, booted from RAM and answered questions put to them on the die: `httpd` as
+uid 100 in a chroot, `dnsfwd` as uid 101 printing `setuid(0) refused (Operation not permitted)`,
+`brokerd` as root behind a unix socket, the config store written with its slots alternating, and a
+login costing 0.902 s for the right password and 0.9017 s for the wrong one (`FW-175`, `FW-181`).
+**The gate's pass condition had to be re-specified before any of that could count**: the two
+independent sources named on 2026-08-25 both return 0 on a statically linked binary by
+construction, and 0 was the passing answer (claim ①). Ten steps of ten closed, the tenth being this
+entry. Two uploads, no `FLW`, `EW`, `EB` or non-zero `AUTOBURN`, and both returns to the loader were
+`busybox reboot -f`.
+
+**The weakest thing here is that the readings which settle three of this gate's claims cannot be
+re-derived from a file, and one of its instruments prints the same text for two different states.**
+Two readings of the first boot — the `POST /api/login` reply and the `dnsfwd` reply — were printed
+to a terminal by a script that does not save them, and a search for their text over
+`bench/2026-09-30/` and `$FWRE_WORK/rebuild/s118/` finds only that script: they are 量 by the
+session that ran them and nothing else (`notes/userspace-integration.md` § 7). Repeating the login
+one needs a fresh boot, because a password was set later in that one. And `cfgstore show` printed
+`bytes 0` for a file that was **absent**, not empty — 量 the earlier `ls` read `No such file or
+directory` — so that instrument cannot tell ENOENT from a zero-length store, which is exactly why
+its output alone is not the evidence (`FW-181`; `notes/userspace-integration.md` § 7.4). Beside
+those, `$FWRE_WORK` holds the interface specification every program was written against
+(`SPEC-R7.md`, `SPEC-R7-8.md`), all four fuzz pre-registrations, and the replay that cleared `rl.c`.
+
+### Three claims that stand
+
+**① The pass condition was an instrument that could not fail, and it was replaced before anything
+was measured against it — with a tool that refuses rather than reporting 0, and with the vendor
+baseline corrected in the same pass.** 讀 and 量 (`FW-20`, `FW-22`, `FW-174`, `FW-177`;
+`notes/rootfs-census.md`). § Gate board's row named two sources — the shipped artefact walked
+through `PT_DYNAMIC`/`DT_SYMTAB`, and `nm --undefined-only` over the build products before strip —
+and rlxfw's own programs are **static**: a `PT_DYNAMIC` walk finds no such segment, and `system` is
+*defined* rather than undefined in a static link. Each therefore reads 0 on every rlxfw binary
+whatever the code does, **and 0 is the passing answer**. That is this repository's own `R-28` class,
+*an acceptance tool that cannot fail on the file format it must check*, reappearing one level below
+where it was first caught — and the sharper reading is that `R-28`'s own countermeasure, *two
+sources of different kind, shipped artefact against build product, each with controls*, is the
+wording that turned out vacuous. 🟢 `tools/uspacescan.py` replaces both: source ① over the shipped
+bytes is a dynamic import walk, then `.symtab`, then a **relocation-masked code fingerprint** of the
+libc member that defines the name, which survives `strip`; source ② reads every `*.o` that went into
+the program with the tool's own ELF reader and counts `SHN_UNDEF` GLOBAL or WEAK, cross-read against
+`mips-linux-nm -u` where a disagreement is a failure and not a vote. **A stripped ELF with no
+`PT_DYNAMIC` and no fingerprint source is refused, not passed**; a name with no implementation in
+the archive is `UNDECIDED (NOFP)` and never 0, with `wordexp` carried as a permanent control row so
+that every run demonstrates it; and a fingerprint leaving fewer than eight distinct unmasked words
+is refused as undecided, the threshold chosen with 3 on one side (a `vfork` thunk that matched five
+unrelated thunks in `iperf3`) and 19 on the other. 量 `--self-test` 30 controls, 0 failed, 0 skipped,
+with a planted `system()` found **both before and after** `mips-linux-strip`, and
+`tools/test-uspacescan.sh` 70 of 70. Over the shipped image: six programs, both sources, **0
+forbidden names, rc 0**, the allowed calls counted (`execve` two, `fork` three), `execle` exempt by
+name with the exemption's control firing — the same ELF under the default name table gives
+`rc 1 FINDING` — and `uprobe`/`ucost`/`iperf3`/`linkprobe` reported `UNPAIRED` rather than as
+agreeing, because no objects were kept. 🟢 **The two sources disagreed once and it produced a finding
+rather than a vote**: over all 199 of busybox's compiled objects they differed on `execvp`, and the
+cause is `libbb_vfork_daemon_rexec.o`, compiled but **not linked** (讀 `busybox_unstripped.map`, 199
+of 100), which source ① said by the same fingerprint method. 🟢 **The vendor baseline was corrected,
+and the correction is that the published method could have missed the very symbol this gate is
+about.** 161 files, 55 ELFs, 3 of them static; 31 of 55 by whole-string scan and 28 of 55 by import
+walk, the gap exactly three files each with its own reason. A string table **tail-merges**: 量 over
+the 52 dynamic ELFs, 3,752 (file, import) pairs of which the scan sees 3,435 and **misses 317 across
+61 distinct names**, and `system` is one of the missed names — libc stores `__libc_system` and its
+`system` entry points 7 bytes into that run, so no `system` run exists in it and **libc is in the 31
+only because it matched `popen`**. `readelf --dyn-syms` is empty on **54 of 55, not on all 55**: 量
+`bin/acltd` keeps its section headers (`e_shoff 0x2348`, `e_shnum 25`, the tree's only `SHT_DYNSYM`
+section header) and host `readelf` 2.42 prints its 51 entries, 29 of them `SHN_UNDEF` — which makes
+that instrument **worse** and not better, because its one non-empty answer out of 55 is exactly what
+would make the other 54 zeros look earned. And `daemon` was never busybox's import: 量 the run sits
+at file offset `0x3f768` while that file's `.dynstr` is `0x1ba8`–`0x2460` and no `.dynsym` entry of
+the name exists; it is `bin/udhcpd`'s import, **the row directly below in the same table**, and
+nothing in this repository can see a value that moved between two adjacent rows — `spec-check` and
+`citecheck` read ids, citations and structure, and a plausible name in the wrong row is structurally
+valid (`FW-174`). ⚠️ What this does not reach: **reachability is undecidable on this ABI and the tool
+says so instead of pretending.** The rsdk gcc compiles abicalls PIC (`e_flags 0x1007` on
+`linkprobe` and `iperf3`, `0x1005` on `uprobe`/`ucost`), so a libc call is
+`lw $t9,%got(f)($gp); jalr $t9` and there is no `jal` to it anywhere; the tool therefore prints the
+count of register-indirect transfers in `.text` and reports `reach=INDIRECT` rather than running a
+BFS that would return undecided on every real input. What it decides is **presence**, which
+over-reports. ⚠️ An inlined or open-coded `execve("/bin/sh", …)` is not this libc's `system` and is
+invisible to all three methods, so `R7`'s ban on `sh -c` is not established by this tool. ⚠️ Neither
+vendor number is a bound by construction: 31 over-counts three files, 28 is a count over 52 and says
+nothing about the other three, one of which (`bin/updatedd`) carries a whole-run `system` string, so
+the rootfs figure is *28 confirmed, ≤ 29* (`notes/dnsfwd.md` § 10).
+
+**② rlxfw's own userspace runs on the die, the privilege separation is verified by trying to undo
+it, and the KDF has a device number for the first time.** 量 two boots, 2026-09-30, no power action
+(`FW-175`, `FW-176`, `FW-179`, `FW-181`; `bench/2026-09-30/R78-*` and `R79-*`;
+`notes/userspace-integration.md` § 7). Boot 1 is image `r78a`, `RLXFW-ID0=BF182DE2`, which is § 6's
+recipe id `bf182de2` in `notes/userspace-integration.md` § 6; boot 2 is the rebuilt image,
+`RLXFW-ID0=0E45C61D`; both entered with
+`J 80500000` after the staged head at `0x80500000` was read back. `ps`: PID 1 is `/init`, `brokerd`
+root, **`httpd`'s USER column is `httpd`**, **`dnsfwd`'s is `dnsfwd`**, `udhcpd` root, `sh` root, and
+all three `/etc/passwd` rows carry `/bin/false`. 🟢 **The drop is verified by reversing it, not by
+announcing it**: `dnsfwd: running as uid 101 gid 101; setuid(0) refused (Operation not permitted)`.
+Beside it `httpd: uid=100 gid=100 root=/srv/www sock=/run/broker.sock port=80 conn=8`,
+`brokerd: listening on /srv/www/run/broker.sock mode 0666`, `rlxfw: lan up, rlx0 10.1.1.1/24`, and
+two loud `*** BENCH PROFILE: A ROOT SHELL IS ENABLED ON /dev/console ***` lines. The four daemons
+each answered: `cfgstore show` listed sixteen keys at `source default`, `seq 0` with both slots
+invalid, `set sys.hostname=rlxfw-bench` gave `written: slot 0, seq 1` and `cfgstore passwd` gave
+`written: slot 1, seq 2`, so **the A/B alternation is only visible on the second write**, with
+`/var/lib/cfg.bin` at 8,192 bytes, mode 0600, owner root; `GET /` answered 200 in 3,850 bytes and
+`/api/status` 200 with `{"ok":true,…,"auth_ready":true}` and all four security headers
+(`X-Frame-Options: DENY`, `Content-Security-Policy: default-src 'self'`,
+`X-Content-Type-Options: nosniff`, and `Cache-Control: no-store` on `/api/*`), through the whole
+chain host → `httpd` (uid 100, chrooted) → unix socket → `brokerd` (root) → typed op; `dnsfwd`
+returned 29 bytes with id `0x1234` echoed and rcode 2, neither hanging nor crashing; and `ifupd`,
+which `D14` would otherwise have had no reading for at all because `wan.mode` is 0 and `udhcpc`
+never execs it, applied one hand-fed lease (`bound ok reason=ok`, rc 0, `/run/wan.dns` written, the
+interface really at `inet addr:10.9.9.9 … Mask:255.255.255.0`) and refused two malformed ones **by
+name** (`REFUSED reason=bad-ip detail=octet-over-255` and `REFUSED reason=no-interface`, both rc 2).
+🟢 **The entropy driver's criteria were registered before the run and all of them were met, while
+its ceiling fired.** `notes/entropy.md` § 5.2: pass = `ev_nic` rises, `qualifying` > 0, `bits` > 0
+and `entropy_avail == bits`; refutation = `ev_nic` rises while `qualifying` stays 0, or `bits` > 0
+while `entropy_avail` stays 0; void = `ev_nic` does not rise. 量 at boot `ev_nic 0 qualifying 0
+bits 0` and `entropy_avail 0`; after 1,000 echoes (188 received) `ev_nic 1193 qualifying 1151
+bits 71` with `entropy_avail` **71 — the two accountings exactly equal**; after a 4,000-echo flood
+(4,000 of 4,000 received) `ev_nic 9194 qualifying 9125 bits 403` and **`clamped 2665`**, so the
+one-bit-per-jiffy ceiling fired 2,665 times and 9,125 qualifying events bought 403 bits, which is
+what the design asks for. The control is the unchanged `r6b8i` image, on which `entropy_avail` read
+0 at 768 s, 1,613 s, 3,289 s and 3,437 s across 400 round-tripping echoes and ~7,700 serial
+interrupts (`FW-160`) — and **that control's first round failed and the failure is itself a
+reading**: the host pinged 10.1.1.1 while `rlx0` was 10.1.1.3/255.0.0.0, so 300 echoes arrived only
+as broadcast ARP, IRQ 12 moved by 15, and the round does not count. 🟢 **The KDF's cost is 量 for the
+first time and it refutes the estimate that stood in for it**: `log2N=12 r=7 p=1` takes **0.902 s**
+(0.902410 s and 0.902122 s for the correct password, answered HTTP 200 with a csrf and `ttl_s 900`;
+0.901743 s for a wrong one, answered 401) — the same time either way, so the timing does not say
+which it was. The pre-run figure derived from qemu was ~0.3 s with a **declared** interval of
+0.15–0.8 s: three times low and outside its own interval, on an emulator that had already
+disqualified itself by ranking `(12,8,1)` faster than `(12,7,1)`. ⚠️ What this does not reach: **no
+refusal was returned on the board.** The only peers in these captures are `httpd` and `dnsfwd`, both
+in the authorisation table, so the refusal half — a uid outside {0, 100, 101}, or uid 101 attempting
+a `SET` — rests on the host's 264-cell matrix and nothing else. ⚠️ The lease was **synthetic**:
+`10.9.9.9`, `10.9.9.1` and `10.9.9.53` were invented at the desk, no DHCP server issued them, and
+`udhcpc` has never run on this board. ⚠️ Why `dnsfwd` answered SERVFAIL is 推 — the configured
+upstream is this host and nothing was read from the board's side to show no resolver is there — and
+the reply bytes were not saved.
+
+**③ The device found two defects no host suite could, and the way the first one was cleared is worth
+more than the fix.** 量 (`FW-182`, `FW-183`, `FW-184`; `docs/KNOWN-ISSUES.md`; `notes/httpd.md`
+§ 11). `POST /api/login` answered `429 {"ok":false,"error":"ratelimit","retry_s":2}` and **did not
+recover** — refused at 640 s, 660 s and 832 s of uptime with 20 s and then 90 s of complete quiet in
+between, while `GET /api/status` answered 200 in the same minute, so `httpd` was alive, forking and
+serving and only the login path was shut. 🟢 **`rl.c` was exonerated before it was suspected, and by
+a sweep rather than by reading it**: replaying the device's own timeline through it with an injected
+clock **grants** at +20 s and at +90 s, and a sweep of **2,709,903** reachable
+`(tokens_milli, last_ms)` pairs per bucket found **0** that refuse after a 90 s gap; an empty global
+login bucket names `retry_s` 5 and an empty per-address bucket 11, and the value 2 is reachable only
+within 250 (respectively 100) milli-tokens of granting, a state that grants within 2 s; `now_ms()`
+is `clock_gettime(CLOCK_MONOTONIC)` in milliseconds and not `times()`, so this kernel's
+`INITIAL_JIFFIES = -300*HZ` never reaches it and 640–830 s is nowhere near the 49.7-day wrap. The
+mechanism, reproduced on the host as a failing unit test before anything was changed: `srv_loop()`
+kept the holder of the single KDF grant in **two** places, `kids[i].holds` and a local
+`int kdf_inflight`; the decision read the local, `reap()` clears only `holds`, runs at the **top** of
+the loop and closes `kids[i].fd`, discarding the release byte and the EOF that were the only two
+paths clearing the local. The literal `retry = 2` in that branch is the constant `retry_s`, and the
+refusal happens **before either bucket is consulted**, which is why 90 s of idle changed nothing.
+🟡 It is a **race and not a deadlock**: one 401 got through at 05:29, immediately followed by eight
+consecutive 429s and a ninth after 15 s of quiet. 🔴 **So the honest headline is not "the tested
+implementation and the deployed implementation were different code"** — `test_rl.c` did cover the
+deployed bucket and was right — but **duplicated state with only one copy maintained, in the one
+function no unit test could call**, because entering it needs `fork()`, `accept()` and a listening
+socket; the repair makes that function testable by extracting the arbitration behind
+`srv_kdf_reset`/`ask`/`gone`, so a test drives the decision that ships — nineteen cases added to
+`test_serve.c`, three of them controls, one of which refuses a holder that is **still alive** ten
+minutes later. 🟢 **Fixed and proven on the device against a discriminator registered
+first**: a leaked grant refuses with the *constant* `retry_s` 2 before either bucket is consulted and
+never recovers, while a legitimate bucket refusal names a truthful wait and clears. 量 twelve
+consecutive logins — 1 to 3 HTTP 200 at 0.912/0.909/0.911 s, the burst of three the design allows,
+then 4 to 12 refused with **`retry_s` 9**, a real bucket figure, then HTTP 200 again at 0.909 s after
+15 s of quiet. 🔴 **The recipe id is not the evidence**: `RECIPE_ID` digests `config/` only and
+`config/` changed for an unrelated reason; the evidence is that the new stripped `httpd` appears
+verbatim inside `vmlinux_img` and the old one does not, with the control run both ways. The fix cost
+232 bytes stripped (83,604 → 83,836, +0.28 %) and `hazlint` stayed at 0 violations over 3,740 loads.
+🔴 **The second defect is open, and its consequence must be said plainly: a password set on this
+image does nothing until `brokerd` restarts.** `cfgstore passwd` succeeded (`written: slot 1,
+seq 2`; `admin.pwhash set: scrypt log2N=12 r=7 p=1, entropy_avail was 150`), `cfgstore get
+admin.pwhash` reads `set` and `/api/status` reports `auth_ready:true` — yet the **correct** password
+was answered `401 {"ok":false,"error":"auth"}` in **14 ms**, and 14 ms means no KDF ran, which is
+what `brokerd` answers when it believes no password is set. Confirmed by an experiment rather than by
+reading the code: `busybox kill 12 13` let `init` respawn both (`brokerd exited exit=0` → pid 81,
+`httpd exited signal=15` → pid 82) and the same password then returned HTTP 200. It fails **closed**,
+which is the right direction, and it is recorded and not fixed (`FW-184`). ⚠️ What this does not
+reach: nothing here says these were the only two differences between the host and the silicon — they
+are the two that were measured. ⚠️ The exact trigger of the grant leak on the device is 未定: any
+child that exited holding the grant produces it, and the captures do not say which one did. ⚠️
+Nothing covers the socketpair — not the five-byte encoding, not `select()`'s ordering against
+`SIGCHLD`, not a child that neither releases nor closes; all three are read out of the source.
+
+### The steps' DoD, read one row at a time
+
+`R7` has no `D`-row table in this repository — `R7-8`'s DoD cites `D14`, which lives in `plan/` and
+is gitignored — so the step list's DoD column is what is read. Ten steps; nine closed and `R7-9` is
+this entry.
+
+| the DoD says | verdict |
+|---|---|
+| **`R7-0`** a fixture that really calls `system()` is caught by both sources; an `execve` fixture is permitted **and** counted; a name that exists nowhere reads 0; the two sources disagreeing is an error, not a vote; a mutated tool exits non-zero | 🟢 **met** (claim ①; `FW-177`). The planted `system()` is caught either side of `strip`, `--self-test` is 30 of 30 with 0 skipped, and `tools/test-uspacescan.sh` is 70 of 70. ⚠️ The row asks for a stripped file to be the case that matters and it is, but the method that answers it needs a `libc` to fingerprint against: without one the tool **refuses**, which is the intended behaviour and also means the reading depends on a toolchain artefact that is not in this repository |
+| **`R7-1`** `busybox --list` 量 under qemu, not read off the config; no enabled applet's source calls `system`/`popen`/`execl*`, shown by scanning the built binary; `hazlint` 0; the list of commands the current image has and this build drops | 🟢 **met, with the row's instrument replaced by a better one.** The enumeration is **53 applet names and 43 ash builtins**, 量 two ways sharing no code — running the binary under `qemu-mips-static` and reading its *Currently defined functions* block, and `tools/appletcensus.py extract` parsing the applet-name table out of the ELF without executing anything — which agree exactly; `--list` is not what was used, and the applet table is read out of the built ELF and never out of a `.config`. Against `config/image-commands.tsv`'s 50 rows: **9 dropped, 12 added**, and the builtin table is a strict superset (43 against 40). `hazlint` 0 violations in 26,072 loads (`notes/busybox-build.md` § 2, § 5, § 6). ⚠️ The forbidden-import gate `G6` reads the **unstripped** link's symbol table; what transfers the claim to the shipped file is that both have the same 403,708-byte `.text` with the same sha256 |
+| **`R7-2`** mounts, LAN up by `ioctl`, daemons supervised with a backoff and a crash-loop stop; every child `fork`+`execve` with a fixed `argv`; the DHCP lease environment treated as hostile, with a malformed battery; the bench shell enabled **and announced** | 🟢 **met** (`notes/init.md` §§ 2–7). Backoff 250 ms doubling to 16,000 ms, eight consecutive fast failures then `SV_GIVENUP`, about 32 s of trying; every child is `fork` + `execve` with an argv of string literals and a three-entry environment, and **not one argv byte comes from the config store, a lease or the command line**; `ifupd` reads five environment names and nothing else, every read length-bounded before the value is examined, everything surviving is a `uint32_t`, and the battery is **43 rows — 26 refusing, 5 partial, 12 applied — asserting `n_ioctl == 0` on every one of the 26**, with 13 named refusals and 8 named partials. The shell is announced by two `***` lines. ⚠️ `SIOCADDRT` has never been issued on this board by anything, so whether the netdev accepts a default route is 未定 |
+| **`R7-3`** the torn-write sweep as a loop over **every** truncation length, each leaving the previous record selected; a bit-flip sweep over the header; both slots invalid → defaults with `source = 0`; the mutation with the length check removed goes red | 🟢 **met, and the row's first clause was refuted as worded and replaced by a stronger invariant** (`notes/config-store.md` §§ 4–6, § 8). *Every truncation leaves record N selected* is not satisfiable and the reason is the format: the record is 131 bytes and the other 3,965 of the slot are fill the parser never reads, so a write that reached byte 131 wrote the whole record and selecting it is **correct**. What was measured instead is that the load is byte-identical to N or to N+1, never a mixture: **8,194 cases** = 2 backgrounds × 4,097 lengths, 262 selecting N, 7,932 selecting a complete N+1 with `L ≥ 131`, and **0** mixtures, partials or fallbacks — with `L = 4096` as the positive control, without which *always N* could be true because N+1 is unselectable. Bit-flips: 1,048 in the extent all rejected, and **512 flips in the `0xFF` fill all accepted with every value identical**, which is what separates this parser from one that rejects everything. Both slots invalid gives defaults with `source == 0`, and `admin.pwhash` has no default, so no password means no login. `M1` (bound removed) 1,742 failures, `M2` (off by one) 38, with `M0` passing first as the precondition |
+| **`R7-4`** the decoder sweep over every header offset and truncation; the authorisation matrix per (op × uid × session × CSRF); the lock's doubling **and** a correct password succeeding after it expires; `NOENTROPY` before the pool is ready | 🟢 **met** (`notes/broker.md` §§ 1–9). Decoder sweep **124,975 cases** = 122,400 single-byte header corruptions (10 frames × 48 offsets × 255 values) + 2,575 truncations, each run one-shot and byte-at-a-time for **249,950 invocations** that must agree on the exact return code — and comparing the exact code rather than the sign is what catches `M1`, which hides behind a second bound check otherwise. Matrix **264 cells** = 11 ops × 4 uids × 3 session states × 2 CSRF states, which caught a real bug: uid 101 was being read for `need_session`. Lock 60 s doubling to 3,600 s, and **a locked bucket is never evicted**, because otherwise sixteen addresses clear a lockout. `NOENTROPY` is sticky-once-seen and `test_entropy.c`'s first fixture is the device's own 0. ⚠️ `M6`, a constant-time compare given an early exit, was **not** caught and that was predicted before the run |
+| **`R7-5`** every RFC vector set passes on the host **and** on the target under qemu; the traversal battery; the route matrix; `chrootcheck` shown failing on a planted `sh`; the scrypt parameters chosen from an anti-DoS budget, with the numbers | 🟢 **met** (`notes/httpd.md` §§ 4–6). 387 cases in four configurations, zero sanitizer findings; the traversal battery is **34 targets all refused with five positive controls**, and the `traversal` mutation turns 3 cases red while the other 31 targets stay refused. `chrootcheck` refuses a planted `/srv/www/bin/sh` with three findings and a planted symlink with one, passes the real root, and its `--self-test` refuses six planted offenders and passes a clean tree. 🟢 The control that earns the qemu run: replacing the Salsa20 state load with a `memcpy` of a `uint32_t` array — the classic endianness bug — leaves the host suite **37/37 green** and turns exactly the three scrypt vectors red on the target. The budget is B1–B5 written before the measurement, and `r = 7` follows from `(12,8,1)`'s peak of 4,197,376 bytes exceeding the 4,194,304 cap by 3,072 |
+| **`R7-6`** the pointer battery (self, forward, cycle, chain, past-end) with a positive control that a legitimate compressed name decodes; the anti-spoof set; off-LAN sources refused; the mutation without the loop guard caught by a time-bounded test | 🟢 **met** (`notes/dnsfwd.md` §§ 3, 5). Three guards, and guard 1 alone is **not** sufficient: the `cycle3-backwards-legal` case has three targets each below its own pointer's offset and still forming a cycle, which guard 2's strictly-decreasing rule refuses, and guard 3 refuses the 200-pointer chain every hop of which is legal under 1 and 2. 15 battery cases, 12 refusals and 3 positive controls, the strongest being a two-hop compressed name (51 → 45 → 16) that must decode to `cdn.example.com`; 3,701 checks with 0 failures; a truncation sweep of 454 prefixes all refused and a corruption sweep of 2,270 with 809 accepted and every bound holding. Off-LAN queries are dropped **in silence**, because an error reply would itself be the amplification. The loop-guard mutation **hung** and was reported by an `alarm(5)` around every pointer case rather than waited out |
+| **`R7-7`** the mechanism read out of this kernel's `random.c` with citations; a credit policy that under-credits rather than over-credits; a card whose refutation condition is written first, with the reading on an image **without** the change as its control | 🟢 **met** (`FW-160`–`FW-165`, `FW-179`; `notes/entropy.md`). The deadlock is read out of the tree with three citations and it is not the flag: `add_timer_randomness` mixes `get_cycles()` but credits only from a jiffies difference, and `arch/rlx/include/asm/timex.h`'s `get_cycles()` is `return 0;`. The 0 registrations of `IRQF_SAMPLE_RANDOM` has three controls, including 36 flag sites in the drop against 0 compiled in. The policy credits **1 bit per 16 qualifying events, capped at 1 bit per jiffy**, and its first qualifying condition — `phase != last_phase` — **could not fail on this source** at 7.1 ms packets and was replaced by a third-order difference. The control image is `entq0`, built from the same HEAD without the change, with `rlxfw-marks verify` reading 11 witnesses against 12 |
+| **`R7-8`** `uspacescan` over every binary in the image, both sources, 0 forbidden imports and the allowed ones counted; the shell prompt; `cfgstore`, `brokerd`, `httpd` and `dnsfwd` each shown running and answering; the KDF's device timing measured rather than inferred from qemu | 🟢 **met, and it is the only step that looks at the shipped bytes on the die** (claims ② and ③). All six programs 0 from both sources; the decompressed extent is 4,096,000 of 5,242,880 bytes, 78.1 % used with 1,146,880 of margin, and rlxfw's busybox at 447,684 bytes replaces four vendor files totalling 579,644. ⚠️ Each of the six is larger than its author reported, by 79,364 bytes together, because the stubs were self-contained and the real `src/lib` is five translation units for the store and two for the KDF |
+| **`R7-9`** the entry states what `R7` established and what it did not | 🟢 **met by this entry.** The row's hazard is calling the gate finished on a green suite instead of on the boot, and the answer is that claim ② and claim ③ are the only claims here that rest on the device, that every note but `userspace-integration.md` says in its own words that nothing in it has run on the silicon, and that the list below is longer than the claims |
+
+### The step list's hazard column, read one at a time
+
+`R7`'s list carries no numbered refutation conditions and no stop-loss. What it carries is a
+per-step column naming where the step is most likely to be wrong, written with the list at `R7-0`
+before any step landed. That is weaker than `R6b`'s `M1`–`M8`, and this entry says so rather than
+promoting a hazard into a pre-registration. What stood in for pre-registration on the device is
+`notes/entropy.md` § 5.2's criteria for the entropy round and, for the `httpd` fix, a discriminator
+written before the rebuilt image booted (claim ③).
+
+* **`R7-0`, declaring a static binary clean because the instrument cannot see into it** — this is
+  the defect the step exists to repair, and it did not survive: the tool refuses such a file.
+* **`R7-1`, enabling `udhcpd` and shipping its lease-notify `system()` with it** — refuted at the
+  bytes rather than at the configuration. `write_leases()` calls `system()`, and uClibc 0.9.30
+  implements it as `execl("/bin/sh", "sh", "-c", …)`, so one call site puts both an interpreter and a
+  variadic exec in the image; the hook is removed **in source** by a committed patch, because *the
+  config does not reach it* is a property of a file in a writable `/var` while *the code is not
+  there* is a property of the bytes. 量 after the patch, all six names absent from the symbol table.
+* **`R7-1`, every dropped verb is a bench card that stops working** — fired, and it was paid twice:
+  five of the vendor image's fifty applets are dropped for the rule (`getty`, `init`, `login`,
+  `nice`, `telnetd`), and `od` and `hexdump` were enabled at the owner's request and then turned off
+  when the manifest's containment argument turned out to rest on their absence.
+* **`R7-2`, supervision that respawns for ever; a PID 1 that leaves zombies** — neither: the cap is
+  bounded and its mutation control `M1` is a **bounded** 1,000-iteration loop, 125× the cap, because
+  a hang is not a test result; reaping is `waitpid(-1, …, WNOHANG)` in a loop.
+* **`R7-3`, a reader that trusts a length, and a fail-open fallback** — answered by the header CRC
+  being checked before any header field is read, by the length being range-checked *after* the CRC
+  matches because a CRC is not an authenticator, and by `admin.pwhash` having no default.
+* **`R7-4`, a slow client holding the broker shut** — `test_wire.c` holds all eight slots with
+  silent peers and a normal call is still served; what **does** block is stated rather than hidden —
+  one `LOGIN` stalls the loop for one scrypt, deliberately, and one `PING` for up to 10 s, which is
+  a real latency hole and is not fixed.
+* **`R7-5`, a KDF that is right little-endian and wrong big-endian** — the hazard the qemu control
+  was built for, and it fired on the planted `memcpy`: green on the host, three vectors red on the
+  target.
+* **`R7-6`, the compression-pointer loop** — refuted by three guards, one of which exists because a
+  proof that depends on reading an argument correctly is not a guard.
+* **`R7-7`, crediting a periodic timer** — not done: the credited quantity is the third-order
+  difference of a phase, and the first version's condition was thrown out precisely because it could
+  not fail.
+* **`R7-8`, a daemon that works under qemu and faults on the silicon** — **this is the hazard that
+  fired**, twice, and both are in `docs/KNOWN-ISSUES.md` (claim ③).
+
+### The questions this gate must be able to answer
+
+The plan's `R7` interview row asks three.
+
+**① 「`strncpy` 真的安全嗎？」** No — it does not NUL-terminate on truncation — and it is not used.
+量 over `src/`, `strncpy` appears in exactly one file, `src/brokerd/test_wire.c`, at two call sites
+in a test, and in no shipped program; `strcpy`, `strcat` and `pthread` appear nowhere in `src/` at
+all. The wider reading is the forbidden-construct audit over the eleven `.c` files of `httpd`:
+`strcpy strcat sprintf atoi alloca system popen gets scanf` read **0 each** against a control ELF
+reading 1 each (2 for `alloca`), 0 variable-length arrays against the control's 1, and 0 cycles in
+the call graph across 11 translation units against the control's 1. `src/lib/netutil.c` exists
+because `inet_aton` accepts `1.2.3`, `0x7f.1`, `017.1.1.1` and `1.2.3.4 `, and it gives every
+rejected shape **its own error code**, because a test that only asserts *refused* cannot tell a
+refusal for the right reason from one for the wrong reason.
+
+**② 「你怎麼證明 rootfs 裡沒有 `system()`？」** This is the gate's own subject, and the honest answer is
+that the plan's answer — *two independent sources + CI* — is the thing that had to be replaced;
+claim ① is what stands in its place. The short form: 0 from two sources of different kind over the
+six shipped programs, with the one exception exempt **by name** and its exemption shown firing both
+ways, a tool that refuses rather than reporting 0 when it cannot see, and a vendor number of 28
+confirmed and ≤ 29 rather than a clean 31.
+
+**③ 「為什麼是多行程不是多執行緒？」** Because this ISA has no atomic read-modify-write, and because a
+process boundary is the privilege boundary the gate is about. `brokerd` is one process, one thread,
+`poll()` over one listening fd and at most eight connection slots, **no shared memory and no
+locks** (`notes/broker.md` § 7); `httpd` forks a child per connection and the parent holds the
+limiter, so the arbitration
+of the single KDF grant lives in the parent — which is also where this gate's first device defect
+was (claim ③). ⚠️ The ISA half is quoted rather than re-measured here, and `CLAUDE.md`'s rule is that
+the ISA is never measured under Linux; what `R7` adds is the consequence, not the reading.
+
+### What `R7` did not establish
+
+🔴 **That anything ran under load.** Six programs, one boot each, one question each. The
+eight-connection cap, the four-per-address cap and the 429 after a burst were exercised on the build
+host by `rootcheck`, not on the board, and `plan` § D8's acceptance test — the memory high-water
+mark under N concurrent login attempts with a real `brokerd` doing real scrypt, **with its refutation
+control, the same test with the limiter removed making the machine lose responsiveness** — is not
+done. It needs the device and `brokerd`, and without the refutation control a green run would prove
+nothing.
+
+🔴 **No TLS.** HTTP only: every password on this port crosses the LAN in clear, and neither cookie is
+`Secure`, because a `Secure` cookie over plain HTTP is a cookie that is never sent. `R7g` is outside
+this gate by the plan's own cut order.
+
+🔴 **That the config store survives anything.** `/var/lib/cfg.bin` is on a filesystem the image calls
+tmpfs; `R8` supplies the MTD backing. `fsync` there verifies that the page cache agrees with itself.
+The torn-write model is a **prefix** write: it does not model a device that commits pages out of
+order, nor a partially programmed NOR word that reads back as the AND of old and new. The `0xFF`
+fill and the `seq` exclusions of 0 and `0xFFFFFFFF` are the parts written **for** NOR rather than
+**on** it. 量 beside that: both boots printed `config store slot 0 seq 0` although the first had
+written `slot 1, seq 2` — which shows nothing carried across the reset, not that a same-image reboot
+behaves differently, because the second boot ran a different image.
+
+🔴 **That any rlxfw filesystem is bounded, and the absence of `CONFIG_TMPFS` is not a simple
+absence.** 讀, and confirmed against the built artefact rather than against the `.config` alone:
+`# CONFIG_TMPFS is not set` and `# CONFIG_SHMEM is not set`, yet `mount -t tmpfs` works:
+`mm/shmem.c`'s `#else !CONFIG_SHMEM` branch registers a `tmpfs_fs_type` whose `get_sb` is
+`ramfs_get_sb`, confirmed by dumping the struct out of `vmlinux`'s `.data`. And `fs/ramfs/inode.c`'s
+option table is `mode=%o` and nothing else, **with no `default:` in its switch** — so every other
+option is silently ignored and a `size=512k` would read as a limit and be none. **Four** mounts —
+`/var`, `/run`, `/tmp` and `/srv/www/run` — can each grow until the board is out of RAM (~26 MB),
+and `simple_statfs` means `df` cannot show it. `test_mounts.c` asserts that no row carries a `size=`,
+which is the only thing that stops one being written and believed. Bounding them needs
+`CONFIG_TMPFS` and `CONFIG_SHMEM`, a kernel change (`notes/init.md` § 3, § 8).
+
+🔴 **That the fuzzing is worth more than the minutes it ran, and three pre-registered thresholds were
+missed and reported as missed.** 量 on the host, four campaigns, and nothing in any of them ran on
+the die. The clean runs are 720–780 s each. `brokerd`: branch coverage
+**66.67 % against ≥ 85 %** and region **87.83 % against ≥ 95 %**, both missed and *not renegotiated*
+— and the note's own reading is that 66.67 % is the harness's **ceiling**, because the
+pre-registration was written without excluding the NULL guards and a second bound that is
+unreachable while the first holds; the correct way to have written it was to exclude those branches
+from the denominator **before** the run. `dnsfwd`: T3, `dns.c` whole-file branch coverage **38.10 %
+against ≥ 65 %**, not met, the threshold **not moved**, and the honest statement is that the
+forwarder engine is covered by the battery and not by the fuzzer. `httpd`'s first harness missed the
+`http.c` line threshold at **84.96 % against 85 %**, and that stays on the record: the bar was not
+lowered by 0.04 points, the harness was connected to three functions it was never calling
+(`http_reason`, `http_mime`, `http_parse_all` — 35 of the 63 lines it had never reached) and the
+number moved to 91.89 %. The config store's four (P1–P4) were met, with 87.0 % named as a ceiling
+and not a shortfall. **365,254 executions with no crash is not an absence proof**; what it is worth
+is bounded by the planted-defect result beside it.
+
+🔴 **That "a fuzzer must find it" is a criterion, because `brokerd`'s planted-defect find is
+stochastic.** Five of six configurations never found the one-byte overflow — 167,561 execs in 300 s,
+209,072 in 900 s, 83,484 in 240 s, 165,409 and 207,918 in 300 s — and the sixth (one seed,
+`AFL_DISABLE_TRIM=1`, `-D`) found it in **7 s at 4,179 execs**. **The first repeat of that same
+configuration missed it.** Six further independent 300 s runs: found at 2 s / 441 execs, at 10 s /
+3,644 and at 1 s / 442; not found in three runs of 300 s at about 160,000 execs each. **3 of 6, and
+bimodal** — inside ~11 s and ~4,000 executions, or not inside 300 s — so run length buys nothing.
+That is the missing coverage gradient seen from the other side: a 32-bit length compared against
+**one** constant gives coverage guidance nothing to climb, because every wrong value lands on the
+same edge. A pass condition of this shape needs a named configuration and a hit rate, or it is a
+coin flip.
+
+🔴 **That a sanitizer's silence is evidence: the first planted HTTP off-by-one is invisible to
+ASAN.** `>=` became `>` in `http_feed()`'s line-buffer bound, so `line[1025]` is written in a
+1025-byte array; 量 on the exact triggering input — a request line of exactly 1024 bytes — the
+mutant built with `AFL_USE_ASAN=1` returns **0**. No report, no crash, nothing for a fuzzer to find.
+The reason is a layout fact: `line` is a **member** of `struct http_parser`, ending at offset 1049
+with the next member, a pointer, at 1052, so byte 1025 lands in the struct's own two bytes of
+padding, and AddressSanitizer instruments *object* boundaries and not intra-object ones. Fifteen
+minutes of fuzzing would have found nothing and the pre-registered rule would have **voided the
+coverage figures** — for a defect that is real. Two consequences: parser scratch in a bare local
+array is checkable and the same scratch inside a struct is not.
+
+🔴 **That NAT forwarding works, and it is out of reach on this bench rather than merely unmeasured.**
+Per-port VLAN was not met at `R6` (`R6-6`) and this host has one NIC, so there is no second segment
+to route to; the rules are installed and read back instead. Beside that: `SIOCADDRT` has never been
+issued on this board by anything; no WAN interface is proven to exist, `RLXFW_WAN_IF` defaults to
+`eth4` and is 未定 pending `R6-6`; and `wan.mode` defaults to 0, so `udhcpc` never started and
+`ifupd` has never been invoked by it.
+
+🔴 **That rlxfw's busybox is clean over the wider name set — `execle` is an exemption by name, not an
+absence.** 量 `execle` at `0x41b690` with one `.got` reference, from `networking/udhcp/script.o`'s
+`udhcp_run_script()`, whose argv is a typed path plus one of four literal event names with
+`CONFIG_UDHCPC_DEFAULT_SCRIPT` compiled in rather than typed. `G6` refuses the build if any other
+object references it **and refuses equally if nothing does**, so the exemption cannot outlive its
+reason — and the exemption is swept both ways rather than dated. The vendor's busybox also imports
+`execlp` and `execvp`, which let `PATH` decide which file runs, so a zero over a wider set is
+decided by the **build** and not by shipping busybox (`FW-22`; `notes/busybox-build.md` § 3, § 4).
+
+🔴 **That the anti-DoS budget behind `r = 7` is measured.** The cost is: `log2N=12 r=7 p=1` takes
+0.902 s on the die. The budget is an **argument** written before it — B1 peak ≤ 4,194,304 bytes, B2
+one concurrent evaluation, B3 ≤ 1.0 s each, B4 one evaluation per connection, B5 ≤ 25 % sustained —
+and `(12,8,1)`'s 4,197,376 exceeds B1 by 3,072 bytes, 0.073 %, with the cap deliberately not
+widened. The 25 % is 0.25 login/s × 1.0 s, worst case from an attacker with unlimited addresses, so
+**a per-IP bucket is not a bound**; and the actual memory high-water mark on the board was never
+measured. ⚠️ The two notes still disagree about the parameter: `notes/broker.md` § 5 writes
+`r = 8` into a new hash and `notes/httpd.md` § 5.3 rejects `(12,8,1)` and rules `r = 7`. The shipped
+behaviour is settled — the device wrote `scrypt log2N=12 r=7 p=1` — and the same disagreement was
+the compiled defect the integration found, `BK_KDF_R` 8 against `kdf.h`'s 7, which alone would have
+made `PWSET` return `-KDFE_NOMEM` every time (`FW-178`).
+
+⚠️ **The entropy result is an accounting result and not a strength result.** `entropy_avail` is a
+variable `rlxfw_random_add()` writes; a pass shows the accounting works and the source is alive, not
+that the source has the min-entropy claimed — establishing that needs raw samples off the board and
+an SP 800-90B style estimate, and `RLXFW_ENT_PER_BIT` = 16 is a **derating**, not a measurement:
+`notes/entropy.md` § 4.2's 16× derating and § 4.3's clamp are arguments, and § 6 says so in its own
+words. The round's three prohibitions — no reset
+press, no mtdblock I/O, no ioctl — are procedure and not instrumentation, and **the second has no
+instrument at all** (`FW-162`), so the pool reading is about this driver only if all three held.
+
+⚠️ **殘留: the driver's `bits` and the kernel's `entropy_avail` agree once and then diverge, twice by
+exactly 128 bits, and why is not known.** 量 71 = 71, then `bits 403` against 275, then `bits 406`
+against 147, then steady at 150. One obvious suspect is excluded: two consecutive reads gave 150,
+and a deliberate second of `cat /dev/urandom` still gave 150, so the reads are not draining it. Two
+drops of exactly 128 bits — 16 bytes, one session token or one salt — is too tidy for quantisation
+error. **Not found out is not found out.** It touches no registered criterion, which looked at the
+first reading's equality and at `bits` rising, and it is the live example of a number a tool reports
+needing someone to reconcile it (`FW-180`).
+
+⚠️ **The image's margin is an ELF's extent, not a running kernel's footprint.** 量 on the host,
+4,096,000 of
+5,242,880 bytes over 2 `PT_LOAD`s, `0x80000000`–`0x803e8000`, 78.1 % used. Nothing measured what the
+four unbounded mounts take at run time, and `df` cannot be asked.
+
+⚠️ **Almost every number in the nine notes is a host measurement.** `notes/init.md`,
+`notes/httpd.md`, `notes/broker.md`, `notes/config-store.md`, `notes/dnsfwd.md` and
+`notes/busybox-build.md` each say in their own words that nothing in them ran on the device;
+`qemu-mips-static` covered the KDF's vector sets and `dnsfwd`'s decoder and nothing else, and
+**qemu certifies logic and never codegen or the ISA**. `hazlint` 0 is one hazard class over the
+words it can reach — it scans `SHF_EXECINSTR` sections linearly, 44 KB of the busybox ELF is named
+as not scanned — and whether this core would mis-execute a violation is `TC-h`, still open.
+
+⚠️ **Three second transcriptions of one table are unreconciled by any tool.** `httpd`'s stub key
+table was diffed row by row against `src/lib/schema.c` — sixteen of sixteen identical, measured by
+two programs each printing from its own copy, with a control that a one-field edit is reported — but
+nothing checks it automatically, and the byte-level reconciliation of `httpd`'s `client.c` against
+`brokerd`'s `proto.c` has not happened. Two independent encodings of one table are exactly as likely
+to disagree as to agree.
+
+⚠️ **Four of the seven things the parallel stubs guessed about each other were wrong**, and two
+compiled defects each alone would have made a password impossible on this image. `CFG_NKEYS` 17
+against the real 16, which made `struct cfg` one 64-byte row too long; seven `CFGE_*` numbers all
+wrong, harmless only because `brokerd` reads the sign; `CFGE_BOUND` against the real `CFGE_RANGE`.
+Right were `cfg_last_key()`'s signature, `init`'s sixteen key ids and six default literals, and the
+`BK_*`/`OP_*` **values** — the names differed and the values did not (`FW-178`).
+
+⚠️ **`M6` is an honest miss and the login timing is not a channel measurement.** `brokerd`'s
+constant-time compare given an early exit was **not** caught by any test, and that was predicted
+before the run: it is functionally identical, so no unit test can see it. The 0.902 s against
+0.9017 s measured on the board compares two whole-request times on one boot; a timing side channel
+needs a timing experiment, and there is none here.
+
+⚠️ **`dnsfwd`'s rate limiter does not stop amplification — the LAN check does.** With 32 slots and
+LRU eviction an attacker spraying 33 source addresses gets a fresh bucket each time; the bucket only
+stops one LAN host starving the others. `dns_rate_allow()` computes `dt` unsigned with no
+backwards-clock guard, so a 32-bit millisecond wrap hands every client one free full burst — left
+alone deliberately, because it is once per 49.7 days and too permissive rather than too strict.
+⚠️ And `lan.netmask` is not one of the keys `SPEC-R7` § 6 grants uid 101, so the off-LAN check may be
+running on the schema's default /24 rather than on the configured prefix.
+
+⚠️ **The vendor baseline is a capability count, not a use count, and it is not a bound in either
+direction.** `bin/dnsmasq` importing `popen` does not show that a path reaches it, and `dnsfwd`
+importing none of the seventeen process-starting names does not prove it cannot start a process some
+other way — 量, a raw `syscall()` would not appear as an import either, which is a second check and
+not a proof of the first. Three of the vendor's 55 ELFs are static and **undetermined** rather than
+clean.
+
+⚠️ **The gate's own specification and every pre-registration are outside this repository.**
+`SPEC-R7.md` and `SPEC-R7-8.md`, which pin the interfaces all seven programs were written against,
+are segment-local files under `$FWRE_WORK`, cited from committed notes and committed C; so are the
+four fuzz pre-registrations (`brokerd`'s `PREREG-fuzz.md`, the config store's `prereg-fuzz.txt`
+whose mtime is the evidence of order, `dnsfwd`'s `fuzz-prereg.txt` timestamped with the sha256 of
+two sources, and `httpd`'s thresholds), `httpd`'s forbidden-construct audit, and the replay and
+state sweep that cleared `rl.c`. What a reader here can follow is `notes/`, `SPEC.md`, `bench/` and
+the code.
+
+⚠️ **Three numbers in this gate's own record do not reconcile, and none of them is settled here.**
+`SPEC.md` `FW-165` records the entropy build's `.text` growth as **+1,816** bytes while
+`notes/entropy.md` § 8, the owner, says **+1,736** and its own table gives 3,582,908 → 3,584,644,
+which is 1,736 — an 80-byte disagreement between a value and its owner. `notes/rootfs-census.md`
+gives **161** files for the extracted vendor tree in one section (量 2026-09-30) and **163** in
+another (量 2026-08-29), for the same path, and never reconciles them. And `notes/init.md` § 8 says
+*`udhcpc`/`udhcpd` do not exist on this image*, which `notes/busybox-build.md` § 5 and § 9 supersede
+on the same day in the same segment — both are among the shipped 53 applets.
+
+⚠️ **The board row's baseline was not beaten arithmetically, and the step list said so before the
+gate ran.** The row reads *Baseline to beat: 31 of 55*. 31 and 28 are counts over dynamically linked
+vendor binaries, and *0 of 55* would not be the same measurement; what `R7` establishes is 0 over
+six statically linked programs by a re-specified instrument, with the vendor number **restated**
+rather than beaten.
+
+⚠️ **The cost ratio is not a measure of difficulty.** 34 on § Gate board, 40 in the plan's own cost
+table and 38 in its prose, against 1 segment actual. `R7g` (TLS) was cut by the plan's own order,
+`R7f`'s endpoints were 6 rather than 12, functional parity was cut at v4, and this segment ran many
+agents in parallel, so one segment of wall clock is not one segment of work. `PROGRESS.md`'s own
+note on that column says it is not a quantity.
+
+⚠️ **`spec-check`'s `C3` fired on a faithful quotation of the thing it was describing**, which is
+this gate's smallest finding and is recorded because it is a live example of a checker whose
+vocabulary is wrong while its behaviour is right: `BLANK_RX` is a bare-substring test on three
+open-value markers, so a row whose value mentions an undefined symbol is silently read as open. The
+wording was changed and the checker was not (`FW-173`).
+
+⚠️ **Flash.** 量: the two boots made **two** uploads, whose console preparation was `AUTOBURN 0`,
+`LOADADDR` and `IPCONFIG` — `AUTOBURN 0` disarms and is not one of `CLAUDE.md` § Flash's four verbs
+— and the `AUTOBURN` word at `0x8040D4A0` was read **twice**, once per boot, reading `00000000` each
+time. No `FLW`, `EW`, `EB`, `DB` or `FLR`, and no non-zero `AUTOBURN`, appears in any capture or
+upload record of the gate; both returns to the loader were `busybox reboot -f` with
+`Reboot Result from Watchdog Timeout!` in the capture (`FW-37`). What that cannot see: two writes
+that cancel, every byte outside the words read, and `H601`, which is never hashed. **No flash map was
+taken in these boots**, so there is no bracket of their own to compare against the 2026-08-16 dump;
+`n_writes` was not read and carries no information (`FW-142`). The `FLR` bracket stays at 1,024 of
+4,194,304 bytes = **0.0244 %**, and `FLS-26`'s ledger does not move. The closing commit records
+`flashwin scan` CLEAN against this unit's dump.
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner's own — opening `R7` and `R8a` on 2026-09-30, asking for both in one segment, enabling
+`od` and `hexdump` in the first build, and the widened relaxation of 2026-09-30 — are not listed.
+Each below is recorded where it is cited.
+
+1. The pass condition of 2026-08-25 re-specified rather than met as worded, and the vendor baseline
+   **restated** rather than beaten arithmetically (`notes/rootfs-census.md`; `FW-20`).
+2. `uspacescan` refusing a file it cannot decide, and reporting `UNDECIDED`/`UNPAIRED` rather than
+   0, with `wordexp` carried as a permanent control row.
+3. `execle` exempt **by name** in rlxfw's busybox, with `G6` swept both ways so the exemption cannot
+   outlive its reason (`notes/busybox-build.md` § 4).
+4. `od` and `hexdump` turned off after the manifest's containment argument turned out to rest on
+   their absence, and the manifest's sentence **narrowed** rather than defended — `grep -c` is a
+   per-byte oracle and was already outside the old wording (`notes/busybox-build.md` § 7, § 7.1).
+5. `R7-3`'s torn-write clause refuted as worded and replaced by a stronger invariant, with `L = 4096`
+   as the positive control that stops the rest being vacuous (`notes/config-store.md` § 5).
+6. `brokerd`'s socket left at mode 0666 with `SO_PEERCRED` as the authorisation, rather than
+   `SPEC-R7` § 3's `0660`, because three uids must reach it and `dnsfwd` is not in gid 100
+   (`notes/broker.md` § 3).
+7. A locked rate-limit bucket never evicted, at the stated cost of refusing logins from new
+   addresses while all sixteen are locked (`notes/broker.md` § 5).
+8. The entropy policy's first qualifying condition thrown out for being unable to fail, and replaced
+   by a third-order phase difference; the credit left as a 16× derating and named as one
+   (`notes/entropy.md` § 4.1, § 4.2).
+9. `r = 7` rather than the canonical 8, because `(12,8,1)` exceeds the pre-written 4 MiB cap by
+   3,072 bytes and the cap was not widened (`notes/httpd.md` § 5.3).
+10. EDNS0 answered `FORMERR` rather than with `TC = 1`, and source-port randomisation left
+    per-process rather than per-query, written down as the thing to revisit (`notes/dnsfwd.md` § 3).
+11. `FW-184` recorded and **not fixed**, under the owner's rule of 2026-09-26; the smaller per-IP
+    over-charge found beside `FW-182` was fixed, and `dns_rate_allow()`'s clock wrap was left.
+12. `FW-173`'s wording changed rather than `spec-check`'s `BLANK_RX`, under the same rule.
+
+---
+
+## The operating clause, re-run at seventeen entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -2834,7 +3373,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**.)*
 
 | pair | shared? |
 |---|---|
@@ -2852,6 +3391,8 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R6` → `P2` 🆕 | **no — `P2` CLOSED three of `R6`'s residuals, each taken on in writing by one of its own steps, and the one subject both still carry is two different observations.** Closed: *"`D5`'s headline number needs a verb typed"* — `P2-2` compiled `recover` on, and `P1-N0` read `recov_mode 1` on both days with no verb typed; *"this project holds no vendor receive figure at all"* — `P2-3`'s `eth4` board-receive trials (`NET-114`), reproduced in seating B at 24.572 / 24.653 / 23.923 Mbit/s; and `NET-109 殘留`'s healthy baseline — `P2-3`'s pre-traffic pair, 294 = 294, and 414 = 414 in seating B. The other half of `NET-109 殘留`, its mechanism, has been `R6b`'s in the row's owner cell since the commit that opened `P2`, so `P2` never took it on. ⚠️ `rlx0`'s transmit path is in both sets: `R6` as `NET-67 殘留`, *why the engine stops retiring a TX descriptor*, and `P2` as frames the driver counts as sent that do not leave port 3 intact (`NET-112`, `NET-116`). What would join them is `R6b`'s candidate M8, and M8 is 推 — the same subject, not yet the same thing 🔄 **2026-09-28, decided at fourteen entries with `M8`'s result in view, as that run asked:** `M8` as written is refuted — block 46 stalled with no jabber — and one variable, `txlen`, removes both symptoms, the corruption (`D2`) and the stall (`D4`: 0 fires at the fix, 12 at 1.4 on the same boot). So the two were one fault at the level of the fix (量) and not of a mechanism (推). The verdict above is what that run could see, recorded and not re-scored (below, fourteen entries) |
 | `P2` → `R6b` 🆕 | **yes — the mechanism of `rlx0`'s transmit fault, as a cause.** `P2` carries it as *"rlxfw's own driver has no throughput figure at the n the DoD asks for, and why is `R6b`'s"* and, in the same paragraph, *"The mechanisms are eight candidates, all 推"*; `R6b`'s step list took the candidates on in writing (*"… read on silicon by `R6b-3`, with every mechanism"*), and its entry carries *"the mechanism of the transmit fault, as a cause"*: the stage a span with no component measured, `M1`-cover8 a fitted rule (`NET-129`, `NET-132`). ⚠️ Four more items sit in both lists and are declined, each for its reason below |
 | `R6b` → `R1y` 🆕 | **no — `R1y` did not take on the thing the fourteen-entry run fired on, and the rest of the two lists are about different objects.** `R6b`'s residuals are the device's and its bench record's: the transmit fault's and the stall's mechanisms, the fix on `SWCORE=n`, `D8`'s inherited switch state on one seating, the vendor-code scope, the reset guard, what `R6b-8` did not build, four DoD rows' edges, what `D5` set aside, the relaxed process's evidence, `C-19`'s night and the power ledger. `R1y`'s are this repository's record: rows that grew in place, records' citations that can only be read, four enforcers ⊘, a reading kept outside the tree, six exemptions as wide as their lines, `SPEC.md` and the open carried-forward rows left as they were, stale line numbers in `tools/`, a tree not swept. ⚠️ The nearest candidate, `CLK-42` 殘留's missing gate, the nearest resemblance, an instrument blind to its own subject, and the flash boundary are each declined below |
+| `R1y` → `R8a` 🆕 | **no — and this run makes that verdict a run late, because entry 16 wrote no sixteen-entry run.** `R1y`'s residuals are text in this repository and the tools that read it; `R8a`'s are a second-stage loader on the silicon, flash, a counter, keys and a cache, and no step of `R8a` took an `R1y` residual on in writing, which the guard written at eight entries decides. ⚠️ The nearest candidate is a reading the tree does not hold — `FW-119`'s pre-commit reading, done by scripts kept outside the repository, beside `SPEC-R8a.md` and the verdict script — and it is declined as a shape: one is a **procedure** the tree does not repeat, the others are **artefacts** the tree does not hold. The flash boundary is not counted, for the thirteen-entry run's reason |
+| `R8a` → `R7` 🆕 | **yes — that nothing rlxfw writes survives, because there is no write path and `R8b` owns the half that would give it one.** `R8a` carries *"Nothing in `R8a` writes one byte"* and *"the monotonicity the design rests on is asserted and never exercised"*; `R7` carries *"That the config store survives anything"*, and `notes/config-store.md` § 11 takes it on in writing and names the gate — *"R8 supplies the MTD backing"* — so `R7` built an A/B store with a monotonic `seq`, an erased-value exclusion and a read-back verify **for a medium it never touched**. 🔴 This is **not** the flash boundary the thirteen-entry run declined: that is the § Flash bookkeeping sentence `CLAUDE.md` requires of every entry, while this has a board row of its own and the row is open. ⚠️ Weaker than `P1` → `R6` in that neither entry names the other's gate — both point at a third, `R8` — and `R8b` is already booked behind `R9`, so the firing adds evidence and not an instruction |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -3501,6 +4042,142 @@ run found at entries 8 and 11 — *a bar met by construction* — and not this c
 11 and 15 no two are consecutive, so the widening declined at eleven entries would not fire on its
 own terms either. **The weaker class stays at two**, and `R6b`'s `D2` *on a fixed image*, the
 candidate the fourteen-entry run recorded, stays uncounted.
+
+### 🆕 At seventeen entries the clause FIRES — and this run has to make the sixteen-entry one too, because entry 16 did not
+
+**What this run does first, and why it is two pairs and not one.** 量 at the time this entry was
+written: the heading of this section read *re-run at fifteen entries*, its last subsection was the
+fifteen-entry run, and the pair table's last row was `R6b` → `R1y`. `R8a`'s entry had landed above
+with **no sixteen-entry run beside it.** So two pairs arrive together, and they are decided
+separately below rather than merged — a run that merges pairs to reach a verdict is doing exactly
+what this section has refused since ten entries. The precedent for the late one is the eleven-entry
+run's: *"So it is made here, one entry late, and the lateness is part of the record."*
+
+**`R1y` → `R8a` does not fire.** `R1y` lists twelve things it did not establish and they are about
+text in this repository and the tools that read it; `R8a`'s sixteen are about a second-stage loader
+on the silicon — flash writes, a counter that never advanced, keys, a cache, a rescue payload that is
+not built. Nor did `R8a` close any of `R1y`'s: no step of `R8a` took one on in writing, and the guard
+written at eight entries decides that — *a gate does not inherit its predecessor's residuals by
+default*. ⚠️ **The nearest candidate is a reading the tree does not hold, and it is declined as a
+shape.** `R1y` carries *`FW-119`'s reading is a session's, not a tool's* — the pre-commit reading of
+every citation on every edited line was done by scripts kept outside the repository and nothing in
+the tree repeats it — and `R8a` carries three of that family: `SPEC-R8a.md` as the format's owner of
+record, the 43-assertion verdict script, and a seating whose bookkeeping cannot be re-derived here.
+But `R1y`'s is a **procedure** the tree does not repeat and `R8a`'s are **artefacts** the tree does
+not hold, and the ten-entry run's rule governs: *a clause that fires on a resemblance measures the
+reader, not the ledger.* ⚠️ **The flash boundary** is in both and is not counted, for the reason the
+thirteen-entry run gave.
+
+🔴🔴 **`R8a` → `R7` FIRES, and it names persistence: that nothing rlxfw writes survives, because
+there is no write path and `R8b` owns the half that would give it one.**
+
+* `R8a`: *"That an image can be written to flash. Nothing in `R8a` writes one byte"*, *"That the
+  anti-rollback counter advances. Nothing in `R8a` writes it … So the monotonicity the design rests
+  on is asserted and never exercised"*, and *"That the `R8` board row is met."*
+* `R7`: *"That the config store survives anything"* — `/var/lib/cfg.bin` is on a filesystem that is
+  ramfs in this kernel, **`R8` supplies the MTD backing**, `fsync` there verifies that the page cache
+  agrees with itself, the torn-write model is a prefix write that does not model a partially
+  programmed NOR word, and the `0xFF` fill and the `seq` exclusions of 0 and `0xFFFFFFFF` are *"the
+  parts written **for** NOR rather than **on** it."*
+
+🟢 **This is a firing on something both gates designed for and neither reached, and the earlier entry
+does not have to be read into the later one**: `notes/config-store.md` § 11's first bullet takes it
+on in writing and names the gate — *"R8 supplies the MTD backing"* — so `R7` built an A/B store with
+a monotonic sequence, an erased-value exclusion and a read-back verify **for a medium it never
+touched**, while `R8a` proved a loader that reads a counter out of that medium **read-only**. Two
+gates arriving at one wall from opposite sides, which is what the nine-entry run said the clause is
+for.
+
+🔴 **It is NOT the flash boundary the thirteen-entry run declined, and the difference has to be
+stated or this firing is the fourth pass over the same sentence.** What was declined there is the
+§ Flash bookkeeping paragraph — commands issued, the bracket's reach, what it cannot see — which
+`CLAUDE.md` § Flash requires every entry to carry, so a clause firing on it would be measuring the
+rule. What fires here is a **functional** absence that has a board row of its own and is open on it:
+`R8`'s row stays open until `R8b` runs, and `R7` shipped a design whose whole durability argument is
+untested. That is a thing two gates set out to establish and did not.
+
+⚠️ **The honest deduction against the firing is that it names something the plan has already
+ordered, so it changes nothing.** `R8b` is booked and not open, behind `R9`, because `R9`'s vendor
+column needs the vendor firmware still bootable from flash and slot A's first write ends that — 讀
+`R8a`'s own booking. So *that thing is the next gate* is already the plan's answer, and what this
+firing adds is only that the thing is now in two consecutive entries' lists, which is the evidence
+the clause exists to produce rather than a new instruction. ⚠️ And unlike `P1` → `R6` and
+`P2` → `R6b`, the earlier entry does not name the later **gate**: both entries point at a third gate,
+`R8`. That is weaker than those two firings and stronger than `R4` → `R5`, which had to argue that
+the later step list took the residual on. **Where it goes is the owner's**, as every firing's has
+been.
+
+⚠️ **What the firing does NOT name — four more things are in both lists:**
+
+* **An instrument that could not fail on its own subject.** `R8a` carries *a suite that asked "was it
+  rejected?" would have been blind* to the reordering mutation; `R7`'s claim ① is the whole gate's
+  pass condition being of that kind. **Declined as a shape for the third time** — the ten- and
+  fifteen-entry runs refused it twice, and refusing it a third time is cheaper than inventing a
+  precedent. 🔴 Recorded all the same, because `R7`'s is the strongest instance this ledger holds: the
+  tool that could not fail **was** the gate's acceptance criterion, not a checker beside it.
+* **qemu certifies logic and never codegen or the ISA.** In `R8a`'s list as *"Everything else is
+  qemu"* and in `R7`'s as six notes saying nothing in them ran on the device. Not counted, for the
+  thirteen-entry run's reason applied to a **second** subject for the first time: it is a sentence
+  `CLAUDE.md` puts in every entry that uses an emulator, not a thing a gate set out to establish. ⚠️
+  That reason has now retired two candidates, which is worth watching: a rule that exempts every
+  house-mandated sentence can exempt a real residual that happens to be one.
+* **A piece the plan named and nobody built.** `R8a`'s `rlxboot-rescue` is *"a region and a refusal,
+  not a payload"*; `R7g` (TLS) is outside `R7` by the plan's own cut order. Declined as a resemblance
+  — one is unbuilt against its own gate's question ③, the other was cut before the gate opened, and a
+  cut is a decision.
+* **A credential or key that is not production-grade.** `R8a`'s development seed is 32 bytes of
+  `0x42` in the tree on purpose; `R7`'s `admin.pwhash` sits behind a CRC-32 that is not a MAC, so
+  anyone who can write the store can set any password. Two different objects, and the clause names a
+  thing.
+
+⚠️ **The flash boundary**, for the reason the thirteen-entry run gave.
+
+### 🆕 The census re-run at seventeen entries — the script needed the closed lists handed to it, as the fifteen-entry run said, and no sixth instance
+
+🔴 **The fifteen-entry run pre-registered the next run's method and it is followed rather than
+assumed**: *"a sixteenth-entry run must hand it those files too."* 量 2026-09-30 with the unchanged
+thirteen-entry script (`$FWRE_WORK/rebuild/s111/land/gate/census.py`, read only; sha256
+`1e81ac1a…`), three arms, exit codes read inside one script file
+(`$FWRE_WORK/rebuild/s118/gr7/census17.sh`):
+
+* **on `PROGRESS.md` alone** it now finds **nothing at all** and refuses, rc 1, with all eight
+  control gates reading 0 — worse than at fifteen entries, because `R1y`'s list has since moved out
+  as well;
+* **on a scratch root whose `PROGRESS.md` is the real file followed by every
+  `docs/history/steps-*.md`** it reproduces the twelve-entry figures — **44 clauses across 8 gates** —
+  and exits 0;
+* **on the same root with one of `P1`'s `D` rows un-bolded** it exits 1 and names `P1: (3, 4)`, so
+  the control can still fire.
+
+The `D`-row form is **66 clauses across eleven gates** — `R3` 5, `P4b-gate` 4, `R4` 4, `R5` 4,
+`R1-pub` 13, `R1z` 4, `P1` 4, `R6` 6, `P2` 8, `R6b` 8, `R1y` 6 — with the four gates before the form
+carrying 13 more, carried rather than re-derived because those step lists are records. **79
+clauses**, and **unchanged at both new entries**: 量
+`grep -c '^### The DoD, split into what can be refuted' PROGRESS.md` returns **0**, so neither `R7`'s
+nor `R8a`'s step list uses the form and the population does not grow. ⚠️ The script's closing line
+still says *thirteen-entry*; what is read here is its per-gate lines.
+
+**No sixth instance**, because the population cannot contain one: both new gates read a per-step DoD
+column instead of `D` rows. Two candidates recorded so an eighteenth entry does not find either and
+call it a sixth:
+
+* 🔴 **`R7`'s § Gate board row is the artefact-for-property shape at its strongest, and it is
+  outside this census's population.** The row names two **instruments** — a `PT_DYNAMIC`/`DT_SYMTAB`
+  walk and `nm --undefined-only` — where the property is *no `system`/`popen` in the shipped bytes*,
+  and both are vacuous on the object under test. It is not counted: the population is `D` rows in
+  `PROGRESS.md`, and this is a gate-board cell. It is recorded because **if that population is ever
+  widened to gate-board rows, this is the first thing the widening will find** — and because it is the
+  first instance of the class that was caught *before* the gate closed on it rather than after,
+  which none of the five was.
+* **`R7-1`'s `busybox --list` 量 under qemu.** The row names a verb; the enumeration that ran is the
+  applet-name table read out of the ELF by `tools/appletcensus.py`, cross-read against the binary's
+  own *Currently defined functions* block. Not counted in the weaker class either: the named verb was
+  not *capable and idle* — `--list` is absent from this build — so the row named a verb that does not
+  exist, which is `R3`'s `MemTotal:` shape and not entry 11's, and it sits outside the `D`-row
+  population anyway.
+
+⚠️ **The weaker class stays at two**, and `R6b`'s `D2` *on a fixed image*, the candidate the
+fourteen-entry run recorded, stays uncounted.
 
 ### Carried unchanged from the seven-entry run
 
