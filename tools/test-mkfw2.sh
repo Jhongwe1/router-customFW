@@ -51,7 +51,7 @@ else T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT; fi
 pass=0; fail=0; skip=0
 ck ()   { if [ "$2" = "$3" ]; then printf '  ok     %-56s %s\n' "$1" "$3"; pass=$((pass+1))
           else printf '  FAIL   %-56s expected %s, got %s\n' "$1" "$2" "$3"; fail=$((fail+1)); fi }
-sk ()   { printf '  (skipped: %s -- %s)\n' "$1" "$2"; skip=$((skip+1)); }
+sk ()   { printf '  skip   %-56s %s\n' "$1" "$2"; skip=$((skip+1)); }
 # 🔴 `_out`/`_err`, not `o`/`e`: the first version of this file used `$T/o` for
 # both the captured stdout AND the directory C3 writes into, and the collision
 # made `mkdir -p` fail and C3c report a refusal the tool never made.

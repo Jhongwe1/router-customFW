@@ -308,6 +308,24 @@
       },
       "f52_note": "this entry used to say it was the \"Source of R1a's named Lexra ASE row (F52)\". 量 2026-09-13, both directions: F52 is defined NOWHERE -- not in SPEC.md, not under upstream/. The row was declared here and never written, and nothing noticed because no citation checker reads this file. The 14 mnemonics above are what it would have held.",
       "not_in_fetch_plan": "no `fetch` key, matching ds-lexra-lx4189: tools/fetch-sources.sh only plans entries whose dest is inside the repo, and this one lives under $FWRE_WORK. So nothing re-checks the sha256 automatically; it is pinned by this entry and by whoever reads the file next."
+    },
+    {
+      "id": "tweetnacl",
+      "role": "imported-source",
+      "kind": "file",
+      "url": "https://tweetnacl.cr.yp.to/20140427/tweetnacl.c",
+      "dest": "refs/tweetnacl-20140427.c",
+      "sha256": "02e65bc3013ff2168983365e55906bc783c4c7e0a60d8100f17bb303a17175c4",
+      "licence": "public domain",
+      "authors": "Daniel J. Bernstein, Bernard van Gastel, Wesley Janssen, Tanja Lange, Peter Schwabe, Sjaak Smetsers",
+      "why": "R8a needs Ed25519 VERIFICATION on a MIPS-I target with no libc. Hand-writing mod-2^255-19 field arithmetic was rejected on a refutation-condition argument, not a difficulty one: RFC 8032's five vectors cannot refute a carry bug that shows on one input in 2^30, so a hand-written implementation would be a published claim whose refutation condition this project cannot write. The import moves that claim onto fifteen years of outside review and costs exactly one thing -- it must be labelled, never described as rlxfw's.",
+      "contains": "src/lib/ed25519.c and src/lib/sha512.c, generated from it by src/rlxboot/test/mk-import.sh, which copies retained line ranges; no imported line is edited. Deletions only: salsa20, poly1305, box, curve25519, randombytes, key generation, crypto_sign_open.",
+      "matches_device": "not device code: it runs on the Lexra core as part of rlxboot, and its verdicts are checked against RFC 8032's vectors on the host and big-endian under qemu-mips-static.",
+      "caveat": "crypto_sign_open was NOT retained: it needs a variable-size buffer in the trust path and it accepts s >= L. rlxfw's wrapper refuses both with its own named reasons (RFC 8032 5.1.7), and a constructed s + L drives that branch.",
+      "needed_by": [
+        "R8a"
+      ],
+      "fetch": "curl -fsSL https://tweetnacl.cr.yp.to/20140427/tweetnacl.c -o refs/tweetnacl-20140427.c  # then: src/rlxboot/test/check-import.sh, which regenerates both files and fails on a one-byte difference"
     }
   ],
   "reference_only": {

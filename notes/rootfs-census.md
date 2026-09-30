@@ -2,6 +2,9 @@
 
 Measured 2026-08-25 at the desk, on `$FWRE_WORK/extracted/unit-2018/squashfs-root`
 — the tree carved out of **this unit's own** flash dump, not a downloaded image.
+§ *The count*, § *The three that decide a design question* and § *Method* were
+re-measured 2026-09-30 with `tools/uspacescan.py`; four of their claims were
+wrong and are marked where they stood.
 
 The question this answers is narrow: **rlxfw's `R7` acceptance condition is
 "`system` / `popen` reference count = 0 across the rootfs", and nothing had ever
@@ -15,21 +18,26 @@ which userspace components rlxfw may ship.
 |---|---:|
 | files in the tree | **161** |
 | ELF executables and libraries | **55** |
-| **ELFs whose `.dynstr` carries `system` or `popen`** | **31** |
+| of those, statically linked — no `PT_DYNAMIC` | **3** |
+| **ELFs matching a whole-string scan for `system`/`popen`** | **31** |
+| **ELFs that *import* `system` or `popen`** | **28** |
 | files carrying a `#!` shebang | **75** |
 | `.sh` files | **36** |
 | symlinks pointing at `busybox` | **50** |
 
-The 31:
+量 2026-09-30, `tools/uspacescan.py --vendor-census`; every row above reproduced
+on the same tree. The 31 below are the string scan's; the 28 are the same list
+without the three marked `§`. The two numbers are **not** a better and a worse
+count of one thing — see § *Method*.
 
 ```
 bin/batchRemoteUpgrade  bin/boa*  bin/buffermemory  bin/ddns_inet  bin/dhcp6c
 bin/dnsmasq†  bin/flash  bin/fwd  bin/iapp  bin/igmpproxy  bin/lld2d
 bin/miniigd  bin/mldproxy  bin/notice  bin/ntp_inet  bin/ntpclient
 bin/ppp_inet  bin/pppd  bin/rebootschedule  bin/rebootschedules  bin/reload
-bin/routed  bin/sysconf  bin/timelycheck  bin/udhcpd  bin/updatedd  bin/wscd
-lib/libapmib.so  lib/libcrypt-0.9.30.3.so  lib/libstdc++.so.6.0.13
-lib/libuClibc-0.9.30.3.so‡
+bin/routed  bin/sysconf  bin/timelycheck  bin/udhcpd  bin/updatedd§  bin/wscd
+lib/libapmib.so  lib/libcrypt-0.9.30.3.so  lib/libstdc++.so.6.0.13§
+lib/libuClibc-0.9.30.3.so†‡§
 ```
 
 > 🔴 **2026-09-14 (the sixty-ninth segment, desk): two of those names are a
@@ -53,30 +61,53 @@ lib/libuClibc-0.9.30.3.so‡
 > the route is worse than its own flash write.
 
 
-`*` both `system` and `popen` · `†` `popen` only · `‡` this is libc, so it is the
-definition rather than a use.
+`*` both names · `†` `popen` only · `‡` libc, so this is a definition, not a use
+· `§` matched by the string scan but **not** an import (§ *Method*). 🔴 `‡` was
+the only mark on libc and it was not enough: libc matches on `popen` alone, and
+its `system` is one of the names the string scan **misses** (§ *Method*).
 
 ## The three that decide a design question
 
+Imports, 量 2026-09-30 by the `PT_DYNAMIC` walk.
+
 | | |
 |---|---|
-| **`busybox` carries neither** | It carries `execv`, `execve`, `execvp`, `vfork`, `fork`, `daemon`. **Shipping busybox does not by itself break a zero.** |
-| **`bin/udhcpd` carries `system`** | It is a standalone binary. This busybox has **no `udhcp*` applet compiled in at all**, so the vendor could not have used the applet. |
-| **`bin/dnsmasq` carries `popen`** | Anything wanting a zero cannot forward DNS with dnsmasq. |
+| **`busybox` imports neither `system` nor `popen`** | It imports `execlp`, `execv`, `execve`, `execvp`, `fork`, `vfork` (and `waitpid`); 250 imports in all, 275 `.dynsym` entries. **Shipping it breaks no zero over `system`/`popen`** — and that is the whole of what it establishes: `execlp` and `execvp` let `PATH` decide which file runs, so a zero over a wider name set is decided by the *build*, and `R7` builds `udhcpc`/`udhcpd` from busybox. `notes/busybox-build.md` § 3–§ 4 owns rlxfw's own build, its excluded applets and its one `execle` exemption. 🔴 **`daemon` is not absent from `.dynstr` — it is a string-scan hit that lies outside it, with no `.dynsym` entry at all.** 量 the run `daemon` sits at file offset `0x3f768`, while this file's `.dynstr` is `0x1ba8`–`0x2460`; no `.dynsym` entry of that name exists, so it is not an import and not an export. It *is* a genuine import of `bin/udhcpd`, **the row directly below**. Naming that is worth more than the fix: the value moved between two adjacent rows of one table, which is a defect no checker in this repository can see — `spec-check` and `citecheck` read ids, citations and structure, and a plausible name in the wrong row is structurally valid. The only thing that catches it is re-deriving each row from the bytes. *(Superseded: "it carries `execv`, `execve`, `execvp`, `vfork`, `fork`, `daemon`" and "shipping busybox does not by itself break a zero" — `daemon` was never a busybox import, `execlp` was absent from the list, and the zero was asserted without naming the set it is a zero over.)* |
+| **`bin/udhcpd` imports `system`** | …and `execle`, `fork`, `daemon`; 84 imports. It is a standalone binary, and this busybox has **no `udhcp*` applet compiled in at all**, so the vendor could not have used the applet. `daemon` is an import *here* — this row, not the one above, is the one it belongs to. |
+| **`bin/dnsmasq` imports `popen`, `execl` and `fork`** | …plus `pclose` and `waitpid`; 120 imports, and the entry count has two agreeing sources, `DT_MIPS_SYMTABNO` 217 = `DT_HASH` nchain 217. Anything wanting a zero cannot forward DNS with dnsmasq. `notes/dnsfwd.md` § 7 owns the symbol-level comparison with rlxfw's own forwarder. *(Superseded: "`bin/dnsmasq` carries `popen`", which named one of three.)* |
 
-`bin/iptables` carries neither, so driving it through `execve` with an argv array
-is compatible with a zero.
+`bin/iptables` imports none of `system`, `popen`, `execl`, `execlp`, `execvp`,
+`execle` — of 118 imports its only two here are `execv` and `fork` — so driving
+it through `execve` with an argv array is compatible with a zero; `bin/ip6tables`
+is the same at 116. `bin/boa` imports both `system` and `popen`, and `execl`,
+`fork` and `pclose` besides.
 
 ## Method, and what it cannot tell you
 
-These binaries have **no section headers** — `file` says so and
-`readelf --dyn-syms` returns nothing for them. A check built on `--dyn-syms`
-reports **0 findings on every one of the 55**, which is indistinguishable from a
-clean result. That is the shape of a tool that cannot fail, so it was not used.
+Two methods, both readable with **no section header table** — the constraint that
+chose them. **String scan**: every NUL-delimited run of printable bytes in the
+whole file, matched *whole*. **Import walk**: `PT_DYNAMIC` → `DT_SYMTAB`, entry
+count from `DT_HASH`'s nchain cross-read against `DT_MIPS_SYMTABNO`, counting
+`SHN_UNDEF`. 量 2026-09-30 by `tools/uspacescan.py`, whose `--self-test` passes
+30 controls with 0 failed and 0 skipped and finds a planted `system()` both
+before and after `mips-linux-strip`.
 
-What was used instead: scan the whole file for NUL-delimited printable runs and
-match the symbol name exactly. `.dynstr` is present in the file whether or not
-section headers are, so every imported symbol name is in the scanned set.
+**The 31 − 28 gap is exactly three files, each for its own reason.**
+`bin/updatedd` is statically linked, so it has no `PT_DYNAMIC` and the import
+walk is *structurally* blind to it; `lib/libstdc++.so.6.0.13` holds the run
+`system` at file offset `0xa4b9c`, outside its `.dynstr`, and has no `.dynsym`
+entry of that name at all; `lib/libuClibc-0.9.30.3.so` **defines** `popen`
+(`st_shndx` 7, `FUNC`, 612 B), which is a definition and not an import.
+
+🔴 **`readelf --dyn-syms` is empty on 54 of the 55, not on all 55.** 量
+`bin/acltd` (10,032 B) keeps its section headers — `e_shoff` `0x2348`,
+`e_shnum` 25, the only `SHT_DYNSYM` *section header* in the tree — and host
+`readelf` 2.42 prints its 51 entries, 29 of them undefined. Every other file has
+`e_shoff` 0. That makes `--dyn-syms` **worse** than this section used to argue,
+not better: a checker built on it returns one non-empty answer out of 55, and
+that one answer is exactly what would make its 0 on the other 54 look earned.
+*(Superseded: "these binaries have no section headers … a check built on
+`--dyn-syms` reports 0 findings on every one of the 55".)*
 
 **Positive control** — names known to be imported must be seen:
 
@@ -88,16 +119,58 @@ section headers are, so every imported symbol name is in the scanned set.
 
 **Negative control** — `zzz_not_a_symbol` and `pthread_create`: 0 and 0 on both.
 
-**The known false negative, recorded because it was observed**: `printf` counts 0
-on both, and both certainly format strings. The name only appears inside
-`fprintf` / `sprintf` / `snprintf`, and the match is whole-line. So the method
-answers "is this exact name present", not "does this program format".
+### What each method gets wrong, and what has to hold for a count to mean anything
 
-**Therefore 31 is an upper bound.** A match is a name in the file; it is not
-proof the name is an imported symbol rather than a message string. Deciding that
-needs a walk of `PT_DYNAMIC` → `DT_SYMTAB` for the `UND` entries, which does not
-depend on section headers either. Three of the 31 are worth doing that way
-before the number is used for anything.
+**A string scan over-reports.** A whole-run match says a name is in the bytes,
+not that the program asked for it: 3 of the 31 above are not imports. On a
+**stripped, statically linked** ELF the over-report is the whole reading. 量 on
+rlxfw's own busybox (447,684 B, no `PT_DYNAMIC`, no `.symtab`): the whole-run
+match gives `system` **0**, while a *bare name* scan — substring, the form a
+`strings | grep` reaches for — gives **7**, and all seven are other people's
+text: five uClibc messages (`Interrupted system call`, `Interrupted system call
+should be restarted`, `Bad system call`, `Read-only file system`, `Too many open
+files in system`) and two paths (`/etc/filesystems`, `/proc/filesystems`). Such a
+file offers a bare scan **no positive control at all**, so its 0 is a statement
+about the instrument and not about the file. What decides it instead is a third
+method that survives `strip`: a relocation-masked fingerprint of the libc member
+that defines the name. 量 on the same binary it finds `execle` at `0x41b690` with
+one `.got` reference — so the file is **not** clean, and the string scan's 0 for
+`system` was the only true thing a name scan said about it.
+`notes/busybox-build.md` owns that build and that `execle`'s exemption;
+`tools/uspacescan.py` refuses a file for which it has none of the three methods,
+rather than reporting 0. The same reading on a static `cfgstore` is **unmeasured**
+— that binary does not exist yet, so there is no 0 to quote; it can be taken once
+the image step builds one.
+
+**A string scan also under-reports, and this section denied that.** The old
+wording was *"`.dynstr` is present in the file whether or not section headers
+are, so every imported symbol name is in the scanned set"*, and that is false: a
+string table **tail-merges**, so a shorter name may be stored only as the tail of
+a longer one and never appear as a run of its own. 量 over the 52 dynamic ELFs
+here — 3,752 (file, import) pairs, of which the scan sees 3,435 and **misses 317
+across 61 distinct names**: `malloc` behind `safe_malloc` in `bin/dnsmasq`,
+`close` in 37 files, `printf` behind `sprintf` — which this section already
+recorded as an oddity without naming the mechanism. 🔴 **And `system` is one of
+the missed names, on this tree**: `lib/libuClibc-0.9.30.3.so` stores
+`__libc_system`, and its `system` entry points 7 bytes into that run, so no
+`system` run exists in it and the scan does not see one. libc is in the 31 only
+because it matched `popen`.
+
+**An import walk cannot see a static file at all.** 0 is also its passing answer,
+so there it is not a weak reading but a vacuous one. Three of the 55 are static:
+`bin/radvd`, `bin/radvdump`, `bin/updatedd`.
+
+**So 28 is not a corrected 31, and neither number is a bound by construction.**
+31 over-counts three files; 28 is a count over 52 files and says nothing about
+the other three. *"31 is an upper bound"* held here as an **observation** — it
+survives because no file both imports `system`/`popen` and is the only place that
+name occurs — and the mechanism that would break it is live in this tree, one
+name away. A count of this kind means something only when all three hold: every
+file in the population is dynamically linked, or the static ones are named and
+counted apart; the name counted is not a proper suffix of another name in the
+same string table, which is decidable (量 `__libc_system` is exactly that case
+for `system`; no name in the tree ends in `popen`); and the instrument is shown
+finding a planted positive in the run that reports the 0.
 
 ## Why the shebang count is here
 

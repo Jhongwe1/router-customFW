@@ -119,3 +119,15 @@ Thumbs.db
 # an artefact and vanishes; here it stays behind, 25 files of build output that
 # `git add -A` would happily commit. Nothing ignored it until 2026-08-30.
 ci-out/
+
+# ---------------------------------------------------------------------------
+# The harness's own directory
+# ---------------------------------------------------------------------------
+# 2026-09-30: `.claude/` holds this session's agent worktrees and transcripts --
+# 量 15,166 untracked files, one of which is a whole second checkout of this
+# repository under `.claude/worktrees/`. Nothing ignored it, so a single
+# `git add -A` would have staged all of them, and the sibling failure is on
+# record: a census once deleted 2,580 tracked files (CLAUDE.md, Never).
+# Ignored rather than deleted, because a worktree there may hold an agent's
+# uncommitted edits; removing one is `git worktree remove`, not `rm`.
+.claude/

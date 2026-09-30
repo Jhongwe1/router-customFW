@@ -1,0 +1,5 @@
+cat /proc/uptime /proc/loadavg; cat /proc/sys/kernel/random/entropy_avail
+8808.87 8802.70
+0.00 0.00 0.00 1/12 44
+0
+# 

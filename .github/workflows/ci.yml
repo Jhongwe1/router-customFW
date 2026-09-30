@@ -1004,6 +1004,30 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/cardrun.py --self-test 2>&1 | tee ci-out/cardrun.out; exit "${PIPESTATUS[0]}"
 
+      # R8a-1's update chain, host side (committed in a008fde6).  mkfw2 builds and
+      # verifies the RLXU container, flashguard refuses a destination inside the
+      # loader, H601 or the rescue slot, and rlxsign is Ed25519 in pure Python with
+      # OpenSSL as its independent second source.  The three self-tests are pure
+      # Python and read no $FWRE_WORK.  test-mkfw2 drives all three through their
+      # CLIs and mutates flashguard and mkfw2; its C6 needs the s116 rlxfw build
+      # under $FWRE_WORK, which no runner has, and stands down as ONE skip line
+      # covering 3 -- the row's `C6` in ci-expected.tsv.
+      - name: mkfw2 self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/mkfw2.py --self-test 2>&1 | tee ci-out/mkfw2.out; exit "${PIPESTATUS[0]}"
+
+      - name: flashguard self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/flashguard.py --self-test 2>&1 | tee ci-out/flashguard.out; exit "${PIPESTATUS[0]}"
+
+      - name: rlxsign self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/rlxsign.py --self-test 2>&1 | tee ci-out/rlxsign.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-mkfw2
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: bash tools/test-mkfw2.sh 2>&1 | tee ci-out/test-mkfw2.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:
