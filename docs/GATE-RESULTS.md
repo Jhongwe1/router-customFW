@@ -2435,6 +2435,395 @@ restated for `CLAUDE.md` — are not listed. Each below is recorded where it is 
 
 ---
 
+## 2026-09-30 — `R8a` (a signed container verified on the silicon with zero flash writes, and the half of `R8` that needs a write carved out and booked)
+
+### One line
+
+**v0.5+, one segment (the 118th, shared with `R7`), and zero power-ons of its own. There is no
+`R8a` estimate to divide by**: the plan costs `R8` at 22 segments and § Gate board at 18, both
+covering the write half as well, and `R8a` is deliberately uncosted for `R1h`'s reason — it is a
+split of that work, not work added to it. `rlxboot`, a freestanding 16,240-byte payload linked at
+`0x81800000` with no libc, no `malloc` and no recursion, reads an `RLXU` container staged in RAM and
+either boots it or refuses and names the check that refused. Four rounds in one seating read all
+three of the board row's pass conditions on the die: a correct container accepted and its payload
+booted (`RLXBOOT-SIG ok` / `DIGEST ok` / `VER cur=1 ctr=0 ok` / `BOOT load=80500000 entry=80500000`,
+then `RLXFW-ID0=3685A3A4` and a shell); one flipped **payload** bit refused at `DIGEST bad` /
+`REFUSE digest` with no `BOOT` line; and a version below a RAM-staged counter refused at `VER cur=1
+ctr=5 bad` / `REFUSE rollback`, with the same container at counter 0 booting as the control. 43
+assertions read line by line, four rounds PASS (`FW-170`, `FW-171`). Six steps of six closed. Ten
+uploads, no `FLW`, `EW`, `EB` or non-zero `AUTOBURN`, and both returns to the loader were `busybox
+reboot -f`. **`R8a` closing does not close the `R8` board row**, which stays open until `R8b` runs.
+
+**The weakest thing here is that the two readings this seating took off the hardware — the flash
+counter and the cache — each cannot distinguish the state they report from another.**
+`RLXBOOT-CTRSRC flash` with `ctr=0` in rounds 1 and 2 is what an erased bitmap gives *and* what an
+undecoded MMIO window gives: `FLS-11` is 量 at `0xBD000000` over 4,096 bytes and this counter sits
+4,128,768 bytes further in, where the window's decode size is measured nowhere — which is why pass
+condition ③ was driven from RAM and not from flash. And rounds 1 and 4 copied 1,114,112 bytes to
+`0x80500000` and jumped into them, which is the first of the two readings `notes/rlxboot.md` § 6
+offered; its second — reading the destination's first instruction word back with `DW` and comparing
+it with the container's — was not taken, no cell of the seating read `0x80500000` (量, the 26
+captures' `sent` fields are six `DW`/`J` commands a round and two `busybox reboot -f`), and that
+section's own sentence is that on a write-back cache **without** write-allocate *"it booted"* is not
+evidence that the flush is unnecessary. So the composite path is 量 and `CCTL 0x200`'s effect on
+this die is still measured nowhere.
+
+### Three claims that stand
+
+**① The board row's three pass conditions hold on the silicon, and the two refusing rounds each
+carry their own positive control inside the same capture.** 量 four rounds, one seating, 2026-09-30
+(`bench/2026-09-30/R8A-*`; `FW-170`, `FW-171`). Round 1: the good container with the counter read
+from **flash**, erased and therefore 0 — `RLXBOOT-V1 build=6395889d` / `CTRSRC flash` / `HDR ok` /
+`SIG ok` / `DIGEST ok` / `VER cur=1 ctr=0 ok` / `BOOT load=80500000 entry=80500000`, then the payload
+decompressing and reaching its own prompt. Round 2: the same build with one **payload** bit flipped,
+file offset `0x80000` bit 0 — `SIG ok` and then `DIGEST bad` / `REFUSE digest`, no `BOOT`, no boot,
+`refuse-action reset`, the watchdog bite and the loader prompt caught by `--esc-after`. Round 3: the
+**same** container with a RAM counter of 5 — `CTRSRC ram` / `SIG ok` / `DIGEST ok` and then `VER
+cur=1 ctr=5 bad` / `REFUSE rollback`. Round 4: the same container with the RAM bitmap at 0 — `VER
+cur=1 ctr=0 ok`, and it boots. 🟢 **Round 2 flips a payload bit so that `SIG ok` prints in the same
+capture**, which is what shows Ed25519 ran and passed; a flipped signature bit would have given a
+`SIG bad` indistinguishable from a wrong key, a byte-order fault, or a container that never arrived.
+🟢 **Rounds 3 and 4 differ in the bitmap's value and in nothing else** — same container, same
+`CTRSRC ram` — so round 3's refusal cannot be attributed to a bitmap merely having been staged.
+Three discriminator cells carry that, each read in all four rounds: `DW 81080000 4` is the only place
+the two containers differ, their headers being byte-identical (`4AE4B216` in rounds 1, 3 and 4 and
+`4BE4B216` in round 2), `DW 81000000 4` read `524C5855 00010060 00000001 00110000` four times of
+four, so `MEM-14` did not bite and no round is void, and `DW 81700000 4` read `1753169B…` in rounds 1
+and 2 against `52434E54 07FFFFFF` and `52434E54 FFFFFFFF` in rounds 3 and 4, so no stale bitmap
+survived a reset into a round that was not meant to have one (`MEM-17`). The staged head of
+`rlxboot` itself was read back before each jump and read `3C1D8181 27BDC740 3C088180 25083F70` four
+times of four. ⚠️ What this does not reach: one seating, one image, one build id and four rounds; the
+`--until` of every jump cell accepted the prompt **or** the shell, so the capture did not presuppose
+the outcome, but the verdict that compared 43 assertions line by line is
+`$FWRE_WORK/rebuild/s118/r8run/40-verdict.py` with a self-test of 14 of 14, and it lives outside this
+repository.
+
+**② The verifier's authority is placed where a refutation can be written, and the crypto is an
+import that says so.** 讀 and 量 (`FW-166`, `FW-172`; `notes/rlxboot.md` § 5). Ed25519 verification
+and SHA-512 are **TweetNaCl 20140427**, declared in `SOURCES.json`, public domain, regenerated from
+the upstream file by `src/rlxboot/test/mk-import.sh` naming retained line ranges, with
+`check-import.sh` failing on one byte's difference; nothing in the tree calls them rlxfw's. The
+argument for importing is refutability rather than difficulty: five RFC 8032 vectors cannot refute a
+carry bug that appears on one input in 2^30, so the test set that would establish hand-written
+arithmetic mod 2^255−19 does not exist at desk scale, and a hand-written field implementation would
+have been a published claim whose refutation condition cannot be written. SHA-256 is rlxfw's own
+(`src/rlxboot/sha256b.c`) on the mirror argument — no rare-input failure mode of that kind, the RFC
+6234 vectors exercise the whole round schedule, the padding is enumerable — and it is cross-checked
+against RFC 6234, against coreutils at every message length 0..200, and against a second
+implementation written by another hand in the same segment. 🟢 **Three implementations sharing no
+code derive the same public key** `2152f8d1…9881db12` from the one development seed: `tools/rlxsign.py`
+(pure Python from the RFC), `src/lib/ed25519.c` (host and big-endian MIPS under `qemu-mips-static`)
+and **OpenSSL 3.0.13, run by the main session rather than reported by an agent**. 🟢 The order the
+checks run in is itself asserted: nothing is copied and no payload byte is read before the header's
+signature verifies, `struct rlxu`'s `hashed` and `copied` make that testable, and all 9,472 bit-flip
+cases assert it rather than a chosen example. ⚠️ The mutation that reordered verification to hash the
+payload before checking the signature — this unit's own `check_image()` defect — was caught by only
+one functional case, and **only because every case asserts its refusal reason by name**; a suite that
+asked "was it rejected?" would have been blind to it (`notes/rlxboot.md` § 9, `M2`). ⚠️ `src/lib/ed25519.c`
+carries the build's one warning exemption, `-Wno-sign-compare`; `crypto_sign_open` was replaced
+rather than called, for its caller buffer and because it does not test `s < L`.
+
+**③ Nothing in the gate can write flash, the guards are shown permitting as well as refusing, and the
+stock loader refuses the container on two independent readings.** 量 `tools/mkfw2.py` 21 of 21,
+`tools/rlxsign.py` 16 of 16, `tools/flashguard.py` 23 of 23 and `tools/test-mkfw2.sh` 56 of 56
+(`FW-166`); that suite's `X` cases are the sweep that no tool here emits, prints or executes `FLW`,
+`EW`, `EB` or a non-zero `AUTOBURN`, with `X2b` the control that the sweep can fire at all.
+`flashguard` owns four forbidden classes — the loader region, `H601` delegated to
+`flashwin.overlaps_forbidden`, the read-only rescue slot, and off-chip destinations, which `burn()`
+truncates rather than refuses — and `B2` drives eight **permitted** ranges through the CLI as the
+other half, with `M1` the mutation that turns `F8` and `F13` red
+(`notes/update-chain.md` § 4). On the target side `flashscan.py` reconstructs every address the
+linked payload builds and refuses any in `[0xB8001200, 0xB8001300)`, and `flashsafe.sh` shows it
+refusing a planted store into the controller block and permitting the same store moved
+(`notes/rlxboot.md` § 7). 🟢 The stock loader reads no header it recognises in a container, on two
+independent readings: `mkfw2 verify --stock-loader` (offset `0x00` is `RLXU`, neither `cs6c` nor
+`cr6c` and none of `burn()`'s eight section signatures) and `tools/rtkimage.py check`, which is not
+this gate's code and exits 1 on **two** conditions — `sum16 0x9C4C` where `C-4` requires 0, and body
+≠ `nfjrom` — while reading the vendor-shaped `linux.bin` correctly in the same run as its control.
+That refusal is a requirement rather than a nicety: the loader's scan path goes through neither the
+signature check nor the counter, so a slot image the loader recognised would let one corrupted byte
+elsewhere boot an old image directly (plan § D6). ⚠️ `flashguard` guards a **destination range**,
+which is an argument someone computed: it does not read the loader's `burnAddr`, cannot see a `J` into
+code that writes flash, and cannot see an upload made while the burn word is armed. ⚠️
+`upstream/tools/loader-unpack.py` does **not** reproduce `check_image()`, although both the
+out-of-tree `SPEC-R8a.md` and plan § D6 say it does — `grep -c check_image` over it returns 0 — and
+what the desk reproduction actually is is `rtkimage.py`'s `sum16` plus its `cr6c` parser, imported
+rather than written again.
+
+### The three pass conditions, read one at a time
+
+`R8a`'s conditions are § Gate board row `R8a`'s three clauses, which are also the plan's `R8` pass
+row ① to ③; its ④, ten power cuts during a write, is `R8b`'s and is not read here.
+
+| the condition says | verdict |
+|---|---|
+| **①** a correct signature accepted and the image boots | 🟢 **met on two rounds** (1 and 4; `FW-170`). Both printed `SIG ok` / `DIGEST ok` / `VER … ok` / `BOOT load=80500000 entry=80500000` and both reached `RLXFW-ID0=3685A3A4` and a shell with `rlx0 10.1.1.3`. ⚠️ The image that booted is `r6b8i`'s `nfjrom` wrapped in a container, not a slot image and not a flash boot: the loader staged both files by TFTP and `J 81800000` entered `rlxboot` |
+| **②** one flipped bit anywhere refused | 🟢 **met for one flip, by the round that keeps its positive control** (round 2; `FW-171`). The bit was chosen in the **payload** so that `SIG ok` appears in the same capture. The *anywhere* half is the host suite's, not the device's: 9,472 flips — 768 header, 512 signature, 8,192 payload — every one rejected, and the refusal stages the sweep reached were header 64, bounds 376, signature 840 and digest 8,192 (`notes/rlxboot.md` § 8). ⚠️ So *anywhere* is 量 under `qemu-mips-static` and one flip of 9,472 is 量 on the die |
+| **③** a version below the anti-rollback counter refused | 🟢 **met with its control** (rounds 3 and 4; `FW-170`, `FW-171`). ⚠️ Driven from the **RAM** source on purpose, because an undecoded window and an erased region both give `ctr=0` on the device and the flash source cannot tell them apart. Nothing in `R8a` advanced the counter, so what is read is the comparison and not the bitmap's monotonicity |
+
+### The steps' DoD, read one row at a time
+
+`R8a` has no row of its own in the plan, so the step list's DoD column is what is read. Six steps,
+`R8a-0` through `R8a-5`, all closed.
+
+| the DoD says | verdict |
+|---|---|
+| **`R8a-0`** the order is the specification: nothing copied and no payload byte hashed before the header's own signature verifies, and the destination bounds checked before any copy | 🟢 **met** (`notes/update-chain.md` § 2, `notes/rlxboot.md` § 3). Steps 1 to 5 are pinned, `hashed` and `copied` are asserted 0 on every refusal at or before step 3 across all 9,472 cases, and seventeen bounds are refused **by name** so a refusal for the wrong reason is a failure. Four bounds were added to the format as the notes say — `payload_len == 0`, word alignment of `load_addr` and `entry_addr`, and the stage-2 window as a refused destination. ⚠️ The format's and the memory map's owner of record is `SPEC-R8a.md`, a segment-local file under `$FWRE_WORK` and not in this repository, cited from committed notes and committed C: what a reader here can follow is `notes/`, `SPEC.md` and the code |
+| **`R8a-1`** `flashguard` refuses the three regions and **permits a legitimate neighbour**; `mkfw2` refuses the auto-executed names and refuses to emit anything the stock loader would accept | 🟢 **met** (claim ③). ⚠️ Plan precondition ③ is met only **in half**, and this row is where the half lands: `mkfw2 build --flash-at` is optional and defaults to none, so the guard fires on a destination the caller chose to declare, and the container format carries no flash destination at all. ⚠️ `FW-169` is a defect recorded and deliberately not fixed under the owner's rule of 2026-09-26 |
+| **`R8a-2`** RFC vector sets on the host **and** on the target under qemu; a bit-flip sweep where every single flip is rejected; the crypto's provenance stated | 🟢 **met** (claim ②; `FW-172`). `t_crypto` 36 checks, `t_container` 71, the truncation sweep 1,184 lengths refused against the one accepted, `hazlint` 0 violations in 405 loads, and a measured verifier stack of 4,392 bytes against 32,768 reserved — a painting high-water mark, so a **lower** bound. The vectors are extracted by a parser with its own negative control rather than transcribed, and RFC 8032 § 7.1's TEST 1024 is deliberately absent with OpenSSL in its place, because a message transcribed from memory can only be a false red or a re-signed vector that agrees with its own tool. ⚠️ The cache hazard the row named is the one thing the desk could not settle: qemu's Malta writes `XContext` for the same instruction, so both `CCTL` writes were exercised as instructions and not as cache operations |
+| **`R8a-3`** two implementations that share no code agreeing, a mismatch being a finding; the counter's flash read exercised against the real erased region and the rejection driven from a RAM bitmap, each labelled | 🟢 **met, and with three implementations rather than two** (claim ②; `FW-172`). The flash read is round 1's and round 2's `CTRSRC flash`, the rejection is rounds 3 and 4's `CTRSRC ram`, and the console line says which was used in every round. ⚠️ *Exercised against the real erased region* is exactly as strong as the window's decode, which is unmeasured at this address |
+| **`R8a-4`** the three outcomes read from the console, `AUTOBURN` reading `00000000` before any upload and no flash verb issued in the seating | 🟢 **met, with one precision the row's wording does not carry** (claim ①). The `AUTOBURN` word at `0x8040D4A0` was read **four** times, once at the head of each round, and read `00000000` each time; the seating made **ten** uploads, so the reading is one per round and not one per upload. What the ten uploads sent on the console is `AUTOBURN 0`, `LOADADDR` and `IPCONFIG` — `AUTOBURN 0` disarms and is not one of `CLAUDE.md` § Flash's four verbs — and 量 over every capture and every upload record of the rounds, no `FLW`, `EW`, `EB` or non-zero `AUTOBURN` appears. ⚠️ The rounds cost no power action: `/proc/uptime` read 8,808.87 s at 10:58 and the first round's first cell ran at 11:17, and the two returns to the loader are `busybox reboot -f` with `Reboot Result from Watchdog Timeout!` in the capture (`FW-37`). All four rounds ran inside four minutes of console time, 11:17:44 to 11:21:39 by the captures' own `started_wallclock` |
+| **`R8a-5`** the entry states what `R8a` established and what it did not — nothing about writing flash, nothing about power cuts, nothing about key management, no claim of secure boot on a part with no evidence of a key-hash fuse | 🟢 **met by this entry and the booking below.** The row's hazard is *letting `R8a`'s success read as the board row met*, and the answer is in the one line above and on § Gate board: the `R8` row stays open |
+
+### The step list's hazard column, read one at a time
+
+`R8a`'s list carries no numbered refutation conditions and no stop-loss; what it carries is a
+per-step column naming where the step is most likely to be wrong, written with the list at `R8a-0`
+before any step landed. That is weaker than `R6b`'s `M1`–`M8`, and the entry says so rather than
+promoting a hazard into a pre-registration. What stood in for pre-registration on the device is the
+run script's ten assertions and its no-flash-verb scan, both run **before the port opened**, and the
+per-round expectations the verdict script compared line by line (`FW-170`).
+
+* **`R8a-0`, repeating the stock loader's defect** — did not happen, and the mutation that would
+  have introduced it is in the suite: `M2` (`notes/rlxboot.md` § 9) reorders the two steps and 7
+  cases go red, six of them order assertions and the seventh a **verdict** that was not predicted.
+* **`R8a-1`, a refusal with no positive control** — answered by construction: every forbidden range
+  has a permitted neighbour, `B2` drives eight of them, and `F3` is the case that goes red if
+  `H601`'s delegation is ever replaced by a copy.
+* **`R8a-1`, a container the loader recognises** — refuted twice, once by this gate's own reading and
+  once by a tool that is not its code (claim ③).
+* **`R8a-2`, cache handling** — the hazard the gate could not close at the desk, and the one the
+  bench moved only part of the way (the weakest-thing paragraph).
+* **`R8a-2`, deep recursion on a bare-metal stack** — did not fire: the call graph is a chain five
+  deep, not a tree, and the stack was measured rather than argued.
+* **`R8a-3`, two implementations agreeing because they share a mistake** — the reason the seed is
+  fixed and the keys derived independently; the third derivation is OpenSSL, which shares no
+  language with either.
+* **`R8a-4`, a refusal that is really a staging failure** — this is the hazard the round design
+  answers, and it is why the entry's claim ① leads with the two positive controls rather than with
+  the four passes.
+* **`R8a-5`, letting success read as the board row met** — answered in the negative, in as many
+  words.
+
+### The questions this gate must be able to answer
+
+The plan's `R8` interview row asks five. `R8a` answers two and a half of them; the other two are
+`R8b`'s and nothing here touches them.
+
+**① 「rollback counter 存在哪？NOR 不能改寫怎麼遞增？」** A 512-byte unary bitmap, 4,096 bits, at flash
+offset `0x3F0000`, read through the MMIO window and **read-only** in this gate. The counter is the
+number of zero bits from the start, MSB first; an erased NOR byte is `0xFF`, so a factory-erased
+region reads 0 and an install clears one bit, which needs no erase. A zero bit after the first one
+bit is malformed and resolves **upward**, to the total zero count, because of the two ways to be
+wrong a counter too high refuses updates and a counter too low accepts a rollback. `version ==
+counter` is accepted and `version < counter` refused, because refusing equality would stop a device
+re-installing the image it is running and would require the counter to advance on a boot rather than
+on an install (`notes/rlxboot.md` § 4). What the answer does not cover: nothing here advanced it.
+
+**② 「那攻擊者只要弄壞 `0x010000` 就能繞過你的驗簽？」** No, and the reason is that a slot image
+deliberately carries no header the stock loader recognises — two independent readings, one from a
+tool that is not this gate's (claim ③) — together with an **erased** barrier at
+`0x030000`–`0x06FFFF`, so that no slot contains one of the loader's six scan candidates. An erased
+NOR word reads `0xFFFFFFFF`, which is neither `cs6c` nor `cr6c`, so the barrier is provably
+unbootable rather than merely unlikely to boot. ⚠️ That is a reading of `check_image()`'s acceptance
+rule and not a measurement, and its one unread input is `check_image()`'s `bank_offset`, which plan
+§ D5 records as never having been read for this build: if it is not 0 the candidate table shifts and
+the barrier moves with it.
+
+**③ 「你的 `rlxboot` 壞了會怎樣？」** Half answered. The plan's answer is that the stock loader keeps
+scanning to `0x020000`, where a read-only, signature-verifying recovery `rlxboot` sits. The region is
+in the layout and `flashguard` refuses every write to it — and **the rescue payload is not built**
+(讀: `src/rlxboot/Makefile` has no rescue target). So what exists today is a reserved region and a
+refusal, not a fallback that has ever run.
+
+**④ 「寫到一半斷電會怎樣？」and ⑤ 「只有一台機器你敢寫 flash？」** Not answered, and not attempted.
+Both are `R8b`'s, the first because the interrupted write **is** the experiment and the second
+because its answer is the rescue drill, which has not been done.
+
+### What `R8a` did not establish
+
+🔴 **That an image can be written to flash.** Nothing in `R8a` writes one byte. `flashguard` refuses
+destinations and does not write the ones it permits; `flashscan` is the check on the payload's own
+instruction stream; and the whole demonstration is a container staged in RAM by the loader's TFTP and
+entered with `J`.
+
+🔴 **That a power cut during a write is survivable.** That is `R8b`'s pass criterion ④, ten physical
+power pulls, and the interrupted write is the experiment. Nothing here bounds what an interrupted
+write leaves behind.
+
+🔴 **That the anti-rollback counter advances.** Nothing in `R8a` writes it. The flash bitmap is
+erased today, so it reads 0 and every version passes, and rounds 3 and 4 drove the comparison from a
+**RAM** bitmap at `0x81700000`. The boundary cases — version 5 against counter 4, 5 and 6 — are
+`C13`'s, against a command-supplied counter (`notes/update-chain.md` § 7). So the monotonicity the
+design rests on is asserted and never exercised.
+
+🔴 **That the key management is production-grade.** The development seed is 32 bytes of `0x42` and it
+is **in the tree on purpose**: anyone who reads `src/rlxboot/devkey.h` or
+`tools/fixtures/mkfw2/dev-key.tsv` can sign a container this build accepts. It exists so that two
+independently written implementations can be compared without exchanging a key. What `R8b` needs
+instead is a key that never enters this repository and never enters `$FWRE_WORK`, which is shared
+with another checkout, with only the public half built into `rlxboot`; rotation is a rebuild,
+because this format carries no key list and no revocation.
+
+🔴 **That `rlxboot` resists an attacker who can already write flash.** Plan § D6 says outright that
+it cannot. It defends the remote update path, not physical access, and the erased barrier is a
+defence against *corruption* reaching a bootable header, not against someone who chooses those
+bytes.
+
+🔴 **That this hardware has secure boot, and nothing here may imply it does.** There is **no**
+evidence of an OTP or an eFuse for a public-key hash on this part. The stock loader still runs first,
+unverified, and can still be replaced by anyone with flash write access; `rlxboot` is a second stage
+that verifies what it is handed, which is a different claim.
+
+🔴 **That the `R8` board row is met.** `R8a` is the half of it that needs no flash write. The row
+stays open until `R8b` runs, and the booking below prices what that costs.
+
+⚠️ **The cache argument is 量 for a composite path and for nothing narrower.** Rounds 1 and 4 write
+back D with `CCTL 0x200`, invalidate I with `0x002`, copy 1,114,112 bytes and jump in, and the
+payload boots — so that sequence works on this die for this copy. It does not show `0x200` was
+necessary: the D side is write-back **without** write-allocate, a store to a non-resident line goes
+straight to memory, and `notes/cache-model.md` records `0x100` `DWB` as a value whose effect no
+source documents. The destination was never read back, and `notes/rlxboot.md` § 6's own refutation
+condition is only half taken.
+
+⚠️ **That the flash window is decoded at `0xBD3F0000`.** The weakest-thing paragraph. `ctr=0` from
+flash is the reading an erased region and an undecoded window share.
+
+⚠️ **That `rlxboot` works anywhere but on this build, this image and these four rounds.** One
+seating, one build id `6395889d`, one payload sha256, one container, one `load_addr`. Everything
+else is qemu, and **qemu certifies logic and never codegen or the ISA**.
+
+⚠️ **That the timing is bounded.** Ed25519 over 96 bytes and SHA-256 over 3 MiB have been timed on
+nothing that resembles this core, and the four rounds' durations were not taken as a measurement of
+either.
+
+⚠️ **What pinning the container at `0x81000000` costs.** It is the one address in RAM this project has
+measured being rewritten: `MEM-14` puts `0x00000144` into word 1 on every boot, which is a
+container's `format` and `header_len`, so a reset between the upload and the jump corrupts the
+container into a header refusal. The four rounds read that word and it was intact four times of four
+— which is a check that the hazard did not fire, not a demonstration that it cannot.
+
+⚠️ **`rlxboot-rescue` is a region and a refusal, not a payload.** It is not built, has never run, and
+the half of question ③ that depends on it is unanswered.
+
+⚠️ **rlxfw's own flash image would not pass the stock loader today, and that was never the claim
+anyone checked.** 量 `cvimg` writes `cr6b` and `check_image()` accepts only `cs6c` and `cr6c`
+(`FW-168`). It does not touch `R8a`, which boots from RAM, and it decides `R8b`: `rlxboot` and the
+rescue **must** carry a `cr6c` header, because being scanned is how they run at all, and a slot must
+deliberately **not** — two opposite properties at one producer's output, each needing its own
+control. It also records that `R8`'s old *"the stock loader will accept my image"* has never been
+verified in this repository.
+
+⚠️ **The layout is arithmetic, not a measurement.** It is computed from `SPEC.md`'s `FLM-*` rows and
+the scan table in `docs/loader-command-semantics.md` § a, and `bank_offset` is its one unread input.
+
+⚠️ **`flashscan`'s census is a check on one program, not a proof about programs.** The
+reconstruction is per-register and forgets a register written by anything it does not model, which
+its own text says.
+
+⚠️ **The MTD refusal's third layer has still never been observed firing**, here or anywhere in this
+project: observing `MTD_CAP_ROM` at `mtd_open` needs an even char minor over this device, which
+`tools/mkinitramfs.py` refuses to declare. It stays 讀.
+
+⚠️ **The seating's own bookkeeping cannot be re-derived from the repository.** `FW-170` counts the
+rounds at 49 cells and breaks them down as 4 `rescue`, 10 TFTP and 31 console captures, which sums
+to 45; what is committed under `bench/2026-09-30/R8A-*` is 26 console captures with their `.timing`
+and `.meta.json`, ten `*-rescue.json` upload records and four reads of the `AUTOBURN` word, and the
+script that counted the rest is outside this repository. The seating was shared with `R7-8`, whose
+captures are not in this gate's commits.
+
+⚠️ **Flash.** 量, per round: the four rounds sent 26 console commands in all — six `DW`/`J` a round
+and two `busybox reboot -f` — and ten uploads, whose console preparation was `AUTOBURN 0`,
+`LOADADDR` and `IPCONFIG`. No `FLW`, `EW`, `EB`, `DB` or `FLR`, and no non-zero `AUTOBURN`, appears
+in any capture or upload record of the gate; the `AUTOBURN` word read `00000000` four times, once
+per round. What that cannot see: two writes that cancel, every byte outside the words read, and
+`H601`, which is never hashed. **No flash map was taken in these rounds**, so there is no bracket of
+their own to compare against the 2026-08-16 dump; `n_writes` was not read either, and it carries no
+information (`FW-142`). The `FLR` bracket stays at 1,024 of 4,194,304 bytes = **0.0244 %**, and
+`FLS-26`'s ledger does not move. The one flash access the gate made is a **read**: `rlxboot`'s
+read-only counter read through the MMIO window in rounds 1 and 2.
+
+### `R8b`: the booking, and its preconditions priced from what is now known
+
+`R8b` is **booked and not open**. It is persistence and the ten power cuts, and it waits for `R9`,
+for the preconditions below, and for the owner's own dated yes — one per write (`CLAUDE.md`
+§ Flash). Every line here is priced against the tree as it is at this close, not against the plan's
+expectation of it.
+
+| the plan's precondition | where it stands |
+|---|---|
+| **①** the rescue drill done: `0x3F0000` deliberately written to garbage, a TFTP rescue walked, timed, and written into the runsheet | 🔴 **not done, and it is itself a flash write.** Nothing in `R8a` wrote a byte, so nothing recovered from a broken one. Plan § D6 splits the drill in two, and the half that drills *a slot is broken and `rlxboot` recovers it* needs the rescue payload, which is not built. So the precondition that licenses the later writes needs a dated yes of its own before it can license anything |
+| **②** `burn()` at `0x80401318`'s flash target read out | 🟢 **met at the desk, before this gate** (`docs/loader-flash-write.md` § 1): `burn()` is the image parser and dispatcher, matching eight section signatures, bounded at the top against the chip capacity and with **no lower bound** at all. ⚠️ `C-3`'s residual stands — which of `burn()`'s four callees erases and which programs — and the capacity bound is correct for this device only by coincidence, this unit taking the unknown-chip fallback |
+| **③** `mkfw2` refuses a container whose destination lands in a forbidden range, **with a positive control** | ⚠️ **half.** The guard and its positive controls exist and are `R8a`'s (claim ③). The missing half is that a destination is an **optional declaration**: `--flash-at` defaults to none and the container carries no destination field, so a container built without it is emitted unguarded. `R8b`'s producer has to make the destination part of what it signs, or precondition ③ is a check that can be skipped by omission |
+| **④** the main write path is rlxfw's own MTD driver, the loader's `AUTOBURN` demoted to a fallback | 🔴 **there is no write path, and the gate this precondition names never existed.** Three layers refuse today: the designated write path `rtl819x-spi-write.c` is a separate translation unit whose `obj-$(CONFIG_MTD_RTL819X_WRITE)` names a `CONFIG_` kconfig never declares, so it is not compiled and its two entry points return `-EPERM`; `mtd->write` and `mtd->erase` in the compiled unit are stubs that refuse with `-EOPNOTSUPP` and count; and `mtd->flags` is `MTD_CAP_ROM`, so `mtdchar` refuses an open for writing before those stubs are consulted. The precondition names `R5b` as the owner and `R5b` was struck as a gate that never entered the board (`C-3`'s owner cell), so the body has no gate but `R8b`. ⚠️ And the accurate sentence is the driver's own: **rlxfw contributes no flash-write code to this image** — not that this image cannot write flash. The vendor's `mtd_spi_write` and `mtd_spi_erase` are installed unconditionally and reach real page-program and sector-erase sequences; what keeps them out of reach is the userspace surface, an odd char minor and a `0400` block node, which are access controls on a path that exists |
+| **⑤** stage 2 confirmed: with the kernel region garbage the ESC window still appears | ⚠️ **read, not measured.** `doBooting()`'s else branch goes straight to `goToDownMode()` with no ESC wait — a bad image takes you to the rescue path immediately rather than costing it — and this unit's `stage2.bin` carries the strings (`docs/loader-flash-write.md` § 3). `C-4`'s residual is still a bench item: that a deliberately corrupted image reaches the prompt **in practice**, kernel region only |
+
+**The layout is settled and it is constrained, and the constraint is not capacity.** 讀 (`FW-167`,
+`notes/update-chain.md` § 6): today's image wrapped in a container is 1,114,272 bytes, which rounds
+up to `0x120000` = 1,179,648 on the loader's own 64 KiB step, and two full slots fit with 1,310,720
+bytes free. The binding limit is the stock loader's **scan table**: at the obvious base `0x030000`,
+four of its six candidates fall inside slot A, so the lowest usable slot base is `0x070000` and
+`0x030000`–`0x06FFFF` is left erased as a provably unbootable barrier. `rlxboot` at `0x010000` and
+the rescue at `0x020000` are the only two regions the stock loader can reach and must each carry a
+`cr6c` header on purpose; slots A and B are reachable only through `rlxboot`, which is the whole
+design.
+
+**Slot A's first write ends the vendor firmware, and that is why the order is a constraint rather
+than a preference.** 讀 the arithmetic: slot A spans `0x070000`–`0x18FFFF` and the vendor kernel
+`cr6c` spans `0x060000`–`0x151012`, 987,155 bytes, so the first write to slot A destroys **921,619
+of those 987,155 bytes** — everything but the one 65,536-byte sector below the slot base — plus
+65,536 bytes of the SquashFS. `cr6c`'s 16-bit sum stops being zero, `check_image()` stops returning
+2, and the loader has nothing left to boot from flash. Slot B takes another 1,179,648 bytes of the
+SquashFS, leaving 630,850 of its 1,876,034 under no kernel. That boot **is** `R9`'s vendor column:
+`R9` is this project's acceptance gate and its method is *vendor firmware = boots normally, rlxfw =
+RAM boot, and switching between them is one power cycle*, so every vendor-column measurement depends
+on the vendor firmware still booting from this chip. TOTOLINK released no source, so there is no
+second copy to build. **Therefore `R9` before `R8b` is a constraint, not a preference.** ⚠️ The
+honest qualification is that the bytes are not unrecoverable in principle — the 2026-08-16 dump is
+outside this repository — but restoring 3.3 MiB means exactly the writes nine gates have avoided,
+through a `burn()` with no lower bound, on one device with no spare, and a restore that stops
+partway leaves neither firmware. *"Gone"* is the right word to plan with.
+
+**What `R8b`'s own pass criterion needs, beyond the preconditions.** Criterion ④ is ten physical
+power pulls during a write, each followed by a boot from the other slot, and its refutation is
+written: any one that enters no slot means the A/B design has a hole. That criterion is what makes
+the two-slot layout load-bearing — the single-slot alternative is recorded, and with one slot the ten
+cuts would test `rlxboot-rescue` plus a TFTP upload rather than A/B at all. Beside it, `R8b` must
+make one producer guarantee two opposite properties, a `cr6c` header where the loader must scan and
+no recognisable header where it must not, each with its own control (`FW-168`).
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner's own — opening `R7` and `R8a` on 2026-09-30, splitting the `R8` board row at the flash
+boundary, and the widened relaxation of no frozen cards and predictions only where they earn it,
+with the flash rules, the power handshake and `NET-165` unchanged — are not listed. Each below is
+recorded where it is cited.
+
+1. `version == counter` accepted rather than refused, with the recovery argument that refusing it
+   would require the counter to advance on a boot (`notes/rlxboot.md` § 4).
+2. A malformed bitmap resolved **upward**, to the total zero count (`notes/rlxboot.md` § 4).
+3. Ed25519 and SHA-512 imported rather than written, and SHA-256 written rather than imported, on
+   the two halves of one argument about refutability (`notes/rlxboot.md` § 5).
+4. `crypto_sign_open` replaced rather than called, and `s < L` tested in rlxfw's wrapper
+   (`notes/rlxboot.md` § 5).
+5. One warning exemption, `-Wno-sign-compare`, on one imported file, rather than editing imported
+   crypto (`notes/rlxboot.md` § 5).
+6. RFC 8032 § 7.1's TEST 1024 left out of `rlxsign`'s table, with OpenSSL's four cases in its place
+   and a skip line that says what is then unchecked (`notes/update-chain.md` § 3).
+7. Four bounds added to the pinned format — `payload_len == 0`, word alignment, and the stage-2
+   window as a refused destination — and listed as additions (`notes/rlxboot.md` § 3).
+8. `RLXBOOT_REFUSE_RESET` left at 1, so a refusal resets rather than halts, which is why rounds 2
+   and 3 end at the loader prompt through a watchdog bite.
+9. Pass condition ③ driven from the RAM counter rather than from flash, because the flash source
+   cannot distinguish an erased region from an undecoded window (`FW-170`, `notes/rlxboot.md` § 10).
+10. `FW-169` recorded and not fixed, under the owner's rule of 2026-09-26 that a new or changed
+    checker must block bricking, an `H601` leak or a misjudged result.
+11. `check_image()`'s desk reproduction taken from `tools/rtkimage.py` rather than from
+    `upstream/tools/loader-unpack.py`, which two documents wrongly credit with it
+    (`notes/update-chain.md` § 5).
+
+---
+
 ## The operating clause, re-run at fifteen entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
