@@ -1,0 +1,44 @@
+# tools/uspacescan-names.tsv -- the names R7 forbids, the ones it allows, and
+# the two that exist only to make the instrument show its hand.
+#
+# This file is DATA on purpose: `tools/uspacescan.py` keys nothing off an
+# individual name, so the gate's subject can be widened or narrowed without
+# touching the instrument -- and `test-uspacescan.sh` D1 proves the table is
+# load-bearing by moving `execve` to FORBIDDEN in a copy of this file and
+# requiring the verdict on the very same ELF to flip.
+#
+# class     FORBIDDEN  its presence in the artefact is a finding; the gate fails
+#           ALLOWED    counted and printed on every run, never flagged
+#           CONTROL    not part of the verdict; its `expect` must hold or the
+#                      tool refuses to report anything at all
+#
+# expect    only read for CONTROL rows
+#           ZERO   both sources must report 0 occurrences
+#           NOFP   source (1) must report "no fingerprint could be built", i.e.
+#                  UNDECIDED -- the proof that an unfingerprintable name comes
+#                  back undecided and never as a passing 0
+#
+# The dividing line between FORBIDDEN and ALLOWED is NOT "does it start a
+# process".  It is "can the bytes that decide WHAT runs be a string something
+# else parsed":
+#
+#   system, popen          hand the whole command line to /bin/sh -c
+#   execl, execle          argv arrives as varargs, which is how a caller that
+#                          meant to build an array ends up building "sh -c ..."
+#   execlp, execvp         search PATH, so the file that runs is decided by the
+#                          environment rather than by the program
+#   execve, fork, vfork    argv is an array the caller built from typed values,
+#                          the path is absolute, and nothing is searched
+#
+# name	class	expect	why
+system	FORBIDDEN	-	the whole command line is parsed by /bin/sh -c
+popen	FORBIDDEN	-	the whole command line is parsed by /bin/sh -c
+execl	FORBIDDEN	-	varargs argv; the usual carrier of a built-up command line
+execlp	FORBIDDEN	-	varargs argv, and PATH decides which file runs
+execvp	FORBIDDEN	-	PATH decides which file runs
+execle	FORBIDDEN	-	varargs argv with a caller-supplied environment
+execve	ALLOWED	-	typed argv array, absolute path, no PATH search, no shell
+fork	ALLOWED	-	makes a process; decides nothing about what it runs
+vfork	ALLOWED	-	makes a process; decides nothing about what it runs
+zzz_not_a_symbol	CONTROL	ZERO	exists in no library and in no program on earth
+wordexp	CONTROL	NOFP	in this uClibc's headers but in no archive member, so no fingerprint can be built for it
