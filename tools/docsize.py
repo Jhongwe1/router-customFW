@@ -101,7 +101,9 @@ BUDGET = {
     "CLAUDE.md:lines": 351,
     "CLAUDE.md:bytes": 24200,
     "CLAUDE.md:maxline": 647,
-    "PROGRESS.md:bytes": 98100,  # 2026-09-30, R1y-4: 95,212 B +3 %, down
+    "PROGRESS.md:bytes": 103000,  # 2026-09-30, R7-0/R8a-0: two step lists open
+    #   at once (R7 and R8a), 100,140 B +3 %.  Up from R1y-4's 98,100, and the
+    #   next closing commit takes it down again: a closed list moves out.
     "PROGRESS.md:maxline": 9870,
     "PROGRESS.md#Now:bytes": 6000,
     "PROGRESS.md#Now:maxline": 1000,

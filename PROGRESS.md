@@ -13,15 +13,15 @@ the work (house rule 6).
 
 | | |
 |---|---|
-| **Active gate** | **None.** **`R1y` closed 2026-09-30** in one segment (117th; `docs/GATE-RESULTS.md` entry 15); its step list moved to `docs/history/steps-R1y.md` in the closing commit. Which gate opens next is the owner's decision. Closed gates and their evidence are on § Gate board. |
-| **Active step** | None: no gate is open. `R1y`'s last steps closed 2026-09-30 — the move (`b0850eb`) and the write-up, entry 15. |
+| **Active gate** | **`R7` (my userspace) and `R8a` (the signed update chain, zero flash writes)**, both opened 2026-09-30 by the owner in the 118th segment, to be closed in it if they can be. `R8` is split at the flash boundary: `R8a` here, `R8b` — persistence and the ten power cuts — booked and not open, because its experiment is an interrupted flash write. Closed gates and their evidence are on § Gate board. |
+| **Active step** | `R7-0` and `R8a-0`, the two opening steps, in this commit; both lists are at the end of this file. The owner's relaxation of 2026-09-27 carries over and was widened on 2026-09-30 — no frozen cards, predictions only where they earn it, no desk-sweep per commit; the flash rules, the power handshake and `NET-165` do not relax. |
 | **Session history** | `LOG.md`, one dated entry per segment. What this table said until 2026-09-23 is archived verbatim in `docs/history/progress-now.md`. |
-| **Next after this** | 🔄 **2026-09-30（第一百一十七段）**: `R1y` closed. Entry 15 re-runs the operating clause at fifteen entries, and it does not fire: `R1y`'s residuals are the record's and `R6b`'s the device's. Entry 14's clause still names the mechanism of `rlx0`'s transmit fault — its doable part is `M5`, one press and no image; opening it, recording it as not doable on this bench, or opening another gate is the owner's decision. The mainline builds `SWCORE=n` since 8g, so `R9` builds `quiet-swcore` (`docs/KNOWN-ISSUES.md`). <!-- C12: between gates, no step id --> |
-| **Blocked on** | Nothing. Waiting on the owner, blocking no step: `CLAUDE.md` § Flash has every press claim rlxfw's `n_writes`, which carries no information (`FW-142`); `MK6`, `MK7` and `MK9`'s witnesses cannot fail, nor `MK10`'s on a standard-`/init` image (`FW-143`); `CLK-42` 殘留 waits for a gate; and the main session's rulings in `R6b` and `R1y`, listed in entries 14 and 15, stand unless the owner overrides them. |
+| **Next after this** | 🔄 **2026-09-30（第一百一十八段）**: `R7` and `R8a` opened, and what comes next is `R7-1` through `R7-7` and `R8a-1`/`R8a-2`, which are independent of each other, then the two bench steps `R7-8` and `R8a-4`, which share one seating. What follows the gates is the owner's: `R9` wants the vendor firmware still bootable from flash, and `R8b`'s first provisioning write ends that, so the order `R7 → R9 → R8b` is a constraint and not a preference. Entry 14's clause still names the mechanism of `rlx0`'s transmit fault — its doable part is `M5`, one press and no image. The mainline builds `SWCORE=n` since 8g, so `R9` builds `quiet-swcore` (`docs/KNOWN-ISSUES.md`). |
+| **Blocked on** | Nothing. Waiting on the owner, blocking no step: **`R8b` needs a dated yes per flash write, and nothing in `R7` or `R8a` writes one byte**; `CLAUDE.md` § Flash has every press claim rlxfw's `n_writes`, which carries no information (`FW-142`); `MK6`, `MK7` and `MK9`'s witnesses cannot fail, nor `MK10`'s on a standard-`/init` image (`FW-143`); `CLK-42` 殘留 waits for a gate; and the main session's rulings in `R6b` and `R1y`, listed in entries 14 and 15, stand unless the owner overrides them. |
 
-**Step list for the active gate**: none is open. The next gate's list goes at
-the **end** of this file, where a new list or row moves no line a checked file
-cites (`SPEC.md` `FW-110`), and moves verbatim to `docs/history/steps-<gate>.md`
+**Step lists for the active gates**: `R7`'s and `R8a`'s are at the **end** of
+this file, where a new list or row moves no line a checked file cites
+(`SPEC.md` `FW-110`), and each moves verbatim to `docs/history/steps-<gate>.md`
 in its closing commit, as `R1y`'s did; `cfcensus` and `C12` read the lists
 there as well (`R1y-4`).
 
@@ -112,8 +112,9 @@ Status: `·` not started · `~` in progress · `✓` closed (needs an evidence l
 | **R1-pub** | instruction / hazard / Lexra-ASE census + the vendor-kernel emulation column + the three-toolchain silicon comparison (`R2c`) — the first independently publishable artefact, `docs/rlx-isa.md`. | 14 | **20** | **`✓`** | `docs/GATE-RESULTS.md` entry 9 (2026-09-16) · step list `docs/history/steps-R1-pub-R2c.md` |
 | **R1z** 🆕 | paying the debts this repository's own record names, with the population derived from § Carried forward rather than hand-picked. `tools/cfcensus.py check` went from 29 findings to 0, and it is a gate now. | 3 | **3** | **`✓`** | `docs/GATE-RESULTS.md` entry 10 (2026-09-16) · step list `docs/history/steps-R1z.md` |
 | **R6** | my Ethernet driver: `ping`, an `iperf3` number, 30 min flood clean. `D1`–`D3`, `D5` and `D6` met and `D4` met in part; the named stretch, per-port VLAN (`R6-6`), not met. | 37 | **18** | **`✓`** | `docs/GATE-RESULTS.md` entry 12 (2026-09-22) · step list `docs/history/steps-R6.md` · `notes/switch-driver.md` § 8 · `SPEC.md` `NET-43`–`NET-45`, `NET-48`–`NET-54` |
-| **R7** | my userspace; `system()`/`popen()` count = 0 from two independent sources — 🔄 **named 2026-08-25, and they must be different in kind**: the shipped artefact walked through `PT_DYNAMIC`/`DT_SYMTAB` (**not** `readelf --dyn-syms`, which reports nothing on this file format), and `nm --undefined-only` over the build products before strip. Baseline to beat: **31 of 55** (`FW-20`) | 34 | — | `·` | |
-| **R8** | signed update accepted, one flipped bit rejected, 10 power-cuts survived | 18 | — | `·` | |
+| **R7** | my userspace; `system()`/`popen()` count = 0 from two independent sources — 🔄 **named 2026-08-25, and they must be different in kind**: the shipped artefact walked through `PT_DYNAMIC`/`DT_SYMTAB` (**not** `readelf --dyn-syms`, which reports nothing on this file format), and `nm --undefined-only` over the build products before strip. Baseline to beat: **31 of 55** (`FW-20`). 🔴 **Both named sources are vacuous on rlxfw's own binaries, which are static** — a `PT_DYNAMIC` walk finds no such segment and `system` is *defined*, not undefined, in a static link, so each reads 0 by construction and 0 is the pass. The instrument is re-specified at `R7-0`; the gate cannot close on the wording of 2026-08-25 | 34 | — | `~` | |
+| **R8** | signed update accepted, one flipped bit rejected, 10 power-cuts survived. 🔄 **Split 2026-09-30 at the flash boundary, because the three clauses do not carry the same risk**: `R8a` proves signature-accepted, one-bit-rejected and version-below-counter-rejected with **zero flash writes**, from RAM; `R8b` is persistence and the ten power cuts, whose experiment *is* an interrupted flash write, so it is booked behind `R9` (whose vendor column needs the vendor firmware still bootable from flash) and behind a dated yes per write | 18 | — | `~` | `R8a` open 2026-09-30; `R8b` booked, not open |
+| **R8a** 🆕 | the half of `R8` that needs no flash write: a signed container staged in RAM, verified by `rlxboot` — ① a correct signature accepted and the image boots, ② one flipped bit anywhere refused, ③ a version below the anti-rollback counter refused. It is not `R8`: it establishes nothing about writing flash, about surviving a power cut, or about key management, and it is not secure boot on a part with no evidence of a key-hash fuse | **—** —— uncosted for `R1h`'s reason: the budget lives in its own step list, and `R8`'s 18 already carries this work | — | `~` | step list at the end of this file |
 | **R9** | three-column differential table, **third column not empty** | 16 | — | `·` | |
 | **P1** ✅ | `mfgtest` passes on a good unit, and every check has been made to FAIL once | 8 | **4** | **`✓`** | `docs/GATE-RESULTS.md` entry 11 (2026-09-17) · step list `docs/history/steps-P1.md` |
 | **P2** ✅ | boot-time breakdown + throughput, both firmwares, same script. `D1`, `D2`, `D4` and `D6`–`D8` met, `D3` under its closing rule, and `D5` for ICMP and the vendor's driver, while rlxfw's own driver's reading is a failure handed to `R6b` (`NET-116`); the stretch, `P2-6`, carried to `P3` as `LA-1`. | 6 | **10** | **`✓`** | `docs/GATE-RESULTS.md` entry 13 (2026-09-25) · step list `docs/history/steps-P2.md` · `SPEC.md` `NET-116`–`NET-121`, `FW-135`–`FW-141` |
@@ -125,7 +126,7 @@ Status: `·` not started · `~` in progress · `✓` closed (needs an evidence l
 | **R1y** ✅ | the record's maintainability: `PROGRESS.md` split into state and record — closed step lists, history and closed rows moved verbatim to `docs/history/`, with a resolver for the line citations records keep; `TOOL-2`'s three instrument defects; `SPEC.md` § 17's owner column repaired once. The four enforcers the booking named are ⊘ by the owner's rule of 2026-09-26 | — | **1** | **`✓`** | `docs/GATE-RESULTS.md` entry 15 (2026-09-30) · step list `docs/history/steps-R1y.md` · `notes/record-integrity.md` § 5.7–5.8 · `SPEC.md` `FW-137`–`FW-139`, `FW-158`, `FW-159` |
 | | | **200** | | | |
 
-🔄 **198 → 200 on 2026-09-01**, and the ORDER matters: the number was written as 198+2 and then CHECKED by summing the column, which is backwards and is recorded that way. The sum is **200 over 18 rows**, with `R1h` deliberately uncosted (its budget lives in its own step list). The paragraphs below say why this column is not a quantity; that is a reason to delete it, not a reason to let its arithmetic drift.
+🔄 **198 → 200 on 2026-09-01**, and the ORDER matters: the number was written as 198+2 and then CHECKED by summing the column, which is backwards and is recorded that way. The sum is **200 over 18 rows**, with `R1h` deliberately uncosted (its budget lives in its own step list) and, since 2026-09-30, `R8a` too — it is a split of `R8`'s work, not work added to it, so costing it would double-count the 18 beside `R8`. The paragraphs below say why this column is not a quantity; that is a reason to delete it, not a reason to let its arithmetic drift.
 
 🟢 **Est. is CALIBRATED now — 2026-09-11, `R5-11` — and what came out is a band, not a ratio.** This note said *the calibration point is the first driver
 (R5); when it lands, multiply every remaining row by the measured ratio and say so here.* `R5` landed. 量, against the **plan's 小計**, which the paragraphs
@@ -426,3 +427,86 @@ measured rather than repeated.
 <!-- cfcensus:debt end -->
 
 ---
+
+## `R7`'s step list — OPEN 2026-09-30, 118th segment
+
+**Gate:** my userspace (§ Gate board, row `R7`). **Opened** 2026-09-30 by the
+owner, who asked for `R7` and `R8` in one segment. The relaxation of 2026-09-27
+carries over and was widened the same day: no frozen cards, predictions only
+where they earn it, no desk-sweep per commit, tests beside the code. **Nothing
+in `R7` writes flash**, the power handshake stands, and the board is never left
+at the loader prompt (`NET-165`).
+
+### The scope ruling this list opens with
+
+The row's pass condition — `system()`/`popen()` = 0 from two independent
+sources — was written on 2026-08-25 against the vendor's **dynamically** linked
+rootfs, and rlxfw's own programs are **static**. A `PT_DYNAMIC`/`DT_SYMTAB` walk
+finds no such segment in a static ELF, and `nm --undefined-only` cannot see
+`system` because a static link *defines* it. Each named source therefore returns
+0 on every rlxfw binary whatever the code does, and 0 is the passing answer:
+this is the repository's own `R-28` class, a tool that cannot fail, reappearing
+one level below where it was first caught. `R7-0` re-specifies both sources and
+gives each a planted positive control; the gate does not close on the old
+wording. The vendor baseline itself is restated rather than beaten
+arithmetically: 31 of 55 by string scan and 28 by import walk are counts over
+dynamic binaries, and *0 of 55* would not be the same measurement.
+
+Out of scope, each with its reason: **`R7g` TLS** — the plan's own cut order
+puts it first to go, and it has no bearing on the gate's claims. **WAN↔LAN NAT
+forwarding measured end to end** — per-port VLAN was not met at `R6` (`R6-6`)
+and this host has one NIC, so there is no second segment to route to; the rules
+are installed and read back instead, which is what this bench can witness.
+**A fuzz campaign of hours** — the pass condition is a coverage threshold
+written before the run plus a planted defect the fuzzer must find, which is what
+separates a connected harness from a silent one.
+
+### The steps
+
+| Step | | What it produces | DoD | Where it is most likely to be wrong |
+|---|---:|---|---|---|
+| **`R7-0`** | desk | This list, the board rows, and `tools/uspacescan.py`: the re-specified instrument, one source over the shipped bytes and one over the pre-link objects, each with a planted positive control | A fixture that really calls `system()` is caught by both sources; an `execve` fixture is permitted **and** counted; a name that exists nowhere reads 0; the two sources disagreeing is an error, not a vote; a mutated tool exits non-zero | Declaring a static binary clean because the instrument cannot see into it — the defect being repaired. A stripped file is the case that matters, and a method that needs symbols is not a method |
+| **`R7-1`** | desk | rlxfw's own busybox, built from the drop's 1.13.4 source with the 4181 toolchain: `config/rlxfw-busybox.config`, `tools/mkbusybox.sh`, any patch under `config/busybox-patches/` | `busybox --list` 量 under qemu, not read off the config; no enabled applet's source calls `system`/`popen`/`execl*`, shown by scanning the built binary; `hazlint` 0; the list of commands the current image has and this build drops | Enabling `udhcpd` and shipping its lease-notify `system()` with it; a config that looks right while the binary says otherwise. Every dropped verb is a bench card that stops working |
+| **`R7-2`** | desk | `init`, a compiled PID 1, and `ifupd`, the compiled replacement for `udhcpc`'s shell `-s` script | Mounts, LAN up by `ioctl`, daemons supervised with a backoff and a crash-loop stop; every child `fork`+`execve` with a fixed `argv`; the DHCP lease environment treated as hostile, with a malformed battery; the bench shell enabled **and announced** | Supervision that respawns for ever; a PID 1 that leaves zombies; taking the lease environment on trust, which is a WAN-side input |
+| **`R7-3`** | desk | The config store: bounded TLV reader, CRC-32, A/B slots with a monotonic sequence, and the `cfgstore` CLI | The torn-write sweep as a loop over **every** truncation length, each leaving the previous record selected; a bit-flip sweep over the header; both slots invalid → defaults with `source = 0`; the mutation with the length check removed goes red | A reader that trusts a length — the vendor's defect exactly (`CVE-2024-21778`'s shape). A fail-open fallback: no password must mean no login, not no check |
+| **`R7-4`** | desk | `brokerd`: `AF_UNIX`, typed ops, sessions, the rate limit, and `PING` as the typed replacement of a string-to-shell diagnostic | The decoder sweep over every header offset and truncation; the authorisation matrix per (op × uid × session × CSRF); the lock's doubling **and** a correct password succeeding after it expires; `NOENTROPY` before the pool is ready | A slow client holding the broker shut; an authorisation rule scattered through the ops instead of in one table. `PING`'s child must be reaped even when this image's `ping` ignores `-c` |
+| **`R7-5`** | desk | `httpd` (privilege-dropped, chrooted, no ELF in the root), the JSON and HTTP parsers, and the KDF — SHA-256, HMAC, PBKDF2, scrypt from their RFCs | Every RFC vector set passes on the host **and** on the target under qemu; the traversal battery; the route matrix; `chrootcheck` shown failing on a planted `sh`; the scrypt parameters chosen from an anti-DoS budget, with the numbers | A KDF that is right little-endian and wrong big-endian — the target is big-endian and the host is not. scrypt's memory on a 26 MB machine is a DoS path, so the parameters are a security decision, not a benchmark |
+| **`R7-6`** | desk | `dnsfwd`: UDP, forward only, refuses to be an open forwarder, with the compression-pointer guard and the query/reply match | The pointer battery (self, forward, cycle, chain, past-end) with a positive control that a legitimate compressed name decodes; the anti-spoof set; off-LAN sources refused; the mutation without the loop guard caught by a time-bounded test | The compression-pointer loop, which is the classic bug in this exact program. Random query ids are only as good as the pool, and on this board the pool is the open question `R7-7` settles |
+| **`R7-7`** | desk | The kernel's entropy source, in rlxfw's own code, and the card that decides it | The mechanism read out of this kernel's `random.c` with citations; a credit policy that under-credits rather than over-credits; a card whose refutation condition is written first, with the reading on an image **without** the change as its control | Crediting a periodic timer, which would be a dishonest number. `entropy_avail` rising proves accounting, never that the bits are strong — and the honest fail-closed consequence is that login is refused until it rises |
+| **`R7-8`** | bench | The image: the manifest rewritten to rlxfw's busybox and rlxfw's `/init`, built, and one boot per program's first run on the device (`D14`) | `uspacescan` over every binary in the image, both sources, 0 forbidden imports and the allowed ones counted; the shell prompt; `cfgstore`, `brokerd`, `httpd` and `dnsfwd` each shown running and answering; the KDF's device timing measured rather than inferred from qemu | The decompressed kernel + initramfs must stay under 5,242,880 bytes, and six new static binaries is where that budget goes. A daemon that works under qemu and faults on the silicon is what `D14` exists to catch |
+| **`R7-9`** | desk | The write-up: `docs/GATE-RESULTS.md`'s entry, the notes, the `SPEC.md` rows, and what the gate did not establish | The DoD read one row at a time, each with the reading that settles it and the ones it does not | Calling the gate finished on a green test suite instead of on the device boot. The claim is about the shipped bytes, and only `R7-8` looks at those |
+
+## `R8a`'s step list — OPEN 2026-09-30, 118th segment
+
+**Gate:** the signed update chain, proved with **zero flash writes** (§ Gate
+board, row `R8`, split at the flash boundary on 2026-09-30). **Opened**
+2026-09-30 by the owner. `R8b` — persistence and the ten power cuts — is booked
+and not open: its experiment is an interrupted flash write, so it waits for `R9`
+(whose vendor column needs the vendor firmware still bootable from flash), for
+its preconditions, and for a dated yes per write.
+
+### Why the split is a ruling and not a convenience
+
+The board row's three clauses were written as one gate. Two of them — a correct
+signature accepted, and a single flipped bit rejected — are claims about a
+verifier, and a verifier can be driven entirely from RAM: the loader stages a
+container and `rlxboot`, `rlxboot` verifies and either boots or refuses, and
+nothing is written. The third — surviving ten power cuts during a write —
+**cannot** be demonstrated without writing, because the interrupted write is the
+experiment. Keeping them in one gate would have smuggled an irreversible,
+one-device risk in behind two results that carry none, and it would have spent
+`R9`'s evidence base: the first provisioning write to `0x010000` or to a slot
+ends the vendor firmware's ability to boot from flash, which is the control
+column of the project's own acceptance gate. So the risk is carved out and named
+rather than bundled.
+
+### The steps
+
+| Step | | What it produces | DoD | Where it is most likely to be wrong |
+|---|---:|---|---|---|
+| **`R8a-0`** | desk | This list, the board row's split, and the container format: `RLXU` v1, header then signature then payload, with the verification order pinned | The order is the specification: nothing is copied and no payload byte is hashed before the header's own signature verifies, and the destination bounds are checked before any copy | Repeating the stock loader's defect, which copies the payload to an address taken from the untrusted header *before* checksumming it |
+| **`R8a-1`** | desk | `tools/mkfw2.py`, `tools/rlxsign.py` and `tools/flashguard.py` — the plan's precondition ③, and the one new checker this gate justifies, because what it blocks is bricking | `flashguard` refuses the loader region, `H601` and the rescue slot, importing `flashwin.overlaps_forbidden` rather than restating it, **and permits a legitimate neighbour** — a guard that refuses everything is not a guard; `mkfw2` refuses the auto-executed file names and refuses to emit anything the stock loader would accept, proved with the desk reproduction of `check_image()` | A refusal with no positive control, which passes by refusing. A container the loader recognises would let one corrupted byte elsewhere boot an old image without passing through verification |
+| **`R8a-2`** | desk | `rlxboot`: a freestanding payload that verifies the container and boots it, with Ed25519 and SHA-512 | RFC 8032 and RFC 6234 vector sets on the host **and** on the target under qemu; a bit-flip sweep over the header and the signature where every single flip is rejected; the crypto's provenance stated — an import is labelled an import, never called mine | Cache handling: this core is write-back without write-allocate, and a missing I-side invalidate after writing code looks exactly like a bad signature. Deep recursion in imported arithmetic on a bare-metal stack |
+| **`R8a-3`** | desk | The cross-check: the host signer and the target verifier derive the same public key from one seed, and a container built by the tool verifies inside the payload | Two implementations that share no code agreeing; a mismatch is a finding, not a retry. The counter's flash read exercised against the real erased region, and the rejection case driven from a RAM-staged bitmap, each labelled | Two agreeing because they share a mistake — the reason the seed is fixed and the keys are derived independently |
+| **`R8a-4`** | bench | The round on the device: container and payload staged by the loader's TFTP, `rlxboot` entered, and three outcomes read from the console | ① a correct container accepted and the image boots to its own prompt; ② one flipped bit refused, with `RLXBOOT-SIG bad` and no boot; ③ a version below the counter refused, with the counter's source printed. `AUTOBURN` reads `00000000` before any upload and no flash verb is issued in the seating | A refusal that is really a staging failure: the negative cases need the positive one in the same seating to mean anything. The board must not sit at the prompt between rounds (`NET-165`) |
+| **`R8a-5`** | desk | The write-up, and `R8b` booked with its preconditions priced: the rescue drill, the MTD write path that does not yet exist, and the layout arithmetic | The entry states what `R8a` established and what it did not — nothing about writing flash, nothing about power cuts, nothing about key management, and no claim of secure boot on a part with no evidence of a key-hash fuse | Letting `R8a`'s success read as the board row met. The row stays open until `R8b` runs |

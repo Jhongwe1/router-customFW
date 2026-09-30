@@ -959,7 +959,7 @@ P1        mfgtest passes on a good unit, and every check made to FAIL once  clos
 R6        my Ethernet driver                closed 2026-09-22
 P2        boot-time breakdown + throughput, both firmwares, same script  closed 2026-09-25
 R6b       what R6 left: the vendor Ethernet tree out of the image, and its residuals   closed 2026-09-28
-R1y       the record's maintainability: state, record and finding documents
+R1y       the record's maintainability: state, record and finding documents   closed 2026-09-30
 R7        my userspace
 R8        signed update, survives power cuts
 R9        three-column differential table, and the third column is not empty
