@@ -276,6 +276,7 @@ def resolve(entries, unit, repo, decl_path):
         e.size = os.path.getsize(src)
         e.digest = sha256(src)
     check_no_writable_flash_node(entries, decl_path)
+    check_no_h601_dumper(entries, decl_path)
     return entries
 
 
@@ -342,6 +343,159 @@ def check_no_writable_flash_node(entries, decl_path):
                 "instead, which is the same device read-only BY THE KERNEL"
                 % (decl_path, e.lineno, e.path, e.source, maj, mnr,
                    mnr // 2, maj, mnr + 1))
+
+
+
+# --------------------------------------------------------------------------
+# The H601 byte-dumper ban.  R7, 2026-09-30.
+#
+# `CLAUDE.md` forbids H601's bytes, or their sha256, entering this repository
+# at all -- tracked or untracked.  `/dev/mtd0ro` (c:90:1) spans the loader AND
+# H601, and a console capture lands under `bench/` and then in git.  So an
+# image that carries BOTH that node and a printable-encoder applet has a
+# one-command path from H601 to a committed file.
+#
+# Until now what stood between the two was a SENTENCE in
+# config/rlxfw-initramfs.tsv: *"this userspace has no
+# dd/md5sum/od/hexdump/cmp/cksum/sum/sha1sum among its fifty applets"*.  That
+# was true of the vendor binary the manifest names, and it stopped being a
+# property of the image the moment rlxfw started building its own busybox: the
+# first R7 build enabled `od` and `hexdump` on request and nothing in this
+# repository could say so.  A list nobody re-checks is not a control.
+#
+# THE RULE.  If this declaration carries any mtd device node, then no `file`
+# entry in it may be a multi-call binary whose APPLET TABLE holds one of the
+# names below.  The table is read out of the built ELF, never out of a
+# `.config`: the question is what the shipped bytes can do.
+#
+# WHY ANY mtd NODE AND NOT "mtd0 ONLY".  Which partition a minor lands on is
+# the driver's registration order, and this manifest's own /dev/mtd2ro row says
+# so in as many words ("a size that is not 4194304 means add_mtd_device took a
+# different index").  A rule that trusted the numbering could be defeated by a
+# renumbering nobody noticed, so every major-31 and major-90 node counts.
+#
+# 🔴 WHAT IS DELIBERATELY NOT ON THE LIST, and this is the honest limit of the
+# check.  `cat`, `grep`, `tail -c`, `cut -b`, `sed` and `tr` all put RAW bytes
+# of an arbitrary file on the console, and `cat` cannot be removed -- `K5` reads
+# /proc/cpuinfo with it and the capture corpus holds 412 `cat` sends.  `grep -c
+# <byte>` is worse in kind: a per-byte ORACLE, which is a comparison, so
+# config/rlxfw-initramfs.tsv's *"nothing here reads a byte of H601 and compares
+# it to anything"* was already slightly too strong before R7.  What this ban
+# buys is therefore narrower than that sentence and is stated as what it is:
+# **no applet can turn arbitrary bytes into a printable, lossless form, and
+# none can digest them.**  The guard against `cat /dev/mtd0ro` is a refusal in
+# tools/cardcheck.py on an mtd path as an argument, which is a different tool
+# and does not exist yet.
+#
+# 量 2026-09-30 on the R7 build, with a positive control on every reading:
+#   sed      has no `l` command output (it parses and prints nothing, while
+#            `p` prints and `L` says "unsupported command"), and no `\x`
+#            OUTPUT escape (`s/A/\x41\x42/` emits the literal `x41x42`)
+#   tr       maps bytes to bytes; -d and -s only shorten.  It cannot expand
+#            one byte into two printable ones
+#   ash read has no `-n` (rc=2), and a shell variable is a NUL-terminated C
+#            string: a `while read -r` loop over 41 00 0a ff 1b 42 yields
+#            exactly `[A]`.  So `read` + `printf %d` is NOT a byte-dumper here
+#   cat      has no `-v` (`invalid option -- v`)
+#   wc -L    and `ls -l` give lengths, never content
+H601_DUMPER_APPLETS = frozenset((
+    # printable, lossless encoders -- one of these plus an mtd node is a
+    # complete path from H601 to a capture file to git
+    "od", "hexdump", "xxd", "base64", "uuencode", "uudecode", "strings",
+    # a digest: `CLAUDE.md` forbids "their sha256" by name, and any of these
+    # over /dev/mtd0ro digests H601
+    "md5sum", "sha1sum", "sha256sum", "sha512sum", "cksum", "sum",
+    # byte-for-byte comparison, and the two general-purpose languages that can
+    # write their own encoder in one line
+    "cmp", "dd", "awk", "vi", "ed",
+))
+
+
+def _mtd_nodes(entries):
+    """Every declared `nod` whose major is mtdblock or mtdchar."""
+    out = []
+    for e in entries:
+        if e.kind != "nod":
+            continue
+        parts = e.source.split(":")
+        if len(parts) != 3:
+            continue
+        try:
+            maj = int(parts[1])
+        except ValueError:
+            continue
+        if maj in (MTD_BLOCK_MAJOR, MTD_CHAR_MAJOR):
+            out.append(e)
+    return out
+
+
+def _applet_table(path):
+    """The applet names in `path`, or None if it has no readable table.
+
+    Reads the table with tools/appletcensus.py, which finds it by SIGNATURE --
+    the longest contiguous run of NUL-separated, strictly increasing names --
+    and REFUSES a short or unsorted run rather than returning a short list.
+    That refusal is what `None` means here, and it is why an unreadable table
+    is a refusal one level up (H4) and not a zero.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    try:
+        import appletcensus
+    except Exception as ex:
+        die("cannot import tools/appletcensus.py (%s), so no image's applet "
+            "table can be read and the H601 dumper ban cannot answer. It "
+            "refuses rather than passing" % ex)
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read()
+    except OSError as ex:
+        die("cannot read %s to look for an applet table: %s" % (path, ex))
+    try:
+        names, _off = appletcensus.find_applets(data)
+    except appletcensus.Refuse:
+        return None
+    return names
+
+
+def check_no_h601_dumper(entries, decl_path):
+    """Refuse an image that carries an mtd node AND a byte-encoding applet.
+
+    Called from the END of resolve(), the same one call site as
+    check_no_writable_flash_node and for the same reason: the control path
+    (_try) and the real path (cmd_build) both go through resolve, so a check
+    added to cmd_build alone would be exercised by nothing.
+    """
+    nodes = _mtd_nodes(entries)
+    if not nodes:
+        return
+    node = nodes[0]
+    tables = 0
+    for e in entries:
+        if e.kind != "file" or not e.resolved:
+            continue
+        names = _applet_table(e.resolved)
+        if names is None:
+            continue
+        tables += 1
+        hit = sorted(set(names) & H601_DUMPER_APPLETS)
+        if hit:
+            die("%s:%d: %s declares %s, which reaches H601 (0x006000-0x007FFF) "
+                "and the loader, and %s's applet table holds %s. That is a "
+                "one-command path from H601's bytes to a console capture and "
+                "then into this repository, which CLAUDE.md forbids outright. "
+                "Build the busybox without %s, or do not declare an mtd node in "
+                "this image"
+                % (decl_path, e.lineno, node.path, node.source, e.path,
+                   ", ".join(hit), hit[0]))
+    if tables == 0:
+        die("%s:%d: %s declares %s, an mtd node that reaches H601, and NO "
+            "`file` entry in this declaration has a readable applet table -- so "
+            "whether this image can encode H601's bytes has not been measured. "
+            "A count of zero dumpers from a parser that found no table is not a "
+            "measurement"
+            % (decl_path, node.lineno, node.path, node.source))
 
 
 def check_required(entries, decl_path):
@@ -951,6 +1105,27 @@ GOOD = (
     "file\t/init\t$REPO/init.sh\t0755\trlxfw\tmine\n"
 )
 
+
+# The controls' stand-in for a busybox.  🔴 IT CARRIES A REAL APPLET-NAME TABLE
+# and used to be eleven bytes, because until check_no_h601_dumper existed
+# nothing read the file's contents.  A stub is refused by H4 now -- correctly,
+# since a manifest with an mtd node and no readable table is a manifest nobody
+# has measured -- so A25 and A26, which declare mtd nodes and must be ACCEPTED,
+# need a table with no dumper in it.  The names are ASCII-sorted because
+# appletcensus finds the table by that signature.
+_FIXTURE_APPLETS = (
+    "ash cat cp cut date echo false grep halt head kill ln ls mkdir mount "
+    "ping ps reboot rm sed sh sleep tail true umount wc").split()
+_FIXTURE_BUSYBOX = (b"\x7fELFbusybox\x00"
+                    + b"\x00".join(n.encode() for n in _FIXTURE_APPLETS)
+                    + b"\x00")
+#: H1's planted binary: the same table with `hexdump` inserted in sort order.
+_FIXTURE_BUSYBOX_HEXDUMP = (
+    b"\x7fELFbusybox\x00"
+    + b"\x00".join(n.encode() for n in
+                   sorted(_FIXTURE_APPLETS + ["hexdump"]))
+    + b"\x00")
+
 # The controls' fixture tree has to satisfy the `unit` counterpart check now,
 # so the dirs and the symlink have to exist in it.  run_controls() builds them.
 
@@ -1056,7 +1231,7 @@ def _elf_with_section(path, secname, payload, big=True):
 _VFIX = [
     ("/bin", 0o040755, b"", 0, 0),
     ("/dev", 0o040755, b"", 0, 0),
-    ("/bin/busybox", 0o100755, b"\x7fELFbusybox", 0, 0),
+    ("/bin/busybox", 0o100755, _FIXTURE_BUSYBOX, 0, 0),
     ("/bin/sh", 0o120777, b"busybox", 0, 0),
     ("/dev/console", 0o020600, b"", 5, 1),
     ("/init", 0o100755, b"#!/bin/sh\n", 0, 0),
@@ -1198,7 +1373,7 @@ def run_controls():
         os.makedirs(os.path.join(unit, "dev"))
         os.makedirs(repo)
         with open(os.path.join(unit, "bin", "busybox"), "wb") as f:
-            f.write(b"\x7fELFbusybox")
+            f.write(_FIXTURE_BUSYBOX)
         with open(os.path.join(repo, "init.sh"), "w") as f:
             f.write("#!/bin/sh\n")
 
@@ -1309,7 +1484,9 @@ def run_controls():
         # under test, so a mutant that hashed the path instead of the contents
         # passed it.  hashlib directly, on bytes this control writes itself.
         man = emit_manifest(e, unit, repo) if e else ""
-        want = hashlib.sha256(b"\x7fELFbusybox").hexdigest()
+        # (the bytes are _FIXTURE_BUSYBOX, a literal this control owns; the
+        # digest is still computed with hashlib and never with sha256())
+        want = hashlib.sha256(_FIXTURE_BUSYBOX).hexdigest()
         c.add("A11 the manifest carries a digest of the source's BYTES",
               want in man, want[:16])
 
@@ -1499,6 +1676,40 @@ def run_controls():
               err_name is not None and err_high is None,
               "b:31:9 named /dev/harmless refused=%s; c:90:19 accepted=%s"
               % (err_name is not None, err_high is None))
+
+
+        # --- H1-H4: the H601 byte-dumper ban -------------------------------
+        # H1 -- it fires.  The declaration is the real shape PLUS the read-only
+        # mtd node this image actually carries, and the busybox is the fixture
+        # table with `hexdump` planted in it.  Both halves are needed: the node
+        # alone is A25 (accepted) and the applet alone is an image with no path
+        # to flash.
+        bbx = os.path.join(unit, "bin", "busybox")
+        mtd0ro = "nod\t/dev/mtd0ro\tc:90:1\t0400\trlxfw\tx\n"
+        open(bbx, "wb").write(_FIXTURE_BUSYBOX_HEXDUMP)
+        err_h1, _ = _try(good + mtd0ro, unit, repo)
+        # H3 -- and WITHOUT an mtd node the same binary is accepted, which is
+        # what stops H1 being passed by a ban that refuses hexdump everywhere.
+        # The ruling is conditional: an image with no path to flash may carry it.
+        err_h3, _ = _try(good, unit, repo)
+        # H4 -- an mtd node plus a file whose table cannot be read REFUSES
+        # rather than reporting zero dumpers.  Eleven bytes is what this
+        # fixture used to be, so this case is also the reason it changed.
+        open(bbx, "wb").write(b"\x7fELFbusybox")
+        err_h4, _ = _try(good + mtd0ro, unit, repo)
+        # H2 -- the positive control: the dumper-free table with the same node.
+        open(bbx, "wb").write(_FIXTURE_BUSYBOX)
+        err_h2, _ = _try(good + mtd0ro, unit, repo)
+        c.add("H1  an mtd node + a busybox whose table holds `hexdump`",
+              err_h1 is not None and "hexdump" in err_h1,
+              (err_h1 or "did not refuse")[:70])
+        c.add("H2  …and the same node with a dumper-free table is accepted",
+              err_h2 is None, err_h2 or "accepted (control on H1)")
+        c.add("H3  …and with NO mtd node, `hexdump` is accepted",
+              err_h3 is None, err_h3 or "accepted (the rule is conditional)")
+        c.add("H4  an unreadable applet table REFUSES, never reports zero",
+              err_h4 is not None and "not been measured" in err_h4,
+              (err_h4 or "did not refuse")[:70])
 
         # --- V1..V8: `cmd_verify`, which had no controls at all -------------
         # Every case drives the WHOLE subcommand over a synthesised image, so

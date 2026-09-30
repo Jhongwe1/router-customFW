@@ -1,0 +1,26 @@
+# src/fuzz/proto.dict -- tokens for fuzzing the broker request header.
+#
+# A coverage-guided fuzzer gets NO GRADIENT on this header: magic is a 32-bit
+# equality and body_len is a 32-bit compare against one constant, so every wrong
+# value lands on the same edge and havoc has nothing to climb.  量 2026-09-30:
+# three AFL++ 4.09c runs (havoc default, -D + cmplog, and a single-seed run)
+# totalling ~660,000 execs never produced body_len = 2049, although a hand-made
+# one-bit change of a seed does.  The tokens below are the fix, and they are the
+# ordinary answer for magic numbers and length fields.
+magic_rlxb="RLXB"
+magic_rlxr="RLXR"
+ver1="\x01"
+len_0="\x00\x00\x00\x00"
+len_1="\x00\x00\x00\x01"
+len_2047="\x00\x00\x07\xff"
+len_2048="\x00\x00\x08\x00"
+len_2049="\x00\x00\x08\x01"
+len_2050="\x00\x00\x08\x02"
+len_4095="\x00\x00\x0f\xff"
+len_4096="\x00\x00\x10\x00"
+len_max="\xff\xff\xff\xff"
+len_hi="\x7f\xff\xff\xff"
+op_get="\x01"
+op_set="\x02"
+op_login="\x10"
+op_pwset="\x12"

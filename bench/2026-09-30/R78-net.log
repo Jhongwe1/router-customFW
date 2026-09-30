@@ -1,0 +1,7 @@
+busybox netstat -lntup
+netstat: invalid option -- p
+BusyBox v1.13.4 (2026-09-01 00:00:00 UTC) multi-call binary
+
+Usage: netstat [-laentuwxr]
+
+# 

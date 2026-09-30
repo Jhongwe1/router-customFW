@@ -1,0 +1,4 @@
+cfgstore get admin.pwhash; cat /proc/uptime
+admin.pwhash=set
+3634.65 3621.49
+# 

@@ -1,0 +1,13 @@
+busybox kill 12 13; sleep 3; ps | busybox grep -E "brokerd|httpd"
+brokerd: stopped
+rlxfw: init: brokerd exited exit=0
+brokerd: entropy_avail=162 auth_ready=1
+brokerd: listening on /srv/www/run/broker.sock mode 0666
+rlxfw: init: brokerd started pid=81 exit=0
+rlxfw: init: httpd exited signal=15
+rlxfw: init: httpd started pid=82 signal=15
+httpd: uid=100 gid=100 root=/srv/www sock=/run/broker.sock port=80 conn=8
+   81 root       180 S    brokerd 
+   82 httpd      172 S    httpd 
+   85 root       548 S    busybox grep -E brokerd|httpd 
+# 

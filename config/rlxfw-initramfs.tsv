@@ -73,7 +73,7 @@ dir	/etc	-	0755	unit	-
 
 # --- the two files in the image that are mine.  Only the first says so on
 #     the console: the second is never executed by the boot ---
-file	/init	$REPO/config/rlxfw-init.sh	0755	rlxfw	rung 1's init: prints the discriminator, mounts /proc and /sys, brings the LAN up (switch unlock+init+start, NIC unlock+netdev on, rlx0 10.1.1.3; P2-2, PROGRESS P2 settled item 3; `init` since rtl819x-switch 1.5, R6b-8 8d), execs a shell
+file	/init	$REPO/build/rlxfw-user/init/init	0755	rlxfw	R7's COMPILED PID 1, 75,128 bytes stripped, static, no PT_INTERP. It mounts /proc /sys /var /run /tmp /srv/www/run, brings the LAN up, loads the config store, starts and respawns brokerd, httpd, dnsfwd and udhcpd, and in the bench profile starts one root shell on /dev/console.  Its first line is byte for byte the one config/rlxfw-init.sh printed (`rlxfw: init running, RLXFW-R3-RUNG1-OK`), so tools/bootbytes.py and RUNSHEET.md B5/P6 still match.  `mkinitramfs --init` CANNOT carry this: that flag checks its argument is a tracked #!/bin/sh script under config/, which an ELF is not -- so this is an ordinary `file` row, which /init always was.  The former source, $REPO/config/rlxfw-init.sh, is still tracked and still the thing --init would accept.  It replaced the four-line ash script that mounts /proc and /sys, brings the LAN up (switch unlock+init+start, NIC unlock+netdev on, rlx0 10.1.1.3; P2-2, PROGRESS P2 settled item 3; `init` since rtl819x-switch 1.5, R6b-8 8d), execs a shell
 
 # --- and the two binaries of mine, which nothing at boot runs ---
 #
@@ -101,27 +101,36 @@ file	/bin/uprobe	$REPO/build/rlxfw-user/isaprobe/uprobe	0755	rlxfw	R1c's column-
 file	/bin/ucost	$REPO/build/rlxfw-user/isaprobe/ucost	0755	rlxfw	R1-pub-4b's D-cost instrument, and the SECOND binary this project has compiled that runs as a Linux process. 16,692 bytes stripped, static, no PT_INTERP (量 2026-09-16, `make ucost-show`, sha256 76c7e2318021484967ccc0e8c5a2eadd992c5bee372a2a7bcd10d0a1ebe3c6db). 🔴 It does NOT link cells4.S and that is deliberate: cells4.S is one of the four files feeding uprobe's BUILD_ID, which seating 23's capture printed, and seating 24 re-runs a 4a row for repeatability -- worth most if that binary is byte-identical. ucost hand-writes its own probed words instead and `tools/ucostcheck.py` checks every one against tools/isa-payload.tsv in BOTH directions. Nothing execs it: /init does not, and the boot capture's predicted length is unchanged by it
 file	/bin/mfgtest	$REPO/config/mfgtest.sh	0755	rlxfw	P1-1's device-side factory checks, and the THIRD executable here that is not this unit's -- Decision B is unchanged for the same reason the two above give: NOTHING EXECS IT.  /init does not, so the boot is still the vendor's shell and the shell is still not the new thing, and the boot capture's predicted length is unchanged by it (量: adding /bin/uprobe moved it by 0).  It is a busybox ash script, so it needs no interpreter this image does not already have -- and every command it types is checked against config/image-commands.tsv by tools/mfginject.py's C2 before any card is frozen, which is the question FW-46 says nothing here could ask.  P1-3 runs it at the shell: `mfgtest auto <id>`.
 
-# --- this unit's own binaries, unmodified ---
-file	/bin/busybox	$UNIT/bin/busybox	0755	unit	273,332 bytes; NEEDED = libc.so.0, libgcc_s.so.1; interp /lib/ld-uClibc.so.0
-file	/lib/libuClibc-0.9.30.3.so	$UNIT/lib/libuClibc-0.9.30.3.so	0755	unit	the C library this busybox was linked against
-file	/lib/ld-uClibc-0.9.30.3.so	$UNIT/lib/ld-uClibc-0.9.30.3.so	0755	unit	the interpreter; without it exec fails with no message that says why
-file	/lib/libgcc_s.so.1	$UNIT/lib/libgcc_s.so.1	0755	unit	busybox's second NEEDED entry
+# --- 🔴 R7-8: the row below is rlxfw's busybox, NOT this unit's (see its note) ---
+file	/bin/busybox	$REPO/build/rlxfw-user/busybox/busybox	0755	rlxfw	R7's busybox and the SIXTH executable here that is not this unit's -- and the first one that is EXEC'D, which retires Decision B's "the shell is not the new thing": /init is rlxfw's compiled PID 1 and the shell it starts is this binary. 447,684 bytes stripped (557,462 unstripped), static, no PT_INTERP, e_flags 0x1007, 53 applets / 43 ash builtins, sha256 ef057f6ee7a4ead58d8b2028dbaaf0899b65d9c8ad41ec8e8e7c143f567fec60 (量 R7-8: built a second time straight into build/ and byte-identical to the R7 build). No od, no hexdump, no dd and no digest verb -- notes/busybox-build.md 3 and 7 own the applet decision and the reasoning; the four vendor files it replaces (busybox 273,332 + libuClibc + ld-uClibc + libgcc_s, 579,644 together) are the five rows deleted below
+# 🔴 R7-8 DELETED FIVE ROWS HERE.  Nothing in this image is dynamically linked
+# any more: every ELF below is static with no PT_INTERP, so the C library, the
+# interpreter, libgcc_s and the two loader search names had no reader left.
+# They were:  file /lib/libuClibc-0.9.30.3.so, file /lib/ld-uClibc-0.9.30.3.so,
+# file /lib/libgcc_s.so.1, slink /lib/libc.so.0, slink /lib/ld-uClibc.so.0 --
+# 579,644 bytes of vendor content with the old busybox, replaced by 447,684.
+# `dir /lib` STAYS, empty, for a reason that is not sentiment: removing it would
+# move every line number below it up by one, and four committed citations point
+# into lines 74..105 (docs/mfgtest.md, SPEC.md, LOG.md, config/image-commands.tsv).
+# An empty directory costs one cpio dir entry and zero bytes of file content.
+# The deletion is available to a commit that repairs those four citations.
 
-# --- the loader's search names, as the unit ships them ---
-slink	/lib/libc.so.0	libuClibc-0.9.30.3.so	0777	unit	the SONAME busybox records
-slink	/lib/ld-uClibc.so.0	ld-uClibc-0.9.30.3.so	0777	unit	the PT_INTERP string in busybox
+# (the loader search names were here; see the deletion note above)
 
-# --- busybox applets, as the unit ships them: 50 of these are symlinks in the
-#     dump and these are the ones the three rungs use ---
-slink	/bin/sh	busybox	0777	unit	rung 1
-slink	/bin/ash	busybox	0777	unit	-
-slink	/bin/cat	busybox	0777	unit	K5 reads /proc/cpuinfo
-slink	/bin/echo	busybox	0777	unit	-
-slink	/bin/ls	busybox	0777	unit	-
-slink	/bin/mount	busybox	0777	unit	/proc and /sys
-slink	/bin/ps	busybox	0777	unit	-
-slink	/bin/ifconfig	busybox	0777	unit	rung 2
-slink	/bin/ping	busybox	0777	unit	rung 3
+# --- busybox applets.  🔴 R7-8 retagged all eleven `unit` -> `rlxfw`: they point
+#     at rlxfw's busybox now, not the unit's.  量 R7-8 that all eleven names are
+#     among that build's 53 applets (tools/appletcensus.py extract --binary), so
+#     no symlink dangles; `sleep` and `mkdir` are ALSO ash builtins, which is why
+#     the dump had symlinks for them at all ---
+slink	/bin/sh	busybox	0777	rlxfw	rung 1
+slink	/bin/ash	busybox	0777	rlxfw	-
+slink	/bin/cat	busybox	0777	rlxfw	K5 reads /proc/cpuinfo
+slink	/bin/echo	busybox	0777	rlxfw	-
+slink	/bin/ls	busybox	0777	rlxfw	-
+slink	/bin/mount	busybox	0777	rlxfw	/proc and /sys
+slink	/bin/ps	busybox	0777	rlxfw	-
+slink	/bin/ifconfig	busybox	0777	rlxfw	rung 2
+slink	/bin/ping	busybox	0777	rlxfw	rung 3
 # THERE IS NO /bin/uname, AND ADDING ONE WOULD NOT WORK.  Recorded here because
 # a symlink for it was added for RUNSHEET K5 and then removed, and neither step
 # wrote down why -- notes/kernel-build.md sec 9 still carries the fossil, a
@@ -139,8 +148,8 @@ slink	/bin/ping	busybox	0777	unit	rung 3
 # than retagged: an entry that adds nothing and was wrong about its own
 # provenance is not worth a line. It got in because the `unit` tag was checked
 # for `file` entries only, and 15 of the 31 entries were `slink`.
-slink	/bin/mkdir	busybox	0777	unit	-
-slink	/bin/sleep	busybox	0777	unit	-
+slink	/bin/mkdir	busybox	0777	rlxfw	-
+slink	/bin/sleep	busybox	0777	rlxfw	-
 
 # --- one symlink that is MINE, and the reason it has to be ---
 # /bin/uname was here too, and the adversarial pass killed it with the same
@@ -215,11 +224,37 @@ nod	/dev/tty	c:5:0	0666	rlxfw	busybox's shell wants a controlling terminal for j
 # `if (!count) return 0;` -- a clean EOF, which is why `wc -c` terminates on a
 # character device at all.
 #
-# NOT A CONTENT CHECK, and G8b's forbidden sentence stays forbidden. 量, two
-# routes: this userspace has no dd/md5sum/od/hexdump/cmp/cksum/sum/sha1sum among
-# its fifty applets, so nothing here reads a byte of H601 and compares it to
-# anything. What these two nodes buy is size, readability, and a path over the
-# forbidden region that is provably unable to write it.
+# NOT A CONTENT CHECK, and G8b's forbidden sentence stays forbidden.
+#
+# 🔴 R7-8 REPLACED THE SENTENCE THAT WAS HERE.  It said that with no
+# dd/md5sum/od/hexdump/cmp/cksum/sum/sha1sum among its fifty applets "nothing here
+# reads a byte of H601 and compares it to anything".  量 by the busybox work, that
+# was ALREADY TOO STRONG before R7 and for a reason no applet list can fix:
+# `grep -c <byte>` is a per-byte oracle, which IS a comparison, and `cat`, `tail -c`
+# and `cut -b` put raw bytes of an arbitrary file on the console, where a capture
+# makes them reconstructable.  `cat` cannot be removed: K5 reads /proc/cpuinfo with
+# it and the capture corpus holds 412 `cat` sends.
+#
+# The claim this build DOES support is narrower, and it is the one to quote:
+#
+#     no applet can turn arbitrary bytes into a printable, lossless form, and
+#     none can digest them.
+#
+# notes/busybox-build.md 7.1 owns the evidence -- every verb measured under
+# qemu-mips-static against a 6-byte fixture with a NUL, a newline, a high byte and
+# an ESC, each reading with a positive control -- and it is not restated here.
+# tools/mkinitramfs.py `check_no_h601_dumper` is the build-time refusal that keeps
+# it true: with any mtd node declared, no `file` row may be a multi-call binary
+# whose applet table holds one of eighteen encoder or digest names, and an applet
+# table that cannot be READ is a refusal rather than a zero.
+#
+# WHAT IS STILL OWED, named rather than implied: a `tools/cardcheck.py` refusal on
+# any /dev/mtd* path as an argument to any command.  That is what would catch `cat`
+# and `grep`, it is narrower than the command table, and IT DOES NOT EXIST.  Until
+# it does, the operator not typing `cat /dev/mtd0ro` is the whole control.
+#
+# What these two nodes buy is size, readability, and a path over the forbidden
+# region that is provably unable to write it.
 nod	/dev/mtd0ro	c:90:1	0400	rlxfw	R3-9: read-only by the KERNEL (odd minor), over mtd0 = loader + H601. `wc -c` = 1245184. `echo x >` must be EACCES -- that is the control, and it writes nothing
 nod	/dev/mtd1ro	c:90:3	0400	rlxfw	R3-9: read-only by the KERNEL (odd minor), over mtd1 = the vendor rootfs. `wc -c` = 2949120, the reading the withdrawn /dev/mtdblock1 row was for, with no writable node left behind
 #
@@ -377,3 +412,52 @@ file	/bin/iperf3	$REPO/build/rlxfw-user/iperf3/iperf3	0755	rlxfw	R6-5's throughp
 # from the ELF, and does not grow a row: one there would call linkprobe an
 # applet and be deleted by the next regeneration.
 file	/bin/linkprobe	$REPO/build/rlxfw-user/linkprobe/linkprobe	0755	rlxfw	R6b-6's caller of rtl819x-nic's ethtool ops, and the FIFTH executable here that is not this unit's. ETHTOOL_GDRVINFO, GLINK and GRINGPARAM through SIOCETHTOOL and nothing else -- no ETHTOOL_S*, which tools/linkprobecheck.py refuses in the source. 16,240 bytes stripped, static, no PT_INTERP, e_flags 0x1007 (量 2026-09-26, `make show`; build_id 1bce836f2e21c43a, sha256 071c8f81a47cc8ed84ad9d6ddce8a7e5b4db45ca1ba35fd457a1d9f47bd3d723). Holds the bytes `rtl819x` zero times (gate G5), so a driver name it prints came from the kernel. Nothing execs it
+
+# --- R7-8: rlxfw's own userspace ------------------------------------------
+#
+# Six compiled programs, PID 1 among them, and the web root httpd chroots into.
+# Every one is static, big-endian MIPS-I, e_flags 0x1007, no PT_INTERP, hazlint
+# clean (0 violations each, 量 R7-8) and carries none of the six names
+# tools/uspacescan-names.tsv forbids -- proved from two independent sources, the
+# shipped bytes and the pre-link objects, which agreed on all six.
+#
+# THESE ROWS ARE AT THE END OF THE FILE ON PURPOSE.  Four committed citations
+# point into lines 74..105; new rows go where they cannot move one (FW-110).
+# gen_init_cpio reads the spec in order, so each `dir` precedes its children.
+#
+# /var, /var/lib, /run and /srv/www/run are NOT declared as directories the image
+# carries: init mkdirs and mounts them.  CONFIG_TMPFS and CONFIG_SHMEM are unset,
+# so "tmpfs" is ramfs and `size=` is SILENTLY IGNORED -- every one of those mounts
+# is unbounded against ~26 MB of DRAM.  That is an R7 residual and not a defect of
+# these rows: the writers in this image are bounded by construction (the store is
+# two 4,096-byte slots, /run holds a pid and at most three dotted quads, no daemon
+# logs to a file).  A future writer that is not bounded has no containment here.
+#
+# THE BROKER SOCKET IS 0666 AND THE MODE BITS ARE NOT THE GUARD.  brokerd binds
+# /srv/www/run/broker.sock and authorises every request from SO_PEERCRED plus a
+# per-uid op table; uid 100 (httpd) and uid 101 (dnsfwd) both have to connect, and
+# mode bits cannot express {0,100,101} without a group both are in.  Putting dnsfwd
+# in gid 100 would buy 0660 by giving the two unprivileged daemons a shared group
+# inside httpd's chroot -- a real widening for a decoration -- so the mode stays
+# 0666 and the sentence to read is this one: anything on this box can OPEN that
+# socket, and what it may DO is decided by its uid and the op table alone.
+dir	/sbin	-	0755	rlxfw	not in the unit's dump, so it cannot be tagged unit
+file	/sbin/ifupd	$REPO/build/rlxfw-user/ifupd/ifupd	0755	rlxfw	udhcpc's -s script, exec'd by busybox udhcpc with the lease in the environment. 23,164 bytes stripped. It configures an interface and a route through ioctls and netlink and EXECUTES NOTHING: its objects reference no execve, fork or vfork at all (量 R7-8, source 2)
+dir	/usr	-	0755	rlxfw	-
+dir	/usr/sbin	-	0755	rlxfw	-
+file	/usr/sbin/brokerd	$REPO/build/rlxfw-user/brokerd/brokerd	0755	rlxfw	the only process that reads or writes the config store, and the only one that holds sessions. 101,172 bytes stripped. Runs as root; every caller is identified by SO_PEERCRED. Its one exec is PING: execve(/bin/busybox, {ping,-c,N,-W,1,dotted}) with a typed four-byte target, never text that reaches an interpreter
+file	/usr/sbin/httpd	$REPO/build/rlxfw-user/httpd/httpd	0755	rlxfw	binds :80 as root, then chroot(/srv/www), setgid(100), setuid(100). 83,820 bytes stripped. It never opens the config store: cfg_load and cfg_store are not on its link line, which is the guard, and every read or write of configuration is a typed op to brokerd
+file	/usr/sbin/dnsfwd	$REPO/build/rlxfw-user/dnsfwd/dnsfwd	0755	rlxfw	binds :53 as root, then setgid(101), setuid(101). 73,908 bytes stripped. Forwards to dns.upstream, which it asks brokerd for; the Kaminsky question check has a mutation control that goes red when it is removed
+file	/usr/sbin/cfgstore	$REPO/build/rlxfw-user/cfgstore/cfgstore	0755	rlxfw	the console CLI over the store: get, set, unset, dump --hex, init --force, passwd. 86,320 bytes stripped. `passwd` is the ONLY way this image can get an admin.pwhash at all -- the key has no default, and httpd's /api/password needs a session, which needs a password. It refuses, loudly, while entropy_avail is under 128
+dir	/srv	-	0755	rlxfw	-
+dir	/srv/www	-	0755	rlxfw	httpd's chroot. `make -C src/httpd chrootcheck ROOT=srv/www` refuses an ELF, a symlink out, a setuid bit or a device node under it, and was shown refusing a planted /srv/www/bin/sh (量 R7-8)
+file	/srv/www/index.html	$REPO/srv/www/index.html	0644	rlxfw	the one page; 0644 and not executable, which is what send_file() requires
+dir	/srv/www/static	-	0755	rlxfw	-
+file	/srv/www/static/style.css	$REPO/srv/www/static/style.css	0644	rlxfw	-
+file	/srv/www/static/app.js	$REPO/srv/www/static/app.js	0644	rlxfw	-
+dir	/run	-	0755	rlxfw	the mountpoint init puts a ramfs on; /run/dnsfwd.pid and /run/wan.dns live there
+file	/etc/passwd	$REPO/config/rlxfw-passwd	0644	rlxfw	root, httpd (100) and dnsfwd (101). Every shell field is /bin/false: setuid(100) needs the uid to exist, not to be usable
+file	/etc/group	$REPO/config/rlxfw-group	0644	rlxfw	root, httpd (100), dnsfwd (101), each with no supplementary members. dnsfwd is deliberately NOT in gid 100; see the socket paragraph above
+nod	/dev/ttyS0	c:4:64	0600	rlxfw	the console UART as a tty device rather than as /dev/console, so a program can open it by name. Major 4 minor 64 讀 Documentation/devices.txt
+nod	/dev/urandom	c:1:9	0666	rlxfw	where pwhash_salt() draws its 16 salt bytes. It REFUSES below entropy_avail 128, and 量 2026-09-30 on the previous image entropy_avail was 0 at 768 s uptime -- R7-7's driver is what feeds the pool, and whether it does is a boot question
+nod	/dev/random	c:1:8	0666	rlxfw	declared for completeness; nothing in this image opens it, which is deliberate -- a blocking read on this pool would hang a daemon

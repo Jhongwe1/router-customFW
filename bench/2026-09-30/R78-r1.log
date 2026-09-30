@@ -1,0 +1,4 @@
+ps | busybox grep -E "brokerd|httpd"
+   12 root       180 S    brokerd 
+   13 httpd      172 S    httpd 
+# 

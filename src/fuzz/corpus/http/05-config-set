@@ -1,0 +1,8 @@
+ POST /api/config HTTP/1.1
+Host: x
+Cookie: rlxs=0123456789abcdef0123456789abcdef; rlxc=fedcba9876543210fedcba9876543210
+X-RLX-CSRF: fedcba9876543210fedcba9876543210
+Content-Type: application/json
+Content-Length: 27
+
+{"sys.hostname":"router-1"}

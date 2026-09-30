@@ -1,0 +1,37 @@
+# host-side readings, image r78a (recipe bf182de2), taken 2026-09-30T05:29:21Z
+# board 10.1.1.1, host 10.1.1.2.  The httpd chain is host -> httpd(uid 100, chroot)
+# -> unix socket -> brokerd(root) -> typed op.
+
+## GET /
+HTTP 200  3850 bytes
+
+## GET /api/status, with headers
+HTTP/1.1 200 OK
+X-Frame-Options: DENY
+Content-Security-Policy: default-src 'self'
+X-Content-Type-Options: nosniff
+Connection: close
+Content-Type: application/json
+Content-Length: 73
+Cache-Control: no-store
+
+{"ok":true,"uptime_s":3496,"version":"rlxfw-brokerd-1","auth_ready":true}
+## POST /api/login with the correct password -- 429 here is the srv_loop grant-leak
+## defect (a child that exited holding the KDF grant left the marker set for ever)
+HTTP/1.1 401 Unauthorized
+X-Frame-Options: DENY
+Content-Security-Policy: default-src 'self'
+X-Content-Type-Options: nosniff
+Connection: close
+Content-Type: application/json
+Content-Length: 27
+Cache-Control: no-store
+
+{"ok":false,"error":"auth"}
+-> HTTP 401 in 0.014356s
+
+## a DNS query through dnsfwd
+query id 0x1234 (hex), qname example.com A
+reply 29 bytes from 10.1.1.1, id 0x1234, rcode 2
+rcode 2 is SERVFAIL.  WHY it is SERVFAIL is 推: the configured upstream is 10.1.1.2,
+this host, and nothing was listening on udp/53 here -- not verified from the board's side.

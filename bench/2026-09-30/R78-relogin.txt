@@ -1,0 +1,4 @@
+# taken 2026-09-30T05:31:19Z after killing brokerd and httpd
+password benchpw1             {"ok":true,"csrf":"7ab06c8e1735cab54576e12288ad856b","ttl_s":900}HTTP 200 in 0.902410s 
+password definitely-not-it    {"ok":false,"error":"auth"}HTTP 401 in 0.901743s 
+password benchpw1             {"ok":true,"csrf":"0e687474b925c939d120f7fb68885261","ttl_s":900}HTTP 200 in 0.902122s 

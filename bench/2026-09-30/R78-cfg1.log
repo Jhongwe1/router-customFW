@@ -1,0 +1,22 @@
+cfgstore show
+store  /var/lib/cfg.bin  bytes 0  source default  seq 0
+slot0  too few bytes for the record (seq 0)   slot1  too few bytes for the record (seq 0)
+
+NAME           VALUE              SOURCE   SEQ
+sys.hostname   rlxfw              default  0
+lan.ipaddr     10.1.1.1           default  0
+lan.netmask    255.255.255.0      default  0
+dhcpd.enable   1                  default  0
+dhcpd.start    10.1.1.100         default  0
+dhcpd.end      10.1.1.199         default  0
+dhcpd.lease    86400              default  0
+dns.upstream   10.1.1.2           default  0
+wan.mode       0                  default  0
+wan.ipaddr     0.0.0.0            default  0
+wan.netmask    0.0.0.0            default  0
+wan.gateway    0.0.0.0            default  0
+fw.nat         0                  default  0
+fw.lan_icmp    1                  default  0
+http.port      80                 default  0
+admin.pwhash   <unset>            default  0
+# 

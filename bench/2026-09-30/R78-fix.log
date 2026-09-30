@@ -1,0 +1,8 @@
+ip=10.1.1.1 subnet=255.255.255.0 interface=rlx0 /sbin/ifupd bound; ifconfig rlx0 | busybox head -2
+ifupd: bound ok reason=ok if=rlx0 ip=10.1.1.1/24 dns=0 no-router-no-default-route
+head: invalid option -- 2
+BusyBox v1.13.4 (2026-09-01 00:00:00 UTC) multi-call binary
+
+Usage: head [OPTION]... [FILE]...
+
+# 

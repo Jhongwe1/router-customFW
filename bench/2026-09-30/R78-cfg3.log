@@ -1,0 +1,4 @@
+cfgstore get sys.hostname; ls -l /var/lib/cfg.bin
+sys.hostname=rlxfw-bench
+-rw-------    1 root     root         8192 Jan  1 00:02 /var/lib/cfg.bin
+# 

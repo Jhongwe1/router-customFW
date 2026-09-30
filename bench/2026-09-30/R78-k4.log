@@ -1,0 +1,24 @@
+cat /proc/rlxfw-entropy
+rlxfw-entropy 1.0
+alive 1 probe_reads 24 tc0data 00007D00 cdbr 03E80000 tccnr F0000000
+per_bit 16 hz 100
+ev_nic 9258
+qualifying 9188
+repeat 67
+acc 11 nseen 3
+bits 407
+clamped 2665
+early 0 badsrc 0
+dist  0 67
+dist  1 121
+dist  2 227
+dist  3 372
+dist  4 1145
+dist  5 5487
+dist  6 757
+dist  7 504
+dist  8 11
+dist  9 118
+dist 10 66
+dist 11 380
+# 

@@ -1,0 +1,4 @@
+cat /proc/sys/kernel/random/entropy_avail; cat /proc/sys/kernel/random/entropy_avail
+150
+150
+# 

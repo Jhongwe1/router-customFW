@@ -1,0 +1,15 @@
+# taken 2026-09-30T05:38:29Z, image with the srv_loop grant-leak fix
+attempt  1: {"ok":true,"csrf":"f505720ac0b710986b338b52720c6a97","ttl_s":900}HTTP 200 in 0.912105s 
+attempt  2: {"ok":true,"csrf":"5cc60e6ced5f338e586115cd0694b756","ttl_s":900}HTTP 200 in 0.909493s 
+attempt  3: {"ok":true,"csrf":"353ac5beb67d87b7acc83401ae657a84","ttl_s":900}HTTP 200 in 0.911077s 
+attempt  4: {"ok":false,"error":"ratelimit","retry_s":9}HTTP 429 in 0.015425s 
+attempt  5: {"ok":false,"error":"ratelimit","retry_s":9}HTTP 429 in 0.012773s 
+attempt  6: {"ok":false,"error":"ratelimit","retry_s":9}HTTP 429 in 0.011723s 
+attempt  7: {"ok":false,"error":"ratelimit","retry_s":9}HTTP 429 in 0.009711s 
+attempt  8: {"ok":false,"error":"ratelimit","retry_s":9}HTTP 429 in 0.013374s 
+attempt  9: {"ok":false,"error":"ratelimit","retry_s":9}HTTP 429 in 0.013332s 
+attempt 10: {"ok":false,"error":"ratelimit","retry_s":9}HTTP 429 in 0.007839s 
+attempt 11: {"ok":false,"error":"ratelimit","retry_s":9}HTTP 429 in 0.009009s 
+attempt 12: {"ok":false,"error":"ratelimit","retry_s":9}HTTP 429 in 0.013594s 
+# and after 15 s of quiet:
+{"ok":true,"csrf":"4a7989f64c76d166bdd30afbdc2062cc","ttl_s":900}HTTP 200 in 0.908966s

@@ -1,0 +1,9 @@
+# The HTTP corpus is HTTP: every request line and header ends CRLF, and the
+# repository .gitattributes says `text=auto eol=lf`, which would rewrite those
+# CRLFs to LF on commit and leave the seeds no longer valid requests.  `-text`
+# turns every conversion off for the corpus, in both directions.
+#
+# 量 2026-09-30: without this line `git ls-files --eol` reports `i/none w/crlf`
+# for nine of the fourteen HTTP seeds, which is git saying it intends to convert
+# them.  With it they read `i/-text w/-text`.
+corpus/** -text

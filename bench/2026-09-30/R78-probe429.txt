@@ -1,0 +1,19 @@
+# probe taken 2026-09-30T05:30:08Z, image r78a, pre-fix
+
+## Q1: eight logins back to back, correct password each time
+attempt 1: {"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.008882s 
+attempt 2: {"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.010099s 
+attempt 3: {"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.013194s 
+attempt 4: {"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.013371s 
+attempt 5: {"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.013263s 
+attempt 6: {"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.006921s 
+attempt 7: {"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.008232s 
+attempt 8: {"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.011064s 
+
+## Q1: and after 15 s of quiet, one more
+{"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.013445s
+
+## Q2: a deliberately WRONG password, for comparison
+{"ok":false,"error":"ratelimit","retry_s":2}HTTP 429 in 0.012994s
+
+## a correct password costs ~0.92 s of scrypt if it reaches the KDF; a 14 ms reply did not.

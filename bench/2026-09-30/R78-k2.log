@@ -1,0 +1,6 @@
+cat /proc/uptime; printf "benchpw1\nbenchpw1\n" | cfgstore passwd; cat /proc/uptime
+643.62 634.42
+written: slot 1, seq 2
+admin.pwhash set: scrypt log2N=12 r=7 p=1, entropy_avail was 150
+644.54 634.42
+# 

@@ -142,6 +142,14 @@ MUT = [
      "for e in entries if False]"),
     # check_required() has its own `if init is not None:`, so the anchor
     # carries the call it guards (A0 found the first spelling ambiguous).
+    # M26/M27 -- the H601 byte-dumper ban.  M26 is the ban itself; M27 is the
+    # "a parser that found no table has not measured anything" leg, which is the
+    # one most likely to rot into a silent zero.
+    ("M26 the dumper refusal never fires                    (kills H1)",
+     "        hit = sorted(set(names) & H601_DUMPER_APPLETS)\n        if hit:",
+     "        hit = sorted(set(names) & H601_DUMPER_APPLETS)\n        if False:"),
+    ("M27 an unreadable applet table reports zero dumpers   (kills H4)",
+     "    if tables == 0:", "    if False:"),
     ("M25 the pipeline never calls override_init            (kills I1)",
      "    if init is not None:\n        override_init(",
      "    if False:\n        override_init("),
@@ -150,10 +158,21 @@ MUT = [
 
 def make_tree(d):
     """A tree the controls can run in.  They build every fixture in a temp
-    directory of their own, so the tool alone is enough -- but `ROOT` is
-    computed from the file's path, so it has to sit under a `tools/`."""
+    directory of their own -- but `ROOT` is computed from the file's path, so it
+    has to sit under a `tools/`, and it needs one COMPANION.
+
+    🔴 The docstring said "the tool alone is enough" and that stopped being true
+    on 2026-09-30, when check_no_h601_dumper started reading an image's applet
+    table with tools/appletcensus.py.  The table has one parser on purpose (a
+    second copy here would be a second owner of the signature it finds tables
+    by), so the module has to be beside the subject.  量: without it B0 goes red
+    with five controls failing -- H1, H2, H4, and A25/A26 through the mtd nodes
+    they declare -- which is B0 doing its job rather than a defect in the tool.
+    """
     work = os.path.join(d, "router-rebuild")
     os.makedirs(os.path.join(work, "tools"))
+    shutil.copy(os.path.join(os.path.dirname(SRC), "appletcensus.py"),
+                os.path.join(work, "tools", "appletcensus.py"))
     return work
 
 
@@ -208,13 +227,17 @@ def main():
             open(tgt, "w", encoding="utf-8").write(src.replace(old, new, 1))
             r, out = run(tgt, work)
             killed = r != 0
-            want = re.search(r"\(kills ([VI][0-9]+)\)", name)
+            # [VIH]: H<n> arrived with the H601 dumper ban on 2026-09-30.
+            # W0 matches the case label in the tool's own output, so a family
+            # letter missing here reads as NO-CASE and the row is refused --
+            # which is what happened to M26/M27 on their first run.
+            want = re.search(r"\(kills ([VIH][0-9]+)\)", name)
             wrong = ""
             if not want:
                 # W0 needs a named case; a row without one would be judged by
                 # its exit code alone, which is what W0 exists to refuse.
                 killed = False
-                wrong = "  NO-CASE: the row names no (kills V<n>|I<n>)"
+                wrong = "  NO-CASE: the row names no (kills V<n>|I<n>|H<n>)"
             if killed and want:
                 tag = want.group(1)
                 if not re.search(r"^  FAIL  +" + tag + r"\b", out, re.M):

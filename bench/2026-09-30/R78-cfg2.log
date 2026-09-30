@@ -1,0 +1,3 @@
+cfgstore set sys.hostname=rlxfw-bench
+written: slot 0, seq 1
+# 

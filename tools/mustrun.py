@@ -134,10 +134,23 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CI_REL = os.path.join(".github", "workflows", "ci.yml")
 
-# How far the step -> tool -> tool indirection is followed.  FOUR is a
-# measurement and not a taste (THREE until 2026-09-24); `derive` carries it
-# and `C13` is the control, which is what turned red when it moved.
-DEFAULT_DEPTH = 4
+# How far the step -> tool -> tool indirection is followed.  SIX is a
+# measurement and not a taste (THREE until 2026-09-24, FOUR until 2026-09-30);
+# `derive` carries it and `C13` is the control, which is what turned red when
+# it moved.  量 2026-09-30 (`R7-8`), 121 `run:` steps, this tree:
+#
+#     depth 4  1,916 code pair(s)
+#     depth 5  2,010
+#     depth 6  2,013
+#     depth 7  2,013   <- the fixed point
+#
+# The two hops that appeared: `mkinitramfs.py` now imports `appletcensus.py`
+# (the H601-dumper ban reads the applet table out of the built ELF) and
+# `appletcensus` reaches `cardcheck`.  Raising the default is the traversal
+# being made to REACH further, not a tolerance being widened: a deeper
+# traversal finds strictly more pairs and therefore selects strictly more
+# suites, and the evidence it is far enough is that depth 7 adds none.
+DEFAULT_DEPTH = 6
 
 
 class Refuse(Exception):

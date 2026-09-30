@@ -1,0 +1,3 @@
+cat /dev/urandom > /dev/null & sleep 1; kill %1; cat /proc/sys/kernel/random/entropy_avail
+150
+# 

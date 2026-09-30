@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rlxfw</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<!-- No framework, no CDN, no inline script.  The Content-Security-Policy this
+     server sends on every response is `default-src 'self'`, which forbids an
+     inline <script> as well as an external one, so the page's own code lives in
+     /static/app.js.  That is why there are three files here and not two. -->
+<header>
+  <h1>rlxfw</h1>
+  <p id="ver">&mdash;</p>
+</header>
+
+<main>
+
+<section id="login-card">
+  <h2>Sign in</h2>
+  <p id="login-note" class="note"></p>
+  <form id="login-form" autocomplete="off">
+    <label for="pw">Administrator password</label>
+    <input id="pw" name="pw" type="password" maxlength="64" required>
+    <button type="submit" id="login-btn">Sign in</button>
+  </form>
+</section>
+
+<section id="app" hidden>
+
+  <nav>
+    <button type="button" data-tab="status" class="tab on">Status</button>
+    <button type="button" data-tab="config" class="tab">Configuration</button>
+    <button type="button" data-tab="tools" class="tab">Tools</button>
+    <button type="button" id="logout">Sign out</button>
+  </nav>
+
+  <div id="tab-status" class="panel">
+    <h2>Status</h2>
+    <table id="status-table"><tbody></tbody></table>
+    <p class="note">Refreshed every 10 s. <code>cfg_source</code> 0 means the
+    store held no valid record and the defaults are in use.</p>
+  </div>
+
+  <div id="tab-config" class="panel" hidden>
+    <h2>Configuration</h2>
+    <form id="config-form">
+      <div id="config-fields"></div>
+      <button type="submit">Save</button>
+    </form>
+    <p class="note">Every field is checked again by <code>brokerd</code>; this
+    page's checks only save a round trip.</p>
+  </div>
+
+  <div id="tab-tools" class="panel" hidden>
+    <h2>Tools</h2>
+
+    <fieldset>
+      <legend>Change the administrator password</legend>
+      <form id="pw-form" autocomplete="off">
+        <label for="pw-old">Current password</label>
+        <input id="pw-old" type="password" maxlength="64" required>
+        <label for="pw-new">New password (8 to 64 characters)</label>
+        <input id="pw-new" type="password" maxlength="64" minlength="8" required>
+        <button type="submit">Change</button>
+      </form>
+      <p class="note" id="entropy-note"></p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Ping</legend>
+      <form id="ping-form">
+        <label for="ping-target">Address</label>
+        <input id="ping-target" type="text" value="10.1.1.2" maxlength="15"
+               pattern="[0-9.]+" required>
+        <label for="ping-count">Count (1&ndash;5)</label>
+        <input id="ping-count" type="number" value="2" min="1" max="5" required>
+        <button type="submit">Send</button>
+      </form>
+      <pre id="ping-out"></pre>
+    </fieldset>
+
+    <fieldset>
+      <legend>Reboot</legend>
+      <p class="note">The connection drops; the unit is back in about 30 s.</p>
+      <button type="button" id="reboot">Reboot now</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Firmware</legend>
+      <p class="note">Not implemented in this release: the update chain with its
+      signature check and anti-rollback counter is the next gate, and a firmware
+      upload without them would be the vulnerability it is meant to close. This
+      button exists so the answer is visible rather than absent.</p>
+      <button type="button" id="fw">Try an upload</button>
+    </fieldset>
+  </div>
+
+</section>
+
+</main>
+
+<p id="msg" role="status"></p>
+
+<footer>
+  <p>rlxfw &mdash; independent firmware. HTTP only: there is no TLS in this
+  release, so this password crosses the LAN in clear. Use it on a network you
+  control.</p>
+</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

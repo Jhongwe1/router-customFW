@@ -1,0 +1,122 @@
+/* srv/www/static/style.css -- one stylesheet, no imports, no web fonts.
+ *
+ * The Content-Security-Policy this server sends is `default-src 'self'`, so a
+ * @import or a font URL would be blocked rather than slow.  Everything here is a
+ * system font and a colour. */
+
+:root {
+	--fg: #17191c;
+	--bg: #f6f7f8;
+	--card: #ffffff;
+	--line: #d6dade;
+	--accent: #1b5e8f;
+	--warn: #8a3b12;
+	--ok: #1c6b3a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+	margin: 0;
+	padding: 1rem;
+	font: 15px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+	color: var(--fg);
+	background: var(--bg);
+	max-width: 46rem;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+header { border-bottom: 2px solid var(--accent); margin-bottom: 1rem; }
+h1 { font-size: 1.4rem; margin: 0 0 .1rem; letter-spacing: .02em; }
+h2 { font-size: 1.05rem; margin: 0 0 .6rem; }
+#ver { margin: 0 0 .6rem; color: #5a6470; font-size: .85rem; }
+
+section, fieldset {
+	background: var(--card);
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	padding: .9rem 1rem;
+	margin: 0 0 1rem;
+}
+fieldset { margin-bottom: .9rem; }
+legend { font-weight: 600; padding: 0 .3rem; }
+
+nav { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: .9rem; }
+
+label { display: block; margin: .6rem 0 .2rem; font-size: .85rem; color: #46505c; }
+
+input {
+	width: 100%;
+	max-width: 22rem;
+	padding: .4rem .5rem;
+	border: 1px solid var(--line);
+	border-radius: 3px;
+	font: inherit;
+	background: #fff;
+	color: var(--fg);
+}
+input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+button {
+	margin-top: .7rem;
+	padding: .4rem .9rem;
+	border: 1px solid var(--accent);
+	border-radius: 3px;
+	background: var(--accent);
+	color: #fff;
+	font: inherit;
+	cursor: pointer;
+}
+button.tab { background: #fff; color: var(--accent); margin-top: 0; }
+button.tab.on { background: var(--accent); color: #fff; }
+button#logout { margin-left: auto; margin-top: 0; background: #fff;
+		color: var(--warn); border-color: var(--warn); }
+button#reboot, button#fw { background: #fff; color: var(--warn);
+			   border-color: var(--warn); }
+
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: .28rem .5rem; border-bottom: 1px solid var(--line); }
+th { width: 12rem; font-weight: 600; color: #46505c; font-size: .85rem; }
+td { font-variant-numeric: tabular-nums; }
+
+pre {
+	background: #11161b;
+	color: #dde5ec;
+	padding: .6rem .7rem;
+	border-radius: 3px;
+	overflow-x: auto;
+	font-size: .82rem;
+	min-height: 1.2rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.note { color: #5a6470; font-size: .82rem; margin: .5rem 0 0; }
+.bad { color: var(--warn); font-weight: 600; }
+.good { color: var(--ok); font-weight: 600; }
+
+#msg { min-height: 1.4rem; margin: .4rem 0; font-size: .9rem; }
+
+footer { border-top: 1px solid var(--line); margin-top: 1.2rem; padding-top: .6rem; }
+footer p { color: #5a6470; font-size: .8rem; margin: 0; }
+
+code { background: #eceff1; padding: 0 .2rem; border-radius: 2px; font-size: .85em; }
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--fg: #e6eaee;
+		--bg: #14181c;
+		--card: #1b2026;
+		--line: #2d353d;
+		--accent: #5aa9d6;
+		--warn: #e2a06a;
+		--ok: #7cc79b;
+	}
+	input { background: #11161b; color: var(--fg); }
+	button { color: #0e1317; }
+	button.tab { background: #1b2026; color: var(--accent); }
+	button#logout, button#reboot, button#fw { background: #1b2026; }
+	th, .note, #ver, footer p { color: #96a3af; }
+	code { background: #232a31; }
+}

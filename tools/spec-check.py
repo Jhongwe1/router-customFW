@@ -267,6 +267,17 @@ REDACTION_ALLOWLIST = {
         "makes that acceptable is that the instrument protecting the CONTENT "
         "is flashwin scan, which reads bytes and not shapes, and which is run "
         "over the committed tree as this entry's control.",
+    ('SSID / passphrase', 'password'):
+        "the word in a ROUTE NAME: FW-178's `/api/password` (notes/httpd.md section 2), a statement about "
+        "the MODEL and this file's only hit. SCOPE: keyed on the matched WORD, so any lower-case "
+        "`password` in SPEC.md passes, a later row with a credential beside it included. NOT MIRRORED in "
+        "audit-bench-log.py: its control A2 refuses a match entry (量 2026-09-30, scratch copy exits 2)",
+    ('private IPv4', '10.9.9'):
+        "a SYNTHETIC lease this desk typed into ifupd for one seating (FW-181, R78-iu1): no DHCP "
+        "server issued it and it is not an address this unit is configured with, the 10.1.1 entry's "
+        "distinction. SCOPE: any 10.9.9.x in SPEC.md. NOT MIRRORED in audit-bench-log.py: its "
+        "control A2 probes with 10.9.9.9 and refuses a match entry, as does leakscan.py's L3, yet "
+        "five R78-iu files give audit-bench-log.py 13 hits once committed (量 2026-09-30; scratch copies)",
 }
 
 
@@ -284,17 +295,15 @@ def clean_header(cell):
     return cell.replace('*', '').replace('`', '').strip()
 
 
-# A fenced code block is not markdown.  This matters the moment C8 stops being
-# about SPEC.md: `docs/`, `notes/` and this repository's READMEs all print
-# example tables inside fences, and counting their rows would make the check
-# fire on text that never renders as a table.
+# A fenced code block is not markdown.  This matters the moment C8 stops being about SPEC.md: `docs/`,
+# `notes/` and this repository's READMEs all print example tables inside fences, and counting their rows
+# would make the check fire on text that never renders as a table.
 #
-# 🔴 The obvious implementation has a false positive, and it was measured before
-# this was written: a throwaway checker used on 2026-08-30 read an INLINE
-# triple-backtick span at the start of an indented line as an unclosed fence and
-# swallowed the rest of a file.  A fence opener's info string may not itself
-# contain a backtick (CommonMark 4.5), and requiring that is what separates the
-# two.  `T6` is the case.
+# 🔴 The obvious implementation has a false positive, and it was measured before this was written: a
+# throwaway checker used on 2026-08-30 read an INLINE triple-backtick span at the start of an indented
+# line as an unclosed fence and swallowed the rest of a file.  A fence opener's info string may not
+# itself contain a backtick (CommonMark 4.5), and requiring that is what separates the two.  `T6` is the
+# case.
 FENCE_RX = re.compile(r'^(\s{0,3})(`{3,}|~{3,})(.*)$')
 
 
@@ -462,24 +471,19 @@ def table_findings(path, tables, lines=None, mask=None):
 
 # C9.  A code span whose content is only whitespace.
 #
-# This is the SAME defect as C8b seen one level down, and it is the one C8b
-# cannot reach: `\r` and `\n` typed as real characters become a span holding a
-# line break, and outside a table nothing renders differently enough to notice.
-# 量 2026-08-30, before this existed: FOUR instances in the repository (the
-# count read three until the finished checker was run over the tree at HEAD),
-# and one
-# of them --  docs/loader-command-semantics.md's readline listing -- annotated
-# BOTH exits of a three-way branch with the same empty character, so the
-# sentence "only one writes a terminator" named neither.  It was settled by
-# disassembling $FWRE_WORK/stage2.bin at 0x804070e4: `li v0,10` / `beq` is the
-# LF exit and returns with no NUL, `li v0,13` / `bne` / `j` puts `sb zero,0(s0)`
-# in the jump's delay slot, so CR is the one that writes it.  SPEC.md LDR-06d
-# already said so; this file's own listing did not.
+# This is the SAME defect as C8b seen one level down, and it is the one C8b cannot reach: `\r` and `\n`
+# typed as real characters become a span holding a line break, and outside a table nothing renders
+# differently enough to notice. 量 2026-08-30, before this existed: FOUR instances in the repository (the
+# count read three until the finished checker was run over the tree at HEAD), and one of them --
+# docs/loader-command-semantics.md's readline listing -- annotated BOTH exits of a three-way branch with
+# the same empty character, so the sentence "only one writes a terminator" named neither.  It was
+# settled by disassembling $FWRE_WORK/stage2.bin at 0x804070e4: `li v0,10` / `beq` is the LF exit and
+# returns with no NUL, `li v0,13` / `bne` / `j` puts `sb zero,0(s0)` in the jump's delay slot, so CR is
+# the one that writes it.  SPEC.md LDR-06d already said so; this file's own listing did not.
 #
-# CommonMark 6.1: a backtick run of length N opens a span closed by the next run
-# of EXACTLY length N, and an unmatched run is literal text.  Pairing that way
-# rather than counting backticks per line is what separates this from two
-# ADJACENT spans across a line break (`SPEC.md` then `CPU-19`), which is
+# CommonMark 6.1: a backtick run of length N opens a span closed by the next run of EXACTLY length N,
+# and an unmatched run is literal text.  Pairing that way rather than counting backticks per line is
+# what separates this from two ADJACENT spans across a line break (`SPEC.md` then `CPU-19`), which is
 # ordinary and which a per-line parity test reports thirteen times.
 TICKS_RX = re.compile(r'`+')
 
@@ -539,25 +543,21 @@ def span_findings(path, lines, mask):
 #   * It says nothing about whether the SENTENCE is still true.  It says the
 #     citation still points at the construct it named.
 #
-# The population is `tools/rlxprobe/` -- the payload sources, which this
-# repository edits.  References into `src-vendor/` and `upstream/` are pinned
-# at a sha and do not rot; that is why they are not here, and T21 asserts the
-# population this DOES cover is not empty.
+# The population is `tools/rlxprobe/` -- the payload sources, which this repository edits.  References
+# into `src-vendor/` and `upstream/` are pinned at a sha and do not rot; that is why they are not here,
+# and T21 asserts the population this DOES cover is not empty.
 SRCREF_DIR = os.path.join('tools', 'rlxprobe')
 SRCREF_TOL = 3
 SRCREF_RX = re.compile(r'^(?:tools/rlxprobe/)?([A-Za-z0-9_][A-Za-z0-9_.\-]*'
                        r'\.(?:c|h|S|lds)):(\d+)(?:-(\d+))?(.*)$', re.S)
 
-# Exempt, each with a reason, and T22 asserts the exemption is LOAD-BEARING --
-# if these files ever stop holding a reference, the entry has to come out
-# rather than sit here forever unread.
+# Exempt, each with a reason, and T22 asserts the exemption is LOAD-BEARING -- if these files ever stop
+# holding a reference, the entry has to come out rather than sit here forever unread.
 #
-# 🔴 `study/` IS NOT ON THIS LIST AND THAT IS NOT AN OVERSIGHT.  It is
-# gitignored (`.gitignore:17`), so `table_scope()` -- which is `git ls-files`
-# -- never yields it and the sweep cannot reach it in the first place.  An
-# entry for it would be a row that can never fire, which is the shape T22
-# exists to keep out of this dict; 量 2026-08-31, the first version of this
-# dict had one.
+# 🔴 `study/` IS NOT ON THIS LIST AND THAT IS NOT AN OVERSIGHT.  It is gitignored (`.gitignore:17`), so
+# `table_scope()` -- which is `git ls-files` -- never yields it and the sweep cannot reach it in the
+# first place.  An entry for it would be a row that can never fire, which is the shape T22 exists to
+# keep out of this dict; 量 2026-08-31, the first version of this dict had one.
 SRCREF_EXEMPT = {
     'bench/': 'frozen prediction blocks and their corrections: captures have '
               'landed against these numbers, and a record silently updated to '

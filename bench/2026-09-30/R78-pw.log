@@ -1,0 +1,8 @@
+cat /etc/passwd /etc/group
+root:x:0:0:root:/:/bin/false
+httpd:x:100:100:httpd:/:/bin/false
+dnsfwd:x:101:101:dnsfwd:/:/bin/false
+root:x:0:
+httpd:x:100:
+dnsfwd:x:101:
+# 

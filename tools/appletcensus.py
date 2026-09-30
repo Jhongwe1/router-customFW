@@ -136,11 +136,33 @@ SILICON_ABSENT = {
                 "(registered after extraction: an out-of-sample prediction)",
 }
 
-# 🟢 The strongest single control is a COUNT from a different method.
-# FW-25 counted the applet table by RUNNING the binary under qemu-mips-static
-# on 2026-08-29 and reports 50.  This tool counts it by parsing bytes and never
-# executes anything.  Two methods, no shared code, one number.
-FW25_APPLET_COUNT = 50
+# 🟢 The strongest single control is a COUNT from a different method: each row
+# below was taken by RUNNING the binary under qemu-mips-static, and this tool
+# counts by parsing bytes and never executes anything.  Two methods, no shared
+# code, one number per artefact.
+#
+# 🔴 ONE CONSTANT PER ARTEFACT, KEYED ON THE BYTE SIZE THE TSV'S OWN HEADER
+# RECORDS.  This was `FW25_APPLET_COUNT = 50` until 2026-09-30 -- one number,
+# measured on THIS UNIT'S vendor binary, compared against whatever
+# `config/image-commands.tsv` happened to describe.  From R7 there are two
+# busyboxes in this project with two different applet sets, and a single
+# constant would let a count taken on one certify the other: regenerate the TSV
+# from rlxfw's build and T8 would have reported 53 against 50 as a FAILURE of
+# the tool, or (worse, with the wrong constant) 50 against 50 on a file that
+# describes neither.  The size is the only field in the TSV that says which
+# binary it came from, so it is the key.
+#
+# A size with no row here is a REFUSAL, not a skipped case: an unregistered
+# artefact is exactly the state this split exists to stop.
+#: {bytes: (what it is, applet count, how the count was taken)}
+APPLET_COUNT_BY_ARTEFACT = {
+    273332: ("this unit's own vendor binary", 50,
+             "FW-25, qemu-mips-static 2026-08-29"),
+    447684: ("rlxfw's own build (R7, tools/mkbusybox.sh)", 53,
+             "量 2026-09-30, qemu-mips-static AND this tool, agreeing"),
+}
+#: kept as a name because SPEC.md FW-25 is cited by it; it is the vendor row's.
+FW25_APPLET_COUNT = APPLET_COUNT_BY_ARTEFACT[273332][1]
 
 # cardcheck.py's 推 list, copied here so the two can be compared by program.
 # 🔴 This copy is a SECOND owner of that set and it is deliberate and bounded:
@@ -307,7 +329,7 @@ def write_tsv(info, out=TSV):
     lines = [
         "# config/image-commands.tsv -- what the first-boot image can INVOKE.",
         "# Derived by tools/appletcensus.py from the busybox declared at",
-        "# config/rlxfw-initramfs.tsv:104.  Regenerate with `appletcensus.py",
+        "# config/rlxfw-initramfs.tsv:105.  Regenerate with `appletcensus.py",
         "# extract --write`; that half is BENCH-ONLY because it reads $FWRE_WORK.",
         "#",
         "# 🔴 kind=applet means `busybox <name>` resolves.  It does NOT mean the",
@@ -350,6 +372,11 @@ def read_tsv(path=TSV):
             parts = line.split("\t")
             if len(parts) >= 2:
                 meta["version"] = parts[1]
+            # The third field is `<n> bytes`, and it is what names the artefact.
+            if len(parts) >= 3:
+                m = re.match(r"^(\d+) bytes$", parts[2].strip())
+                if m:
+                    meta["bytes"] = int(m.group(1))
         if not line or line.startswith("#") or line.startswith("kind\t"):
             continue
         k, _, n = line.partition("\t")
@@ -529,18 +556,39 @@ def _selftest():
                      f"{sorted(CARDCHECK_BUILTINS_推 - measured)}"))
 
     # T7 -- printf: named because it is the one that changes what P1-1 can write.
+    #       🔴 It asserted `== "builtin"` until 2026-09-30, and that is narrower
+    #       than the property it is named for.  `classify()` checks applets
+    #       FIRST, and rlxfw's own build has printf as BOTH -- so a TSV
+    #       regenerated from it failed a case whose subject (a format verb
+    #       exists, awk being absent) held MORE strongly than before.  量: on the
+    #       vendor TSV the answer is still `builtin`, so the old verdict is
+    #       reproduced on the old population and this is not a widened tolerance.
     if kinds:
-        case("T7", classify("printf", kinds) == "builtin",
-             "printf is a builtin (awk is absent, so it is the only format verb)")
+        k7 = classify("printf", kinds)
+        case("T7", k7 in ("builtin", "applet"),
+             f"printf is invocable as a {k7} (awk is absent, so it is the only "
+             f"format verb)")
 
-    # T8 -- the count, against a number measured by a DIFFERENT METHOD.
-    #       FW-25 ran the binary under qemu-mips-static on 2026-08-29 and
-    #       counted 50.  This tool never executes anything.  No shared code.
+    # T8 -- the count, against a number measured by a DIFFERENT METHOD, and
+    #       against the row for THE ARTEFACT THIS TSV DESCRIBES.  The size in
+    #       the header picks the row; a size with no row fails rather than
+    #       falling back, because falling back is how one artefact's count would
+    #       certify another's.
     if kinds:
         n = len(kinds["applet"])
-        case("T8", n == FW25_APPLET_COUNT,
-             f"applet count {n} against FW-25's independently measured "
-             f"{FW25_APPLET_COUNT} (qemu-mips-static, 2026-08-29)")
+        sz = meta.get("bytes")
+        row = APPLET_COUNT_BY_ARTEFACT.get(sz)
+        if row is None:
+            case("T8", False,
+                 f"the TSV's header names a busybox of {sz} bytes and "
+                 f"APPLET_COUNT_BY_ARTEFACT has no row for it, so its "
+                 f"{n} applets are checked against nothing. Register the "
+                 f"artefact.")
+        else:
+            what, want, how = row
+            case("T8", n == want,
+                 f"applet count {n} against {want}, independently measured on "
+                 f"{what} ({how})")
 
     # T9 -- the keyword list must NOT be in the TSV: it is known short.
     case("T9", not kinds or not kinds.get("keyword"),

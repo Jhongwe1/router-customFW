@@ -1,0 +1,9 @@
+busybox kill 12; sleep 3; ps | busybox grep brokerd
+brokerd: stopped
+rlxfw: init: brokerd exited exit=0
+brokerd: entropy_avail=135 auth_ready=1
+brokerd: listening on /srv/www/run/broker.sock mode 0666
+rlxfw: init: brokerd started pid=21 exit=0
+   21 root       180 S    brokerd 
+   24 root       548 S    busybox grep brokerd 
+# 

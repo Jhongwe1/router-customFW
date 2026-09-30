@@ -1,0 +1,12 @@
+cat /proc/interrupts
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:       5866        RLX LOPI  serial (0x20)
+ 12:       9194        RLX LOPI  rtl819x-nic (0x20)
+ 13:      11589        RLX LOPI  rlx timer (0x620)
+ 25:      11563            ICTL  rtl819x-timer (0x20)
+
+ER0:          0
+ER1:          0
+ER2:          0
+# 

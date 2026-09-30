@@ -1,0 +1,90 @@
+Remove udhcpd's notify_file hook -- the one system() call in rlxfw's applet set.
+
+WHY THIS EXISTS.  It is NOT a build fix; 1.13.4 compiles with this
+toolchain's gcc 3.4.6 unpatched (量 2026-09-30: `make busybox` exits 0 with
+one warning, ll_proto.c's own `#warning de-bloat`).  It is a removal, and the
+measurement that demanded it is this: with udhcpd enabled and this hook left
+in, the linked ELF's symbol table holds
+
+    0041b060 W system
+    0041c280 T execl
+
+量 2026-09-30, `mips-linux-nm busybox_unstripped`.  `system` is pulled in by
+`write_leases()` in networking/udhcp/files.c, and uClibc 0.9.30's `system()`
+is itself implemented with `execl("/bin/sh", "sh", "-c", line, NULL)` -- so
+ONE call site puts both a shell-command interpreter and a PATH-free variadic
+exec into the image.  R7's claim is `system()`/`popen()` count = 0 in the
+shipped bytes, and busybox is part of the shipped bytes.
+
+WHAT IT CHANGES, exactly three things:
+  * `struct server_config_t` loses `notify_file`  (dhcpd.h)
+  * the `notify_file` row leaves udhcpd.conf's keyword table, and
+    KWS_WITH_DEFAULTS goes from `ARRAY_SIZE(keywords) - 6` to `- 5`.
+    THE COUNT IS LOAD-BEARING: that enum is the number of keywords that DO
+    get a compiled-in default applied before the file is read, and the six
+    subtracted are the trailing "keywords with no defaults" (option, opt,
+    notify_file, sname, boot_file, static_lease).  Removing one of the six
+    without changing the 6 would apply `read_opt("")` to `sname` on every
+    start.
+  * `write_leases()` loses the `if (server_config.notify_file) { ... }` block.
+
+WHAT BREAKS WITHOUT IT.  Nothing in rlxfw's own operation: `server_config`
+is a zero-initialised static and `notify_file` is one of the six keywords
+that get NO default, so a udhcpd.conf without a `notify_file` line leaves the
+pointer NULL and the hook is never reached.  The hook is therefore not a
+run-time hazard for rlxfw's own configuration -- it is a LINK-time one, and
+that is the whole point: "the config does not reach it" is a property of a
+file that ships in a writable /var, while "the code is not there" is a
+property of the bytes.  R7's two-source proof reads the bytes.
+
+WHAT IT DOES NOT ESTABLISH.  It says nothing about `execle`, which
+networking/udhcp/script.c uses to run udhcpc's `-s` script and which SPEC-R7
+§ 3 depends on (`udhcpc -i <wan> -s /sbin/ifupd`).  That call survives, by
+name, with a control: tools/mkbusybox.sh refuses the build if any object
+other than `networking/udhcp/script.o` references `execle`.  And it says
+nothing about /bin/sh: ash is in this build on purpose, so the IMAGE can
+still interpret a command line -- what is gone is any rlxfw process that
+hands one to it.
+
+WHAT WOULD BE LOST IF THE HOOK WERE EVER WANTED.  A DHCP lease-change
+notification.  The R7 design's answer is that brokerd owns the config store
+and reads `/var/udhcpd.leases` itself; nothing needs to be told.
+
+--- a/networking/udhcp/dhcpd.h
++++ b/networking/udhcp/dhcpd.h
+@@ -55,7 +55,6 @@
+ 	uint32_t min_lease;             /* minimum lease a client can request */
+ 	char *lease_file;
+ 	char *pidfile;
+-	char *notify_file;              /* What to run whenever leases are written */
+ 	uint32_t siaddr;                /* next server bootp option */
+ 	char *sname;                    /* bootp server name */
+ 	char *boot_file;                /* bootp boot file option */
+--- a/networking/udhcp/files.c
++++ b/networking/udhcp/files.c
+@@ -299,13 +299,12 @@
+ 	/* keywords with no defaults must be last! */
+ 	{"option",       read_opt, &(server_config.options),      ""},
+ 	{"opt",          read_opt, &(server_config.options),      ""},
+-	{"notify_file",  read_str, &(server_config.notify_file),  ""},
+ 	{"sname",        read_str, &(server_config.sname),        ""},
+ 	{"boot_file",    read_str, &(server_config.boot_file),    ""},
+ 	{"static_lease", read_staticlease, &(server_config.static_leases), ""},
+ 	/* ADDME: static lease */
+ };
+-enum { KWS_WITH_DEFAULTS = ARRAY_SIZE(keywords) - 6 };
++enum { KWS_WITH_DEFAULTS = ARRAY_SIZE(keywords) - 5 };
+
+ void FAST_FUNC read_config(const char *file)
+ {
+@@ -371,12 +370,6 @@
+ 	}
+ 	close(fp);
+
+-	if (server_config.notify_file) {
+-// TODO: vfork-based child creation
+-		char *cmd = xasprintf("%s %s", server_config.notify_file, server_config.lease_file);
+-		system(cmd);
+-		free(cmd);
+-	}
+ }

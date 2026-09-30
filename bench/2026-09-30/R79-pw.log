@@ -1,0 +1,4 @@
+printf "benchpw1\nbenchpw1\n" | cfgstore passwd
+written: slot 0, seq 1
+admin.pwhash set: scrypt log2N=12 r=7 p=1, entropy_avail was 135
+# 

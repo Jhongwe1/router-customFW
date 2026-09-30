@@ -1,46 +1,48 @@
 # config/image-commands.tsv -- what the first-boot image can INVOKE.
 # Derived by tools/appletcensus.py from the busybox declared at
-# config/rlxfw-initramfs.tsv:104.  Regenerate with `appletcensus.py
+# config/rlxfw-initramfs.tsv:105.  Regenerate with `appletcensus.py
 # extract --write`; that half is BENCH-ONLY because it reads $FWRE_WORK.
 #
 # 🔴 kind=applet means `busybox <name>` resolves.  It does NOT mean the
 #    applet works, and it says NOTHING about options: SPEC.md FW-42
 #    measured `grep` present and `grep -E` absent on this same image.
-# busybox	v1.13.4	273332 bytes
+# busybox	v1.13.4	447684 bytes
 kind	name
 applet	ash
-applet	bunzip2
-applet	bzcat
 applet	cat
-applet	chpasswd
 applet	cp
 applet	cut
 applet	date
+applet	dmesg
+applet	dumpleases
 applet	echo
+applet	egrep
 applet	expr
 applet	false
+applet	fgrep
 applet	free
-applet	getty
 applet	grep
 applet	halt
 applet	head
 applet	hostname
 applet	ifconfig
-applet	init
 applet	ip
+applet	ipaddr
+applet	iplink
+applet	iproute
 applet	kill
 applet	killall
 applet	klogd
 applet	ln
-applet	login
+applet	logger
 applet	ls
 applet	mkdir
 applet	mount
-applet	nice
+applet	netstat
 applet	nslookup
 applet	ping
-applet	ping6
 applet	poweroff
+applet	printf
 applet	ps
 applet	reboot
 applet	renice
@@ -51,10 +53,11 @@ applet	sh
 applet	sleep
 applet	syslogd
 applet	tail
-applet	telnetd
 applet	tr
 applet	traceroute
 applet	true
+applet	udhcpc
+applet	udhcpd
 applet	umount
 applet	uptime
 applet	wc
@@ -67,6 +70,7 @@ builtin	bg
 builtin	break
 builtin	cd
 builtin	chdir
+builtin	command
 builtin	continue
 builtin	echo
 builtin	eval
@@ -75,7 +79,9 @@ builtin	exit
 builtin	export
 builtin	false
 builtin	fg
+builtin	getopts
 builtin	hash
+builtin	help
 builtin	jobs
 builtin	kill
 builtin	let

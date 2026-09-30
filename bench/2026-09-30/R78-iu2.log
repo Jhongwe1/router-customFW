@@ -1,0 +1,12 @@
+cat /run/wan.dns; ifconfig rlx0
+10.9.9.53
+rlx0      Link encap:Ethernet  HWaddr 02:52:4C:58:46:57  
+          inet addr:10.9.9.9  Bcast:10.9.9.255  Mask:255.255.255.0
+          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+          RX packets:5028 errors:0 dropped:0 overruns:0 frame:0
+          TX packets:4212 errors:0 dropped:0 overruns:0 carrier:0
+          collisions:0 txqueuelen:0 
+          RX bytes:532182 (519.7 KiB)  TX bytes:450120 (439.5 KiB)
+          Interrupt:12 
+
+# 

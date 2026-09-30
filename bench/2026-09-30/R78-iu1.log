@@ -1,0 +1,4 @@
+ip=10.9.9.9 subnet=255.255.255.0 router=10.9.9.1 dns=10.9.9.53 interface=rlx0 /sbin/ifupd bound; echo rc=$?
+ifupd: bound ok reason=ok if=rlx0 ip=10.9.9.9/24 gw=10.9.9.1 dns=1
+rc=0
+# 

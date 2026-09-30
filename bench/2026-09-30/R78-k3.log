@@ -1,0 +1,4 @@
+cfgstore get admin.pwhash; cat /proc/sys/kernel/random/entropy_avail
+admin.pwhash=set
+150
+# 

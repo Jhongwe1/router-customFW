@@ -1,0 +1,4 @@
+ip=999.1.2.3 subnet=255.0.255.0 router=8.8.8.8 interface=rlx0 /sbin/ifupd bound; echo rc=$?
+ifupd: bound REFUSED reason=bad-ip detail=octet-over-255 if=rlx0
+rc=2
+# 

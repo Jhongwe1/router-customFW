@@ -1323,6 +1323,92 @@ the declaration, the plan and the notes it cites.
 * **`D5` carries one ⊘ that a ruling put there**: the 1,472-B rtt mdev rise (`NET-121`), which the
   owner may override.
 
+## 🔴 `httpd` refuses every login after a child exits holding the KDF grant — 2026-09-30 (`R7-8`, first boot of rlxfw's own userspace)
+
+`POST /api/login` answers `429 {"ok":false,"error":"ratelimit","retry_s":2}` and does not
+recover. 量 on the device: refused at 640 s, 660 s and 832 s of uptime, with 20 s and then
+90 s of complete quiet in between, while `GET /api/status` answered 200 in the same minute —
+so httpd was alive, forking and serving, and only the login path was shut.
+
+**The mechanism, reproduced on the host as a failing unit test before anything was changed.**
+`srv_loop()` kept the identity of the child holding the single KDF grant in **two** places:
+`kids[i].holds`, and a local `int kdf_inflight`. The decision read the local. `reap()` clears
+`holds`, cannot reach its caller's local, runs at the **top** of the loop, and closes
+`kids[i].fd` — discarding any unread release byte or EOF, which were the only two paths that
+cleared `kdf_inflight`. A child that exited while holding the grant therefore left the marker
+set on an empty slot; `if (kdf_inflight >= 0)` was then taken by every later login, and the
+literal `retry = 2` in that branch is the constant `retry_s`. The refusal happens **before
+either rate bucket is consulted**, which is why 90 s of idle changed nothing.
+
+**It is a race, not a deadlock**, and saying so matters: one `401` did get through at 05:29,
+immediately followed by eight consecutive `429`s and a ninth after 15 s of quiet. Whether the
+parent reads the release byte before `reap()` closes the fd decides it. Killing `httpd` and
+letting `init` respawn it clears the marker, because it is a local in the parent's loop and a
+new parent starts clean.
+
+**`rl.c` was exonerated first, and how is worth more than the fix.** Replaying the device's own
+timeline through `rl.c` with an injected clock **grants** the login at +20 s and at +90 s; a
+sweep of **2,709,903** reachable `(tokens_milli, last_ms)` pairs per bucket found **0** that
+refuse after a 90 s gap. An empty global login bucket names `retry_s` 5 and an empty per-IP
+bucket names 11 — the value 2 is reachable only within 250 (respectively 100) milli-tokens of
+granting, a state that grants within 2 s. `now_ms()` is `clock_gettime(CLOCK_MONOTONIC)` in
+milliseconds, not `times()`, so this kernel's `INITIAL_JIFFIES = -300*HZ` never reaches it and
+640–830 s is nowhere near the 49.7-day wrap.
+
+**So the honest headline is not "the tested implementation and the deployed implementation were
+different code".** `test_rl.c` did cover the deployed bucket, and it was right: the bucket was
+never broken. What had no test at all was the **state machine around** it, written inside a
+`for(;;)` that needs `fork()`, `accept()` and a listening socket to enter. The defect is
+**duplicated state with only one copy maintained, in the one function no unit test could call** —
+and the repair makes that function testable by extracting the arbitration behind
+`srv_kdf_reset`/`ask`/`gone`, so a test drives the decision that actually ships.
+
+A second, smaller defect was found in the same pass and is not what the device did: a refusal
+the *global* bucket caused also charged the caller's per-IP bucket. It self-heals within 11 s.
+
+🟢 **Fixed and proven on the device**, 2026-09-30, on a rebuilt image. The
+discriminator was registered before the run: a leaked grant refuses with the *constant*
+`retry_s` 2 before either bucket is consulted and never recovers, while a legitimate bucket
+refusal names a truthful wait and clears. 量 twelve consecutive logins: attempts 1–3
+**HTTP 200** at 0.912 s, 0.909 s and 0.911 s — the burst of three the design allows — then
+attempts 4–12 refused with **`retry_s` 9**, a real bucket figure, and after 15 s of quiet
+**HTTP 200** again in 0.909 s. The recipe id is *not* the evidence that the fix is in the image
+(`RECIPE_ID` digests `config/` only, and `config/` changed for an unrelated reason); the evidence
+is that the new stripped `httpd` appears verbatim inside `vmlinux_img` and the old one does not,
+with the control run both ways.
+
+## 🔴 `brokerd` never sees a password set after it started, so `cfgstore passwd` has no effect until it restarts — 2026-09-30 (`R7-8`)
+
+量 on the device, and it is a separate defect from the one above. `cfgstore passwd` succeeded —
+`written: slot 1, seq 2`, and `admin.pwhash set: scrypt log2N=12 r=7 p=1, entropy_avail was
+150` — `cfgstore get admin.pwhash` reads `set`, and `/api/status` reports `auth_ready:true`.
+Yet the **correct** password was answered `401 {"ok":false,"error":"auth"}` in **14 ms**.14 ms
+means no KDF ran, and that is what `brokerd` answers when it believes no password is set.
+
+**Confirmed by one experiment rather than by reading the code.** `busybox kill 12 13` let `init`
+respawn both daemons (`brokerd exited exit=0` → pid 81, `httpd exited signal=15` → pid 82), and
+the same password then returned **HTTP 200** with a session's csrf token and `ttl_s 900`. So the
+configuration `brokerd` loads at start-up is the only one it ever has.
+
+This fails in the **fail-closed** direction — it refuses a login rather than allowing one — but
+for a router "the password you just set does nothing" is serious. The repair is either to re-read
+the 8 KiB store per request, which needs no new IPC, or to have `cfgstore` signal `brokerd`.
+Not fixed at the time of writing.
+
+## 🟢 What the first boot of rlxfw's own userspace DID establish — 2026-09-30 (`R7-8`)
+
+Recorded beside the two defects above so the entry is not read as a failure. 量, one boot,
+image `r78a`, recipe `bf182de2`: `init` as PID 1; `httpd` running as user `httpd` and `dnsfwd`
+as user `dnsfwd` in `ps`; `dnsfwd` printing `setuid(0) refused (Operation not permitted)`, so the
+privilege drop is verified by trying to undo it; `uspacescan` reading **0 forbidden imports from
+both sources** on all six programs; the config store written and read back (8,192 bytes, mode
+0600) with the A/B alternation visible across two writes; `GET /` and `/api/status` answered 200
+with all four security headers, through the chain host → httpd (uid 100, chrooted) → unix socket
+→ brokerd (root) → typed op; `dnsfwd` echoing a query id and returning SERVFAIL without hanging;
+`ifupd` applying a well-formed lease and refusing two malformed ones by name; and, after the
+restart above, a login costing **0.902 s** for the right password and **0.9017 s** for the wrong
+one — the same, so the timing does not leak which it was.
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**
