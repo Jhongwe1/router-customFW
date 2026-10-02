@@ -20,6 +20,7 @@ THE MODEL
                      8 + len(tag)      for rlxfw_mark(tag)
                     17 + len(tag)      for rlxfw_markx(tag, v)
                  + varwidth_excess     (vendor `%x` fields; see below)
+                 + echo_excess         (the capture tool's own ESCs; see below)
 
 `rlxfw-mark.h:44-51` with `rlxfw_mark.c:85-114`: the macro emits
 `"RLXFW-" tag "\\n"` as one .rodata literal and `rlxfw_puts` writes `\\r`
@@ -87,6 +88,28 @@ does NOT transfer.  The `307`/`309` pair below is two `*reboot*.log` files
 differing by the two bytes of one echoed `^[`, and that reading is correct for
 those files.  量 on all five loud captures: **zero `0x1b` bytes and zero
 literal `^[`** in every one of them.
+
+THE ECHOED CONSOLE INPUT
+------------------------
+🔴 A boot capture can also hold bytes the board did not generate: the capture
+tool's own `--esc-after` ESCs, reflected back.  量 2026-09-30, the first two
+boots of R7's userspace (`bench/2026-09-30/R78-boot.log` and `R79-boot.log`;
+4,806 and 4,337 ESCs written, per their `.meta.json`): every ESC the console
+echoed came back as the two characters `^[`, and the CR the tool sent once
+`--until` matched handed them all to ash as one command, which answered
+`sh: <the same ESCs, raw>: not found`.  Each echoed ESC costs three bytes --
+206 in R78 (618 B), 239 in R79 (717 B) -- so their raw constants, 2647 and
+2746, differ by exactly 3 x 33 = 99, and without the echo both are 2029.  That
+the echo is the tty rendering an input byte, and that ESCs arriving before
+/init holds the console are never echoed, is 推.
+
+`echo_excess` counts those bytes in the capture itself, two per `^[` and one
+per raw 0x1b, so like `varwidth_excess` it is a term and not a tolerance.  量
+2026-10-02: no other capture the gate accepts holds a single `^[` or 0x1b (174
+of 176), so the term is 0 wherever it did not exist before and every earlier
+verdict stands.  K8 is its control.  ⚠️ What it does not model: a boot in which
+no ESC is echoed before the CR would lack `sh: : not found`, 17 bytes (推,
+never captured).
 
 WHICH FILES ARE BOOT CAPTURES
 -----------------------------
@@ -182,6 +205,11 @@ MARK_CALL = re.compile(r'rlxfw_(mark|markx)\(\s*"([A-Za-z0-9_-]+)"')
 #: RTL_R32(GPIO_PIN_CTRL))`.  See `varwidth_excess`.
 VARWIDTH_FIELD = re.compile(rb"tmpReg\[0x([0-9a-fA-F]+)\]")
 
+#: The capture tool's own ESC, as the console echoes it and as ash prints it
+#: back raw in `sh: ...: not found`.  See `echo_excess`.
+ECHO_CARET = b"^["
+ECHO_RAW = b"\x1b"
+
 #: The image a capture booted, by its own `RLXFW-ID0=` mark line -- K7's
 #: partition key.  Content, so it cannot depend on the constant it partitions.
 ID0_LINE = re.compile(rb"^RLXFW-ID0=([0-9A-F]{8})\r\n", re.M)
@@ -234,6 +262,20 @@ DECLARED_CONSTS = {
          "rtl819x-switch 1.5's RLXFW-SW-INIT= line parses as a mark.  量 2 "
          "captures, 2026-09-28 (bench/2026-09-28b/I1Q-boot.log after a cold "
          "power-on, I4Q-boot.log after busybox reboot -f), 1,830 B each",
+    2029: "quiet console, SWCORE=n, with R7's compiled /init, its four "
+          "daemons and the bench shell -- recipe bf182de2 (`r78a`) and its "
+          "rebuild 0e45c61d.  量 2 captures, 2026-09-30 "
+          "(bench/2026-09-30/R78-boot.log, R79-boot.log), 2647 and 2746 "
+          "before `echo_excess`.  2029 = 246 + 296 + 197 + 1290: the loader's "
+          "and the vendor kernel's lines, the same 246 bytes as the 339 and "
+          "407 captures; /init's first eight lines (the rung-1 line, "
+          "`compiled PID 1 (R7)`, six `mounted`; 讀 src/init/main.c and "
+          "mounts.c); the ten kernel marks RLXFW-SW-UNLOCK to RLXFW-N-NDOPEN, "
+          "which interleave with those eight lines character by character so "
+          "that none parses -- an exact interleaving on both captures; and "
+          "the remaining /init, brokerd, httpd, dnsfwd, udhcpd and ash lines, "
+          "`sh: : not found` included.  A boot in which any of the ten parses "
+          "on its own line reads less, undeclared",
 }
 
 #: The population floor.  A sweep that finds three captures and agrees with
@@ -292,9 +334,24 @@ def raw_const(blob, marks):
     return len(blob) - sum(cost(t, v) for t, v in marks)
 
 
+def echo_excess(blob):
+    """-> the bytes this capture spends reflecting the capture tool's own
+    ESCs: two for each `^[` the console echoed and one for each raw 0x1b ash
+    printed back.  Counted in this capture, like `varwidth_excess`, and not a
+    tolerance; see THE ECHOED CONSOLE INPUT, and K8 for its control."""
+    return 2 * blob.count(ECHO_CARET) + blob.count(ECHO_RAW)
+
+
 def normalised_const(blob, marks):
-    """`raw_const` with the vendor's variable-width field taken out."""
-    return raw_const(blob, marks) - varwidth_excess(blob)
+    """`raw_const` with the vendor's variable-width field and the echoed
+    input taken out."""
+    return raw_const(blob, marks) - varwidth_excess(blob) - echo_excess(blob)
+
+
+def without(term, blob, marks):
+    """`normalised_const` with ONE term put back.  K7 and K8 compare against
+    this, so that neither control can pass on the other term's work."""
+    return normalised_const(blob, marks) + term(blob)
 
 
 def captures(root=None):
@@ -414,6 +471,75 @@ def gate_control():
                     % (got_a, got_r, one_var))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _echo_fixture(k, full=True, extra=b""):
+    """K8's fixture: a boot whose console echoed `k` ESCs, two before /init's
+    first line and the rest on ash's prompt, as R78 and R79 do.  `full` ends
+    after the tool's CR, with ash's `sh: <k raw ESCs>: not found`; otherwise
+    the capture stops at the echo, as one cut before the CR would.
+    🔴 LITERAL `^[` and `\\x1b`, not `ECHO_CARET`/`ECHO_RAW`, for K5's
+    reason: a fixture built from the constants moves with them."""
+    tail = (b"\r\nsh: " + b"\x1b" * k + b": not found\r\n# ") if full else b""
+    return (b"J 80500000\n\r---Jump to address=80500000\n\r"
+            b"RLXFW-B00\r\n" + _FIXTURE_GATE_LINE + b"^[^["
+            b"rlxfw: init running, RLXFW-R3-RUNG1-OK\r\n" + extra +
+            b"# " + b"^[" * (k - 2) + tail)
+
+
+def echo_control():
+    """Drive `captures()` over five synthetic captures and require the echo
+    term to take out exactly the echo.  -> (ok, detail).
+
+    Two ESC counts in each shape, so the term has to absorb a DIFFERENCE and
+    not match one value; and the two shapes tell `2 x ^[ + 1 x raw` apart from
+    `3 x` either one alone, which agree on every real capture so far.  The
+    fifth adds one ordinary byte, which the term must NOT take: that is the
+    difference between a term and a tolerance.
+    """
+    lo, hi = 5, 38
+    files = {"full-lo-boot.log": _echo_fixture(lo),
+             "full-hi-boot.log": _echo_fixture(hi),
+             "cut-lo-boot.log": _echo_fixture(lo, full=False),
+             "cut-hi-boot.log": _echo_fixture(hi, full=False),
+             "one-byte-boot.log": _echo_fixture(hi, extra=b"x")}
+    tmp = tempfile.mkdtemp(prefix="bootbytes-echo-")
+    try:
+        d = os.path.join(tmp, "bench", "fixture")
+        os.makedirs(d)
+        for name, blob in files.items():
+            with open(os.path.join(d, name), "wb") as fh:
+                fh.write(blob)
+        acc, _rej = captures(root=tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    raw = {os.path.basename(p): without(echo_excess, b, m) for p, b, m in acc}
+    norm = {os.path.basename(p): normalised_const(b, m) for p, b, m in acc}
+    if sorted(norm) != sorted(files):
+        return False, "the gate accepted %s of the five" % sorted(norm)
+
+    # The fixture's own claim, asserted as K5 asserts its one line: the lo
+    # and hi halves of each shape differ in the echo and in nothing else.
+    def bare(blob):
+        return blob.replace(b"^[", b"").replace(b"\x1b", b"")
+    one_var = all(bare(files["%s-lo-boot.log" % s])
+                  == bare(files["%s-hi-boot.log" % s]) for s in ("full", "cut"))
+    step = hi - lo
+    want = [("full, %d more ESCs: +%d without the term and +0 with it"
+             % (step, 3 * step),
+             raw["full-hi-boot.log"] - raw["full-lo-boot.log"] == 3 * step
+             and norm["full-hi-boot.log"] == norm["full-lo-boot.log"]),
+            ("cut before the CR: +%d without and +0 with" % (2 * step),
+             raw["cut-hi-boot.log"] - raw["cut-lo-boot.log"] == 2 * step
+             and norm["cut-hi-boot.log"] == norm["cut-lo-boot.log"]),
+            ("one ordinary byte: +1 with it",
+             norm["one-byte-boot.log"] - norm["full-hi-boot.log"] == 1),
+            ("halves differ only in echo", one_var)]
+    bad = [w for w, good in want if not good]
+    if bad:
+        return False, ("%s -- without the term %s, with it %s"
+                       % (bad, sorted(raw.items()), sorted(norm.items())))
+    return True, "; ".join(w for w, _g in want)
 
 
 def check():
@@ -539,11 +665,16 @@ def check():
     for _p, b, m in varwidth:
         ids = ID0_LINE.findall(b)
         by_image.setdefault(ids[0].decode() if ids else "none", []).append((b, m))
+    # 🔄 2026-10-02: WITHOUT is `without(varwidth_excess, ...)` and not
+    # `raw_const`, so that echo varying inside one image cannot pass the first
+    # half for this term.  量 identical output: no capture carries both.
     raw_multi = sorted(i for i, v in by_image.items()
-                       if len({raw_const(b, m) for b, m in v}) > 1)
+                       if len({without(varwidth_excess, b, m)
+                               for b, m in v}) > 1)
     norm_multi = sorted(i for i, v in by_image.items()
                         if len({normalised_const(b, m) for b, m in v}) > 1)
-    raw_set = sorted({raw_const(b, m) for _p, b, m in varwidth})
+    raw_set = sorted({without(varwidth_excess, b, m)
+                      for _p, b, m in varwidth})
     norm_set = sorted({normalised_const(b, m) for _p, b, m in varwidth})
     good = len(varwidth) > 0 and len(raw_multi) > 0 and not norm_multi
     detail = ("%d capture(s) over %d image(s) carry the field, hex-digit widths "
@@ -558,6 +689,30 @@ def check():
                               "the varwidth normalisation is NOT shown to be "
                               "load-bearing: %s" % detail))
     ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
+
+    # K8: the echo term takes out exactly the echo and nothing else.  On a
+    # SYNTHETIC fixture, like K5, because the corpus offers no partition that
+    # is independent of the term: the two captures carrying echo are two
+    # images, one capture each, so K7's per-image test has nothing to compare.
+    # The corpus half is K2's and K6's -- R78 and R79 must both land on the
+    # declared 2029, and 2029 must be reached.
+    good, detail = echo_control()
+    print("  %s  %-10s %s" % ("ok  " if good else "FAIL", "K8",
+                              "the echo term removes exactly the echo on a "
+                              "synthetic fixture (%s)" % detail
+                              if good else
+                              "the echo term is NOT exact on its fixture: %s"
+                              % detail))
+    ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
+    echoed = [(p, b, m) for p, b, m in accepted if echo_excess(b)]
+    print("        observed, not asserted: %d of %d boot capture(s) carry "
+          "echoed input" % (len(echoed), n))
+    for path, blob, ms in echoed:
+        print("          %-44s %4d ESC echoed, %4d B, const %d without the "
+              "term, %d with it"
+              % (os.path.relpath(path, ROOT), blob.count(ECHO_CARET),
+                 echo_excess(blob), without(echo_excess, blob, ms),
+                 normalised_const(blob, ms)))
 
     # Observation, deliberately carrying NO assertion.  What the gate rejected
     # in the real corpus is worth reading -- it is how a mis-named capture
@@ -593,6 +748,10 @@ def predict():
         print("           of that const, %d byte(s) are the vendor's "
               "variable-width %s field"
               % (varwidth_excess(blob), VARWIDTH_FIELD.pattern.decode()))
+    if echo_excess(blob):
+        print("           of that const, %d byte(s) are the capture tool's "
+              "echoed ESCs"
+              % echo_excess(blob))
 
     src = source_marks()
     unseen = sorted(t for t in src if t not in set(boot))
@@ -617,7 +776,7 @@ def predict():
 
 
 def main(argv):
-    print("bootbytes 1.3  --  boot capture length, derived not copied")
+    print("bootbytes 1.4  --  boot capture length, derived not copied")
     if len(argv) > 1 and argv[1] == "predict":
         return predict()
     return check()
