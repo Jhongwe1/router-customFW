@@ -372,6 +372,67 @@ def allowed(txt, line=""):
             return (needle, why)
     return None
 
+#: 🆕 2026-10-02 (s119): exemptions by FILE NAME, which ALLOW cannot express --
+#: its three scopes are a value, a substring of a line and a whole line, each
+#: wherever it appears.  These rows exist for 10.9.9.x, and 10.9.9.9 is the
+#: address control A2 below and leakscan.py's L3 probe with: a "match" entry
+#: would blind both, which is why this list is not in ALLOW and why `allowed()`,
+#: the function A2 and L3 call, never reads it.  A row is (path from the
+#: repository root, pattern label, matched text, the whole line once stripped,
+#: reason).  It silences that pattern's that-text hits on that line of that one
+#: file: the same line in any other file, and any other line of the named one,
+#: still fires.  Control A4 holds every row to being needed -- its file still
+#: holds the line, the line still produces the hit, and ALLOW does not already
+#: cover it -- so a stale row fails the run instead of waiting for something to
+#: land on its line.
+_R78 = ("; the lease is SYNTHETIC: 10.9.9.9, 10.9.9.1 and 10.9.9.53 were typed "
+        "into ifupd at the console for R78-iu1..4, no DHCP server issued them, "
+        "and R78-fix put rlx0 back on 10.1.1.1 (notes/userspace-integration.md "
+        "7.6, SPEC.md FW-181)")
+FILE_EXEMPT = [
+    ("bench/2026-09-30/R78-iu1.log", "private IPv4", "10.9.9",
+     "ip=10.9.9.9 subnet=255.255.255.0 router=10.9.9.1 dns=10.9.9.53 "
+     "interface=rlx0 /sbin/ifupd bound; echo rc=$?",
+     "ash's echo of the typed command" + _R78),
+    ("bench/2026-09-30/R78-iu1.log", "private IPv4", "10.9.9",
+     "ifupd: bound ok reason=ok if=rlx0 ip=10.9.9.9/24 gw=10.9.9.1 dns=1",
+     "ifupd reporting the lease it applied; dns=1 is a count "
+     "(src/ifupd/main.c)" + _R78),
+    ("bench/2026-09-30/R78-iu1.meta.json", "private IPv4", "10.9.9",
+     '"sent": "ip=10.9.9.9 subnet=255.255.255.0 router=10.9.9.1 '
+     'dns=10.9.9.53 interface=rlx0 /sbin/ifupd bound; echo rc=$?",',
+     "console-capture's record of what it sent" + _R78),
+    ("bench/2026-09-30/R78-iu2.log", "private IPv4", "10.9.9", "10.9.9.53",
+     "`cat /run/wan.dns`: the dns= ifupd wrote in R78-iu1" + _R78),
+    ("bench/2026-09-30/R78-iu2.log", "private IPv4", "10.9.9",
+     "inet addr:10.9.9.9  Bcast:10.9.9.255  Mask:255.255.255.0",
+     "`ifconfig rlx0` after R78-iu1; Bcast is not typed, it is the broadcast "
+     "of the typed ip and subnet" + _R78),
+    ("bench/2026-09-30/R78-iu4.log", "private IPv4", "10.9.9",
+     "ip=10.9.9.9 subnet=255.255.255.0 interface= /sbin/ifupd bound; echo rc=$?",
+     "ash's echo of the typed command" + _R78),
+    ("bench/2026-09-30/R78-iu4.meta.json", "private IPv4", "10.9.9",
+     '"sent": "ip=10.9.9.9 subnet=255.255.255.0 interface= /sbin/ifupd '
+     'bound; echo rc=$?",',
+     "console-capture's record of what it sent" + _R78),
+]
+
+ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
+
+def exempt(path, label, txt, line):
+    """The FILE_EXEMPT row covering this hit in this file, or None.  `path` is
+    resolved and compared from the repository root, so neither the cwd nor an
+    absolute spelling changes the answer, and a path outside it is never named."""
+    try:
+        rel = os.path.relpath(os.path.realpath(path), ROOT).replace(os.sep, "/")
+    except ValueError:                  # another drive, so not under ROOT
+        return None
+    for name, lab, tok, whole, why in FILE_EXEMPT:
+        if (rel, label, txt, line.strip()) == (name, lab, tok, whole):
+            return (name, why)
+    return None
+
 def scan(name, text):
     """-> [(pattern label, 1-based line number, matched text, the whole line)].
 
@@ -443,9 +504,40 @@ def main(paths):
     print(f"  ok  {len(exact)} \"exact\" entr(ies): each silences its own line, and a MAC "
           f"after or before it on that line still fires\n")
 
+    # 🆕 A4 (s119): FILE_EXEMPT, both ways.  Each row must be NEEDED -- its file
+    # still holds its line, the line still produces its hit, ALLOW does not
+    # already cover that hit, and the row is what silences it -- or it is stale.
+    # And no wider than its name: its hit under another path, label or text, its
+    # line widened by a MAC either side, and A2's probe under its path all fire.
+    print("=== POSITIVE CONTROL 4: a name-scoped exemption is needed, and covers its own line only ===")
+    for name, lab, tok, whole, _why in FILE_EXEMPT:
+        full = os.path.join(ROOT, name)
+        try:
+            body = io.open(full, encoding='utf-8', errors='replace', newline='').read()
+        except OSError as e:
+            print(f"  FAIL: {name} is named by an exemption and cannot be read "
+                  f"({e.strerror}), so the row is stale")
+            return 2
+        own = [h for h in scan(name, body) if (h[0], h[2], h[3].strip()) == (lab, tok, whole)]
+        if not own or any(allowed(h[2], h[3]) or not exempt(full, h[0], h[2], h[3])
+                          for h in own):
+            print(f"  FAIL: {name} no longer holds {whole!r} as a {lab} hit that only "
+                  f"this row silences ({len(own)} hit(s)), so the row is stale")
+            return 2
+        wider = [(full + ".x", lab, tok, whole), (full, lab + " (other)", tok, whole),
+                 (full, lab, tok + "0", whole), (full, lab, tok, whole + " " + mac),
+                 (full, lab, tok, mac + " " + whole)]
+        if any(exempt(*w) for w in wider + [(full, h[0], h[2], h[3]) for h in ph]):
+            print(f"  FAIL: the row for {name} silences a hit it does not name -- it is "
+                  f"wider than its file and its line")
+            return 2
+    print(f"  ok  {len(FILE_EXEMPT)} name-scoped exemption(s): each still silences a hit on its "
+          f"own line of its own file, and nothing under another path, label, text or line\n")
+
     print("=== THE ACTUAL LOGS ===")
     total = 0
     suppressed = 0
+    named = 0
     for p in paths:
         # newline='' -- WITHOUT it Python's universal newlines collapses every
         # CRLF into one LF, and the number printed below as `bytes` comes out
@@ -460,13 +552,17 @@ def main(paths):
         # here is ASCII and survives the decode.  The number was.
         text = io.open(p, encoding='utf-8', errors='replace', newline='').read()
         raw = scan(p, text)
-        hits = [h for h in raw if not allowed(h[2], h[3])]
-        skipped = len(raw) - len(hits)
+        kept = [h for h in raw if not allowed(h[2], h[3])]
+        hits = [h for h in kept if not exempt(p, h[0], h[2], h[3])]
+        skipped = len(raw) - len(kept)
+        byname = len(kept) - len(hits)
         total += len(hits)
         suppressed += skipped
+        named += byname
         nbytes = os.path.getsize(p)
         flag = '' if len(text) == nbytes else f'  <- {len(text)} chars, non-ASCII present'
         note = f", {skipped} allowlisted" if skipped else ''
+        note += f", {byname} exempted by name" if byname else ''
         print(f"  {os.path.basename(p):22s} {nbytes:6d} bytes  "
               f"{len(hits)} hit(s){note}{flag}")
         for label, ln, txt, _l in hits:
@@ -475,6 +571,9 @@ def main(paths):
     if suppressed:
         print(f"  {suppressed} match(es) suppressed by the allowlist, "
               f"which is printed above with a reason per entry")
+    if named:
+        print(f"  {named} match(es) exempted by name, each row held to its own file "
+              f"and line by control A4")
     if total == 0:
         print("  ok  nothing in any log matches a pattern that demonstrably "
               "fires and is not allowlisted")
