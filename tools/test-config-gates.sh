@@ -36,6 +36,17 @@
 # and, in the other direction, four end-to-end cases on the real repository
 # files, because a suite that only ever runs on synthetic input has not been
 # shown to work on the artefact it exists for.
+#
+# A mutation case answers only if two things hold, and the suite REFUSES (exit
+# 2, with the reason) rather than reporting when either does not.  Both had
+# failed silently by 5eaeb643, one in CI and one at the desk:
+#   * the mutation CHANGED the file.  A sed whose target has gone is a no-op,
+#     and the case then tests the unmutated file -- E6's target left the
+#     declaration with R7-8 (f353b7b8) and nothing said so.  `mutate` refuses.
+#   * an UNMUTATED copy, where the mutants run, passes its own self-test.  The
+#     mutants run in $T, not tools/, and since R7 mkinitramfs.py imports
+#     tools/appletcensus.py from its own directory: in $T that import failed,
+#     and M6 went red in CI on f5641f3d..5eaeb643 (see M6).  `identity` refuses.
 set -o nounset
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -53,6 +64,37 @@ ck () {  # label expected actual
     else printf '  FAIL   %-52s expected %s, got %s\n' "$1" "$2" "$3"; fail=$((fail+1)); fi
 }
 sk () { printf '  skip   %-52s %s\n' "$1" "$2"; skip=$((skip+1)); }
+# A refusal is not a case: it prints no `ok`/`FAIL`/`skip` line, so ci-census
+# sees cases missing rather than a count that looks whole.
+refuse () { printf 'REFUSED: %s\n' "$*"; exit 2; }
+
+# mutate NAME FILE SED-EXPRESSION -> $T/NAME, FILE with the expression applied.
+mutate () {
+    sed "$3" "$2" > "$T/$1" || refuse "mutation $1: sed exited $? on ${2#"$REPO"/}"
+    if cmp -s "$2" "$T/$1"; then
+        refuse "mutation $1 left ${2#"$REPO"/} byte-identical: its target is" \
+               "no longer in the file, so the case would test the UNMUTATED" \
+               "file. Repoint it at what now carries the same meaning (git log" \
+               "-S on the old target names the commit that moved it): $3"
+    fi
+}
+
+# identity NAME FILE -> an unmodified copy at $T/NAME must pass its own
+# self-test, or a control the mutants turn red there could be red because of
+# WHERE they run rather than WHAT was changed.
+identity () {
+    local out rc first
+    cp "$2" "$T/$1" || refuse "cannot copy ${2#"$REPO"/} to $T"
+    out="$("$PY" "$T/$1" self-test 2>&1)"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        first="$(printf '%s\n' "$out" | grep -m1 'FAIL' | sed 's/^ *//')"
+        [ -n "$first" ] || first="$(printf '%s\n' "$out" | tail -1 | sed 's/^ *//')"
+        refuse "an UNMUTATED copy of ${2#"$REPO"/} fails its own self-test" \
+               "(rc $rc) in the directory its mutants run in, so no kill" \
+               "measured there is the mutation's. First: $first"
+    fi
+    echo "  observed  an unmutated copy of ${2##*/} passes its own self-test where its mutants run"
+}
 
 echo "=== S1: both tools pass their own controls, unmutated ==="
 o="$("$PY" "$KD" self-test 2>&1)"; rc=$?
@@ -64,7 +106,8 @@ ck "mkinitramfs A2 present"                1 "$(printf '%s\n' "$o" | grep -c 'A2
 
 echo
 echo "=== D1-D4: break kconfig-delta, and name the control that must go red ==="
-mutkd () { sed "$2" "$KD" > "$T/$1"; }
+identity kd0 "$KD"
+mutkd () { mutate "$1" "$KD" "$2"; }
 
 mutkd d1 's|if rule.frm != frm or rule.to != to:|if rule.to != to:  # MUTATED: the from value is no longer checked|'
 ck "D1 mutation landed"   1 "$(grep -c 'MUTATED: the from value' "$T/d1")"
@@ -88,7 +131,15 @@ ck "D4 fails C11"         1 "$(printf '%s\n' "$o" | grep -c '^  .*FAIL.*C11 ')"
 
 echo
 echo "=== M1-M3: break mkinitramfs, and name the control that must go red ==="
-mutmk () { sed "$2" "$MK" > "$T/$1"; }
+# mkinitramfs.py imports tools/appletcensus.py from its OWN directory (R7,
+# check_no_h601_dumper), so the module goes beside the mutants -- as
+# tools/test-mkinitramfs-mutants.py's make_tree puts it beside its subject.
+# Without it `identity` refuses: A25, A26, H1, H2 and H4 are red in an
+# unmutated copy.
+cp "$HERE/appletcensus.py" "$T/appletcensus.py" \
+    || refuse "cannot copy tools/appletcensus.py beside the mkinitramfs mutants"
+identity mk0 "$MK"
+mutmk () { mutate "$1" "$MK" "$2"; }
 
 mutmk m1 's|^        if not os.path.exists(src):|        if False:  # MUTATED: a missing source is no longer an error|'
 ck "M1 mutation landed"   1 "$(grep -c 'MUTATED: a missing source' "$T/m1")"
@@ -173,6 +224,13 @@ echo "=== M6-M7: the flash-write node ban, and why A26 is not redundant ==="
 # M6 -- the call site.  A guard that is never called looks exactly like one
 # that never fires, which is this repository's own "a tool reporting 0 is
 # making a claim".
+# 🔴 2026-10-02: RED IN CI from f5641f3d to 5eaeb643 (`expected 1, got 0`), and
+# the mutation was not at fault.  It ran in $T, where R7's `import
+# appletcensus` (check_no_h601_dumper, f353b7b8) found no module, so with the
+# ban gone A24's three declarations -- each an mtd node -- were refused by that
+# import failure instead.  The same failure turns A25, A26, H1, H2 and H4 red
+# in an UNMUTATED copy, so M7's kill of A26 was not M7's either.  Fixed where
+# the mutants are made: the companion copy and `identity`, above.
 mutmk m6 's|^    check_no_writable_flash_node(entries, decl_path)|    pass  # MUTATED: the flash-write node ban is never called|'
 ck "M6 mutation landed"   1 "$(grep -c 'MUTATED: the flash-write node ban is never called' "$T/m6")"
 o="$("$PY" "$T/m6" self-test 2>&1)"
@@ -393,10 +451,22 @@ if [ -d "$UNIT" ]; then
     ck "E5 every file is unit-owned or named as mine" 1 \
        "$(grep -c 'nothing was substituted' "$T/ir.log")"
     # and it refuses when a source is taken away, on the real declaration
-    sed 's|\$UNIT/bin/busybox|$UNIT/bin/busybox-gone|' "$DECL" > "$T/decl-bad"
+    # 🔴 2026-10-02: from f353b7b8 (R7-8) to 5eaeb643 this took NOTHING away.
+    # It named the source string `$UNIT/bin/busybox`; R7-8 moved the
+    # /bin/busybox row to `$REPO/build/rlxfw-user/busybox/busybox` and deleted
+    # the last `unit` file row, so decl-bad was the real declaration byte for
+    # byte: rc 0 where build/ is present, and rc 3 in a clone for a reason that
+    # was not this case's -- /init's build/ source, the first file row, is
+    # missing there.  The row is now found by its PATH, so the next move of its
+    # source cannot make this a no-op again, `mutate` refuses if anything does,
+    # and the refusal must NAME the source taken away: rc 3 alone is what any
+    # missing source gives.
+    mutate decl-bad "$DECL" 's|^\(file\t/bin/busybox\t[^[:space:]]*\)|\1-gone|'
     "$PY" "$MK" build --decl "$T/decl-bad" --unit "$UNIT" --repo "$REPO" \
-        --out "$T/ir2" >/dev/null 2>&1
-    ck "E6 a missing source in the REAL declaration refuses" 3 "$?"
+        --out "$T/ir2" >"$T/ir2.log" 2>&1
+    e6=$?
+    ck "E6 a missing source in the REAL declaration refuses, naming it" "3 1" \
+       "$e6 $(grep -c '/bin/busybox declares source .*/busybox-gone and it is not there' "$T/ir2.log")"
 else
     sk "E5-E6 this unit's rootfs" "no extracted tree under $WORK"
 fi
@@ -424,7 +494,8 @@ ck "S3 ci-expected.tsv declares a count"   1 \
 ck "S3 all $RM_N declared controls pass"   1 \
    "$(printf '%s\n' "$o" | grep -c "$RM_N passed, 0 failed")"
 
-mutrm () { sed "$2" "$RM" > "$T/$1"; }
+identity rm0 "$RM"
+mutrm () { mutate "$1" "$RM" "$2"; }
 
 # G1 -- an ambiguous anchor must not be resolved by taking the first.  This is
 # the difference between this file and a .patch, so it is the mutation that
