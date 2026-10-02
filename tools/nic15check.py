@@ -15,10 +15,13 @@ registration, the retry rule, the record key, the map codes, the mark
 values), the bytes the `tx` verb writes, the verb dispatcher and both /proc
 page formatters.  This tool compiles that header UNCHANGED with the host's
 gcc (`-std=gnu89 -Werror`, the kernel's dialect) inside a generated driver
-that defines `NIC15_HOST` and the five hooks the header declares, and
-asserts, case by case:
+that defines `NIC15_HOST` and the five hooks the header declares, with an
+include directory of its own standing in for the kernel's (STUBS, below),
+and asserts, case by case:
 
-  K0  the header compiles as the kernel's dialect, warnings as errors
+  K0  the header compiles as the kernel's dialect, warnings as errors;
+      first, an #include it reaches that neither the host nor STUBS
+      provides refuses the run, naming the include
   K1  each parser accepts its whole list, `sweep ... wire` included
   K2  each parser refuses a fixed malformed list -- no trailing-space case,
       because 1.4's handler strips trailing space before any parser sees it
@@ -503,6 +506,19 @@ int main(void)
 }
 """
 
+# The kernel headers the header includes with NIC15_HOST defined, which no host
+# has.  build() writes each into the harness's own include directory, holding
+# what the header and the driver above use from the real one (under
+# config/rlxfw-src/linux-2.6.30/include/) and nothing else: a use a stub lacks
+# fails K0, never passes.
+STUBS = {
+    # R7-7: the header includes it for rtl819x-nic.c's rlxfw_entropy_event()
+    # call, which is kernel code and not compiled here.
+    "linux/rlxfw-entropy.h":
+        "/* nic15check stub, empty: the header includes it for rtl819x-nic.c, "
+        "which this harness does not compile */\n",
+}
+
 
 class Refused(Exception):
     pass
@@ -512,15 +528,38 @@ class Crashed(Exception):
     pass
 
 
-def build(header, work):
-    """Compile the generated driver against `header`.  -> (path, errtext)."""
+def build(header, work, preflight=False):
+    """Compile the generated driver against `header`.  -> (path, errtext).
+    `preflight` first refuses, by name, a header the compile reaches that
+    nothing provides -- which K0's note, gcc's first line, would show only as
+    `In file included from`."""
+    work = os.path.abspath(work)
     src = os.path.join(work, "harness.c")
     exe = os.path.join(work, "harness")
+    inc = os.path.join(work, "inc")
+    for name, stub in STUBS.items():
+        os.makedirs(os.path.dirname(os.path.join(inc, name)), exist_ok=True)
+        with open(os.path.join(inc, name), "w", encoding="utf-8",
+                  newline="\n") as fh:
+            fh.write(stub)
     text = HARNESS.replace("@HEADER@", header).replace(
         "PAGE_ALLOC", str(PAGE + 64))
     with open(src, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(text)
-    p = subprocess.run(["gcc"] + CFLAGS + ["-o", exe, src],
+    if preflight:
+        # gcc -M -MG names each header the compile reaches: a found one by
+        # the absolute path it was found at, a missing one as its #include
+        # spells it -- relative, so it names nothing under `work`.
+        p = subprocess.run(["gcc"] + CFLAGS + ["-I", inc, "-M", "-MG", src],
+                           cwd=work, capture_output=True, encoding="utf-8")
+        deps = re.split(r"(?<!\\)\s+", p.stdout.replace("\\\n", " ").strip())
+        miss = [d for d in deps[2:] if not os.path.exists(
+            os.path.join(work, d.replace("\\ ", " ")))]
+        if miss:
+            raise Refused("the compile reaches %s, which neither the host nor "
+                          "STUBS provides: give STUBS a stub holding what the "
+                          "header uses from it" % ", ".join(miss))
+    p = subprocess.run(["gcc"] + CFLAGS + ["-I", inc, "-o", exe, src],
                        capture_output=True, encoding="utf-8")
     if p.returncode != 0:
         return None, p.stderr.strip() or ("gcc exit %d" % p.returncode)
@@ -1174,7 +1213,7 @@ def run_all(header, keep=None):
     os.makedirs(work, exist_ok=True)
     rows = []
     try:
-        exe, err = build(header, work)
+        exe, err = build(header, work, preflight=True)
         rows.append(("K0", exe is not None,
                      "gcc %s" % " ".join(CFLAGS[:2]) if exe else
                      "does not compile: " + err.splitlines()[0][:150]))
