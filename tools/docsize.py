@@ -101,9 +101,14 @@ BUDGET = {
     "CLAUDE.md:lines": 351,
     "CLAUDE.md:bytes": 24200,
     "CLAUDE.md:maxline": 647,
-    "PROGRESS.md:bytes": 103000,  # 2026-09-30, R7-0/R8a-0: two step lists open
-    #   at once (R7 and R8a), 100,140 B +3 %.  Up from R1y-4's 98,100, and the
-    #   next closing commit takes it down again: a closed list moves out.
+    "PROGRESS.md:bytes": 106000,  # 2026-10-04, R9-0: R9's step list open, and
+    #   R9 is the project's acceptance gate, so its list is the longest a single
+    #   gate has needed: 102,637 B +3 %.  Up from 103,000 -- which was
+    #   R7-0/R8a-0's 100,140 +3 % and which the 2026-09-30 closing commits
+    #   should have taken DOWN when R7's and R8a's lists moved verbatim to
+    #   docs/history/ and did not, so this raise is smaller than it looks and
+    #   part of it is a ratchet-down that was owed.  R9's closing commit takes
+    #   it down again: a closed list moves out.
     "PROGRESS.md:maxline": 9870,
     "PROGRESS.md#Now:bytes": 6000,
     "PROGRESS.md#Now:maxline": 1000,

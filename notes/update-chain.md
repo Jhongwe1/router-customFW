@@ -205,9 +205,9 @@ it describes needs the owner's own dated yes, one per write.
 
 量 today's 4,194,304 bytes: loader `0x000000`–`0x005FFF` (24,576), `H601`
 `0x006000`–`0x007FFF` (8,192), vendor config `0x008000`–`0x00FFFF` (32,768), the
-vendor web image `w6cg` `0x010000`–`0x053A24` (277,029), the vendor kernel
-`cr6c` `0x060000`–`0x151012` (987,155), a SquashFS `0x180000`–`0x34A041`
-(1,876,034) and an erased tail `0x34C000`–`0x3FFFFF` (737,280).
+vendor web image `w6cg` `0x010000`–`0x053A23` (277,028), the vendor kernel
+`cr6c` `0x060000`–`0x151011` (987,154), a SquashFS `0x180000`–`0x34A040`
+(1,876,033) and an erased tail `0x34C000`–`0x3FFFFF` (737,280).
 
 Today's rlxfw image is 1,114,112 bytes; wrapped in a container it is 1,114,272,
 which rounds up to `0x120000` = 1,179,648 on the loader's own 64 KiB step.
@@ -254,17 +254,17 @@ this barrier moves with it.
 
 | write | destroys |
 |---|---|
-| `rlxboot` `0x010000`–`0x01FFFF` | 65,536 bytes of `w6cg` (of its 277,029) — the vendor web image's header, so `w6cg` is finished |
+| `rlxboot` `0x010000`–`0x01FFFF` | 65,536 bytes of `w6cg` (of its 277,028) — the vendor web image's header, so `w6cg` is finished |
 | rescue `0x020000`–`0x02FFFF` | another 65,536 bytes of `w6cg` |
-| slot A `0x070000`–`0x18FFFF` | **921,619 of the vendor kernel `cr6c`'s 987,155 bytes**, and 65,536 of the SquashFS |
-| slot B `0x190000`–`0x2AFFFF` | **1,179,648 more of the SquashFS's 1,876,034** |
+| slot A `0x070000`–`0x18FFFF` | **921,618 of the vendor kernel `cr6c`'s 987,154 bytes**, and 65,536 of the SquashFS |
+| slot B `0x190000`–`0x2AFFFF` | **1,179,648 more of the SquashFS's 1,876,033** |
 | state `0x3F0000`–`0x3FFFFF` | 65,536 bytes of the erased tail — nothing |
 
 Being specific, because this is the decision: **slot A's first write ends the
 vendor firmware.** `cr6c`'s payload is truncated at `0x070000`, its 16-bit sum
 stops being zero, `check_image()` stops returning 2, and the loader has nothing
-left to boot from flash. The SquashFS then loses 1,245,184 of its 1,876,034 bytes
-across the two slots, leaving 630,850 bytes of a rootfs that no kernel reaches.
+left to boot from flash. The SquashFS then loses 1,245,184 of its 1,876,033 bytes
+across the two slots, leaving 630,849 bytes of a rootfs that no kernel reaches.
 
 That is exactly what gate `R9`'s vendor column needs. `R9` is a three-column
 differential proof whose method is *vendor firmware = boots normally, rlxfw = RAM
