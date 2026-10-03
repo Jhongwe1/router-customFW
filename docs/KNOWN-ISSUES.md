@@ -1511,8 +1511,8 @@ Nothing here concerns the device: no failing step reads the board, and no captur
 **What changes in practice.** A line in an agent's report that says a step will go red is
 handled before the push — repaired, or the push waits — and agents now write it as a line
 starting `WILL-RED:`, so it cannot be relayed as a remark. After a commit that adds `bench/`
-captures, every suite that reads `bench/` runs before the push, under any relaxation; the list
-of those suites is being drawn up and will be linked here. This entry closes on the first green
+captures, every suite that reads `bench/` runs before the push, under any relaxation. Read 2026-10-02 from `ci.yml` and the tools, and run on a tree without and with new captures: `bootbytes`, `capdate`, `test-boot-timeline`, `test-reply-size`, `xcheck sweep`, `audit-bench-log (exit-code gate)` (`text`);
+`viewdecode`, `mustrun` (`instruments`); and the `cardcheck` and `rbcheck` mutation suites, which scan `bench/` and were not run. `capdate` goes red on a new date directory without its `bench/README.md` row; the others hold numbers new captures move. This entry closes on the first green
 run.
 
 ## Closed since `v0.2` was tagged
