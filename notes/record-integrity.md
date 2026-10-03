@@ -319,7 +319,7 @@ finding's *data*, not pointers into today's file — and `5b01d73` re-pointed
 `751` → `1003`, because `751` happened to be spelled with a full path and was
 therefore the one number `CITE_RX` could see. `:758`, `:768`, `:1232`, `:1239`
 stayed. The row's prose still read `751`. Put back, and marked
-**這一處不准改號碼** the way `SPEC.md:823` already is.
+**這一處不准改號碼** the way `SPEC.md:826` already is.
 
 ### 5.1b Declaring a quotation launders it, and the baseline is a floor rather than a census — 量 2026-09-22
 
@@ -329,7 +329,7 @@ edits that line, so its blame becomes today, so the citation is `STABLE` by
 construction and never reaches `C3` or the baseline at all.
 
 量 2026-09-22, over this segment's own repair: four citations were classified
-as historical quotations. Three of them sit on `SPEC.md:950` — the `FW-105`
+as historical quotations. Three of them sit on `SPEC.md:953` — the `FW-105`
 row, which this segment annotated — and after the commit all three read
 `STABLE`. Only the fourth, § 5.1's own line above, was left untouched and is
 the one row this repair adds to `tools/citecheck-baseline.tsv`.
