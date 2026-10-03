@@ -242,17 +242,17 @@ that that method's byte stores reach DRAM (`CPU-35`), so `rlx_isc_inv` is not
 linked at all (`RLX_ISC=0`).
 
 ⚠️ **What is still 推.** That `CCTL 0x002` suffices is 量 for probe1's victims — a
-two-word patch inside the payload's own image — and this is a copy of up to 3 MiB
-to an address 19 MiB away. Nothing has measured the D-side writeback of `0x200` on
-this die at all; `notes/cache-model.md` marks `0x100` `DWB` as a value whose
-effect no source records. **The refutation condition is on the bench and it is
-cheap**: a payload that prints its own banner after the invalidate was fetched
-through the I side, and a payload whose first instruction word read back with
-`DW` equals the container's is one whose copy reached DRAM. Until that seating,
-"the caches were handled correctly" is an argument, not a reading. And qemu cannot
-supply it: on `qemu-system-mips`'s Malta the same instruction writes `XContext`,
-so the two `CCTL` writes were exercised as instructions and not as cache
-operations.
+two-word patch inside the payload's own image — and `0x200`'s D-side writeback is
+measured nowhere on this die. `R8a`'s boots took the first reading this section
+offered (`FW-170`). 🔄 **The second — `DW` of the destination after the copy —
+cannot move this to 量** (2026-10-03; recorded, not run). No hazard is armed: the
+SHA-256 over the container streams 1.1 MB through the 8 KiB D-cache first (讀), so
+the copy stores to lines the D side does not hold (推), probe1's FRESH case (量);
+a prompt is reachable only through a reset or a Linux run, and both write back (讀:
+the loader's `0x202`, the kernel's `0x200`); and rlxboot has no no-flush arm (讀).
+What decides it is `CPU-19` ①'s experiment, not scheduled: a probe1-style store to
+a cache-resident line read back through the I side, `0x002` alone against `0x200` +
+`0x002`, untreated and store-miss controls. qemu cannot: its Malta writes `XContext`.
 
 ## 7. No write path, and how to confirm it from the binary
 
