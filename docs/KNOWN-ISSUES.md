@@ -1453,7 +1453,7 @@ with all four security headers, through the chain host → httpd (uid 100, chroo
 restart above, a login costing **0.902 s** for the right password and **0.9017 s** for the wrong
 one — the same, so the timing does not leak which it was.
 
-## 🔴 CI is red on all four heads pushed on 2026-09-30, from `R8a`'s closing commit on, and `census` has run on none of them — 2026-10-02 (the one hundred and nineteenth segment)
+## 🟢 CI was red on all four heads pushed on 2026-09-30, from `R8a`'s closing commit on, and `census` ran on none of them — 2026-10-02 (the one hundred and nineteenth segment); closed 2026-10-04 on run `37134992834`
 
 量 2026-10-02, `gh`: runs `36683089537` (`f5641f3d`), `36683808713` (`b52dee0d`),
 `36719609297` (`8cb929d2`) and `36719878923` (`5eaeb643`) are all `failure`; the last green run
@@ -1464,7 +1464,9 @@ commits, `3e3e14c1`…`f5641f3d`, so neither commit that brought a fault in (`a0
 `f353b7b8`) had a run of its own. What each step printed is quoted from run `36719878923`,
 read through the jobs API, because `gh run view --log` leaves these steps out without saying
 so; all four reproduce at the desk on `5eaeb643` (`desk-sweep --only`: 4 ran, 4 red).
-**Diagnosed, fix in progress: nothing below is fixed.** `SPEC.md` `FW-185`.
+**What follows is the diagnosis as it stood on 2026-10-02; each step was then repaired in a
+commit of its own, and the entry closed on the first green run (its last paragraph).**
+`SPEC.md` `FW-185`.
 
 **`nic15check`.** It prints
 `RESULT: 0 passed, 50 failed (header config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic-tx.h)`:
@@ -1545,19 +1547,41 @@ authorised leaving detection to CI, and CI detected: the first two runs had conc
 118's `LOG.md` entries mentions a CI verdict.
 
 **What this does not establish.** `census` ran on none of the four heads, so every layer it
-covers is unmeasured there (`CLAUDE.md` § Closeout: a red `text` job hides `census`). The four
-causes look independent — different files and mechanisms, `nic15check`'s from `a008fde6` and
-the other three from `f353b7b8` (讀, git history) — but only one green run can show that no
-repair unmasks another, and `test-config-gates` already holds two defects of which CI shows
-one. Every 量 above about a mechanism was measured at the desk; the runner was not re-run.
-Nothing here concerns the device: no failing step reads the board, and no capture was changed.
+covers is unmeasured there (`CLAUDE.md` § Closeout: a red `text` job hides `census`); it ran
+again first on `8a3b3be3`, in the last paragraph. The four causes looked independent — different
+files and mechanisms, `nic15check`'s from `a008fde6` and the other three from `f353b7b8` (讀, git
+history) — and the green run is the one reading that shows no repair unmasked another, on that
+head. Every 量 above about a mechanism was measured at the desk; the runner was not re-run on
+the four old heads. Nothing here concerns the device: no failing step reads the board, and no
+capture was changed.
 
 **What changes in practice.** A line in an agent's report that says a step will go red is
 handled before the push — repaired, or the push waits — and agents now write it as a line
 starting `WILL-RED:`, so it cannot be relayed as a remark. After a commit that adds `bench/`
 captures, every suite that reads `bench/` runs before the push, under any relaxation. Read 2026-10-02 from `ci.yml` and the tools, and run on a tree without and with new captures: `bootbytes`, `capdate`, `test-boot-timeline`, `test-reply-size`, `xcheck sweep`, `audit-bench-log (exit-code gate)` (`text`);
-`viewdecode`, `mustrun` (`instruments`); and the `cardcheck` and `rbcheck` mutation suites, which scan `bench/` and were not run. `capdate` goes red on a new date directory without its `bench/README.md` row; the others hold numbers new captures move. This entry closes on the first green
-run.
+`viewdecode`, `mustrun` (`instruments`); and the `cardcheck` and `rbcheck` mutation suites, which scan `bench/` and were not run. `capdate` goes red on a new date directory without its `bench/README.md` row; the others hold numbers new captures move. This entry was to close on the first green
+run, and it has.
+
+🟢 **Closed 2026-10-04 on run `37134992834`.** 量 `gh`: on `8a3b3be3`, created 2026-10-03
+23:56:00 +08:00, `lint`, `text`, `instruments` and `census` all `success`, `census` finishing at
+2026-10-04 00:26:50 +08:00 — the first time it had run since `380cdf6d`. The push carried eleven
+commits, `5eaeb643..8a3b3be3`, and each red step was repaired in a commit of its own:
+`test-config-gates` in `9013a17a` (its mutants run where an unmutated copy passes, with
+`appletcensus.py` copied beside the subject as `test-mkinitramfs-mutants.py`'s `B0` does, and a
+mutation that changes nothing is refused); `audit-bench-log (exit-code gate)` in `ae9b2b9e` (the
+thirteen hits exempted by file name and exact line in `FILE_EXEMPT`, held by control `A4`, so
+`ALLOW` and the `10.9.9.9` probes are untouched); `nic15check` in `d96be8b9` (the harness
+supplies the kernel header the include asks for, and a header found nowhere refuses the run by
+name); and `bootbytes` in `fe141ba9` (the capture tool's echoed ESCs counted as a term, so
+`R7`'s userspace boot is one declared constant, 2,029, rather than two). Before the push, a desk
+run on the integration clone ran all 26 selected steps and 25 were green; the 26th,
+`test-config-gates`, is red at the desk and only there — two `E5` lines and `E6` need the
+gitignored `build/` — with 68 passed and 3 failed in the desk shape and 64 passed, 0 failed and
+2 skipped in the runner's, both measured, and the same 68 / 3 at `8a3b3be3`'s base. What the
+closure does not establish: anything about a head after `8a3b3be3`; that the desk shape of
+`test-config-gates` is green, which it is not until `build/` exists; and anything about the host
+tests under `src/`, which no CI step runs (讀), so `FW-184`'s regression test,
+`src/brokerd/test_reload.c`, runs only at the desk.
 
 ## Closed since `v0.2` was tagged
 
