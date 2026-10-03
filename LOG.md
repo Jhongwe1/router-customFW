@@ -33711,3 +33711,94 @@ CI 代替。
 `spec-check`／`citecheck`／`docsize`／`cfcensus`／`capdate`／`test-file-modes` 全綠；
 `flashwin scan --dump` 對整棵樹 16,256 個檔 CLEAN。板子仍通電、跑著帶登入修好的映像，
 **flash 一個位元組都沒寫過**。
+
+## 2026-10-02 — 第一百一十九段（23:28 開場，桌面＋上機，…）：（進行中）
+
+### 1. CI 紅：2026-09-30 推上去的四個 head，同樣四個步驟（紀錄）
+
+開場時擁有者貼回上一段收工寫的帳（量，`gh`，2026-09-30 收工時）：`f5641f3d`、`b52dee0d`、
+`8cb929d2`、`5eaeb643` 四個 run 全部 failure，最後一個綠的是 `380cdf6d`；`lint` 過，`text`
+與 `instruments` 紅，`census` 被 skip。約 23:29 主 session 用 `gh run list` 重量，相符。
+`ci-rec` 代理接著用 `gh run view --json jobs` 讀每一步、用 jobs API 讀完整的 job log，並在
+23:48–23:52 於桌面重現（`5eaeb643` 的乾淨 clone，`desk-sweep --only` 這四步：4 ran、4 red）。
+
+- 四個 run 紅的都是同樣四步：`text` 的 `bootbytes`、`test-config-gates`、
+  `audit-bench-log (exit-code gate)`，`instruments` 的 `nic15check`；`census` 四次都是
+  `skipped`、0 步。第一次推送帶了六個提交（`3e3e14c1`…`f5641f3d`），帶進缺陷的
+  `a008fde6` 與 `f353b7b8` 都沒有自己的 run。
+- **`gh run view --log` 與 `--log-failed` 會漏步驟**：`text` job 的 `--log` 裡根本沒有那三步，
+  `--log-failed` 只給 `nic15check`。對它 grep `bootbytes` 回 0 —— 那個 0 是工具的盲點，
+  不是答案；jobs API 的整份 log 才讀得到。
+
+四個原因（診斷；修法由別的代理在做，這裡一個都不宣稱修好）：
+
+1. `nic15check`：`0 passed, 50 failed`（23 個 `K`、27 個 `M`）。讀：`a008fde6` 把
+   `#include <linux/rlxfw-entropy.h>` 放進 `rtl819x-nic-tx.h`，而 `nic15check` 用主機的 gcc
+   編的正是那個 header；工具只印 gcc 錯誤的第一行，所以 log 看不到缺的是哪個檔。量（桌面
+   23:52）：單獨編那個 header 停在 `fatal error: linux/rlxfw-entropy.h: No such file or directory`，
+   `380cdf6d` 的版本編得過。**諷刺要記下來**：include 放在那裡是 `FW-110` 的修法 —— 熵鉤子
+   第一版往 `rtl819x-nic.c` 插了 22 行、移動 61 個被引用的行、`citecheck` 在六個檔上紅（讀，
+   `a008fde6` 的提交訊息）—— 保住 61 個引用的那個修法，改成打壞一支主機 harness。mutation
+   套件一路是對的：`M0` 不在紅的基準上算 kill，每個 mutant 都讀 `SURVIVED`。
+2. `test-config-gates`：**上一段交接的診斷是錯的 —— 帳上寫 `E6`，runner 上紅的是 `M6`**：
+   `FAIL M6 fails A24 expected 1, got 0`，而 `E5-E6` 在 runner 上跳過（沒有解開的 rootfs；量，
+   job log 與 `ci-out-text` artifact 的 `test-config-gates.out`）。
+   量（桌面 23:48，四臂，預測與否證條件先寫進腳本）：`M6` 從 `mktemp -d` 的目錄跑一份拿掉
+   flash 寫入節點禁令呼叫的 `mkinitramfs.py`；`f353b7b8` 在同一處加了第二道守衛
+   `check_no_h601_dumper`，它從腳本自己的目錄 import `appletcensus`，在暫存目錄裡 import
+   失敗，於是把每一個帶 mtd 節點的宣告都拒絕 —— 理由是 import，不是禁令 —— `A24` 照樣綠，
+   `M6` 紅。四臂：暫存目錄＋未改，`A25`、`A26` 紅；暫存目錄＋`M6`，`A24` 綠（重現 CI）；
+   `PYTHONPATH=tools`＋`M6`，`A24` 紅，`accepted: mtdblock0, mtdblock1, mtd0 even`；
+   `PYTHONPATH=tools`＋未改，全綠。否證條件（第三臂 `A24` 綠）沒有發火；修這一步的代理獨立
+   讀到同一個原因。讀：`tools/test-mkinitramfs-mutants.py` 在 `R7` 就撞過同一個 import —— 它的
+   控制 `B0` 要求未改的工具在暫存樹裡也要過，所以它把 `appletcensus.py` 複製到旁邊 —— 而這個
+   套件的突變沒有跟著改。`E6` 也壞了，但只在有 `build/` 的桌面上：它 `sed` 的目標
+   `$UNIT/bin/busybox` 在 `R7-8`（`f353b7b8`）換成 `$REPO/build/rlxfw-user/busybox/busybox`，
+   `sed` 什麼都沒改；desk-sweep 的拷貝沒有 `build/`，`E5` 先拒絕，`E6` 空洞地綠（桌面
+   `68 passed, 3 failed`：`M6` 與兩個 `E5`）；runner 上兩個都跳過。**那句警告在桌面上是真的，
+   對 CI 紅的那個案例（`M6`）什麼都沒說，而 `M6` 沒有人預測到。**
+3. `audit-bench-log`：13 個命中全是 `10.9.9`，在**五個檔、三份擷取**（`R78-iu1` 的 .log 5、
+   .meta.json 3，`R78-iu2.log` 3，`R78-iu4` 的 .log 1、.meta.json 1）—— 帳上寫「五個擷取」，
+   其實是五個檔。讀（修這一步的代理，從擷取的位元組；按值的計數在這裡重讀過）：12 個是打進
+   `ifupd` 的合成租約值（`FW-181`）—— `10.9.9.9` 六次、`10.9.9.1` 與 `10.9.9.53` 各三次 ——
+   出現在 ash 對送出命令的回顯、`.meta.json` 的 `sent` 紀錄、`ifupd` 的 `bound ok` 那一行與
+   `cat /run/wan.dns` 的輸出；1 個不是打的：`Bcast:10.9.9.255`，核心從打進去的位址與 mask
+   推出的廣播。沒有一個說不出來源。
+4. `bootbytes`：`K2` 兩個沒宣告的常數 `{2647: 1, 2746: 1}`，來自 `R78-boot.log` 與
+   `R79-boot.log`（都在 `f353b7b8`）。它們是不是對的新常數是 推，要像 2026-09-28 的
+   `88b7262` 推出 339 那樣，從各自的映像推出來。
+
+**流程上的失誤比四個步驟重要，不淡化。** 四個裡有三個在推之前就被點名，其中兩個寫在造成它
+的代理的報告裡：image 代理寫「`test-config-gates` `E6` 會紅，因為它 sed 的字串沒了」（在桌面上是真的；CI 紅的是
+`M6`）；
+owner-file 代理寫「`audit-bench-log` 會報 13 個 `10.9.9`，在那裡加 `ALLOW` 會打壞它自己的
+控制 `A2` 與 `leakscan` 的 `L3`，因為兩者都用 `10.9.9.9` 當探針，所以要先改那兩個探針」——
+同一個警告還隨著擷取一起提交進了 `tools/spec-check.py` 的 C6 白名單（`f353b7b8`）。兩份
+都讀過、都跟擁有者說了「值得知道」，然後沒動作。`bootbytes` 是早就有規則的那一類：
+`CLAUDE.md` 收工那節寫明新擷取會移動母體案例，而 2026-09-28 `2470d6f` 上 CI 紅的就有
+`bootbytes` `K2`，那一條自己寫著「是我的錯」。擁有者 09-30 的放寬授權把偵測推給 CI（第一百
+一十八段：「CI 代替」），而 CI 做了它的事 —— 前兩個 run 在 15:50 與 15:58 已經是 failure；
+它沒有授權無視一份已經在手上的警告。`8cb929d2` 與 `5eaeb643` 在 21:09 與 21:11 推上那片紅，
+第一百一十八段的兩條紀錄都沒有提 CI 的判決。
+
+**這不證明的**：`census` 在這四個 head 上一次都沒跑，它管的每一層在那裡都沒有量；四個原因
+看起來互相獨立（`nic15check` 來自 `a008fde6`，另外三個來自 `f353b7b8`），但只有一次綠的
+run 能證明修一個不會揭出另一個 —— `test-config-gates` 已經一步裡藏兩個缺陷，CI 只顯示一個；
+機制上的 量 都是桌面量的，runner 沒有重跑；跟裝置無關。
+
+**做法上改的**：代理報告裡「這會紅」的一行，推之前處理 —— 修掉，或推送等；這一段起代理把
+它寫成 `WILL-RED:` 開頭的一行，主 session 對每一行都要動作。提交 `bench/` 擷取之後、推之前，
+讀 `bench/` 的每一個套件都要跑，不管放寬到哪一層；清單由另一支代理在列，列好之後連到
+`docs/KNOWN-ISSUES.md` 那一條。紀錄先於修法：這一條、那一條與 `SPEC.md` `FW-185` 先落地，
+修的提交才有東西可以指。
+
+順帶讀到、這個提交不改：`notes/entropy.md` 說那次插入「moved 70 citations across six files.
+§ 8 records it」，而 § 8（Build result）沒有這件事；61 是行、70 是引用，可能是兩種單位，
+沒有重量。
+
+### 2. `PROGRESS.md` 的 `R8` 列（狀態就地修正）
+
+主 session 重量時讀到：gate board `R8` 列的證據格寫「`R8a` open 2026-09-30; `R8b` booked,
+not open」，而 `R8a` 2026-09-30 就關了（`docs/GATE-RESULTS.md` 第十六條；§ Now 也這樣寫）。
+就地改成 `R8a` ✓ 加第十六條的連結，行數不變（那一行沒有被引用）；`Status` 的 `~` 不動：
+`R8b` 還沒開，`R8` 整列仍開著。

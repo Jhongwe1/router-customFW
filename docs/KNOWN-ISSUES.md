@@ -1409,6 +1409,112 @@ with all four security headers, through the chain host → httpd (uid 100, chroo
 restart above, a login costing **0.902 s** for the right password and **0.9017 s** for the wrong
 one — the same, so the timing does not leak which it was.
 
+## 🔴 CI is red on all four heads pushed on 2026-09-30, from `R8a`'s closing commit on, and `census` has run on none of them — 2026-10-02 (the one hundred and nineteenth segment)
+
+量 2026-10-02, `gh`: runs `36683089537` (`f5641f3d`), `36683808713` (`b52dee0d`),
+`36719609297` (`8cb929d2`) and `36719878923` (`5eaeb643`) are all `failure`; the last green run
+is `36632061486`, on `380cdf6d`. All four fail the same four steps — in `text`, `bootbytes`,
+`test-config-gates` and `audit-bench-log (exit-code gate)`; in `instruments`, `nic15check` —
+with `lint` green and `census` `skipped`, zero steps run. The first of those pushes carried six
+commits, `3e3e14c1`…`f5641f3d`, so neither commit that brought a fault in (`a008fde6`,
+`f353b7b8`) had a run of its own. What each step printed is quoted from run `36719878923`,
+read through the jobs API, because `gh run view --log` leaves these steps out without saying
+so; all four reproduce at the desk on `5eaeb643` (`desk-sweep --only`: 4 ran, 4 red).
+**Diagnosed, fix in progress: nothing below is fixed.** `SPEC.md` `FW-185`.
+
+**`nic15check`.** It prints
+`RESULT: 0 passed, 50 failed (header config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic-tx.h)`:
+`K0 does not compile`, `K1`–`K22` `not run: K0 failed`, `M0` reading
+`the unmutated copy is RED: no kill below is counted`, and `M1`–`M26` each
+`SURVIVED: the mutant does not compile` — 23 `K` and 27 `M`. 讀: `a008fde6` added
+`#include <linux/rlxfw-entropy.h>` to `rtl819x-nic-tx.h`, a header that lives in the kernel
+tree, and `tools/nic15check.py` compiles exactly that header (its `HEADER`) into a harness with
+the host's gcc. The tool prints only the first line of gcc's error, so the log never names the
+missing file; 量 at the desk, the header compiled alone stops at
+`fatal error: linux/rlxfw-entropy.h: No such file or directory`, and its copy at `380cdf6d`
+compiles. 🔴 **The include is there because of a fix.** The hook's first version inserted 22
+lines into `rtl819x-nic.c`, moved 61 cited lines and turned `citecheck` red in six files
+(`FW-110`; 讀, `a008fde6`'s message — `notes/entropy.md` counts 70 citations; neither count is
+re-measured here). Moving the include into a header no file cites by line kept all 61 and broke
+a host harness instead. 🟢 **The mutation suite did what it is for**: `M0` refused to count a
+kill off a red baseline, and every mutant reads `SURVIVED`, not killed.
+
+**`test-config-gates`.** One failure on the runner, `FAIL M6 fails A24 expected 1, got 0`
+(`RESULT: 63 passed, 1 failed, 2 skipped`); `E5-E6` are skipped there, since the runner has no
+extracted rootfs (量, the job log and the `ci-out-text` artifact's `test-config-gates.out`).
+量 at the desk, four arms with the prediction written first, and read independently by the
+agent repairing this step: `M6` runs a copy
+of `mkinitramfs.py` with the flash-write node ban's call removed, from a `mktemp -d` directory,
+and `f353b7b8` added a second guard beside that call in `resolve()`, `check_no_h601_dumper`,
+which imports `tools/appletcensus.py` from the script's own directory. From the temporary copy
+the import fails, the new guard refuses every declaration that has an mtd node — for the
+import, not the ban — and `A24`'s three bad nodes stay refused with the ban gone. With `tools/`
+on `PYTHONPATH` the same mutant's `A24` reads `accepted: mtdblock0, mtdblock1, mtd0 even`, and
+the unmutated copy passes `A24`–`A26`. 讀: `tools/test-mkinitramfs-mutants.py` met the same
+import in `R7` — its control `B0` requires the unmutated tool to pass in the temporary tree,
+and it copies `appletcensus.py` beside the subject — and this suite's mutants were not given
+the same copy. ⚠️ **The handoff's diagnosis was wrong about the case.** The account written at
+segment 118's close names `E6`, as did the warning before the push. `E6` is broken too, but
+only at the desk with `build/` present — 讀, its `sed` target `$UNIT/bin/busybox` became
+`$REPO/build/rlxfw-user/busybox/busybox` in `R7-8` (`f353b7b8`), so the `sed` changes
+nothing; in a desk-sweep copy, which has no `build/`, `E5` refuses first and `E6` passes
+vacuously (the desk-only case `LOG.md` records on 2026-09-28), and on the runner both are
+skipped. **The warning was true at the desk and said nothing about the case CI fails on, `M6`,
+which nobody predicted.**
+
+**`audit-bench-log (exit-code gate)`.** `13 hit(s) -- review each before committing`, each a
+`private IPv4` match on `10.9.9`, in five files of three captures (量, the runner's log; the desk
+reproduces 13): `bench/2026-09-30/R78-iu1.log` 5, `R78-iu1.meta.json` 3, `R78-iu2.log` 3,
+`R78-iu4.log` 1, `R78-iu4.meta.json` 1. 讀: they come from the synthetic lease typed into
+`ifupd` at the desk on 2026-09-30 (`FW-181`); no DHCP server issued it. Twelve are the typed
+values — `10.9.9.9` six times, `10.9.9.1` and `10.9.9.53` three each — in ash's echo of the
+sent command, the `sent` records of the `.meta.json` files, `ifupd`'s `bound ok` line and the
+output of `cat /run/wan.dns`; one was not typed, `Bcast:10.9.9.255`, the broadcast the kernel
+derives from the typed address and mask. None is unexplained (讀, the agent repairing this step,
+from the capture bytes; the counts by value re-read here). `f353b7b8` committed the
+warning together with the captures, in `tools/spec-check.py`'s C6 allowlist entry for `10.9.9`:
+the five files "give audit-bench-log.py 13 hits once committed", and the tool's control `A2`
+and `leakscan.py`'s `L3` both probe with `10.9.9.9`.
+
+**`bootbytes`.** `FAIL K2 a normalised constant is NOT declared: {2647: 1, 2746: 1}`, from
+`bench/2026-09-30/R78-boot.log` (3,890 bytes) and `R79-boot.log` (3,989 bytes), both committed
+in `f353b7b8`; `6 of 7 ok` (量, the runner's log). 讀: the tool declares the normalised
+boot-capture lengths it accepts, and a capture of a new image moves that population. Whether
+2,647 and 2,746 are the right new constants is 推 until each is derived from its image, as
+`88b7262` derived 339 on 2026-09-28.
+
+🔴 **The failure that matters is not any of the four steps.** Three of the four were named
+before the push (讀, the account written at segment 118's close), two of them in the reports of
+the agents whose work caused them: the image agent wrote that `test-config-gates` `E6` would go
+red because the string it `sed`s is gone (true at the desk; CI fails on `M6`, above); the
+owner-file agent wrote that `audit-bench-log`
+would report 13 `10.9.9` hits, that an allowlist entry there would break its own control `A2`
+and `leakscan`'s `L3`, which both probe with `10.9.9.9`, and that those probes had to change
+first. Both reports were read and relayed to the owner as worth knowing, and neither was acted
+on. `bootbytes` is a class with a written rule: `CLAUDE.md` § Closeout says new captures move
+population cases, and `LOG.md` records the same case on 2026-09-28 — `2470d6f`'s captures
+turned `bootbytes` `K2` red — as the same mistake. The owner's relaxation of 2026-09-30
+(`LOG.md`, segment 118: no desk-sweep, the minimum relevant checks per commit, CI instead)
+authorised leaving detection to CI, and CI detected: the first two runs had concluded red by
+15:50 and 15:58 (+08:00) that day. It did not authorise ignoring a warning already in hand.
+`8cb929d2` and `5eaeb643` were pushed onto that red at 21:09 and 21:11, and neither of segment
+118's `LOG.md` entries mentions a CI verdict.
+
+**What this does not establish.** `census` ran on none of the four heads, so every layer it
+covers is unmeasured there (`CLAUDE.md` § Closeout: a red `text` job hides `census`). The four
+causes look independent — different files and mechanisms, `nic15check`'s from `a008fde6` and
+the other three from `f353b7b8` (讀, git history) — but only one green run can show that no
+repair unmasks another, and `test-config-gates` already holds two defects of which CI shows
+one. Every 量 above about a mechanism was measured at the desk; the runner was not re-run.
+Nothing here concerns the device: no failing step reads the board, and no capture was changed.
+
+**What changes in practice.** A line in an agent's report that says a step will go red is
+handled before the push — repaired, or the push waits — and agents now write it as a line
+starting `WILL-RED:`, so it cannot be relayed as a remark. After a commit that adds `bench/`
+captures, every suite that reads `bench/` runs before the push, under any relaxation; the list
+of those suites is being drawn up and will be linked here. This entry closes on the first green
+run.
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**
