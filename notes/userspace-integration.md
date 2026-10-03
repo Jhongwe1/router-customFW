@@ -382,3 +382,42 @@ boot**. It does not establish that the six programs are correct, only that none
 of them died and was respawned. It says nothing about load: the box was 99.96 %
 idle, so this is an idle soak and not a stress result. And `rlx0`'s zero error
 counters are over 6,431 packets, which is a small population.
+
+### 9.2 🆕 2026-10-04 — `n_writes` names three different counters, and one of them is the flash
+
+A reading hazard rather than a finding about the machine, recorded because it
+would produce a false alarm in exactly the place that matters least to be wrong
+about. 量 2026-10-04:
+
+| `/proc` file | `n_writes` | what it counts |
+|---|---|---|
+| `rtl819x-spi` | **0** | **flash writes** — the one `CLAUDE.md` § Flash means, and `FW-142` bounds |
+| `rtl819x-nic` | 14 | register writes in the Ethernet driver |
+| `rtl819x-switch` | 6 | register writes in the switch driver |
+
+So a census that greps `n_writes` across `/proc` reads three non-zero-looking
+numbers, two of which say nothing whatever about flash. The flash counter is the
+one in `rtl819x-spi`, it read 0 before this segment's two whole-chip digests and
+0 after them, and `FW-142` already says what even that zero cannot establish.
+
+### 9.3 🆕 2026-10-04 — a second memory point on the same boot, and why the first pair was not comparable
+
+`FW-188` records `MemFree` 21,836 kB at 8 h 55 m and says in the same row that
+one point is not a trend. 量 2026-10-04 05:26:53, uptime 36,902.56 s
+(10 h 15 m), `bench/2026-10-04/SOAK2`, from `busybox free`:
+
+| | 04:09:29 | 05:26:53 | Δ |
+|---|---:|---:|---:|
+| `free` | 21,808 kB | 21,816 kB | **+8** |
+| `used` | 6,680 kB | 6,672 kB | **−8** |
+
+Over 1 h 17 m `used` did not grow. 🔴 **This is not yet the answer**: the
+registered criterion is two readings at least four hours apart within one boot,
+and 1 h 17 m is not that. It is a second point pointing away from a leak.
+
+🔴 **And the pair that was NOT comparable is the instructive half.**
+`/proc/meminfo` read 21,836 kB at 04:07 while `busybox free` read 21,808 kB at
+04:09 — two minutes apart, 28 kB different. Differencing those two would have
+manufactured a 28 kB leak out of an instrument disagreement. The table above is
+`free` against `free`. Any later reading that closes this row must come from
+`busybox free` as well, or it joins a different population.

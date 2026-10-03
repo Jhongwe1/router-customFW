@@ -1,0 +1,9 @@
+cat /proc/uptime /proc/loadavg; busybox free; echo S2""Z
+36902.56 36864.57
+0.00 0.00 0.00 2/17 89
+              total         used         free       shared      buffers
+  Mem:        28488         6672        21816            0            0
+ Swap:            0            0            0
+Total:        28488         6672        21816
+S2Z
+# 

@@ -1,0 +1,9 @@
+cat /proc/rtl819x-view; echo Q2""Z
+version rtl819x-view 1.1
+admit 311
+last none j 0 rc 0
+n_mib 0 n_tbl 0 n_peek 0 refused 0 busy 0 ld 0
+ref 00000000 none
+jiffies 3673405
+Q2Z
+# 

@@ -244,3 +244,60 @@ its positive control is a button held for ten seconds against a 1 Hz writer.
 🟢 **`dt/rtl8196e-totolink-n150rt.dts` is where that conflict became something
 to point at.** In a device tree, two consumers of one GPIO line is visible in
 the source; on 2.6.30 it is an errno at run time.
+
+## 🆕 2026-10-04 (120th segment) — the peripheral census, read off the running board
+
+This file has been a driver-binding document. This section is the first of what
+`P3`'s report needs for its 周邊盤點 and 已知良好的暫存器值 sections: every
+driver's own `/proc` state, read on one boot of `f184a` that had been up 10 h 15
+m with no reset. 量 2026-10-04 05:29, `bench/2026-10-04/PER-CPU`, `PER-VIEW`,
+`PER-NIC`, `PER-SW`, `PER-GPIO`, `PER-KEYS`, `PER-TMR`, `PER-MDIO`. All reads.
+
+### Three independent confirmations
+
+| reading | value | what it confirms |
+|---|---|---|
+| `/proc/cpuinfo` `cpu model` | **52481** = `0xCD01` | a THIRD source for `PRId`: `RLX4181` rev 1, with `RLX5281` (`0xdc01`) positively excluded. Also `system type RTL819xD`, `tlb_entries 32`, `mips16 implemented yes`, `BogoMIPS 398.95` |
+| `rtl819x-timer` `period_cycles` | **2000** | a THIRD source for `TC0DATA`'s count field being 2,000 — `REG-05` reads the field as bits 31:4 and the raw register prints `0x00007D00`, which is the pair that nearly produced a false contradiction against `CLAUDE.md` earlier in this segment |
+| `rtl819x-timer` `jiffies` / `wall` | `4298640981` / `37036.85` | these look inconsistent and are not. 4,298,640,981 − 4,294,937,296 (Linux's `INITIAL_JIFFIES`, −300×HZ at HZ=100) = **3,703,685**, which is 37,036.85 × 100 exactly. The large value is the kernel's negative start, not a defect |
+
+`rtl819x-timer` also carries `hz_assumed 14286057` beside `hz_tick 200000`,
+`hz_cdbr 200000`, `hz_used 200000` and `hz_agree 1`: the base clock and two
+derivations of the real one, with the driver stating that the two derivations
+agree rather than assuming it.
+
+### Three gaps, each of which would be wrong to paper over
+
+* **MDIO has never read a PHY id.** `rtl819x-mdio`: all five ports `id - rc 1
+  xrc 1`, `mdio_rd 0`, `mdio_wr 0`, bus `unlocked 0`, `scanned 00000000`. So any
+  claim that this driver identifies the PHYs is unsupported. `NET-136` 殘留
+  already records that nothing reads PHY register 31.
+* **The key driver has no interrupt.** `rtl819x-keys`: `irq_probe -6`,
+  `irq_live -6`, `enxio -6` — `-ENXIO` — so it polls, `poll_ms 50`,
+  `poll_jiffies 5`. `nbuttons 1`, `b0_gpio 5`, `b0_code 408`, and `n_ev 0`: no
+  key event on this boot. A claim that the button is interrupt-driven is false.
+* **GPIO's live CNR and DIR do not match the spec.** `rtl819x-gpio`:
+  `cnr FFFFFF8B` against `boot_cnr FFFFFFDF`, `dir FF000040` against
+  `boot_dir FF000000`, and the driver says so itself with `cnr_as_spec 0` and
+  `dir_as_spec 0`. `dat 0000007C` equals `boot_dat`. `btn_raw 1`,
+  `btn_pressed 0`. This is the shape `CLAUDE.md` warns of: Linux reprograms
+  `PABCD`'s CNR and DIR, so a loader-state constant does not predict it.
+
+### One row this hands to `R9`
+
+`rtl819x-view` reports `admit 311`, `n_mib 0`, `n_tbl 0`, `n_peek 0`,
+`refused 0`, `busy 0`. rlxfw ships a register viewer with a **bounded
+311-entry allow-list**, and nothing had peeked through it on this boot. That is
+the design answer to `FW-67`'s vendor finding of an unbounded peek/poke, so the
+differential row's mechanism class is 有界化 and its rlxfw cell has a reading.
+Its vendor half stays `V-D`: reading `/proc` on the vendor firmware needs a
+shell, which it has not got.
+
+### What this section does not establish
+
+It is one boot of one image, and `admit 311` is a count the driver reports about
+itself — it is not an audit that the allow-list is correct, only that it exists
+and refused nothing because nothing asked. `refused 0` beside `n_peek 0` is a
+guard that has never been exercised, which is weaker than a guard shown
+refusing. The three gaps are absences of readings, not evidence that the
+hardware cannot do those things.
