@@ -94,7 +94,7 @@ live sites, 0 `struct irqaction`:
 hook is a **net-zero** edit (`FW-110`). It replaces the blank line after
 `nic_n_irq++;` instead of inserting, and the `#include` goes into
 `rtl819x-nic-tx.h`, which no file cites by line — because the first version
-inserted 22 lines and moved 70 citations across six files. § 8 records it.
+inserted 22 lines, and `citecheck` flagged 68 citations in six files as moved by them.
 And every registration that is **compiled** in the image,
 by two independent methods — a grep over the 617-source compiled list taken
 from the kbuild `.cmd` files, and a `readelf -sW` sweep of 645 objects for an
@@ -212,7 +212,7 @@ an existing rlxfw driver. **No new kernel config symbol** — so
 | `config/rlxfw-src/linux-2.6.30/include/linux/rlxfw-entropy.h` | the interface, and the mechanism above in short |
 | `config/rlxfw-marks.tsv` `MK13` | `obj-y += rlxfw-entropy.o` into `drivers/char/Makefile`, anchored on the line that builds `random.o` |
 | `config/host-compat/0009-random-rlxfw-input.patch` | adds `rlxfw_random_add()` to `random.c`; changes no existing line |
-| `config/rlxfw-src/…/drivers/net/rtl819x-nic.c` | one call in `nic_isr()`, **replacing a blank line** so the file's 61 cited lines do not move (`FW-110`) |
+| `config/rlxfw-src/…/drivers/net/rtl819x-nic.c` | one call in `nic_isr()`, **replacing a blank line** so no line that other files cite moves (`FW-110`; § 2.2 gives the count the first version moved) |
 | `config/rlxfw-src/…/drivers/net/rtl819x-nic-tx.h` | the `#include`, which lives here because no file cites this header by line |
 
 ### 3.1 The clock
