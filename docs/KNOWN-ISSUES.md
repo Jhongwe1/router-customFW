@@ -1377,12 +1377,12 @@ attempts 4–12 refused with **`retry_s` 9**, a real bucket figure, and after 15
 is that the new stripped `httpd` appears verbatim inside `vmlinux_img` and the old one does not,
 with the control run both ways.
 
-## 🔴 `brokerd` never sees a password set after it started, so `cfgstore passwd` has no effect until it restarts — 2026-09-30 (`R7-8`)
+## 🟢 `brokerd` never saw a password set after it started, so `cfgstore passwd` had no effect until it restarted — 2026-09-30 (`R7-8`); fixed, and shown on the device 2026-10-03
 
 量 on the device, and it is a separate defect from the one above. `cfgstore passwd` succeeded —
 `written: slot 1, seq 2`, and `admin.pwhash set: scrypt log2N=12 r=7 p=1, entropy_avail was
 150` — `cfgstore get admin.pwhash` reads `set`, and `/api/status` reports `auth_ready:true`.
-Yet the **correct** password was answered `401 {"ok":false,"error":"auth"}` in **14 ms**.14 ms
+Yet the **correct** password was answered `401 {"ok":false,"error":"auth"}` in **14 ms**. 14 ms
 means no KDF ran, and that is what `brokerd` answers when it believes no password is set.
 
 **Confirmed by one experiment rather than by reading the code.** `busybox kill 12 13` let `init`
@@ -1390,10 +1390,54 @@ respawn both daemons (`brokerd exited exit=0` → pid 81, `httpd exited signal=1
 the same password then returned **HTTP 200** with a session's csrf token and `ttl_s 900`. So the
 configuration `brokerd` loads at start-up is the only one it ever has.
 
-This fails in the **fail-closed** direction — it refuses a login rather than allowing one — but
-for a router "the password you just set does nothing" is serious. The repair is either to re-read
-the 8 KiB store per request, which needs no new IPC, or to have `cfgstore` signal `brokerd`.
-Not fixed at the time of writing.
+For the first password this fails **closed**: it refuses a login rather than allowing one. 🔴 **For
+a password `cfgstore` replaces, it fails open**, which this entry did not say until 2026-10-03.
+On the host, `5eaeb643`'s broker kept accepting the replaced password and kept honouring every
+session opened under it (讀 + host test `src/brokerd/test_reload.c`, R2 and R3; on `5eaeb643`'s
+`brokerd` it fails 16 of its 40 checks, 2 of them controls). 量 on `r78a`, `F184-old`
+(`bench/2026-10-03/`), with `brokerd`'s pid 25 the same before and after: once `cfgstore passwd`
+had replaced the password, the **new** one was answered **HTTP 401 in 0.896 s**, a KDF's time, so
+it was checked against a stored hash (推: the one `brokerd` loaded when it started), and the
+**replaced** one **HTTP 200 in 0.897 s**. The same run reproduced the first half: the first
+password, written while `brokerd` ran as pid 12, was answered HTTP 401 in 0.143 s, no KDF, and
+HTTP 200 in 0.908 s once `busybox kill 12` had let `init` respawn it as pid 25.
+
+🟢 **Fixed, and shown on the device 2026-10-03.** `brokerd` now re-reads the store before every
+request it has not already refused (`bk_cfg_reload()`, called from `bk_dispatch()` before the
+session lookup), so each request is answered from the record a broker started at that instant
+would load. No lock is needed, 讀: `cfg_store()` writes in place, not by rename, but only into the
+slot that does not hold the selected record, and the per-slot header CRC, payload CRC and seq make
+a re-read that races a write return the last complete record (`src/cfgstore/test_cfg.c`'s
+torn-write sweep). A store that cannot be read, or has bytes and no valid record, leaves the
+defaults, which have no `admin.pwhash`; that is logged once per change of state. A changed
+`admin.pwhash` drops every session, as PWSET does. `test_reload` passes all 40 checks on the fix,
+built with gcc-13, with clang-18, and with clang-18 under asan and ubsan.
+
+量 on fw184's image `f184a`, `F184-fix2`, with `brokerd`'s pid 12 the same before and after: the
+first password was answered **HTTP 200 in 0.892 s** straight after `cfgstore passwd` wrote it,
+with no restart; after a second `cfgstore passwd`, the **new** password **HTTP 200 in 0.896 s**
+and the **replaced** one **HTTP 401 in 0.892 s**. The recipe id is not the evidence that `f184a`
+carries the fix: both boots print `RLXFW-ID0=0E45C61D`, because it digests `config/` only. The
+evidence is that the new stripped `brokerd` (101,212 bytes) appears verbatim in `f184a`'s
+`vmlinux_img` and not in `r78a`'s, the old one (101,172) the reverse, with the other five
+programs byte-identical to `r78a`'s; and `ls -l` on the device read `/usr/sbin/brokerd` as
+101,212 bytes (`F184-new-id`).
+
+⚠️ **The first run on `f184a` decided nothing, and it is kept.** `F184-fix` read INCONCLUSIVE.
+`f184a` had just booted; `brokerd` answers LOGIN and PWSET with NOENTROPY until `entropy_avail`
+has reached 128 once (`CB2-boot`: `entropy_avail=0 auth_ready=0`); `/api/status` did not report
+`auth_ready` within the script's 180 s, so the script stopped before writing any password (讀,
+its step 0). 1,000 echo requests at 7.1 ms (1,000 of 1,000 answered, by the host's ping log
+`$FWRE_WORK/rebuild/s119/bench/ENT1-ping1.txt`, outside this repository) then moved
+`/proc/rlxfw-entropy`'s `ev_nic` 288 → 2,292, and `bits` and `entropy_avail` both 17 → 142
+(`ENT1-e0`, `ENT1-e1`); `F184-fix2` ran next, on the same boot.
+
+What this does not establish: that a session opened under a replaced password is refused on the
+device (R3 is a host result; the bench script logs in and walks no session); two writers at once
+(a web SET or PWSET racing `cfgstore` can lose one update; for PWSET the window is its two KDFs,
+~1.8 s); `main()` itself, which the host test does not drive; a torn write on the device; the
+per-request cost on the device (推: one open, two 4 KiB reads, two CRCs over ~200 bytes, no
+measurement); and more than one run on each image.
 
 ## 🟢 What the first boot of rlxfw's own userspace DID establish — 2026-09-30 (`R7-8`)
 
