@@ -3363,7 +3363,152 @@ Each below is recorded where it is cited.
 
 ---
 
-## The operating clause, re-run at seventeen entries
+## 2026-10-04 — `R8` (closed on the three clauses `R8a` read from RAM, and the clause whose experiment is an interrupted flash write given a row of its own, `R8b`, behind `R9`)
+
+### One line
+
+**v0.5+, two segments — the 118th, shared with `R7`, for `R8a`; the 119th for this decision and for
+the CI repair that was its first condition — and no power action of its own.** § Gate board costs
+`R8` at 18 segments and the plan at 22, both for the two halves; the actual is **2** for the half
+that closed, which measures the cut and not the difficulty. **This entry is a split, not a
+completion.** `R8`'s row read *signed update accepted, one flipped bit rejected, 10 power-cuts
+survived*. It closes on what `R8a` read on the silicon on 2026-09-30 — a signed container accepted
+and its payload booted, one flipped payload bit refused at `DIGEST bad`, and a version below a
+RAM-staged counter refused at `VER cur=1 ctr=5 bad` — from RAM, with ten uploads and no `FLW`, `EW`,
+`EB` or non-zero `AUTOBURN` (entry 16). The third clause, and the persistence it implies, are an
+interrupted flash write by construction, so they are `R8b`'s row, booked behind `R9` and behind the
+owner's dated yes for each write. Nothing about writing flash or surviving a power cut is
+established here.
+
+**The weakest thing here is that nothing was measured to close it.** The row closes on readings
+taken a segment earlier and on two conditions set for it in this segment, of which one was met and
+one was replaced. Met: CI green with `census` on a head that contains `R8a`'s work — run
+`37134992834` on `8a3b3be3`, all four jobs `success`, the first `census` run since `380cdf6d` (量,
+`gh`). Replaced: `notes/rlxboot.md` § 6's second reading, a `DW` of `rlxboot`'s destination after
+the copy, was designed and then not run, because no value it can return separates *the flush is
+necessary* from *it is not* (`FW-172`, `6cfe908e`). So the cache handling on the gate's own success
+path is still 推, and the experiment that would decide it is `CPU-19` ①'s and is not scheduled.
+
+### Three claims that stand
+
+**① The row's three clauses hold on the silicon — on entry 16's evidence, which this entry does not
+re-measure.** 量 2026-09-30, four rounds in one seating (`bench/2026-09-30/R8A-*`; `FW-170`,
+`FW-171`). Round 1: the good container with the counter read from flash — `SIG ok` / `DIGEST ok` /
+`VER cur=1 ctr=0 ok` / `BOOT` — and the payload reached its shell. Round 2: one payload bit flipped,
+`SIG ok` and then `DIGEST bad` / `REFUSE digest`, no boot, with `SIG ok` in the same capture as the
+positive control that Ed25519 ran. Rounds 3 and 4: the same container against a RAM bitmap of 5 and
+then of 0 — `VER cur=1 ctr=5 bad` / `REFUSE rollback`, then a boot — differing in the bitmap's value
+and in nothing else. ⚠️ One seating, one build id `6395889d`, one image; the *anywhere* of *one
+flipped bit anywhere* is the host suite's 9,472 flips under `qemu-mips-static`, not the device's;
+and the script that compared 43 assertions line by line lives outside this repository.
+
+**② `R9` before `R8b` is a constraint, and the split is how the board states it.** 讀 the arithmetic
+(`FW-167`; entry 16 § `R8b`): slot A spans `0x070000`–`0x18FFFF` and the vendor kernel
+`0x060000`–`0x151012`, so the first write to slot A destroys 921,619 of that kernel's 987,155 bytes
+and `check_image()` stops finding a bootable image in flash. That boot is `R9`'s vendor column,
+TOTOLINK released no source, and restoring the 2026-08-16 dump means 3.3 MiB through a `burn()`
+with no lower bound, on a device with no spare. A row that held both halves would read `~` for the
+whole of `R9` while nothing in it could move; running `R8b` first would end the vendor column. ⚠️
+The arithmetic is 讀 from `SPEC.md`'s flash-map rows and the loader's scan table, and its one unread
+input is `check_image()`'s `bank_offset`, never read for this build.
+
+**③ The tree that holds `R8a`'s work is green on every CI layer, `census` included, for the first
+time since `380cdf6d`.** 量 `gh`: run `37134992834` on `8a3b3be3`, created 2026-10-03 23:56:00
++08:00; `lint`, `text`, `instruments` and `census` all `success`, `census` finishing at 2026-10-04
+00:26:50 +08:00. `8a3b3be3` descends from `f5641f3d`, `R8a`'s closing commit. Each of the four steps
+`SPEC.md` `FW-185` records as red on the four 2026-09-30 heads was repaired in a commit of its own —
+`test-config-gates` in `9013a17a`, `audit-bench-log (exit-code gate)` in `ae9b2b9e`, `nic15check` in
+`d96be8b9`, `bootbytes` in `fe141ba9` — and the push of eleven commits, `5eaeb643..8a3b3be3`,
+followed a desk run on the integration clone in which all 26 selected steps ran and 25 were green.
+The 26th, `test-config-gates`, is red at the desk and only there: two `E5` lines and `E6` need the
+gitignored `build/` — 68 passed and 3 failed in the desk shape, 64 passed, 0 failed and 2 skipped in
+the runner's, both measured. ⚠️ A green run is a claim about its controls: it certifies the layers
+that ran on `8a3b3be3` and says nothing about a later head.
+
+### The board row's clauses, read one at a time
+
+| the row said, until 2026-10-04 | verdict |
+|---|---|
+| **signed update accepted** | 🟢 **met** on entry 16's rounds 1 and 4. ⚠️ The update is a container staged in RAM by the loader's TFTP and entered with `J`, not an image written to a slot and booted from flash |
+| **one flipped bit rejected** | 🟢 **met** on round 2 for one payload bit, with `SIG ok` as its positive control; *anywhere* is the host's 9,472 flips |
+| **10 power-cuts survived** | 🔴 **not met, and not attempted**: the interrupted write is the experiment. It is `R8b`'s row now, booked and not open |
+| *(added by `R8a`)* **a version below the anti-rollback counter rejected** | 🟢 **met** on rounds 3 and 4, from a RAM bitmap, because the flash source cannot tell an erased region from an undecoded window. The counter never advanced |
+
+### The questions this gate must be able to answer
+
+The plan's `R8` row asks five. Entry 16 answers ① and ② and half of ③; ④
+「寫到一半斷電會怎樣？」and ⑤「只有一台機器你敢寫 flash？」are `R8b`'s, and closing `R8` changes none
+of the five answers. ③ is still half: the rescue payload is not built.
+
+### What `R8` did not establish
+
+🔴 **That anything can be written to flash and read back after a reset.** Neither `R8a`'s four
+rounds nor anything since issued a flash-write command, so no image has been written to a slot, no
+slot has been booted from flash, and the anti-rollback counter has never advanced: the monotonicity
+the design rests on is asserted and never exercised.
+
+🔴 **That an update survives a power cut.** The ten power cuts are `R8b`'s criterion ④ — ten
+physical pulls during a write, each followed by a boot from the other slot — and nothing here bounds
+what an interrupted write leaves behind.
+
+🔴 **That the cache flush is necessary, or correct on its own.** `FW-172` stays 推. Booting showed
+the composite path — copy, write back D with `CCTL 0x200`, invalidate I with `0x002`, jump — on one
+die for one copy. The second reading `notes/rlxboot.md` § 6 asked for cannot decide it: `rlxboot`'s
+SHA-256 streams the container through the 8 KiB D-cache before the copy (讀), so the copy stores to
+lines the D side does not hold (推); every route back to a prompt writes back first; and `rlxboot`
+has no arm that skips the flush. The deciding experiment is `CPU-19` ①'s — a probe1-style store to
+a line resident in the cache, read back by the I side, `0x002` alone against `0x200` plus `0x002`,
+with a no-treatment and a store-miss control — and it is not scheduled.
+
+🔴 **That the row's wording of 2026-08-25 is met.** It is not: the row was rewritten to what was
+measured, and the rewriting is a decision, recorded below, not a result.
+
+⚠️ **Entry 16's other residuals stand unchanged and are not repeated here**: key management, with a
+development seed in the tree on purpose; no secure boot, on a part with no evidence of a key-hash
+fuse; no defence against an attacker who can already write flash; the flash window's decode at
+`0xBD3F0000`; `rlxboot-rescue` unbuilt; `cvimg`'s `cr6b` against `check_image()`'s `cs6c` and `cr6c`
+(`FW-168`); and timing.
+
+⚠️ **The CI evidence is a run, not a property of the tree.** It is green on `8a3b3be3`; the heads
+after it — `44b333d6`, `3ad90840`, `82ec19d7` and this entry's commits — had no run when this was
+written.
+
+⚠️ **Flash.** 量: closing `R8` took no seating, and its rounds are entry 16's, whose bookkeeping
+stands. In the same segment the board was powered once — the owner's cold boot, caught from 23:30:47
+on 2026-10-02 — and reset once with `busybox reboot -f`, for `FW-184`'s runs and not for this gate;
+it made two uploads, `CB1` and `CB2`, each after `DW 8040D4A0` read `00000000` and the loader
+answered ARP, with the staged head read back equal to the file before each `J`. No `FLW`, `EW`,
+`EB`, non-zero `AUTOBURN` or `FLR` was issued. What that cannot see: two writes that cancel, every
+byte outside the words read, and `H601`, which is never hashed. No flash map was taken, so there is
+no bracket of the segment's own; the `FLR` bracket stays at 1,024 of 4,194,304 bytes =
+**0.0244 %**, and `FLS-26`'s ledger does not move.
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner delegated the decision on 2026-10-02 —「用最頂的工程思維幫我決定」— and continued the
+relaxation of 2026-09-27 and 2026-09-30, with the flash rules, `H601`, the power handshake and
+`NET-165` unchanged; those are the owner's own and are not listed.
+
+1. **`R8` closed by splitting its row**, weighed against the other options in the owner's question.
+   Keeping `R8` open until `R9` and then `R8b` was rejected: `R8b` depends on `R9` and `R8a` does
+   not, so one row would read `~` for the whole of `R9` — the plan guesses about six segments —
+   while nothing in it could move. Running `R8b` now, ahead of `R9`, was rejected: slot A's first
+   write ends the vendor firmware that `R9`'s vendor column depends on, and it cannot be undone
+   short of 3.3 MiB through a `burn()` with no lower bound. Opening `R9` first is the next-gate
+   question rather than an alternative to the split; it stays the owner's, and `R9` is the gate that
+   unblocks `R8b`.
+2. **The second closing condition replaced rather than met**: `notes/rlxboot.md` § 6's second
+   reading recorded as unable to decide and not run, `FW-172` left 推, and the deciding experiment
+   left with `CPU-19` ①, unscheduled (`6cfe908e`).
+3. **The rows that named `R8` as their owner re-owned to `R8b` in the closing commit**:
+   `PROGRESS.md` § Carried forward `C-1`, `C-3`, `C-4` and `C-13`, and `SPEC.md` § 17's `REG-13`,
+   `REG-14` and `FLS-06`–`FLS-08`. Each is about a slot layout, the flash write path or a boot from
+   flash, which is the half that writes; left on a closed `R8`, the four carried-forward rows would
+   read `ORPHAN` in `cfcensus`.
+
+---
+
+## The operating clause, re-run at eighteen entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -3373,7 +3518,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs.)*
 
 | pair | shared? |
 |---|---|
@@ -3393,6 +3538,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R6b` → `R1y` 🆕 | **no — `R1y` did not take on the thing the fourteen-entry run fired on, and the rest of the two lists are about different objects.** `R6b`'s residuals are the device's and its bench record's: the transmit fault's and the stall's mechanisms, the fix on `SWCORE=n`, `D8`'s inherited switch state on one seating, the vendor-code scope, the reset guard, what `R6b-8` did not build, four DoD rows' edges, what `D5` set aside, the relaxed process's evidence, `C-19`'s night and the power ledger. `R1y`'s are this repository's record: rows that grew in place, records' citations that can only be read, four enforcers ⊘, a reading kept outside the tree, six exemptions as wide as their lines, `SPEC.md` and the open carried-forward rows left as they were, stale line numbers in `tools/`, a tree not swept. ⚠️ The nearest candidate, `CLK-42` 殘留's missing gate, the nearest resemblance, an instrument blind to its own subject, and the flash boundary are each declined below |
 | `R1y` → `R8a` 🆕 | **no — and this run makes that verdict a run late, because entry 16 wrote no sixteen-entry run.** `R1y`'s residuals are text in this repository and the tools that read it; `R8a`'s are a second-stage loader on the silicon, flash, a counter, keys and a cache, and no step of `R8a` took an `R1y` residual on in writing, which the guard written at eight entries decides. ⚠️ The nearest candidate is a reading the tree does not hold — `FW-119`'s pre-commit reading, done by scripts kept outside the repository, beside `SPEC-R8a.md` and the verdict script — and it is declined as a shape: one is a **procedure** the tree does not repeat, the others are **artefacts** the tree does not hold. The flash boundary is not counted, for the thirteen-entry run's reason |
 | `R8a` → `R7` 🆕 | **yes — that nothing rlxfw writes survives, because there is no write path and `R8b` owns the half that would give it one.** `R8a` carries *"Nothing in `R8a` writes one byte"* and *"the monotonicity the design rests on is asserted and never exercised"*; `R7` carries *"That the config store survives anything"*, and `notes/config-store.md` § 11 takes it on in writing and names the gate — *"R8 supplies the MTD backing"* — so `R7` built an A/B store with a monotonic `seq`, an erased-value exclusion and a read-back verify **for a medium it never touched**. 🔴 This is **not** the flash boundary the thirteen-entry run declined: that is the § Flash bookkeeping sentence `CLAUDE.md` requires of every entry, while this has a board row of its own and the row is open. ⚠️ Weaker than `P1` → `R6` in that neither entry names the other's gate — both point at a third, `R8` — and `R8b` is already booked behind `R9`, so the firing adds evidence and not an instruction |
+| `R7` → `R8` 🆕 | **yes — the same thing as `R8a` → `R7`: persistence, that nothing rlxfw writes survives because there is no write path, and `R8b` owns the half that would give it one.** `R7` carries *"That the config store survives anything"* and names `R8` in it as the gate that supplies the MTD backing; `R8`'s entry carries persistence and the ten power cuts, moved to `R8b`'s row. ⚠️ The weakest firing in this table: `R8`'s list holds it because the decision that closed `R8` moved it there, so it adds no evidence the seventeen-entry run had not, and its instruction — *that thing is the next gate* — points at a gate booked behind `R9` |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -4178,6 +4324,55 @@ call it a sixth:
 
 ⚠️ **The weaker class stays at two**, and `R6b`'s `D2` *on a fixed image*, the candidate the
 fourteen-entry run recorded, stays uncounted.
+
+### 🆕 At eighteen entries the clause FIRES on the same thing as at seventeen — the first time one thing fires on two consecutive pairs, and what it adds is a constraint, not an instruction
+
+**`R7` → `R8` fires, and it names persistence again: that nothing rlxfw writes survives, because
+there is no write path and `R8b` owns the half that would give it one.**
+
+* `R7`: *"That the config store survives anything"* — `/var/lib/cfg.bin` is on a filesystem the
+  image calls tmpfs, and *"`R8` supplies the MTD backing"*.
+* `R8`: *"That anything can be written to flash and read back after a reset"* and *"That an update
+  survives a power cut"*, both moved to `R8b`'s row.
+
+🔴 **Three consecutive entries now carry it — `R8a`, `R7`, `R8` — and the clause's instruction
+cannot be followed as written.** *That thing is the next gate* points at `R8b`, and `R8b` is booked
+behind `R9` because slot A's first write ends the vendor firmware that `R9`'s vendor column boots
+(`FW-167`; entry 16 § `R8b`). The clause names a thing and not a gate — `CPU-45` is the precedent —
+so what this firing says is that the gate which moves persistence is the one that unblocks it,
+`R9`. Which gate opens next stays the owner's, as every firing's destination has been.
+
+⚠️ **The honest deduction is larger than at seventeen entries, and it is why this firing adds no
+evidence of its own.** `R8`'s list holds persistence because the decision that closed `R8` moved it
+there, and a gate closed by splitting off a clause will always carry that clause: the firing was
+predictable from the split before the entry was written. It is counted all the same, because
+`R8`'s row carried *10 power-cuts survived* until 2026-10-04 — a thing the gate set out to establish
+and did not — and `R7`'s residual names `R8` in writing (`notes/config-store.md` § 11), which is
+what the guard written at eight entries asks for.
+
+⚠️ **What the pair does not name.** `FW-172`'s cache argument is in `R8`'s list and not in `R7`'s.
+The limits of the CI evidence are about this repository's checks, not about a thing either gate set
+out to establish. The flash boundary is not counted, for the reason the thirteen-entry run gave.
+
+### 🆕 The census re-run at eighteen entries — unchanged, because `R8` brings no step list
+
+量 2026-10-04 with the unchanged thirteen-entry script (`$FWRE_WORK/rebuild/s111/land/gate/census.py`,
+read only; sha256 `1e81ac1a…`), the seventeen-entry run's three arms pointed at this entry's tree
+(`$FWRE_WORK/rebuild/s119/p2b-work/census18.sh`), exit codes read inside one script file:
+
+* **on `PROGRESS.md` alone** it refuses, rc 1, with all eight control gates reading 0, as at
+  seventeen entries;
+* **on a scratch root whose `PROGRESS.md` is the real file followed by all seventeen
+  `docs/history/steps-*.md`** it reproduces **44 clauses across 8 gates** and exits 0, and the
+  `D`-row form reads **66 clauses across eleven gates** with every per-gate figure of the
+  seventeen-entry run unchanged;
+* **on the same root with one of `P1`'s `D` rows un-bolded** it exits 1 and names `P1: (3, 4)`.
+
+**79 clauses, unchanged.** `R8` closed with no step list of its own — `R8a`'s moved to
+`docs/history/` at its close and does not use the form — and `PROGRESS.md` holds no step list at
+all. **No sixth instance**, by construction. ⚠️ The two candidates recorded at seventeen entries
+stay uncounted, and `R8`'s rewritten board row names three properties and no instrument, so it adds
+no third.
 
 ### Carried unchanged from the seven-entry run
 
