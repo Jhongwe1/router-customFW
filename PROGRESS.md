@@ -221,7 +221,7 @@ version *contains* moved to `README.md` § *Which gates make which version* on
 | `v0.3` | 🟢 **2026-09-11** |
 | `v0.4` | 🟢 **2026-09-17** |
 | `v0.5` | 🟢 **2026-09-29** |
-| `v0.6` | — |
+| `v0.6` | 🟢 **2026-10-04** |
 | `v1.0` | — |
 
 **Public from v0.1.** Held disclosure items stay out until `docs/disclosure.md`

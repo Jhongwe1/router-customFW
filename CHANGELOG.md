@@ -1471,6 +1471,62 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+Nothing since `v0.6`.
+
+---
+
+## v0.6 — 2026-10-04
+
+**Contents, against [`README.md`'s version map](README.md#which-gates-make-which-version):**
+`R7` — rlxfw's own userspace — plus `R8a`, a signed update container verified on the silicon from
+RAM, on whose three clauses `R8` closed by splitting its row; `R1y`, the record's maintainability;
+the `FW-184` fix, shown on the device; and the repair of CI, red on every head pushed on 2026-09-30.
+
+🟢 **What `R7` is, in two sentences.** Six programs of rlxfw's own — `init` as a compiled PID 1,
+`cfgstore`, `brokerd`, `httpd`, `dnsfwd` and `ifupd` — and busybox rebuilt from the drop's 1.13.4
+with an applet set chosen as a security decision booted from RAM and answered on the die: `httpd`
+as uid 100 in a chroot, `dnsfwd` as uid 101 printing `setuid(0) refused (Operation not permitted)`,
+`brokerd` as root behind a unix socket, the config store's two slots alternating, and a login
+costing 0.902 s for the right password and 0.9017 s for the wrong one (`FW-175`, `FW-181`). The
+gate's pass condition was replaced before anything was measured against it — both sources it named
+read 0 on a static binary by construction — by `tools/uspacescan.py`, which refuses a file it cannot
+decide and reads 0 forbidden imports from both of its sources over all six programs.
+
+🟢 **`R8a`**: `rlxboot`, a freestanding 16,240-byte payload, booted a correct container, refused one
+flipped payload bit at `DIGEST bad` with `SIG ok` in the same capture as its positive control, and
+refused a version below a RAM-staged anti-rollback counter at `VER cur=1 ctr=5 bad`: four rounds,
+ten uploads, no flash-write command (`FW-170`, `FW-171`). 🟢 **`R8`** closed on 2026-10-04 on those
+three clauses by splitting its row: `R8b` — persistence and ten power cuts — is a row of its own
+behind `R9`, because slot A's first write destroys 921,619 of the vendor kernel's 987,155 bytes and
+`R9`'s vendor column boots that kernel (讀, `FW-167`).
+
+🟢 **`FW-184`**: `brokerd` now re-reads the store before every request, so a password `cfgstore`
+sets works without a restart and the one it replaces stops working; on the old image the replaced
+password had still been accepted, the fail-open half the entry first missed. 🟢 **`R1y`**:
+`PROGRESS.md` holds state only, its closed step lists, ladder and corrections moved verbatim to
+`docs/history/`, and `tools/citeresolve.py` reads a record's line citation in the tree of the
+commit that wrote it. 🟢 **CI** was red on every head pushed on 2026-09-30, from `R8a`'s closing
+commit on, with `census` skipped; each of the four red steps was repaired in a commit of its own,
+and run `37134992834` on `8a3b3be3` is green on all four jobs.
+
+🔴 **The weakest thing in this release is that all of it ran from RAM, and each device result is
+one boot or one seating of one image.** The config store is on ramfs and does not outlive a power
+cycle; no image has been written to a slot; the anti-rollback counter has never advanced. Two of
+the first boot's readings — the first login reply and the `dnsfwd` reply — were printed to a
+terminal and not saved; nothing ran under load; there is no TLS; and the key that signs containers
+is a development seed kept in the tree on purpose.
+
+⚠️ **What a release's known-issues list is**: the copy of
+[`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md) at this tag, which is frozen; this release's own
+section there is *What `v0.6` does not establish*.
+
+**No flash-write command in `R7`'s or `R8a`'s rounds, nor in the `FW-184` runs** — the `AUTOBURN`
+word read `00000000` at the head of every round, and no `FLW`, `EW`, `EB` or non-zero `AUTOBURN`
+appears in any capture or upload record — but no flash map was taken in them, so they carry no
+bracket of their own: the `FLR` bracket stays at 1,024 of 4,194,304 bytes, 0.0244 %.
+
+### Written under *Unreleased* on 2026-09-29
+
 Nothing since `v0.5`.
 
 ---
