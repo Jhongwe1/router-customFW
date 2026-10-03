@@ -276,8 +276,8 @@ REDACTION_ALLOWLIST = {
         "a SYNTHETIC lease this desk typed into ifupd for one seating (FW-181, R78-iu1): no DHCP "
         "server issued it and it is not an address this unit is configured with, the 10.1.1 entry's "
         "distinction. SCOPE: any 10.9.9.x in SPEC.md. NOT MIRRORED in audit-bench-log.py: its "
-        "control A2 probes with 10.9.9.9 and refuses a match entry, as does leakscan.py's L3, yet "
-        "five R78-iu files give audit-bench-log.py 13 hits once committed (量 2026-09-30; scratch copies)",
+        "control A2 probes with 10.9.9.9 and refuses a match entry, as does leakscan.py's L3, so the "
+        "five R78-iu files' 13 hits are exempted there by file name and exact line (FILE_EXEMPT, A4)",
 }
 
 
