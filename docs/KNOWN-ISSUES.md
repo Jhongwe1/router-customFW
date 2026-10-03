@@ -1433,9 +1433,9 @@ the host's gcc. The tool prints only the first line of gcc's error, so the log n
 missing file; 量 at the desk, the header compiled alone stops at
 `fatal error: linux/rlxfw-entropy.h: No such file or directory`, and its copy at `380cdf6d`
 compiles. 🔴 **The include is there because of a fix.** The hook's first version inserted 22
-lines into `rtl819x-nic.c`, moved 61 cited lines and turned `citecheck` red in six files
-(`FW-110`; 讀, `a008fde6`'s message — `notes/entropy.md` counts 70 citations; neither count is
-re-measured here). Moving the include into a header no file cites by line kept all 61 and broke
+lines into `rtl819x-nic.c`, moved 68 citations of 35 lines in six files and turned `citecheck`
+red (`FW-110`; 量 this segment, `citecheck` on `a008fde6^` plus those 22 lines; the commit
+message's 61 and a former 70 do not reproduce). Moving the include into a header no file cites by line kept all 68 and broke
 a host harness instead. 🟢 **The mutation suite did what it is for**: `M0` refused to count a
 kill off a red baseline, and every mutant reads `SURVIVED`, not killed.
 
