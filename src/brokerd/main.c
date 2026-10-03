@@ -229,12 +229,11 @@ int main(int argc, char **argv)
 
 	bk_init(&bk);
 	bk.cfg_path = cfg_path;
-	if (cfg_load(cfg_path, &bk.cfg) != 0) {
-		/* Fail-closed, per SPEC § 5: defaults, source = 0, and with no
-		 * admin.pwhash no login is possible until one is set. */
-		(void)cfg_defaults(&bk.cfg);
-		bk_log("brokerd: config store unreadable; defaults, source=0");
-	}
+	/* Fail-closed, per SPEC § 5: defaults, source = 0, and with no
+	 * admin.pwhash no login is possible until one is set.  This load only
+	 * makes the start-up log say what the store held: bk_dispatch() loads it
+	 * again before every request (`FW-184`). */
+	(void)bk_cfg_reload(&bk);
 	(void)bk_entropy_ready(&bk);
 	bk_log("brokerd: entropy_avail=%lu auth_ready=%d",
 	       (unsigned long)bk.entropy_last, bk.auth_ready);

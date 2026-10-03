@@ -55,7 +55,11 @@ OBJ_NOMAIN_SRC := $(HERE)session.c $(HERE)ops.c $(LIB_SRC) $(CFGSRC) $(KDFSRC) \
                   $(STUBSRC) $(LIB)/client.c
 
 TESTS := test_proto test_authz test_session test_ratelimit test_entropy \
-         test_ping test_wire
+         test_ping test_wire test_reload
+
+# `FW-184`: test_reload changes the password through the real cfgstore, so the
+# host build makes one, from the sources the image's cfgstore is made from.
+CFGSTORE_SRC := $(REPO)/src/cfgstore/main.c $(CFGSRC) $(KDFSRC)
 
 # ---------------------------------------------------------------- host build
 HOSTCC   ?= gcc-13
@@ -76,6 +80,7 @@ host: $(O)/host
 	$(HOSTCC2) $(HCFLAGS) -o $(O)/host/brokerd.clang $(ALL_SRC)
 	$(HOSTCC) $(HCFLAGS) -o $(O)/host/pinghelp $(HERE)test_pinghelp.c
 	$(HOSTCC) $(HCFLAGS) -DPINGHELP_SLOW=1 -o $(O)/host/pinghelp_slow $(HERE)test_pinghelp.c
+	$(HOSTCC) $(HCFLAGS) -o $(O)/host/cfgstore $(CFGSTORE_SRC)
 	@for t in $(TESTS); do \
 	   $(HOSTCC) $(HCFLAGS) -o $(O)/host/$$t $(HERE)$$t.c $(OBJ_NOMAIN_SRC) || exit 1; \
 	   $(HOSTCC2) $(HCFLAGS) -o $(O)/host/$$t.clang $(HERE)$$t.c $(OBJ_NOMAIN_SRC) || exit 1; \
@@ -91,6 +96,7 @@ test: host
 	   case $$t in \
 	     test_ping) $(O)/host/$$t $(O)/host/pinghelp $(O)/host/pinghelp_slow ;; \
 	     test_wire) $(O)/host/$$t $(O)/host/brokerd ;; \
+	     test_reload) $(O)/host/$$t $(O)/host/cfgstore ;; \
 	     *)         $(O)/host/$$t ;; \
 	   esac; \
 	   n=$$((n+1)); \
@@ -100,6 +106,7 @@ test: host
 	   case $$t in \
 	     test_ping) $(O)/host/$$t.clang $(O)/host/pinghelp $(O)/host/pinghelp_slow ;; \
 	     test_wire) $(O)/host/$$t.clang $(O)/host/brokerd.clang ;; \
+	     test_reload) $(O)/host/$$t.clang $(O)/host/cfgstore ;; \
 	     *)         $(O)/host/$$t.clang ;; \
 	   esac; \
 	   n=$$((n+1)); \
@@ -112,6 +119,7 @@ sanitize: $(O)/host
 	 $(HOSTCC2) $(HCFLAGS) $(SANFLAGS) -o $(O)/host/brokerd.san $(ALL_SRC); \
 	 $(HOSTCC2) $(HCFLAGS) $(SANFLAGS) -o $(O)/host/pinghelp.san $(HERE)test_pinghelp.c; \
 	 $(HOSTCC2) $(HCFLAGS) $(SANFLAGS) -DPINGHELP_SLOW=1 -o $(O)/host/pinghelp_slow.san $(HERE)test_pinghelp.c; \
+	 $(HOSTCC2) $(HCFLAGS) $(SANFLAGS) -o $(O)/host/cfgstore.san $(CFGSTORE_SRC); \
 	 n=0; \
 	 for t in $(TESTS); do \
 	   $(HOSTCC2) $(HCFLAGS) $(SANFLAGS) -o $(O)/host/$$t.san \
@@ -122,6 +130,7 @@ sanitize: $(O)/host
 	   case $$t in \
 	     test_ping) $(O)/host/$$t.san $(O)/host/pinghelp.san $(O)/host/pinghelp_slow.san ;; \
 	     test_wire) $(O)/host/$$t.san $(O)/host/brokerd.san ;; \
+	     test_reload) $(O)/host/$$t.san $(O)/host/cfgstore.san ;; \
 	     *)         $(O)/host/$$t.san ;; \
 	   esac; \
 	   n=$$((n+1)); \

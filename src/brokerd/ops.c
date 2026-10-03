@@ -603,6 +603,88 @@ static int op_pwset(struct broker *bk, const struct proto_req *rq, uid_t uid,
 	return 0;
 }
 
+/* ------------------------------------------ the store, read per request */
+
+/* `FW-184`.  brokerd used to read the store once, in main(), so a password set
+ * with `cfgstore passwd` on the running image changed nothing until brokerd
+ * restarted (量 on the device, `R7-8`) -- and a password REPLACED that way kept
+ * working, with every session opened under it.  bk_dispatch() now calls this
+ * before every request it has not already refused, so each request is
+ * answered from the store as it is when the request arrives: the record a
+ * brokerd started at that instant would load.  ~8 KiB read per request; no
+ * signal, no new IPC.
+ *
+ * NO LOCK, AND NONE IS NEEDED.  cfg_store() writes in place, not by rename,
+ * but only into the slot that does NOT hold the selected record, then fsyncs
+ * and reads it back; each slot carries a header CRC, a payload CRC and a seq.
+ * A slot caught half-written fails its CRC, and cfg_load_info() selects the
+ * other one, which holds the last record whose write completed
+ * (src/cfgstore/test_cfg.c's torn-write sweep asserts that for every prefix
+ * length).  So a request that races a write is answered as of just before it
+ * or just after it, never from a mixture; one that arrives after `cfgstore`
+ * printed `written:` reads the new record.
+ *
+ * FAIL CLOSED, THE WAY A RESTART DOES.  A store that cannot be read, or that
+ * holds bytes but no valid record in either slot, leaves bk->cfg at the
+ * defaults, which carry no admin.pwhash: LOGIN answers AUTH, and nothing
+ * loaded earlier is kept as a fallback.  Logged once per change of state.
+ *
+ * A CHANGED admin.pwhash DROPS EVERY SESSION, as PWSET does: a session opened
+ * under a password must not outlive it. */
+int bk_cfg_reload(struct broker *bk)
+{
+	struct cfg fresh;
+	struct cfg_store_info info;
+	uint8_t was[CFG_VAL_MAX], now[CFG_VAL_MAX];
+	uint16_t wl = 0, nl = 0;
+	const char *path;
+	int had, has, rc, state;
+
+	if (bk == 0)
+		return -1;
+	path = (bk->cfg_path != 0) ? bk->cfg_path : "(none)";
+	rc = cfg_load_info(bk->cfg_path, &fresh, &info);
+	if (rc != 0)
+		state = BK_CFG_IO;
+	else if (info.selected == 0 && info.file_bytes > 0)
+		state = BK_CFG_INVALID;
+	else
+		state = BK_CFG_OK;
+	if (state != BK_CFG_OK)
+		(void)cfg_defaults(&fresh);
+
+	if (state != bk->cfg_state) {
+		if (state == BK_CFG_IO)
+			bk_log("brokerd: config store %s unreadable (%s); answering "
+			       "from the defaults, which hold no admin.pwhash",
+			       path, cfg_strerror(rc));
+		else if (state == BK_CFG_INVALID)
+			bk_log("brokerd: config store %s holds no valid record "
+			       "(slot0 %s; slot1 %s); answering from the defaults, "
+			       "which hold no admin.pwhash", path,
+			       cfg_strerror(info.rc[0]), cfg_strerror(info.rc[1]));
+		else
+			bk_log("brokerd: config store %s readable again", path);
+		bk->cfg_state = state;
+	}
+
+	had = (cfg_get(&bk->cfg, CFGID_ADMIN_PWHASH, was, &wl) == 0);
+	has = (cfg_get(&fresh, CFGID_ADMIN_PWHASH, now, &nl) == 0);
+	if (had != has || wl != nl || (had && !bk_ct_eq(was, now, wl))) {
+		int n = bk_sess_count(bk);
+
+		bk_sess_drop_all(bk);
+		if (n > 0)
+			bk_log("brokerd: admin.pwhash changed in the store; "
+			       "%d session(s) dropped", n);
+	}
+	bk->cfg = fresh;
+	memset(was, 0, sizeof(was));
+	memset(now, 0, sizeof(now));
+	memset(&fresh, 0, sizeof(fresh));
+	return state == BK_CFG_OK ? 0 : -1;
+}
+
 /* --------------------------------------------------------- the gate */
 
 int bk_dispatch(struct broker *bk, const struct proto_req *rq, uid_t peer_uid,
@@ -638,6 +720,11 @@ int bk_dispatch(struct broker *bk, const struct proto_req *rq, uid_t peer_uid,
 		rs_status(rs, ST_PERM);
 		return 0;
 	}
+
+	/* `FW-184`: the store as it is now, before anything below reads bk->cfg
+	 * or looks a session up -- a changed admin.pwhash has to drop the
+	 * sessions before one of them is honoured. */
+	(void)bk_cfg_reload(bk);
 
 	/* client_ip is honoured only from uid 100 (SPEC § 6); everyone else's is
 	 * discarded, so root and dnsfwd cannot forge a bucket. */

@@ -74,9 +74,16 @@ struct bk_rl {
 	long     seen;        /* bk_now() at the last touch, for eviction */
 };
 
+/* What the last bk_cfg_reload() found, kept so that a change is logged once
+ * and not once per request (`FW-184`). */
+#define BK_CFG_OK      0	/* a valid record, or no store yet */
+#define BK_CFG_IO      1	/* the store could not be opened or read */
+#define BK_CFG_INVALID 2	/* bytes, and no valid record in either slot */
+
 struct broker {
 	struct cfg cfg;
 	const char *cfg_path;
+	int cfg_state;              /* BK_CFG_*; 0 from bk_init() */
 
 	struct bk_sess sess[BK_NSESS];
 	unsigned long  sess_seq;
@@ -156,6 +163,13 @@ int bk_dnsfwd_may_read(uint16_t id);
  * bare ST_IO reply. */
 int bk_dispatch(struct broker *bk, const struct proto_req *rq, uid_t peer_uid,
                 struct proto_resp *rs);
+
+/* `FW-184`: re-read the store into bk->cfg.  bk_dispatch() calls it before
+ * every request it has not already refused, and main() once at start-up; the
+ * argument for why that is enough, and how it fails closed, is above it in
+ * ops.c.  0 when bk->cfg is a record from the store or the store does not
+ * exist yet; -1 when it is the defaults over a store that could not be used. */
+int bk_cfg_reload(struct broker *bk);
 
 /* STATUS TLV types (SPEC § 6). */
 #define BKS_UPTIME   0x8001
