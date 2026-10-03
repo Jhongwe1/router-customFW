@@ -1,0 +1,5 @@
+dmesg | tail -25; echo DM""Z
+sh: tail: not found
+sh: dmesg: not found
+DMZ
+# 

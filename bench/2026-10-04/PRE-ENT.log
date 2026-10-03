@@ -1,0 +1,4 @@
+cat /proc/sys/kernel/random/entropy_avail; echo P4""Z
+130
+P4Z
+# 

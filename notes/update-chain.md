@@ -324,3 +324,58 @@ Two more, specific to the host side:
   `FLM-*` rows and the scan table in `docs/loader-command-semantics.md` § a. The
   one input that has never been read is `check_image()`'s `bank_offset`, and the
   barrier depends on it.
+
+## 8. 🆕 2026-10-04 (120th segment): the flash as the device itself reports it, before the first write
+
+The region census in § 6 is derived -- from the loader's structure and from the
+2026-08-16 dump. This section is the **second source**: the same part, read out
+of the running kernel's own drivers on a board that had issued no flash command
+at all. `CLAUDE.md`: no register value enters code on one source.
+
+量 2026-10-04 04:11:32, board running `f184a` (RAM boot, up 8 h 59 m),
+`bench/2026-10-04/PRE-MTD`, `PRE-SPI`, `PRE-SMAP`:
+
+| | |
+|---|---|
+| `mtd0` | `00130000`, `"boot+cfg+linux"` -- `0x000000`-`0x12FFFF`, 1,245,184 B |
+| `mtd1` | `002d0000`, `"root fs"` -- `0x130000`-`0x3FFFFF`, 2,949,120 B |
+| `mtd2` | `00400000`, `"rtl819x-spi-pio"` -- the whole 4 MiB |
+| `erasesize` | `00001000` on all three |
+| `/proc/partitions` | `mtdblock0` 1216, `mtdblock1` 2880, `mtdblock2` 4096 blocks of 1 KiB -- each matches its partition's size independently |
+
+The write-path counters were **all zero**: `n_writes 0`, `n_write_refused 0`,
+`n_xfer 0`, `n_reg_writes 0`, `n_pio_bytes 0`, `n_mmio_bytes 0`, `n_mtd_read 0`,
+`n_rdy_timeout 0`, `n_state_foreign 0`, `n_state_bad 0`, `wedged 0`, with
+`added 1`, `kat_rc 0`, `mtd_index 2`, `sfcr FFC00000` and `sfcr_as_kernel 1`.
+`complement_expected 4186112` is 4,194,304 - 8,192, the part with `H601` taken
+out. `map_ran 0`: no digest had been taken on this boot.
+
+**The driver had never spoken to the chip.** `rdid_ran 0`, `rdid_rc -11`,
+`rdid_id 000000` against `rdid_expect 1C7016`. `/proc/cmdline` is only
+`console=ttyS0,38400` -- no `root=` -- so the rootfs is in RAM, which is what
+makes `n_mtd_read 0` consistent rather than suspicious.
+
+### 8.1 🔴 The erase block is NOT a measurement about the chip
+
+`erasesize 00001000` is the same software constant as the partition map: it is
+what the driver was configured with, not what the part reported. `rdid_ran 0`
+with `rdid_match 0` is a **fail-open zero** -- the chip was never identified --
+and `FLS-06`-`FLS-08` remain 未定.
+
+This is a bricking precondition for `R8b`, not a detail. Every one of
+`FW-167`'s six addresses is `0x10000`-aligned and every planned size is a
+multiple of 65,536, so at 4,096 B **no planned region shares an erase block
+with a forbidden one**, and the margin from `H601` to `0x010000` is eight
+blocks. **At 64 KiB the margin is one block, and that single block holds the
+loader, `H601`, COMPDS and COMPCS together.** The experiment that settles it:
+complete `rdid` and match it against the EN25QH32B table **before any erase**.
+
+### 8.2 What this section does not establish
+
+It does not establish that the vendor's own kernel used this partition table --
+`mtd0`/`mtd1` here are rlxfw's declaration (`FW-28`), and the vendor kernel's
+own table is unmeasured (`FW-11`). It says nothing about the chip's erase
+geometry (§ 8.1). It does not establish that no flash byte has ever been
+written: these counters see only this boot through this driver, and `FW-142`
+says what `n_writes` is blind to. And `erasesize` agreeing with the partition
+map is not corroboration, because they are the same constant.

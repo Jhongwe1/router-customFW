@@ -1,0 +1,34 @@
+ls /proc; echo P1""Z
+1                     fast_l2tp             rtl819x-mdio
+10                    fast_nat              rtl819x-nic
+11                    fast_pppoe            rtl819x-nic-tx
+12                    fast_pptp             rtl819x-spi
+13                    filesystems           rtl819x-spi-map
+14                    filter_table          rtl819x-switch
+15                    fs                    rtl819x-timer
+16                    gc_overflow_timout    rtl819x-view
+2                     gpio                  rtl819x-wdt
+3                     interrupts            self
+4                     iomem                 slabinfo
+5                     ioports               stat
+6                     irq                   suspend_check
+7                     kcore                 sys
+75                    kpagecount            sysvipc
+8                     kpageflags            timer_list
+9                     load_default          tty
+alg                   loadavg               uptime
+br_igmpProxy          meminfo               usb_mode_detect
+br_wlanblock          misc                  version
+buddyinfo             mounts                vmallocinfo
+bus                   mtd                   vmstat
+cmdline               net                   watchdog_reboot
+cpuinfo               pagetypeinfo          wlan0
+crypto                partitions            wlan0-va0
+custom_Passthru_wlan  pptp_conn_ck          wlan0-va1
+devices               qos                   wlan0-va2
+diskstats             rf_switch             wlan0-va3
+driver                rlxfw-entropy         wlan0-vxd
+enable_dos            rtl819x-gpio          zoneinfo
+execdomains           rtl819x-keys
+P1Z
+# 

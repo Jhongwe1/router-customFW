@@ -463,3 +463,37 @@ Every census above is about **applets**. `tools/cardcheck.py:166 (this project h
 
 ⚠️ **And the applet half is not new** — the run reproduced the same **50** applets § *What `busybox` here can actually do* already records, by a different route (running the binary rather than reading it). Two routes, one number.
 
+
+## 🆕 2026-10-04 (120th segment) — a bare applet name does not resolve, and `/bin` holds seventeen things
+
+`config/image-commands.tsv`'s header already said this and it was still worth
+measuring, because the table is the thing `cardcheck` refuses against: *`kind=applet`
+means `busybox <name>` resolves. It does NOT mean the applet works.*
+
+**Refutation condition, written before the test:** if `busybox dmesg` also
+failed, the table would be overstating what the image can invoke and the row
+would need a 殘留.
+
+量 2026-10-04, `bench/2026-10-04/SOAK-DMSG`, `SOAK-BB1`, `SOAK-BB2`, `SOAK-BB3`:
+
+* bare `dmesg` and bare `tail` both return `sh: not found`, although both are
+  listed as applets.
+* `busybox dmesg` resolves. `busybox tail -18` returns `tail: invalid option --
+  1`: this busybox wants `-n 18`. Same class as `FW-42` (`grep` present,
+  `grep -E` absent) and this image's `ping` ignoring `-c`.
+* `ls /bin` -- the positive control, and the more useful half -- returns exactly
+  seventeen entries: `ash busybox cat echo ifconfig iperf3 linkprobe ls mfgtest
+  mkdir mount ping ps sh sleep ucost uprobe`. Five of those are **not** busybox
+  applets: `linkprobe`, `mfgtest`, `ucost`, `uprobe`, `iperf3`.
+* `busybox free`: 28,488 total / 6,680 used / 21,808 free kB.
+
+So the table is correct as worded, and a bench cell that types a bare applet
+name will fail on a name `config/image-commands.tsv` lists.
+
+### What this does not establish
+
+**It is not a census of the image's symlinks**, only of `/bin`. `udhcpd` runs
+under its bare name in `ps`, and `brokerd` and `cfgstore` live in `/usr/sbin`,
+so directories remain unlisted. It does not establish that the other twelve
+`/bin` entries work, only that they resolve -- which is the distinction the
+command table's own header draws.

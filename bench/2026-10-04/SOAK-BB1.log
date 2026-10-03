@@ -1,0 +1,8 @@
+busybox dmesg | busybox tail -18; echo B1""Z
+tail: invalid option -- 1
+BusyBox v1.13.4 (2026-09-01 00:00:00 UTC) multi-call binary
+
+Usage: tail [OPTION]... [FILE]...
+
+B1Z
+# 

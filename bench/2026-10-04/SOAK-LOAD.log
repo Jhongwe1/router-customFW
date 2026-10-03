@@ -1,0 +1,5 @@
+cat /proc/loadavg /proc/uptime; echo LD""Z
+0.00 0.00 0.00 1/17 67
+32128.56 32116.58
+LDZ
+# 

@@ -348,3 +348,37 @@ put to them. It does not show:
   driven by hand with a lease the desk made up (§ 7.6);
 * anything about `entropy_avail`: `notes/entropy.md` owns the driver and its experiment, and
   § 7.3 uses only its consequence, the `auth_ready` flag.
+
+## 9  🆕 2026-10-04 (120th segment): a 9-hour soak of the six programs, banked before a reboot destroyed it
+
+`f184a` is a RAM boot, so the process tree dies with it and a reboot was needed
+for `R9`'s vendor column. These readings were taken first, because they could
+not be taken afterwards. 量 2026-10-04 04:07:21-04:11:32, uptime 32,128.56 s
+rising to ~32,326 s (8 h 55 m to 8 h 59 m), boot at 2026-10-03 19:11:51;
+`bench/2026-10-04/SOAK-PS`, `SOAK-LOAD`, `SOAK-MEM`, `SOAK-NET`, `PRE-STAT`.
+
+| reading | value | what it establishes |
+|---|---|---|
+| `ps` PIDs | `brokerd` 12, `httpd` 13, `dnsfwd` 14, `udhcpd` 15 | **nothing restarted** -- still the original boot PIDs |
+| `/proc/loadavg` last-PID | 67 | only 67 processes ever created since boot |
+| `/proc/stat` `processes` | 77 (read 3 min later) | the same conclusion from an **independent** counter |
+| privilege separation | `httpd` runs as `httpd`, `dnsfwd` as `dnsfwd` | not root, on silicon, not merely in the config |
+| `rlx0` | RX 492,597 B / 5,181 pkt, TX 133,054 B / 1,250 pkt, errs 0 drop 0 colls 0 carrier 0 | `R6b`'s TX fix has not regressed, and no link flap |
+| `/proc/stat` cpu | user 4.29 s, sys 6.26 s, softirq 1.57 s, idle 32,313.60 s | 99.96 % idle; the jiffy total matches uptime exactly |
+| `ctxt` | 938,316 | 29.0 switches/s |
+| `btime` | **0** | this kernel has no real-time clock; wall time is boot-relative, which is why every binary reads `Sep 1 2026` |
+
+A crash-restart loop is what these two counters are chosen to exclude: it would
+put last-PID and `processes` in the thousands, and it would move the daemons'
+PIDs off their boot values. Both sources say it did not happen.
+
+### 9.1 What this section does not establish
+
+**It is not a leak measurement.** `MemFree` read 21,836 of 28,488 kB
+(`busybox free` two minutes later: 21,808, consistent), and one point is not a
+trend -- this boot has no start-of-boot baseline to compare against. The
+deciding experiment is two readings at least four hours apart **within one
+boot**. It does not establish that the six programs are correct, only that none
+of them died and was respawned. It says nothing about load: the box was 99.96 %
+idle, so this is an idle soak and not a stress result. And `rlx0`'s zero error
+counters are over 6,431 packets, which is a small population.

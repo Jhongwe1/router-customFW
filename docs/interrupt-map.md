@@ -1086,3 +1086,40 @@ explain it.
 boot is invisible from inside the kernel — `notes/timer-driver.md` § 13.2's
 `cereload` rows are this project's own demonstration of that — so the guard was
 doing exactly what it was written for.
+
+## 9. 🆕 2026-10-04 (120th segment): two timers agree to 8 ppm, and that is not evidence
+
+量 2026-10-04 04:10:37, `bench/2026-10-04/PRE-IRQ`, board running `f184a`,
+uptime ~32,326 s:
+
+```
+  2:          0             RLX  cascade (0x0)
+  8:      13596        RLX LOPI  serial (0x20)
+ 12:       6200        RLX LOPI  rtl819x-nic (0x20)
+ 13:    3232539        RLX LOPI  rlx timer (0x620)
+ 25:    3232513            ICTL  rtl819x-timer (0x20)
+ER0: 0   ER1: 0   ER2: 0
+```
+
+`ER0`-`ER2` all zero over 8 h 59 m: no error interrupt fired. IRQ 13 divided by
+the uptime is **100.0 Hz**, which is this kernel's `HZ`. IRQ 12's 6,200 matches
+`/proc/rlxfw-entropy`'s `ev_nic 6200` exactly -- the same source counted twice,
+so that agreement is bookkeeping, not corroboration.
+
+🔴 **IRQ 13 (`rlx timer`, LOPI) and IRQ 25 (`rtl819x-timer`, ICTL) read
+3,232,539 and 3,232,513 -- 8 ppm apart -- and this establishes nothing beyond
+"both are 100 Hz".** `CLAUDE.md`: two counters agreeing is not evidence while
+they run at the same rate; make the rates differ first. Whether one of these is
+derived from the other, or they are independent dividers of the same source, is
+**未定**, and the deciding experiment is to reprogram one of them to a
+different rate and re-read both -- which needs a gate, since it changes the
+tick.
+
+### 9.1 What this does not establish
+
+It does not say which of the two drives the scheduler, nor that either is the
+clocksource. It does not establish the absence of spurious interrupts in
+general -- only that the three `ER` counters this kernel exports stayed zero on
+one boot. And the 100.0 Hz figure is a ratio of one interrupt count to one
+uptime reading taken in a different capture, so its precision is not better
+than those two readings' pairing, which was not measured.

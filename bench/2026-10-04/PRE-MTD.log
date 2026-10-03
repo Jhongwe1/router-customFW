@@ -1,0 +1,12 @@
+cat /proc/mtd /proc/partitions; echo M1""Z
+dev:    size   erasesize  name
+mtd0: 00130000 00001000 "boot+cfg+linux"
+mtd1: 002d0000 00001000 "root fs"
+mtd2: 00400000 00001000 "rtl819x-spi-pio"
+major minor  #blocks  name
+
+  31        0       1216 mtdblock0
+  31        1       2880 mtdblock1
+  31        2       4096 mtdblock2
+M1Z
+# 

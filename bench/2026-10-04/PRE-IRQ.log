@@ -1,0 +1,13 @@
+cat /proc/interrupts; echo P2""Z
+           CPU0       
+  2:          0             RLX  cascade (0x0)
+  8:      13596        RLX LOPI  serial (0x20)
+ 12:       6200        RLX LOPI  rtl819x-nic (0x20)
+ 13:    3232539        RLX LOPI  rlx timer (0x620)
+ 25:    3232513            ICTL  rtl819x-timer (0x20)
+
+ER0:          0
+ER1:          0
+ER2:          0
+P2Z
+# 

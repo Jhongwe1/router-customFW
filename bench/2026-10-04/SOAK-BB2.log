@@ -1,0 +1,6 @@
+ls /bin; echo B2""Z
+ash        echo       linkprobe  mkdir      ps         ucost
+busybox    ifconfig   ls         mount      sh         uprobe
+cat        iperf3     mfgtest    ping       sleep
+B2Z
+# 

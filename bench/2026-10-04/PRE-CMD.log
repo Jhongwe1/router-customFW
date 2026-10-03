@@ -1,0 +1,4 @@
+cat /proc/cmdline; echo M4""Z
+console=ttyS0,38400
+M4Z
+# 

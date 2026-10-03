@@ -1,0 +1,25 @@
+cat /proc/rlxfw-entropy; echo M6""Z
+rlxfw-entropy 1.0
+alive 1 probe_reads 5 tc0data 00007D00 cdbr 03E80000 tccnr F0000000
+per_bit 16 hz 100
+ev_nic 6200
+qualifying 6189
+repeat 8
+acc 13 nseen 3
+bits 386
+clamped 0
+early 0 badsrc 0
+dist  0 8
+dist  1 21
+dist  2 45
+dist  3 82
+dist  4 156
+dist  5 245
+dist  6 408
+dist  7 1519
+dist  8 563
+dist  9 1309
+dist 10 1073
+dist 11 768
+M6Z
+# 

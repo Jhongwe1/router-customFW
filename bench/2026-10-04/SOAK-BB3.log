@@ -1,0 +1,7 @@
+busybox free; echo B3""Z
+              total         used         free       shared      buffers
+  Mem:        28488         6680        21808            0            0
+ Swap:            0            0            0
+Total:        28488         6680        21808
+B3Z
+# 

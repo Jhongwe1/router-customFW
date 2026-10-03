@@ -1,0 +1,19 @@
+cat /proc/rtl819x-spi-map; echo M3""Z
+version rtl819x-spi 1.2
+map_ran 0
+map_rc 0
+map_level -1
+map_group 0
+map_unit 0
+map_entries 32
+map_hashed 0
+map_h601_skipped 0
+map_h601_hashed 0
+map_diff_units 0
+map_jiffies 0
+hz 100
+corrupt_at -1
+map_truncated 0
+# no map has completed
+M3Z
+# 
