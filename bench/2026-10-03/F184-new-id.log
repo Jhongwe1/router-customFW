@@ -1,0 +1,5 @@
+ls -l /usr/sbin/brokerd /usr/sbin/cfgstore; echo ID""Z
+-rwxr-xr-x    1 root     root       101212 Sep  1  2026 /usr/sbin/brokerd
+-rwxr-xr-x    1 root     root        86320 Sep  1  2026 /usr/sbin/cfgstore
+IDZ
+# 

@@ -1,0 +1,21 @@
+ps; echo F184""Z
+  PID USER       VSZ STAT COMMAND
+    1 root       160 S    /init 
+    2 root         0 SW<  [kthreadd]
+    3 root         0 SW<  [ksoftirqd/0]
+    4 root         0 SW<  [events/0]
+    5 root         0 SW<  [khelper]
+    6 root         0 SW<  [async/mgr]
+    7 root         0 SW<  [kblockd/0]
+    8 root         0 SW   [pdflush]
+    9 root         0 SW<  [kswapd0]
+   10 root         0 SW<  [mtdblockd]
+   11 root         0 SW<  [kpktgend_0]
+   13 httpd      172 S    httpd 
+   14 dnsfwd     168 S    dnsfwd 
+   15 root       552 S    udhcpd -f /var/udhcpd.conf 
+   16 root       552 S    sh 
+   25 root       180 S    brokerd 
+   26 root       552 R    ps 
+F184Z
+# 

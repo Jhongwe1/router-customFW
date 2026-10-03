@@ -1,0 +1,5 @@
+printf "%s\n" f184old-old | cfgstore passwd; echo F184""Z
+written: slot 0, seq 1
+admin.pwhash set: scrypt log2N=12 r=7 p=1, entropy_avail was 184
+F184Z
+# 

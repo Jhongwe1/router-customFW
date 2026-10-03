@@ -1,0 +1,8 @@
+busybox kill 12; echo F184""Z
+brokerd: stopped
+rlxfw: init: brokerd exited exit=0
+brokerd: entropy_avail=184 auth_ready=1
+brokerd: listening on /srv/www/run/broker.sock mode 0666
+rlxfw: init: brokerd started pid=25 exit=0
+F184Z
+# 

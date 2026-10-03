@@ -1,0 +1,4 @@
+2026-10-03T19:09:35+0800 A-OLD     HTTP 401 in 0.143 s  {"ok":false,"error":"auth"}
+2026-10-03T19:09:45+0800 A-OLD-2   HTTP 200 in 0.908 s  {"ok":true,"csrf":"<redacted>","ttl_s":900}
+2026-10-03T19:09:53+0800 B-NEW     HTTP 401 in 0.896 s  {"ok":false,"error":"auth"}
+2026-10-03T19:10:00+0800 B-OLD     HTTP 200 in 0.897 s  {"ok":true,"csrf":"<redacted>","ttl_s":900}

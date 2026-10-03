@@ -1,0 +1,26 @@
+cat /proc/rlxfw-entropy /proc/sys/kernel/random/entropy_avail; echo EN""Z
+rlxfw-entropy 1.0
+alive 1 probe_reads 5 tc0data 00007D00 cdbr 03E80000 tccnr F0000000
+per_bit 16 hz 100
+ev_nic 288
+qualifying 283
+repeat 2
+acc 11 nseen 3
+bits 17
+clamped 0
+early 0 badsrc 0
+dist  0 2
+dist  1 3
+dist  2 9
+dist  3 12
+dist  4 28
+dist  5 30
+dist  6 34
+dist  7 75
+dist  8 32
+dist  9 20
+dist 10 22
+dist 11 18
+17
+ENZ
+# 
