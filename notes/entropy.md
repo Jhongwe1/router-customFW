@@ -504,17 +504,17 @@ attributable to this change and not to the burst.
 
 ## 8. Build result
 
-| cell | tree | recipe | vmlinux | `.text` | `kconfig-delta check` | `rlxfw-marks verify` |
-|---|---|---|---|---|---|---|
-| `entq0` (control, HEAD) | base clone | `8b5ae480` | 4,256,456 B | 3,582,908 | green `[quiet]` | green, 12 marks, **11** witnesses |
-| `entq1` (this change) | this patch | `ad494952` | 4,257,403 B | 3,584,644 | green `[quiet]` | green, 12 marks, **12** witnesses |
+| cell | tree | recipe | vmlinux | `size -B` text | `.text` section | `kconfig-delta check` | `rlxfw-marks verify` |
+|---|---|---|---|---|---|---|---|
+| `entq0` (control, HEAD) | base clone | `8b5ae480` | 4,256,456 B | 3,582,908 | 2,400,200 | green `[quiet]` | green, 12 marks, **11** witnesses |
+| `entq1` (this change) | this patch | `bbf0d531` | 4,257,403 B | 3,584,724 | 2,401,772 | green `[quiet]` | green, 12 marks, **12** witnesses |
 
 `--variant quiet --marks --jobs 4`, with the declared initramfs spec `r6b8i`
-was built from (spec sha256 `128d9c9f3e34fc06`). Cost: **+947 bytes** of
-vmlinux, +1,736 of `.text`, +4 of `.data`, +208 of `.bss`. `random.o`'s `.text`
-goes 6,708 → 6,804 (+96, the whole of `0009`); `rtl819x-nic.o` 69,592 → 69,668;
-`rlxfw-entropy.o` is 5,460 bytes of object. Zero compiler warnings from any of
-the three files.
+was built from (spec sha256 `128d9c9f3e34fc06`). Cost: **+947 bytes** of vmlinux, **+1,816** of `size -B`'s text column
+(`.text` +1,572 and `.init.text` +244; `.rodata` +256 and `__param` −256 cancel), +4 of data, +208 of bss. `random.o`'s
+`size` text goes 6,708 → 6,804 (+96, the whole of `0009`); `rtl819x-nic.o` 69,592 → 69,668; `rlxfw-entropy.o` is 5,648
+bytes of object. Zero compiler warnings from any of the three files. Read 2026-10-03 from the surviving ELFs, with host
+`size -B`, `readelf -S` and a separate parser agreeing on every section; this section first printed `entq1` as `ad494952`, 3,584,644 (+1,736) and 5,460 B, values no surviving build carries, by a route that is undetermined.
 
 Second, independent reading that the code linked and is not merely a string in
 `.rodata`: `System.map` in `entq1` carries `rlxfw_random_add` (`T`),
