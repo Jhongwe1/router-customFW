@@ -379,3 +379,48 @@ geometry (§ 8.1). It does not establish that no flash byte has ever been
 written: these counters see only this boot through this driver, and `FW-142`
 says what `n_writes` is blind to. And `erasesize` agreeing with the partition
 map is not corroboration, because they are the same constant.
+
+### 8.3 🆕 2026-10-04 04:52-04:53: the chip identified, and the bracket rehearsed before it was trusted
+
+Two readings taken in the same sitting, both reads, `n_writes` still 0 after
+both. They matter to `R8b` in opposite directions: one closes part of § 8.1's
+gap, the other closes a gap nobody had written down.
+
+**The bracket was rehearsed, and its zero is demonstrated.** `R9-6` brackets
+the vendor-firmware boot with this digest. It had never run on this boot and
+the driver had never spoken to the chip, so the one moment that matters would
+also have been the instrument's first use -- which is how a bracket comes back
+clean because it never ran. Control: two `map 0` runs with nothing in between
+must be byte-identical. 量 `bench/2026-10-04/MAPA`, `MAPB`: 32 lines each,
+body sha256 `ae87ac03...` both times, **CONTROL PASS**. `map_hashed 4186112`
+with `map_h601_skipped 8192` -- the `H601` guard is seen permitting and
+refusing, both counts non-zero. `map_jiffies 1284` is 12.84 s at 100 Hz.
+
+🔴 **What the control does not establish is sensitivity.** Two identical maps
+say the digest is reproducible over unchanged flash. They do **not** say it
+would detect a small write. That control needs a known change, and making a
+known change on this part is a write. The only sensitivity evidence is 讀:
+`P2`'s three maps bracketing nine vendor boots returned 31 same / 1 DIFFER
+(group 0), so the digest has reported a difference -- but that was not a
+controlled sensitivity test, and group 0's difference is itself unexplained.
+
+**The part answers `1C7016`.** Hypothesis 推 and refutation written first: any
+other `rdid_id` voids every erase-geometry assumption built on the expected
+table. Positive control: `rdid_id` read `000000` with `rdid_ran 0` beforehand,
+so a non-zero id proves the verb acted. 量: `rdid_ran 1`, `rdid_rc 0` (was
+-11), `rdid_id 1C7016` = `rdid_expect`, `rdid_match 1`.
+
+🔴 **This does not settle the erase size, and § 8.1's margin argument still
+hangs on a table this project does not have.** Part identity is 量; erase
+geometry comes from that part's own table, which is 讀, and the one draft
+datasheet here is the SoC's, not the flash's. The measurement that would settle
+erase size is an actual erase -- a write, so `R8b`'s, behind a dated yes. So
+`FLS-06`-`FLS-08` go from *fail-open zero, the chip was never identified* to
+*part identified 量, geometry 讀, table missing*. That is progress on a
+bricking precondition, not its closure.
+
+**One nuance worth keeping.** After two `map 0` runs, `n_pio_bytes` reads
+8,388,608 = 2 x 4,194,304: each digest read **every** byte of the part,
+including `H601`'s, and hashed all but those 8,192. Read into memory and hashed
+into a digest are different things, and only the second is what the guard
+controls.

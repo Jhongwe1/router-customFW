@@ -1,0 +1,6 @@
+echo map 0 > /proc/rtl819x-spi; echo A1""Z
+RLXFW-S-MRC=00000000
+RLXFW-S-MDIFF=00000000
+RLXFW-S-MH601=00000000
+A1Z
+# 
