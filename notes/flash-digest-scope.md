@@ -237,8 +237,8 @@ the three items above, not on that flag.
 ### 8.2 The bisection, and the limit that comes with it
 
 `verify <n>` hashes `[0, min(n,0x6000))` and `[0x8000, n)`, rounding `n` down to
-`RTL819X_SPI_CHUNK` = 4096 (`rtl819x-spi.c:394` for the value,
-`rtl819x-spi.c:941` for the rounding — `len &= ~(RTL819X_SPI_CHUNK - 1u);`).
+`RTL819X_SPI_CHUNK` = 4096 (`rtl819x-spi.c:430` for the value,
+`rtl819x-spi.c:1216` for the rounding — `len &= ~(RTL819X_SPI_CHUNK - 1u);`).
 🔴 **This read `:765` with the token `limit &= ~(CHUNK-1u)` until 2026-09-17,
 and that citation never pointed at what this sentence claims.** 量 at `HEAD`
 before that segment's edits, line 765 was `0xF6, 0xEC, 0xED, 0xD4, …` — a
