@@ -1016,6 +1016,10 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mkfw2.py --self-test 2>&1 | tee ci-out/mkfw2.out; exit "${PIPESTATUS[0]}"
 
+      - name: mkcr6c self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/mkcr6c.py --self-test 2>&1 | tee ci-out/mkcr6c.out; exit "${PIPESTATUS[0]}"
+
       - name: flashguard self-test
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/flashguard.py --self-test 2>&1 | tee ci-out/flashguard.out; exit "${PIPESTATUS[0]}"

@@ -125,7 +125,8 @@ ELF := $(BD)/rlxboot.elf
 BIN := $(OUT)/rlxboot.bin
 
 .PHONY: all payload stage hazlint hazlint-control flashsafe hosttest qemutest \
-        mutate show clean vectors import-check qemu-elf qemupayload
+        mutate show clean vectors import-check qemu-elf qemupayload \
+        rescue rescue-controls rescue-publish
 
 all: payload
 
@@ -244,6 +245,115 @@ show: $(BIN)
 	@echo 'ram counter 0x81700000   "RCNT" + 512 bytes, used when the magic matches'
 	@echo 'flash ctr   0xBD3F0000   512 bytes, READ ONLY -- see make flashsafe'
 
+# ---------------------------------------------------------------- rescue ---
+
+# THE TWO OPPOSITE PROPERTIES `FW-168` NAMES, AND ONE PRODUCER FOR BOTH.
+#
+# `rlxboot` at flash `0x010000` and `rlxboot-rescue` at `0x020000` are the only
+# two regions the stock loader can reach, so each MUST carry a header
+# `check_image()` accepts -- being scanned and jumped to by the stock loader is
+# how either of them runs at all, and 量 `FW-168` says rlxfw's pipeline writes
+# `cr6b`, which it does not accept.  Every other candidate the loader scans
+# (`0x030000`..`0x060000`, the erased barrier) and both slots MUST NOT carry one,
+# because that path goes through neither the Ed25519 check nor the anti-rollback
+# counter.  `tools/mkcr6c.py` is the one producer of the first property and the
+# one instrument for both; `make rescue` runs it over the images it just made,
+# and `make rescue-controls` is the pair of controls, each shown both ways.
+#
+# ONE BINARY, TWO IMAGES, AND THE EQUAL LENGTH IS LOAD-BEARING.  Both images
+# carry the same payload and the same `startAddr` ($(LOADADDR)) and differ only
+# inside the header's four-byte flash-offset field -- 量 one byte of it, because
+# `0x00010000` and `0x00020000` differ in one -- which is what
+# `DW 8040DD3C 1` tells apart at the prompt (讀 `docs/loader-command-semantics.md`
+# § a: the loader writes the candidate it accepted there, biased by `0x05000000`).
+# `check_image()` COPIES every candidate whose signature matches to `startAddr`
+# during the scan, so a broken `0x010000` is copied to `0x81800000` before
+# `0x020000` is tried; two images of equal length make that overwrite total
+# instead of leaving a tail of the broken one above the rescue.  ⚠️ 推, not 量:
+# nothing has run either image from flash.
+#
+# NO SOURCE FILE CHANGES FOR THE RESCUE, and that is a decision rather than
+# laziness.  `BUILD_ID` is the digest of every source that reaches the image and
+# `R8a` closed on build id `6395889d`; a rescue that differed in C would carry a
+# different id, its own never-executed code path, and would stop being the
+# known-good copy a rescue slot exists to hold.  What distinguishes the two is
+# the header, and the header is the thing `FW-168` is about.
+PRIMARY_AT ?= 0x010000
+RESCUE_AT  ?= 0x020000
+MKCR6C     := $(REPO)/tools/mkcr6c.py
+PRIMARY_IMG := $(OUT)/rlxboot.cr6c
+RESCUE_IMG  := $(OUT)/rlxboot-rescue.cr6c
+
+# SLOT= is optional and the scan says so either way: with one, the slot arm of
+# property (2) is exercised on a real container; without one, only the six
+# candidates are.  A scan that silently covered less would be the defect.
+SLOT ?=
+
+$(RESCUE_IMG): $(BIN)
+	@mkdir -p $(OUT)
+	$(PYTHON) $(MKCR6C) wrap --in $(BIN) --out $(PRIMARY_IMG) \
+	    --start-addr $(LOADADDR) --flash-at $(PRIMARY_AT)
+	$(PYTHON) $(MKCR6C) wrap --in $(BIN) --out $(RESCUE_IMG) \
+	    --start-addr $(LOADADDR) --flash-at $(RESCUE_AT)
+	@a=$$(wc -c < $(PRIMARY_IMG)); b=$$(wc -c < $(RESCUE_IMG)); \
+	 if [ "$$a" != "$$b" ]; then \
+	     echo "  FAIL   the two images are $$a and $$b bytes; equal length is"\
+	          "what makes the loader's copy to $(LOADADDR) total"; exit 1; \
+	 fi; \
+	 echo "  ok     both images are $$a bytes, so the scan's copy to"\
+	      "$(LOADADDR) is total either way"
+	@d=$$(cmp -l $(PRIMARY_IMG) $(RESCUE_IMG) | wc -l); \
+	 if [ "$$d" != "1" ]; then \
+	     echo "  FAIL   the two images differ in $$d bytes; only the header's"\
+	          "flash-offset field may differ"; exit 1; \
+	 fi; \
+	 echo "  ok     they differ in exactly $$d byte, inside the header's"\
+	      "flash-offset field -- same payload, same sum tail"
+
+rescue: $(RESCUE_IMG)
+	@echo
+	@echo '--- scan: every candidate the loader tries, against the policy ---'
+	$(PYTHON) $(MKCR6C) scan \
+	    --place $(PRIMARY_AT)=$(PRIMARY_IMG) \
+	    --place $(RESCUE_AT)=$(RESCUE_IMG) \
+	    $(if $(SLOT),--place 0x070000=$(SLOT),)
+	@echo
+	@printf 'rescue image  %s\n' '$(RESCUE_IMG)'
+	@printf 'bytes         %s of %s in the region\n' \
+	    "$$(wc -c < $(RESCUE_IMG))" "$$(printf '%d' 0x10000)"
+	@printf 'sha256        %s\n' \
+	    "$$(sha256sum $(RESCUE_IMG) | cut -d' ' -f1)"
+	@printf 'mkfw2         %s\n' \
+	    'build --payload <this> --flash-at $(RESCUE_AT) -- see rescue-publish'
+
+# The pair of controls, each shown BOTH ways: the producer's own 17 cases, then
+# the two red arms driven through the CLI so that a `wrap` which emitted an
+# unbootable image, and a `scan` which passed a layout with a stray header, each
+# exit non-zero where it is read rather than inside a self-test.
+rescue-controls: $(RESCUE_IMG)
+	@$(HERE)test/rescue-controls.sh $(REPO) $(OUT) $(STAGE)/rescue
+
+# What the publish WOULD be, printed rather than run.  Nothing here writes
+# flash; `flashguard` refuses `0x020000` outright today (its own rescue row), so
+# `mkfw2 build --flash-at 0x020000` exits 3 and this target prints the command
+# and that refusal instead of pretending the chain is closed.
+rescue-publish: $(RESCUE_IMG)
+	@echo 'the invocation this image is built for, once the destination is'
+	@echo 'signed and the owner has ruled on flashguard'"'"'s rescue row:'
+	@echo
+	@echo '  tools/mkfw2.py build \'
+	@echo '      --payload $(RESCUE_IMG) \'
+	@echo '      --out <somewhere>/rlxboot-rescue-v1.rlxu \'
+	@echo '      --version 1 --load-addr 0x80500000 --entry-addr 0x80500000 \'
+	@echo '      --recipe-id <4 hex> --flash-at $(RESCUE_AT) --dev-seed'
+	@echo
+	@echo 'measured today, and it is a REFUSAL rather than a container:'
+	@-$(PYTHON) $(REPO)/tools/flashguard.py check --at $(RESCUE_AT) \
+	    --bytes 0x10000
+	@echo
+	@echo 'and the positive control, so the guard is shown permitting too:'
+	@$(PYTHON) $(REPO)/tools/flashguard.py check --at 0x030000 --bytes 0x10000
+
 # ------------------------------------------------------------- flash safety ---
 
 flashsafe: $(ELF)
@@ -290,4 +400,4 @@ mutate:
 	@$(HERE)test/mutate.sh $(REPO) $(HOSTCC1) $(STAGE)/mutate
 
 clean:
-	rm -rf $(BD) $(SD) $(OUT) $(STAGE)/hosttest $(STAGE)/qemutest $(STAGE)/mutate
+	rm -rf $(BD) $(SD) $(OUT) $(STAGE)/hosttest $(STAGE)/qemutest $(STAGE)/mutate $(STAGE)/rescue
