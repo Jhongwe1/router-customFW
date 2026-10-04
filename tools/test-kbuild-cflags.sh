@@ -34,6 +34,10 @@
 # 🔄 2026-10-05 (R8b, FW-228): X1-X12d, `--expect-present ROW-ID` -- its
 # refusals above the stage, and the four cells of its truth table through the
 # gate, mainline and armed, with and without the flag.  Same: no drop needed.
+# 🔄 2026-10-05 (GPL-2.0 § 3, P4b): Y1-Y7b and Z0-Z7, `--recipient` -- the
+# build a recipient of the corresponding source runs: the --absent rows the
+# driver's UNIT_REFS names are not read, nothing else is skipped, and the
+# verdict is `recipient` with exit 7, never green.  Same: no drop needed.
 #
 # Usage:  tools/test-kbuild-cflags.sh
 set -o nounset
@@ -540,7 +544,7 @@ gates () {   # gates <built|-> <image> <variant> <absent decl> <build rc> [hook]
         N_PATCHES=7; N_MARKS=25; DROP=/x/rtl819x-toolchain; PY="$PY3"
         TEMPLATE="$RT/base.config"; DELTA_FILE="$RT/delta"; MARKS_DECL="$RT/marks.tsv"
         KDELTA="$REPO/tools/kconfig-delta.py"; MARKSPY="$REPO/tools/rlxfw-marks.py"
-        FWRE_WORK="$RT/work"; ABSENT_DECL="$4"
+        FWRE_WORK="$RT/work"; ABSENT_DECL="$4"; RECIPIENT=0
         ABSENT_FILES=(); ABSENT_SHAS=(); ABSENT_NAMES=()
         [ "$1" = - ] || cp "$1" "$log.config-built"
         cp "$2" "$log.vmlinux.elf"; cp "$RT/System.map" "$log.System.map"
@@ -721,6 +725,172 @@ ck "X12c the manifest records it last, after the same thirty lines" \
    "31/marks_verify_expect_present MK5" "$(wc -l < "$RT/c.manifest" | tr -d ' ')/$(lastrow)"
 ck "X12d and verify's own RESULT says one row was confirmed PRESENT" 1 \
    "$(mf marks_verify_result | grep -c '1 confirmed PRESENT under --expect-present')"
+
+echo
+echo "=== Y1-Y7b: --recipient above the stage (GPL-2.0 § 3) -- only UNIT_REFS is skipped ==="
+# 量 2026-10-05: with the committed declaration the driver exits 3 unless BOTH
+# --absent references are on the desk, and `unit-kernel` is this unit's own
+# vendor kernel, which no recipient of the corresponding source can hold.
+# --recipient skips the rows the driver's UNIT_REFS names and nothing else.
+# The A-block's shape: the real driver, a fake $FWRE_WORK and repository, and a
+# run that gets past the reference guard stops at `no drop at`.  The four cells
+# the flag has -- refs present or missing, flag or not -- are Y1/Y2/Y3/Y4 here
+# and Z1/Z2/Z3/Z4 through the gate below.
+YT="$(mktemp -d)"
+YW="$YT/work"; YR="$YT/repo"; YD="$YR/tools/rlxfw-marks-absent.tsv"
+mkdir -p "$YW/rebuild/desk" "$YW/rebuild/src-vendor/drop" "$YR/config" "$YR/tools" "$YT/empty"
+cp "$CF" "$YR/config/rlxfw-cflags"; cp "$SF" "$YR/config/rlxfw-build-stamp"
+printf 'a synthetic unit kernel\n' > "$YW/rebuild/desk/unit.bin"
+printf 'a synthetic drop kernel\n' > "$YW/rebuild/src-vendor/drop/vmlinux_img"
+cp "$YW/rebuild/desk/unit.bin" "$YT/unit.orig"
+yrow () {   # yrow <name> <relpath under $YW>
+    printf '%s\t%s\t%s\t%s\tsynthetic\n' "$1" "$2" \
+        "$(stat -c %s "$YW/$2")" "$(sha256sum "$YW/$2" | cut -d' ' -f1)"
+}
+UROW="$(yrow unit-kernel rebuild/desk/unit.bin)"
+DROW="$(yrow drop-kernel rebuild/src-vendor/drop/vmlinux_img)"
+SU="$(sha256sum "$YW/rebuild/desk/unit.bin" | cut -c1-16)"
+SD="$(sha256sum "$YW/rebuild/src-vendor/drop/vmlinux_img" | cut -c1-16)"
+printf '%s\n%s\n' "$UROW" "$DROW" > "$YD"
+yrun () { out="$(FWRE_WORK="$YW" RLXFW_REPO="$YR" bash "$K" "$@" 2>&1)"; rc=$?; }
+yhas () { printf '%s\n' "$out" | grep -c -- "$1"; }
+# The wording is pinned here as a literal, not read from the driver: the docs
+# and a recipient's own scripts grep for it.
+RB='RECIPIENT BUILD -- unit-specific checks not run: unit-kernel'
+VERIFIED_D="references verified <- tools/rlxfw-marks-absent.tsv: drop-kernel $SD\$"
+
+yrun gcf-y1 --variant quiet
+ck "Y1 refs present, no flag: both verified, no word of the flag" "3/1/1/0" \
+   "$rc/$(yhas "references verified <- tools/rlxfw-marks-absent.tsv: unit-kernel $SU drop-kernel $SD\$")/$(yhas 'no drop at')/$(printf '%s\n' "$out" | grep -ci 'recipient')"
+mv "$YW/rebuild/desk/unit.bin" "$YT/unit.away"
+yrun gcf-y2 --variant quiet
+ck "Y2 unit ref missing, no flag: 3, named, the refusal names --recipient" "3/1/1/0/0" \
+   "$rc/$(yhas 'unit-kernel: no file at')/$(yhas '  --recipient, which skips the checks that read it and nothing else.')/$(yhas "$RB")/$(yhas 'no drop at')"
+mv "$YT/unit.away" "$YW/rebuild/desk/unit.bin"
+# Y2b -- the offer is about the unit-specific row only: the flag cannot help a
+# missing drop kernel, so offering it there would be a wrong instruction.
+mv "$YW/rebuild/src-vendor/drop/vmlinux_img" "$YT/drop.away"
+yrun gcf-y2b --variant quiet
+ck "Y2b drop ref missing, no flag: 3, and --recipient is NOT offered" "3/1/0" \
+   "$rc/$(yhas 'drop-kernel: no file at')/$(printf '%s\n' "$out" | grep -ci 'recipient')"
+mv "$YT/drop.away" "$YW/rebuild/src-vendor/drop/vmlinux_img"
+
+mv "$YW/rebuild/desk/unit.bin" "$YT/unit.away"
+yrun gcf-y3 --variant quiet --recipient
+ck "Y3 unit ref missing + --recipient: past the guard on the drop ref alone" "3/1/1/0" \
+   "$rc/$(yhas "$VERIFIED_D")/$(yhas 'no drop at')/$(yhas 'problem(s) in the declared')"
+ck "Y3b and line 3 is the banner, before any reference is read" \
+   "== gcf-y3: $RB; not for upload to this project's unit" "$(printf '%s\n' "$out" | sed -n 3p)"
+mv "$YW/rebuild/src-vendor/drop/vmlinux_img" "$YT/drop.away"
+yrun gcf-y3c --variant quiet --recipient
+ck "Y3c and with the drop ref missing too: 3 on drop-kernel -- nothing else skipped" "3/1/0/0" \
+   "$rc/$(yhas 'drop-kernel: no file at')/$(yhas 'unit-kernel: ')/$(yhas 'no drop at')"
+mv "$YT/drop.away" "$YW/rebuild/src-vendor/drop/vmlinux_img"
+mv "$YT/unit.away" "$YW/rebuild/desk/unit.bin"
+
+# Y4 -- refs PRESENT + --recipient is allowed, and the unit row is still not
+# read: what the flag does is a property of argv, not of the desk.
+yrun gcf-y4 --variant quiet --recipient
+ck "Y4 refs present + --recipient: allowed, the unit ref not listed" "3/1/1/0" \
+   "$rc/$(yhas "$VERIFIED_D")/$(yhas 'no drop at')/$(yhas "$SU")"
+# Y4b -- "not read" rather than "read and forgiven": a CHANGED unit file passes
+# under the flag and is refused on its digest without it -- and a changed file
+# is a desk defect, so that refusal does not offer the flag.
+printf 'A synthetic unit kernel\n' > "$YW/rebuild/desk/unit.bin"
+yrun gcf-y4b --variant quiet --recipient; y4r="$rc/$(yhas 'no drop at')"
+yrun gcf-y4c --variant quiet; y4n="$rc/$(yhas 'unit-kernel: .* has sha256 ')/$(printf '%s\n' "$out" | grep -ci 'recipient')"
+ck "Y4b a CHANGED unit ref: unread under the flag, refused (no offer) without" \
+   "3/1 3/1/0" "$y4r $y4n"
+cp "$YT/unit.orig" "$YW/rebuild/desk/unit.bin"
+
+# Y5 -- the exemption is by NAME, so a declaration without that name makes the
+# flag skip nothing: refused.  Y5b -- and with the unit row the only row, verify
+# would get no --absent at all: refused.
+printf '%s\n' "$DROW" > "$YD"
+yrun gcf-y5 --variant quiet --recipient
+ck "Y5 --recipient, no unit-kernel row: 3, it would skip nothing" "3/1/0" \
+   "$rc/$(yhas 'declares no row of that name')/$(yhas 'no drop at')"
+printf '%s\n' "$UROW" > "$YD"
+yrun gcf-y5b --variant quiet --recipient
+ck "Y5b --recipient, the unit row alone: 3, verify never runs with no --absent" "3/1/0" \
+   "$rc/$(yhas 'declares no reference image besides the row(s)')/$(yhas 'no drop at')"
+printf '%s\n%s\n' "$UROW" "$DROW" > "$YD"
+yrun gcf-y6 --variant quiet --recipient --dry-run
+ck "Y6 --recipient --dry-run: 0, the banner, the dry-run reached" "0/1/1" \
+   "$rc/$(yhas "== gcf-y6: $RB; not for upload")/$(yhas 'nothing staged and nothing built')"
+
+# Y7 -- the COMMITTED declaration, under an empty $FWRE_WORK, in both
+# directions: with the flag only drop-kernel is required, and without it both
+# are, the refusal offering the flag once.  A third row a recipient cannot hold
+# would turn Y7 red rather than slip into what --recipient still reads.
+cp "$REPO/tools/rlxfw-marks-absent.tsv" "$YD"
+out="$(FWRE_WORK="$YT/empty" RLXFW_REPO="$YR" bash "$K" gcf-y7 --variant quiet --recipient 2>&1)"; rc=$?
+ck "Y7 committed declaration + --recipient: drop-kernel alone is required" "3/1/1/0" \
+   "$rc/$(yhas 'no file at')/$(yhas 'drop-kernel: no file at \$FWRE_WORK/rebuild/src-vendor/rtl819x-toolchain/linux-2.6.30/rtkload/vmlinux_img')/$(yhas 'unit-kernel: ')"
+out="$(FWRE_WORK="$YT/empty" RLXFW_REPO="$YR" bash "$K" gcf-y7b --variant quiet 2>&1)"; rc=$?
+ck "Y7b and without it: both required, the flag offered once" "3/2/1" \
+   "$rc/$(yhas 'no file at')/$(yhas 'a recipient builds with')"
+rm -rf "$YT"
+
+echo
+echo "=== Z0-Z7: --recipient through the gate -- its own verdict, never green ==="
+# The X-block's harness and the real rlxfw-marks.py.  A unit reference that
+# HOLDS a mark string is the discriminator for "not read": without the flag it
+# turns verify red; with it, verify never sees it.
+eval "$(sed -n -e '/^UNIT_REFS=/p' -e '/^RECIPIENT_NOTE=/p' "$K")"
+ck "Z0 the driver's UNIT_REFS and its note, as the docs quote them" \
+   "unit-kernel|unit-specific checks not run: unit-kernel" "${UNIT_REFS-}|${RECIPIENT_NOTE-}"
+mkdir -p "$RT/work/rebuild/desk"
+printf "this unit's vendor kernel\n"         > "$RT/work/rebuild/desk/unit.bin"
+printf 'a unit kernel holding RLXFW-B00\n' > "$RT/work/rebuild/desk/unit-dirty.bin"
+urow () {
+    printf 'unit-kernel\t%s\t%s\t%s\tthis unit, synthetic\n' "$1" \
+        "$(stat -c %s "$RT/work/$1")" "$(sha256sum "$RT/work/$1" | cut -d' ' -f1)"
+}
+{ urow rebuild/desk/unit.bin;       cat "$RT/absent.tsv"; } > "$RT/absent-u.tsv"
+{ urow rebuild/desk/unit-dirty.bin; cat "$RT/absent.tsv"; } > "$RT/absent-ud.tsv"
+UNIT_AWAY='mv "$RT/work/rebuild/desk/unit.bin" "$RT/unit.away"'
+any_recipient () { cat "$RT/fin.gates" "$RT/fin.out" "$RT/c.manifest" | grep -ci 'recipient'; }
+
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-u.tsv" 0
+ck "Z1 refs present, no flag: green, exit 0, MANIFEST_RX, both refs to verify" \
+   "green/0/1/2/0/30" \
+   "$(mf verdict)/$(fin)/$(mrx)/$(mf marks_verify_absent | tr ',' '\n' | grep -c .)/$(any_recipient)/$(wc -l < "$RT/c.manifest" | tr -d ' ')"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-u.tsv" 0 "$UNIT_AWAY"
+mv "$RT/unit.away" "$RT/work/rebuild/desk/unit.bin"
+ck "Z2 unit ref missing, no flag: verify refused, exit 6, the flag offered" \
+   "refused/not-green/6/0/1" \
+   "$(mf marks_verify)/$(mf verdict)/$(fin)/$(mrx)/$(grep -c 'a recipient builds with' "$RT/fin.gates")"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-u.tsv" 0 "$UNIT_AWAY; RECIPIENT=1"
+mv "$RT/unit.away" "$RT/work/rebuild/desk/unit.bin"
+ck "Z3 unit ref missing + --recipient: verdict recipient, exit 7, no MANIFEST_RX" \
+   "green/recipient/7/0" "$(mf marks_verify)/$(mf verdict)/$(fin)/$(mrx)"
+ck "Z3b the verify line, the last line and the manifest's last row carry it" \
+   "1/1/recipient $RECIPIENT_NOTE/31" \
+   "$(grep -c "verify \[RECIPIENT BUILD -- $RECIPIENT_NOTE\] green (rc=0)" "$RT/fin.gates")/$(grep -c "^== rcell: RECIPIENT BUILD -- $RECIPIENT_NOTE; build rc=0, .*not for upload to this project's unit; the record is " "$RT/fin.out")/$(lastrow)/$(wc -l < "$RT/c.manifest" | tr -d ' ')"
+ck "Z3c verify got the other reference alone, and its RESULT counts one" \
+   "vendor=$(sha256sum "$RT/work/rebuild/ref/vendor.bin" | cut -d' ' -f1)/1" \
+   "$(mf marks_verify_absent)/$(mf marks_verify_result | grep -c 'absent from 1 vendor artefact(s)$')"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-ud.tsv" 0
+z4="$(mf marks_verify)/$(fin)"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-ud.tsv" 0 'RECIPIENT=1'
+ck "Z4 refs PRESENT, a mark in the unit ref: red/6 without the flag, recipient/7 with" \
+   "red/6 recipient/7/0" "$z4 $(mf verdict)/$(fin)/$(mrx)"
+gates "$RT/built-quiet" "$RT/unmarked.elf" quiet "$RT/absent-u.tsv" 0 'RECIPIENT=1'
+ck "Z5 --recipient over a RED verify: not-green, exit 6, NOT FOR UPLOAD names it" \
+   "not-green/6/0/1" \
+   "$(mf verdict)/$(fin)/$(mrx)/$(grep -c "NOT FOR UPLOAD -- .*rlxfw-marks verify red; RECIPIENT BUILD -- $RECIPIENT_NOTE; the record is " "$RT/fin.out")"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-u.tsv" 0 \
+      'MARKS_DECL="$RT/marks-cond.tsv"; cp "$RT/map-armed" "$log.System.map"; EXPECT_PRESENT=(MK5); RECIPIENT=1'
+ck "Z6 + --expect-present MK5, armed: recipient/7, no MANIFEST_RX, no green UNDER" \
+   "green/recipient/7/0/0" \
+   "$(mf marks_verify)/$(mf verdict)/$(fin)/$(mrx)/$(grep -c 'green UNDER' "$RT/fin.out")"
+ck "Z6b and the manifest ends with both rows, the exemption first" \
+   "marks_verify_expect_present MK5|recipient $RECIPIENT_NOTE" \
+   "$(tail -n 2 "$RT/c.manifest" | tr '\t' ' ' | paste -sd'|')"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-u.tsv" 2 'RECIPIENT=1'
+ck "Z7 --recipient with the build step at rc 2: exit 2, never 7" "not-green/2/0" \
+   "$(mf verdict)/$(fin)/$(mrx)"
 rm -rf "$RT"
 
 echo

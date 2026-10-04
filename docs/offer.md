@@ -56,6 +56,20 @@ manifest, `NOTICE`, this file, `docs/sbom.md` at that release's commit, and the
 licence texts of the components. `docs/release-process.md` lists the assets and
 the tool that produces or checks each.
 
+**Building it.** 讀 The build driver refuses to build unless every `--absent`
+reference it declares is present, and one of them, `unit-kernel`, is this
+unit's own vendor kernel, which no recipient is given. A recipient adds
+`--recipient`, which skips only the checks that read that reference and runs
+every other:
+
+    bash tools/rlxfw-kbuild.sh <cell> --variant quiet --marks --jobs 4 \
+         --initramfs <name>.spec --recipient
+
+The build then ends with exit 7 and a line starting `RECIPIENT BUILD`, never
+the `manifest ->` line this project uploads from (`docs/release-process.md`,
+*The build a recipient runs*). 推 Nothing else in the build needs this desk; no
+`--recipient` kernel build has run to show it.
+
 ---
 
 ## 2. What the archive carries, for which binaries

@@ -80,6 +80,25 @@ without its archive beside it is what `docs/offer.md` § 0 forbids.
 | D1 | the published bytes are the prepared ones | each asset downloaded from the release page and hashed | every sha256 equals the notes' |
 | D2 | the records, written after the facts exist | `LOG.md`, the `docs/GATE-RESULTS.md` entry, the board in `PROGRESS.md` | written once D1 passes; a record never precedes the act it records |
 
+## The build a recipient runs
+
+讀 `tools/rlxfw-kbuild.sh` refuses to stage unless every reference in
+`tools/rlxfw-marks-absent.tsv` verifies, and `unit-kernel` is this unit's own
+vendor kernel, which no recipient is ever given. A recipient builds with
+`--recipient`, which skips only the checks that read that row, with the drop
+at its `SOURCES.json` pin under `$FWRE_WORK/rebuild/src-vendor/rtl819x-toolchain`
+and a `tools/mkinitramfs.py` spec whose content record sits beside it:
+
+    bash tools/rlxfw-kbuild.sh <cell> --variant quiet --marks --jobs 4 \
+         --initramfs <name>.spec --recipient
+
+Its verdict is `recipient`, never `green`: exit 7, a last line starting
+`== <cell>: RECIPIENT BUILD -- unit-specific checks not run: unit-kernel`, the
+manifest rows `verdict recipient` and `recipient`, and no `manifest ->` line, so
+`looprun` refuses it and it is never the image B1 pins. 量 2026-10-05 the flag's
+refusals and verdicts hold on synthetic inputs (`test-kbuild-cflags` Y1–Y7b and
+Z0–Z7); no `--recipient` kernel build has run.
+
 ---
 
 ## What this process does not establish

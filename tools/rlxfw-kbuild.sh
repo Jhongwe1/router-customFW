@@ -40,6 +40,7 @@
 #                        above the stage is testable through it.
 #     --expect-present ROW-ID   inverts that row's absent: in `rlxfw-marks
 #                        verify`, this run only, forwarded verbatim (R8b, FW-228)
+#     --recipient        a source recipient's build: skips ONLY the unit-specific checks (below)
 #
 # WHY THE TREE IS RE-STAGED EVERY TIME AND NOT `rm vmlinux`.
 # `r2ab-build.sh` learned this on userspace and it is worse here: a kernel
@@ -52,7 +53,6 @@
 # `rsdk-linux-*` is a wrapper that writes `offset.tmp` into the current
 # directory.  On 2026-08-28 one landed in the repository root, which no vendor-tree check watches.
 set -o nounset
-
 FWRE_WORK=${FWRE_WORK:-/home/key/fwre-work}
 SV="$FWRE_WORK/rebuild/src-vendor"
 DROP="$SV/rtl819x-toolchain"
@@ -88,6 +88,7 @@ CFLAGS_GIVEN=0
 NOSTAMP=0
 DRYRUN=0
 EXPECT_PRESENT=()
+RECIPIENT=0
 # 🔴 `napplied` has TWO writers -- the host-compat loop and the marks block --
 # and the second silently shadows the first.  Nothing read it after the fact
 # until the manifest below did, so it was harmless and invisible; the manifest
@@ -111,10 +112,10 @@ while [ $# -gt 0 ]; do
         --no-stamp)      NOSTAMP=1; shift ;;
         --dry-run)       DRYRUN=1; shift ;;
         --expect-present) EXPECT_PRESENT+=("${2-}"); shift; [ $# -eq 0 ] || shift ;;
+        --recipient)     RECIPIENT=1; shift ;;
         *) echo "unknown option $1" >&2; exit 3 ;;
     esac
 done
-
 # --------------------------------------------------- CFLAGS_KERNEL, declared
 # 🔴 R3-9, 2026-08-30.  `quietm` -- the image that booted -- could not be
 # rebuilt from its own recorded configuration, and the whole difference was
@@ -249,7 +250,6 @@ case "${VARIANT:-quiet}" in
        echo "  refuses an undeclared one rather than falling through to 'no variant', and so does this." >&2
        exit 3 ;;
 esac
-
 # ------------------------------------------------------ the recipe's identity
 # What `ID0` prints on the console, and it is derived rather than typed.  The
 # anti-DoD's build-stamp leg loses its "WHICH of my builds" role the moment the
@@ -272,6 +272,50 @@ STAMP_RENDERED=""
 [ -n "$STAMP_EPOCH" ] && \
     STAMP_RENDERED="$(LC_ALL=C TZ=UTC date -u -d "@$STAMP_EPOCH")"
 echo "== $CELL: stamp=$STAMP_EPOCH [$STAMP_RENDERED] recipe=$RECIPE_ID  <- $STAMP_SRC"
+
+# ------------------------------------------- --recipient, GPL-2.0 § 3 (P4b)
+# 量 2026-10-05: with the committed tools/rlxfw-marks-absent.tsv this driver
+# exits 3, before anything is staged, unless BOTH --absent references are on
+# the desk -- and `unit-kernel` is this unit's own vendor kernel, decompressed
+# from its flash dump.  A recipient of the corresponding source cannot hold it
+# and must never be given it, so the build script the release ships could not
+# be run, unmodified, by the people it ships to (讀 GPL-2.0 § 3: "the scripts
+# used to control compilation").
+#
+# WHAT IT SKIPS IS ONLY WHAT READS A ROW UNIT_REFS NAMES: absent_refs' presence,
+# size and sha256 check of that row, above the stage and at the point of use,
+# and so that file's place in verify's --absent list -- verify_marks' three
+# readings of each --absent artefact: every mark string counted in it (must be
+# 0), the refusal of one holding two or more of them, and every `str:` witness
+# counted in it (must be 0).  Everything else runs as it does without the flag,
+# the drop-kernel row included: that file is in the GPL drop this script stages
+# from, at SOURCES.json's pin, so a recipient who can build at all holds it --
+# and verify still refuses to call anything green with no --absent at all.
+#
+# BY NAME, never by a pattern over relpath or role.  absent_refs refuses a
+# --recipient run whose declaration has no row of that name, so a renamed row
+# cannot leave the flag skipping nothing while it says it skipped something.
+#
+# ITS OWN VERDICT.  What it skips is the anti-DoD's discriminator -- a mark on
+# the console cannot have come from THIS unit's vendor kernel -- so a recipient
+# build is never the build this project uploads: overall_verdict says
+# `recipient` and never `green`, the exit status is 7 (unused: the tripwire
+# returns 1-5, a refusal 3, a red gate 6, no vmlinux 9), and the last line is
+# not `manifest ->`.  looprun's S2 refuses it on its status and again on the
+# missing MANIFEST_RX line, and each of the three carriers says `recipient` on
+# its own.  It combines with every other flag, --expect-present included, and
+# no combination reaches green: overall_verdict reads it after every gate.
+#
+# WITH THE REFERENCES PRESENT it is allowed, and unit-kernel is still not read.
+# What the flag does is a property of argv and not of the desk, so the owner can
+# run on the release commit exactly the build a recipient runs without moving a
+# file derived from the flash dump; the same command without the flag still
+# makes every check.  Without the flag no line of output or of the manifest
+# changes, except that a refusal for a MISSING UNIT_REFS row names the flag.
+UNIT_REFS="unit-kernel"
+RECIPIENT_NOTE="unit-specific checks not run: $UNIT_REFS"
+[ "$RECIPIENT" = 0 ] || \
+    echo "== $CELL: RECIPIENT BUILD -- $RECIPIENT_NOTE; not for upload to this project's unit"
 
 # ------------------------------------------- the initramfs, declared by CONTENT
 # A spec names paths, modes and owners; gen_init_cpio reads the CONTENTS at
@@ -374,7 +418,7 @@ ABSENT_FILES=(); ABSENT_SHAS=(); ABSENT_NAMES=()
 # return 3.  Called above the stage and again by run_gates at the point of use.
 # 🔴 A missing or changed reference is a REFUSAL, never a skipped gate.
 absent_refs() {
-    local rows ln name rel bytes want p size got bad=0
+    local rows ln name rel bytes want p size got bad=0 u
     ABSENT_FILES=(); ABSENT_SHAS=(); ABSENT_NAMES=()
     if [ ! -f "$ABSENT_DECL" ]; then
         echo "$CELL: no $ABSENT_DECL." >&2
@@ -398,6 +442,16 @@ absent_refs() {
         ($4 in dg) { printf "BAD\tline %d: its sha256 is also on line %d -- one artefact counted twice\n", NR, dg[$4]; next }
         { nm[$1] = NR; dg[$4] = NR; printf "ROW\t%s\t%s\t%s\t%s\n", $1, $2, $3, $4 }
     ' "$ABSENT_DECL")"
+    # --recipient skips the rows UNIT_REFS names, so each must BE a row here.
+    if [ "${RECIPIENT:-0}" != 0 ]; then
+        for u in ${UNIT_REFS-}; do
+            printf '%s\n' "$rows" | awk -F'\t' -v u="$u" \
+                '$1 == "ROW" && $2 == u { f = 1 } END { exit !f }' && continue
+            echo "$CELL: --recipient skips $u, the row UNIT_REFS names, and $ABSENT_DECL" >&2
+            echo "  declares no row of that name: the flag would skip nothing it says it skips." >&2
+            bad=$((bad+1))
+        done
+    fi
     while IFS= read -r ln; do
         case "$ln" in
             BAD$'\t'*)
@@ -405,9 +459,20 @@ absent_refs() {
                 bad=$((bad+1)) ;;
             ROW$'\t'*)
                 IFS=$'\t' read -r _ name rel bytes want <<< "$ln"
+                # --recipient: a UNIT_REFS row is not read at all -- no stat, no
+                # digest, no --absent -- whether or not its file is on this desk.
+                if [ "${RECIPIENT:-0}" != 0 ]; then
+                    case " ${UNIT_REFS-} " in *" $name "*) continue ;; esac
+                fi
                 p="$FWRE_WORK/$rel"
                 if [ ! -f "$p" ]; then
                     echo "$CELL: $name: no file at \$FWRE_WORK/$rel" >&2
+                    case " ${UNIT_REFS-} " in
+                        *" $name "*)
+                            echo "  $name is this unit's own reference, which a recipient of the" >&2
+                            echo "  corresponding source cannot hold: a recipient builds with" >&2
+                            echo "  --recipient, which skips the checks that read it and nothing else." >&2 ;;
+                    esac
                     bad=$((bad+1)); continue
                 fi
                 size="$(stat -c %s "$p")"
@@ -430,8 +495,14 @@ absent_refs() {
         return 3
     fi
     if [ "${#ABSENT_FILES[@]}" -eq 0 ]; then
-        echo "$CELL: $ABSENT_DECL declares no reference image. verify with no" >&2
-        echo "  --absent reports 'present in mine' and nothing else." >&2
+        if [ "${RECIPIENT:-0}" != 0 ]; then
+            echo "$CELL: $ABSENT_DECL declares no reference image besides the row(s)" >&2
+            echo "  --recipient does not read ($UNIT_REFS). verify with no --absent" >&2
+            echo "  reports 'present in mine' and nothing else." >&2
+        else
+            echo "$CELL: $ABSENT_DECL declares no reference image. verify with no" >&2
+            echo "  --absent reports 'present in mine' and nothing else." >&2
+        fi
         return 3
     fi
     return 0
@@ -713,14 +784,18 @@ run() {          # run() <logsuffix> <cmd...>
 #                        copy of mkinitramfs's content record for the spec
 #                        (<name>.spec -> <name>.manifest.tsv); - without
 #                        --initramfs; `missing` if given and not recorded
-#   verdict              green, or not-green -- overall_verdict, the one rule
-#                        that also decides the exit status and whether the
-#                        `manifest ->` line is printed
+#   verdict              green, recipient or not-green -- overall_verdict, the
+#                        one rule that also decides the exit status and whether
+#                        the `manifest ->` line is printed
 #   marks_verify_expect_present  the row ids --expect-present named, space
 #                        separated.  🔴 WRITTEN ONLY WHEN THE FLAG WAS GIVEN, last,
 #                        so a run without it writes the same thirty lines as
 #                        before; `marks_verify green` beside it means that row
 #                        was confirmed PRESENT, the opposite of its absent:.
+#   recipient            `unit-specific checks not run: <UNIT_REFS>`.  🔴 WRITTEN
+#                        ONLY WITH --recipient, after the line above, for the
+#                        same reason; `marks_verify_absent` beside it names the
+#                        references verify was given, which are the others.
 #
 # 🔴 WHAT THE TWO INITRAMFS DIGESTS COVER, 2026-09-23.  `initramfs_sha256` is
 # the SPEC's digest: its text -- each entry's path, mode and owner and the
@@ -782,6 +857,7 @@ write_manifest() {          # write_manifest <vmlinux path>
         printf 'verdict\t%s\n'              "$(overall_verdict)"
         [ -z "${EXPECT_PRESENT[*]-}" ] || \
             printf 'marks_verify_expect_present\t%s\n' "${EXPECT_PRESENT[*]}"
+        [ "${RECIPIENT:-0}" = 0 ] || printf 'recipient\t%s\n' "$RECIPIENT_NOTE"
     } > "$m"
 }
 
@@ -795,6 +871,10 @@ write_manifest() {          # write_manifest <vmlinux path>
 #     its 4 means "a vendor tree was dirty"; and
 #   * does NOT print `== <cell>: manifest -> <path>` -- it prints a
 #     NOT FOR UPLOAD line that looprun's MANIFEST_RX does not match.
+#
+# A --recipient build whose gates are both green is not green either: it exits
+# 7 and prints a RECIPIENT BUILD line where `manifest ->` would be (the
+# --recipient block above the dry-run exit says why).
 #
 # 🔴 FAIL, NOT RECORD-ONLY, and the reason is the state CFG-3 was opened
 # for.  Nothing reads these verdicts yet: looprun's S2 reads the exit status
@@ -892,6 +972,7 @@ run_gates() {
         MVERIFY_VERDICT="${line%%$'\t'*}"; MVERIFY_RESULT="${line#*$'\t'}"
     fi
     [ -z "${EXPECT_PRESENT[*]-}" ] || ep_tag="[--expect-present ${EXPECT_PRESENT[*]}] "
+    [ "${RECIPIENT:-0}" = 0 ] || ep_tag="${ep_tag}[RECIPIENT BUILD -- $RECIPIENT_NOTE] "
     echo "== $CELL: rlxfw-marks verify $ep_tag$MVERIFY_VERDICT (rc=$MVERIFY_RC): $MVERIFY_RESULT"
 }
 
@@ -900,7 +981,8 @@ run_gates() {
 overall_verdict() {
     if [ "${BUILD_RC:-}" = 0 ] && [ "${KCHECK_VERDICT:-}" = green ] \
        && [ "${MVERIFY_VERDICT:-}" = green ]; then
-        echo green
+        # --recipient can only take green away, never give it: read last.
+        if [ "${RECIPIENT:-0}" = 0 ]; then echo green; else echo recipient; fi
     else
         echo not-green
     fi
@@ -909,18 +991,27 @@ overall_verdict() {
 # finish_build -- print the line looprun reads, or one it cannot mistake for
 # it, and return the exit status.
 finish_build() {
-    local m="$log.manifest" ep="${EXPECT_PRESENT[*]-}"
-    if [ "$(overall_verdict)" = green ]; then
+    local m="$log.manifest" ep="${EXPECT_PRESENT[*]-}" v rn=""
+    v="$(overall_verdict)"
+    if [ "$v" = green ]; then
         # A line of its own: looprun's MANIFEST_RX anchors on the whole next one.
         [ -z "$ep" ] || echo "== $CELL: green UNDER --expect-present $ep: that" \
             "row's absent: was inverted for this run, and the manifest says so"
         echo "== $CELL: manifest -> $m"
         return 0
     fi
+    [ "${RECIPIENT:-0}" = 0 ] || rn="RECIPIENT BUILD -- $RECIPIENT_NOTE; "
+    if [ "$v" = recipient ]; then
+        echo "== $CELL: ${rn}build rc=0, kconfig-delta check green," \
+             "rlxfw-marks verify green${ep:+ under --expect-present $ep} against" \
+             "the references a recipient holds; not for upload to this project's" \
+             "unit; the record is $m"
+        return 7
+    fi
     echo "== $CELL: NOT FOR UPLOAD -- build rc=${BUILD_RC:--}," \
          "kconfig-delta check ${KCHECK_VERDICT:--}," \
          "rlxfw-marks verify ${MVERIFY_VERDICT:--}${ep:+ under --expect-present $ep};" \
-         "the record is $m"
+         "${rn}the record is $m"
     [ "${KCHECK_VERDICT:-}" = green ] || [ ! -f "$log.kconfig-check.log" ] \
         || tail -n 12 "$log.kconfig-check.log" >&2
     [ "${MVERIFY_VERDICT:-}" = green ] || [ ! -f "$log.marks-verify.log" ] \
