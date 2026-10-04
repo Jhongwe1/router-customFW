@@ -28,10 +28,40 @@
 #
 #   make hazlint     the gate on its own, plus its refusal control
 #   make flashsafe   prove the image cannot program or erase flash
-#   make mutate      the two mutation controls: weaken the digest compare, and
-#                    reorder verification, and show which test goes red
+#   make mutate      the mutation controls: weaken the digest compare, reorder
+#                    verification, and three on the slot choice; show which
+#                    test goes red
 #   make show        the numbers that go on the bench card
 #   make clean
+#
+# BOOT= CHOOSES WHERE THE CONTAINER COMES FROM, AT BUILD TIME AND NEVER AT RUN
+# TIME (the R8b spec's D4; `MEM-17`: DRAM survives a power cycle, so a run-time
+# "RAM first" would let a stale container win).
+#
+#   BOOT=slots   the default and the artefact: read flash slot A (0x070000)
+#                and slot B (0x190000), verify each in its own RAM buffer,
+#                boot the valid one with the higher version (A on a tie), and
+#                halt when neither verifies.  Links `slots.c`.
+#   BOOT=ram     R8a's path, kept buildable: verify the container the loader's
+#                TFTP staged at 0x81000000.  `slots.c` is not linked.
+#
+# The two differ in which sources reach the image, so they differ in BUILD_ID
+# by the Makefile's own rule rather than by a flag the id cannot see.
+#
+# KEY= CHOOSES THE UPDATE KEY THE IMAGE TRUSTS (the R8b spec's D15).
+#
+#   KEY=prod     the default: the public half of the OWNER's production key,
+#                from $(PRODKEY_H) -- `prodkey.h` here, written by
+#                `mkprodkey.py write --pubkey <64 hex>`.  Every image target
+#                REFUSES, before anything is compiled, while that file holds no
+#                key; the committed `prodkey.h` is the placeholder until the
+#                owner's key exists.
+#   KEY=dev      `devkey.h`: seed 32 x 0x42, published in this tree, so anyone
+#                can sign a container such an image accepts.  Host tests,
+#                fixtures and desk runs use it; it has to be typed.
+#
+# The key header is staged and is a BUILD_ID input either way, so the id
+# names the key -- and `RLXBOOT-KEY` prints it at boot.
 
 HERE  := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 REPO  := $(abspath $(HERE)../..)
@@ -74,7 +104,7 @@ CFLAGS = $(ARCH) -O2 -std=gnu99 -ffreestanding -fno-builtin \
          -fomit-frame-pointer -fno-common $(CWARN) \
          -DRLX_RESET=1 -DRLX_GEOM=0 -DRLX_ISC=0 -DRLX_CLEAR_BEV=0 \
          -DRLX_RET_ERET=0 -DRLX_RESULT_BASE=0u -DRLX_GEOM_BASE=0u \
-         -DRLXBOOT_BUILD=0x$(BUILD_ID)u $(CFLAGS_EXTRA)
+         -DRLXBOOT_BUILD=0x$(BUILD_ID)u $(BOOT_DEF) $(KEY_DEF) $(CFLAGS_EXTRA)
 ASFLAGS = $(ARCH) -DRLX_RESET=1 -DRLX_GEOM=0 -DRLX_ISC=0 -DRLX_CLEAR_BEV=0 \
           -Wa,--fatal-warnings $(CFLAGS_EXTRA)
 # --defsym BEFORE -T, and it is not cosmetic: this binutils (2.16-era, shipped
@@ -105,9 +135,45 @@ ED_EXEMPT = -Wno-sign-compare
 # here: rlxboot installs no handler.
 PROBE_SRC := start.S uart.S cache.S report.c
 PROBE_HDR := rlxdefs.h rlxasm.h rlxprobe.h
-MY_C      := main.c container.c sha256b.c flashread.c klib.c
+
+# The selector.  Anything but the two words is a refusal, not a default: a typo
+# that silently built the other path would be the run-time ambiguity D4 rules
+# out, moved to the command line.
+BOOT ?= slots
+ifeq ($(BOOT),slots)
+BOOT_C   := slots.c
+BOOT_DEF := -DRLXBOOT_SLOTS=1
+else ifeq ($(BOOT),ram)
+BOOT_C   :=
+BOOT_DEF := -DRLXBOOT_SLOTS=0
+else
+$(error BOOT must be 'slots' (R8b, the default) or 'ram' (R8a), not '$(BOOT)')
+endif
+BOOT_O := $(addprefix build/,$(BOOT_C:.c=.o))
+
+# The key.  KEY_SRC is the file read; KEY_H the name main.c includes, which is
+# what it is staged as.  PRODKEY_H can point elsewhere -- the qemu run builds
+# against a throwaway key it makes in its own directory -- and BUILD_ID hashes
+# whatever it points at.
+KEY       ?= prod
+PRODKEY_H ?= $(HERE)prodkey.h
+ifeq ($(KEY),prod)
+KEY_SRC := $(PRODKEY_H)
+KEY_H   := prodkey.h
+KEY_DEF := -DRLXBOOT_KEY_PROD=1
+else ifeq ($(KEY),dev)
+KEY_SRC := $(HERE)devkey.h
+KEY_H   := devkey.h
+KEY_DEF := -DRLXBOOT_KEY_PROD=0
+else
+$(error KEY must be 'prod' (the default) or 'dev', not '$(KEY)')
+endif
+
+MY_C      := main.c container.c sha256b.c flashread.c klib.c $(BOOT_C)
 MY_S      := jump.S
-MY_HDR    := rlxboot.h container.h sha256b.h devkey.h rlxboot.lds
+# slots.h is in both builds: main.c includes it unconditionally.  The key
+# header is not listed here: it is KEY_SRC, above.
+MY_HDR    := rlxboot.h container.h sha256b.h rlxboot.lds slots.h
 LIB_C     := ed25519.c sha512.c
 LIB_HDR   := ed25519.h sha512.h
 
@@ -117,6 +183,7 @@ LIB_HDR   := ed25519.h sha512.h
 # never by comparing it with a number someone typed.
 BUILD_ID := $(shell cat \
 	$(addprefix $(HERE),$(MY_C) $(MY_S) $(MY_HDR)) \
+	$(KEY_SRC) \
 	$(addprefix $(REPO)/src/lib/,$(LIB_C) $(LIB_HDR)) \
 	$(addprefix $(PROBE)/,$(PROBE_SRC) $(PROBE_HDR)) \
 	2>/dev/null | sha256sum | cut -c1-8)
@@ -124,8 +191,8 @@ BUILD_ID := $(shell cat \
 ELF := $(BD)/rlxboot.elf
 BIN := $(OUT)/rlxboot.bin
 
-.PHONY: all payload stage hazlint hazlint-control flashsafe hosttest qemutest \
-        mutate show clean vectors import-check qemu-elf qemupayload \
+.PHONY: all payload stage keycheck hazlint hazlint-control flashsafe hosttest \
+        qemutest mutate show clean vectors import-check qemu-elf qemupayload \
         rescue rescue-controls rescue-publish
 
 all: payload
@@ -135,11 +202,24 @@ all: payload
 stage:
 	@mkdir -p $(SD)/rlxboot $(SD)/lib $(SD)/probe $(BD) $(OUT)
 	@cp -f $(addprefix $(HERE),$(MY_C) $(MY_S) $(MY_HDR)) $(SD)/rlxboot/
+	@cp -f $(KEY_SRC) $(SD)/rlxboot/$(KEY_H)
 	@cp -f $(addprefix $(REPO)/src/lib/,$(LIB_C) $(LIB_HDR)) $(SD)/lib/
 	@cp -f $(addprefix $(PROBE)/,$(PROBE_SRC) $(PROBE_HDR)) $(SD)/probe/
 	@# The rlxprobe sources #include "rlxdefs.h" and "rlxprobe.h" by bare
 	@# name, so the include path has to reach them; main.c does the same.
-	@echo "staged into $(SD)  (build id $(BUILD_ID))"
+	@echo "staged into $(SD)  (build id $(BUILD_ID), BOOT=$(BOOT), KEY=$(KEY))"
+
+# THE KEY GATE (D15), ahead of every compile of the image.  `mkprodkey.py
+# check` refuses, with the reason and the command that fixes it, while
+# $(PRODKEY_H) holds no key, holds the development key, or does not decode to
+# a usable point; main.c's #error is the second fence if this is bypassed.
+keycheck:
+ifeq ($(KEY),prod)
+	@$(PYTHON) -B $(HERE)mkprodkey.py check $(PRODKEY_H)
+else
+	@echo 'KEY=dev: this image trusts the DEVELOPMENT key (seed 32 x 0x42,'
+	@echo '         published in devkey.h) -- anyone can sign for it'
+endif
 
 # ----------------------------------------------------------------- payload ---
 
@@ -148,7 +228,7 @@ stage:
 # need the flag-stamp machinery `tools/rlxprobe/Makefile` carries for exactly
 # that reason.  This build is eleven translation units; rebuilding all of them
 # costs less than the first stale object would.
-$(ELF): stage
+$(ELF): keycheck stage
 	@set -e; cd $(STAGE); \
 	for f in $(MY_C); do \
 	    $(CC) $(CFLAGS) -Isrc/rlxboot -Isrc/probe -c -o build/$${f%.c}.o src/rlxboot/$$f; \
@@ -166,10 +246,10 @@ $(ELF): stage
 	done; \
 	$(CC) $(LDFLAGS) -Wl,-Map,build/rlxboot.map -o build/rlxboot.elf \
 	    build/p_start.o build/main.o build/container.o build/sha256b.o \
-	    build/flashread.o build/klib.o build/jump.o \
+	    build/flashread.o build/klib.o $(BOOT_O) build/jump.o \
 	    build/ed25519.o build/sha512.o \
 	    build/p_uart.o build/p_cache.o build/p_report.o
-	@echo "linked $(ELF)"
+	@echo "linked $(ELF)  (BOOT=$(BOOT))"
 
 # THE GATE.  `$(BIN)` depends on `$(BD)/rlxboot.gate`, and that file does not
 # exist unless hazlint exited 0.  There is no target that produces a runnable
@@ -226,6 +306,21 @@ $(BIN): $(BD)/rlxboot.gate
 	     echo "  FAIL   the device image contains a signer"; exit 1; \
 	 fi
 	@echo "  ok     no signer and no key generator in the device image"
+	@# D21, from the artefact as well: a slots image forms NO address of the
+	@# RAM-staged counter (0x81700000), so no RAM source is compiled in; a RAM
+	@# image must form it, which is the control that the census can see it.
+	@n=$$($(OBJDUMP) -d $(ELF) | $(PYTHON) $(HERE)test/flashscan.py \
+	        | grep -c '0x81700000'); \
+	 if [ "$(BOOT)" = slots ] && [ "$$n" != 0 ]; then \
+	     echo "  FAIL   the slots image forms 0x81700000 ($$n census rows):"\
+	          "D21 says the flash bitmap only"; exit 1; \
+	 fi; \
+	 if [ "$(BOOT)" = ram ] && [ "$$n" = 0 ]; then \
+	     echo "  FAIL   the RAM image forms no 0x81700000: the census cannot"\
+	          "see the RAM counter, so the slots check would prove nothing"; exit 1; \
+	 fi; \
+	 echo "  ok     census rows naming 0x81700000: $$n (BOOT=$(BOOT); slots"\
+	      "must be 0, ram must not)"
 
 payload: $(BIN) flashsafe
 	@$(MAKE) --no-print-directory show
@@ -237,12 +332,22 @@ show: $(BIN)
 	@printf 'sha256      %s\n' "$$(sha256sum $(BIN) | cut -d' ' -f1)"
 	@echo 'load/entry  $(LOADADDR)   byte 0 of the image is _start'
 	@echo 'build id    $(BUILD_ID)   printed as RLXBOOT-V1 build=$(BUILD_ID)'
+	@echo 'boot from   $(BOOT)'
+	@printf 'key         %s %s\n' '$(KEY)' \
+	    "$$(grep -o '[0-9a-f]\{64\}' $(KEY_SRC) | head -1)"
 	@echo 'stack       $(STACK_SIZE) reserved above .bss'
 	@printf 'bss         %s bytes\n' \
 	    "$$(( $$(printf '%d' 0x$$($(NM) $(ELF) | awk '$$3=="_bss_end"{print $$1}')) - \
 	          $$(printf '%d' 0x$$($(NM) $(ELF) | awk '$$3=="_bss_start"{print $$1}')) ))"
+ifeq ($(BOOT),slots)
+	@echo 'slot A      flash 0x070000 + 0x120000, READ ONLY, into 0x81000000'
+	@echo 'slot B      flash 0x190000 + 0x120000, READ ONLY, into 0x81200000'
+	@echo 'choice      both verified; higher version wins, A on a tie; neither: halt'
+	@echo 'ram counter NONE -- not compiled (D21): the flash bitmap is the only source'
+else
 	@echo 'container   0x81000000   staged by the loader TFTP, limit 0x81700000'
 	@echo 'ram counter 0x81700000   "RCNT" + 512 bytes, used when the magic matches'
+endif
 	@echo 'flash ctr   0xBD3F0000   512 bytes, READ ONLY -- see make flashsafe'
 
 # ---------------------------------------------------------------- rescue ---
@@ -389,7 +494,7 @@ qemutest: stage
 # passes CFLAGS_EXTRA with Malta's 16550 addresses.
 qemu-elf: $(ELF)
 	@echo
-	@echo '  *** NOT A DEVICE BUILD ***  CFLAGS_EXTRA=$(CFLAGS_EXTRA)'
+	@echo '  *** NOT A DEVICE BUILD ***  BOOT=$(BOOT) CFLAGS_EXTRA=$(CFLAGS_EXTRA)'
 	@echo '  No hazlint gate and no raw image.  For qemu-system-mips only.'
 
 qemupayload:

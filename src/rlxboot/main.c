@@ -1,9 +1,12 @@
 /* src/rlxboot/main.c -- rlxboot's device entry.  rlxfw's own code.
  *
  * Entered by `tools/rlxprobe/start.S` after it has set up a stack and zeroed
- * .bss, which is entered by the loader's `J 81800000`.  Returns only on a
- * refusal, and start.S then arms the watchdog (RLX_RESET=1) so the board comes
- * back to the loader prompt without a power cycle -- see REFUSE_ACTION below.
+ * .bss, which is entered by the loader's `J 81800000` -- or, for the image at
+ * flash 0x010000 or 0x020000, by the stock loader's own scan, which copies it
+ * to the same address.  The BOOT=ram build returns only on a refusal, and
+ * start.S then arms the watchdog (RLX_RESET=1) so the board comes back to the
+ * loader prompt without a power cycle -- see REFUSE_ACTION below.  The
+ * BOOT=slots build never returns: it boots a slot or it halts.
  *
  * THE CACHE, AND HOW I CONVINCED MYSELF IT IS RIGHT.
  *
@@ -66,11 +69,52 @@
                                  * rlx_cctl, rlx_call2_uncached -- reused */
 #include "rlxboot.h"
 #include "container.h"
+#include "slots.h"
 #include "sha256b.h"
-#include "devkey.h"
 
 #ifndef RLXBOOT_BUILD
 #error "RLXBOOT_BUILD must be the 8-hex source digest; the Makefile computes it"
+#endif
+
+/* THE KEY THIS IMAGE TRUSTS IS CHOSEN WHEN IT IS BUILT (the R8b spec's D15).
+ * KEY=prod (the Makefile's default) compiles in the public half of the
+ * owner's production key from the generated `prodkey.h`; KEY=dev the
+ * development key, whose seed is published in `devkey.h` -- so an image built
+ * with it accepts a container anyone signed.  Whichever header is staged is a
+ * BUILD_ID input, and `RLXBOOT-KEY` prints the key at boot so a capture says
+ * which one an image trusts without anyone recomputing an id.  The Makefile's
+ * `keycheck` refuses first; the #error below is for a build that went round
+ * it. */
+#ifndef RLXBOOT_KEY_PROD
+#error "RLXBOOT_KEY_PROD must be 0 (KEY=dev) or 1 (KEY=prod); the Makefile sets it"
+#endif
+#if RLXBOOT_KEY_PROD
+#include "prodkey.h"
+#ifndef RLXBOOT_PRODKEY_HEX
+#error "prodkey.h holds no production key: mkprodkey.py write --pubkey <64 hex>, or build KEY=dev"
+#endif
+#define RLXBOOT_PUBKEY     rlxboot_prodkey
+#define RLXBOOT_KEY_LINE   "RLXBOOT-KEY prod " RLXBOOT_PRODKEY_HEX
+#else
+#include "devkey.h"
+#define RLXBOOT_PUBKEY     rlxboot_devkey
+#define RLXBOOT_KEY_LINE   "RLXBOOT-KEY dev " RLXBOOT_DEVKEY_HEX
+#endif
+
+/* WHERE THE CONTAINER COMES FROM IS DECIDED WHEN THE IMAGE IS BUILT, NEVER WHEN
+ * IT RUNS.  The Makefile's BOOT= sets this and also decides whether `slots.c`
+ * is linked, so the two builds differ in BUILD_ID as well as in behaviour.
+ *   1  (BOOT=slots, the default and the artefact)  R8b: read flash slot A and
+ *      slot B, verify each in its own buffer, boot per the R8b spec's D4, and
+ *      HALT when neither verifies.
+ *   0  (BOOT=ram)  R8a: verify the container the loader's TFTP staged at
+ *      0x81000000.
+ * There is no build that tries one and then the other.  `MEM-17`: DRAM
+ * survives a power cycle, so a "RAM first" path would let a stale container --
+ * from any earlier seating -- win over both slots without anyone typing a
+ * thing. */
+#ifndef RLXBOOT_SLOTS
+#error "RLXBOOT_SLOTS must be 0 (BOOT=ram) or 1 (BOOT=slots); the Makefile sets it"
 #endif
 
 /* 1: on a refusal, return to start.S, which arms the watchdog and the board is
@@ -81,7 +125,14 @@
  * seven reject cases at one power cycle each is seven power cycles on a project
  * with one device and no spare.  Either way NO UNVERIFIED IMAGE IS ENTERED --
  * `rlxboot_jump` is called from exactly one place and only after
- * `rlxu_verify` has returned RLXU_OK. */
+ * `rlxu_verify` has returned RLXU_OK.
+ *
+ * BOOT=ram ONLY.  The slots build always halts (D4: "HALT (spin), no reset
+ * loop"): a reset there would come straight back through the stock loader's
+ * scan to this same rlxboot and the same two slots, forever.  讀
+ * `docs/loader-command-semantics.md`: the loader's only two `WDTCNR` writes
+ * are its own deliberate reboots, so nothing arms the watchdog under a spin
+ * that this payload did not arm itself. */
 #ifndef RLXBOOT_REFUSE_RESET
 #define RLXBOOT_REFUSE_RESET 1
 #endif
@@ -173,53 +224,155 @@ static void report(const struct rlxu *r, int stage, int reason)
 	}
 }
 
+/* ----------------------------------------------------------------- boot --- */
+
+/* The one path into a payload, shared by both builds.  `r` is a verdict of
+ * RLXU_OK and `body` is the first payload byte OF THE BYTES THAT VERDICT WAS
+ * ABOUT: the staged container (BOOT=ram) or the winning slot's own buffer
+ * (BOOT=slots) -- never flash, and never a second copy. */
+static void boot_verified(const struct rlxu *r, const unsigned char *body)
+	__attribute__((noreturn));
+
+static void boot_verified(const struct rlxu *r, const unsigned char *body)
+{
+	/* Verified.  Only now does one byte move. */
+	rlx_memcpy((void *)r->load_addr, (const void *)body, r->payload_len);
+
+	/* Write back the D side, THEN invalidate the I side, both entered
+	 * through KSEG1.  See the file header for the argument; the order is
+	 * the argument. */
+	rlx_call2_uncached((u32)(unsigned long)rlx_cctl, CCTL_DWBINVAL, 0);
+	rlx_call2_uncached((u32)(unsigned long)rlx_cctl, CCTL_IINVAL, 0);
+
+	rlx_puts("RLXBOOT-BOOT load=");
+	rlx_puthex32((u32)r->load_addr);
+	rlx_puts(" entry=");
+	rlx_puthex32((u32)r->entry_addr);
+	nl();
+
+	/* Drain the UART before the jump.  The payload may reprogram the 16550
+	 * or reset the board; a line still in the FIFO is a line the capture
+	 * never sees, and this is the one line that says the boot happened.
+	 * The bound is the loader's own 6540 iterations, copied by uart.S. */
+	{
+		volatile const unsigned char *lsr =
+			(volatile const unsigned char *)RLX_UART_LSR;
+		u32 spin = 6540;
+		while (spin-- && !(*lsr & 0x40))
+			;
+	}
+
+	rlxboot_jump(r->entry_addr);
+}
+
+#if RLXBOOT_SLOTS
+/* The two slots, in .bss: zeroed by start.S, so a field this file forgets to
+ * set reads 0 rather than whatever the vendor kernel left there. */
+static struct rlxb_slot slot_a, slot_b;
+
+static const struct rlxb_io console = { rlx_putc };
+#endif
+
 /* ----------------------------------------------------------------- main --- */
 
 void rlxprobe_main(void)
 {
 	struct rlxu_env env;
+	int malformed = 0;
+#if RLXBOOT_SLOTS
+	struct rlxb_slot *win;
+#else
 	struct rlxu r;
-	int from_ram, malformed = 0;
+	int from_ram;
+#endif
 
 	rlx_puts("RLXBOOT-V1 build=");
 	rlx_puthex32(RLXBOOT_BUILD);
 	nl();
+	rlx_puts(RLXBOOT_KEY_LINE);
+	nl();
 
 	/* The counter is read BEFORE the container is verified, and that is
 	 * safe in a way the rest of this file is careful about: reading it
-	 * touches only two addresses rlxboot chose (0x81700000 and
-	 * 0xBD3F0000), neither of which comes out of the header.  Nothing an
+	 * touches only addresses rlxboot chose (0xBD3F0000, and in BOOT=ram
+	 * 0x81700000), none of which comes out of the header.  Nothing an
 	 * attacker controls influences what is read.  It is read early so
 	 * `RLXBOOT-CTRSRC` is on the console before the ~1 s of silence that
 	 * Ed25519 and a 3 MiB SHA-256 cost -- if the flash window is not
 	 * decoded at 0xBD3F0000 at the prompt, the hang is here and the console
-	 * says so. */
+	 * says so.
+	 *
+	 * D21: the slots build has ONE source, the flash bitmap, and its RAM
+	 * path is not compiled (`flashread.c` says why), so the line is a
+	 * constant there.  BOOT=ram keeps R8a's RAM-first order and says which
+	 * source decided. */
+#if RLXBOOT_SLOTS
+	(void)rlxboot_read_counter_bitmap(ctr_bitmap);
+	rlx_puts("RLXBOOT-CTRSRC flash");
+#else
 	from_ram = rlxboot_read_counter_bitmap(ctr_bitmap);
 	rlx_puts(from_ram ? "RLXBOOT-CTRSRC ram" : "RLXBOOT-CTRSRC flash");
+#endif
 	nl();
 
 	env.ram_base  = RLXB_RAM_BASE;
 	env.ram_end   = RLXB_RAM_END;
 	env.self_base = (unsigned long)_rlxboot_start;
 	env.self_end  = (unsigned long)_stack_top;
+#if RLXBOOT_SLOTS
+	/* No buffer here: `slots.c` gives each slot its own window, and an
+	 * empty one is what a forgotten window would refuse against.  It also
+	 * keeps 0x81700000 -- RLXB_CONTAINER_LIMIT is the RAM counter's
+	 * address -- out of this image entirely, which the payload gate
+	 * checks (D21). */
+	env.buf_base  = 0;
+	env.buf_limit = 0;
+#else
 	env.buf_base  = RLXB_CONTAINER;
 	env.buf_limit = RLXB_CONTAINER_LIMIT;
+#endif
 	env.ldr_base  = RLXB_LDR_BASE;
 	env.ldr_end   = RLXB_LDR_END;
 	/* rlxboot's boot path writes no flash byte, so it declares no write and
 	 * the container's signed `flash_at` is compared against nothing.  It is
 	 * still CHECKED: a container declaring the loader region or H601 is
 	 * refused as `flash_dst` here too, in a path that writes nothing.
-	 * `R8b`'s install path is what will set this to a real offset. */
+	 * `R8b`'s install path is what will set this to a real offset.  (The
+	 * slots build replaces the buffer and these two per slot, in
+	 * `slots.c`, and says why there.) */
 	env.write_at   = RLXU_FLASH_NONE;
 	env.write_form = RLXU_FORM_NONE;
 	ctr_value     = rlxu_counter_from_bitmap(ctr_bitmap, &malformed);
 	env.counter   = ctr_value;
-	env.pk        = rlxboot_devkey;
+	env.pk        = RLXBOOT_PUBKEY;
 
 	if (malformed)
 		rlx_puts("ctr-bitmap malformed: using the total zero count\r\n");
 
+#if RLXBOOT_SLOTS
+	slot_a.name      = 'A';
+	slot_a.flash_off = RLXB_SLOT_A_FLASH;
+	slot_a.size      = RLXB_SLOT_SIZE;
+	slot_a.buf_addr  = RLXB_SLOT_A_BUF;
+	slot_a.src = (const volatile unsigned int *)(RLXB_FLASH_WIN + RLXB_SLOT_A_FLASH);
+	slot_a.buf = (unsigned int *)RLXB_SLOT_A_BUF;
+	slot_b.name      = 'B';
+	slot_b.flash_off = RLXB_SLOT_B_FLASH;
+	slot_b.size      = RLXB_SLOT_SIZE;
+	slot_b.buf_addr  = RLXB_SLOT_B_BUF;
+	slot_b.src = (const volatile unsigned int *)(RLXB_FLASH_WIN + RLXB_SLOT_B_FLASH);
+	slot_b.buf = (unsigned int *)RLXB_SLOT_B_BUF;
+
+	win = rlxb_select(&slot_a, &slot_b, &env, report, &console);
+	if (!win) {
+		/* `rlxb_select` has printed both reasons.  No reset: see
+		 * RLXBOOT_REFUSE_RESET above for why this build never loops. */
+		rlx_puts("refuse-action halt\r\n");
+		for (;;)
+			;
+	}
+	boot_verified(&win->r, rlxb_boot_body(win));
+#else
 	if (rlxu_verify((const unsigned char *)RLXB_CONTAINER,
 	                RLXB_CONTAINER_LIMIT - RLXB_CONTAINER,
 	                &env, &r, report) != RLXU_OK) {
@@ -235,35 +388,6 @@ void rlxprobe_main(void)
 			;
 #endif
 	}
-
-	/* Verified.  Only now does one byte move. */
-	rlx_memcpy((void *)r.load_addr,
-	           (const void *)(RLXB_CONTAINER + RLXU_BODY_OFF),
-	           r.payload_len);
-
-	/* Write back the D side, THEN invalidate the I side, both entered
-	 * through KSEG1.  See the file header for the argument; the order is
-	 * the argument. */
-	rlx_call2_uncached((u32)(unsigned long)rlx_cctl, CCTL_DWBINVAL, 0);
-	rlx_call2_uncached((u32)(unsigned long)rlx_cctl, CCTL_IINVAL, 0);
-
-	rlx_puts("RLXBOOT-BOOT load=");
-	rlx_puthex32((u32)r.load_addr);
-	rlx_puts(" entry=");
-	rlx_puthex32((u32)r.entry_addr);
-	nl();
-
-	/* Drain the UART before the jump.  The payload may reprogram the 16550
-	 * or reset the board; a line still in the FIFO is a line the capture
-	 * never sees, and this is the one line that says the boot happened.
-	 * The bound is the loader's own 6540 iterations, copied by uart.S. */
-	{
-		volatile const unsigned char *lsr =
-			(volatile const unsigned char *)RLX_UART_LSR;
-		u32 spin = 6540;
-		while (spin-- && !(*lsr & 0x40))
-			;
-	}
-
-	rlxboot_jump(r.entry_addr);
+	boot_verified(&r, (const unsigned char *)(RLXB_CONTAINER + RLXU_BODY_OFF));
+#endif
 }

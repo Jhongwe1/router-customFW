@@ -13,6 +13,14 @@
 # The stack measurement does NOT run under -fsanitize=address: it paints 64 KiB
 # below its own frame, which is a stack-buffer-underflow by construction, and
 # ASan is right about that.  It runs in the plain build.
+#
+# 🔴 EACH SUITE'S EXIT CODE IS READ, AND UNTIL 2026-10-05 NONE WAS.  The suites
+# ran as `"$o/t_container" | tail -3`, and under `set -e` a pipeline's status is
+# its LAST command's -- `tail`'s, 0 -- so a t_container with failures printed
+# its own `N failures` line and this script went on to print "both suites
+# exited 0" and "host suite: PASS".  Each suite now writes its output to a
+# file, its status is read with no pipe on the command, and a non-zero status
+# stops the run naming the suite.
 
 set -e
 REPO=${1:?repo}
@@ -34,17 +42,36 @@ build_and_run() {
 	$cc -c -O2 -std=gnu99 $CWARN $extra -o "$o/sha512.o" "$REPO/src/lib/sha512.c"
 	$cc -c -O2 -std=gnu99 $CWARN $extra -o "$o/sha256b.o" "$REPO/src/rlxboot/sha256b.c"
 	$cc -c -O2 -std=gnu99 $CWARN $extra -o "$o/container.o" "$REPO/src/rlxboot/container.c"
+	$cc -c -O2 -std=gnu99 $CWARN $extra -o "$o/slots.o" "$REPO/src/rlxboot/slots.c"
+	# flashread.c twice, as each build compiles it (D21): t_container gets
+	# BOOT=ram's RAM-first reader, t_slots BOOT=slots' flash-only one.
+	$cc -c -O2 -std=gnu99 $CWARN $extra -DRLXBOOT_SLOTS=0 \
+	    -o "$o/flashread_ram.o" "$REPO/src/rlxboot/flashread.c"
+	$cc -c -O2 -std=gnu99 $CWARN $extra -DRLXBOOT_SLOTS=1 \
+	    -o "$o/flashread_slots.o" "$REPO/src/rlxboot/flashread.c"
 	$cc -c -O2 -std=gnu99 $CWARN $extra $DEFS \
 	    -o "$o/t_crypto.o" "$REPO/src/rlxboot/test/t_crypto.c"
 	$cc -c -O2 -std=gnu99 $CWARN $extra $DEFS \
 	    -o "$o/t_container.o" "$REPO/src/rlxboot/test/t_container.c"
+	$cc -c -O2 -std=gnu99 $CWARN $extra $DEFS \
+	    -o "$o/t_slots.o" "$REPO/src/rlxboot/test/t_slots.c"
 	$cc $extra -o "$o/t_crypto" "$o/t_crypto.o" "$o/ed25519.o" "$o/sha512.o" \
 	    "$o/sha256b.o"
 	$cc $extra -o "$o/t_container" "$o/t_container.o" "$o/container.o" \
-	    "$o/ed25519.o" "$o/sha512.o" "$o/sha256b.o"
-	"$o/t_crypto"       | tail -3
-	"$o/t_container"    | tail -3
-	echo "    $tag: both suites exited 0"
+	    "$o/flashread_ram.o" "$o/ed25519.o" "$o/sha512.o" "$o/sha256b.o"
+	$cc $extra -o "$o/t_slots" "$o/t_slots.o" "$o/slots.o" "$o/container.o" \
+	    "$o/flashread_slots.o" "$o/ed25519.o" "$o/sha512.o" "$o/sha256b.o"
+	for t in t_crypto t_container t_slots; do
+		rc=0
+		"$o/$t" > "$o/$t.out" 2>&1 || rc=$?
+		tail -3 "$o/$t.out"
+		if [ "$rc" -ne 0 ]; then
+			echo "  FAIL   $tag/$t exited $rc:"
+			grep '^FAIL' "$o/$t.out" | head -10 | sed 's/^/         /'
+			exit 1
+		fi
+	done
+	echo "    $tag: t_crypto, t_container and t_slots each exited 0"
 }
 
 build_and_run "$CC1" ""    "cc1"
@@ -91,5 +118,15 @@ echo "  ok     the comparison reads a real digest (negative control)"
 
 echo "=== the stack measurement (no sanitiser)"
 "$BD/cc1/t_crypto" stack
+
+echo "=== mkprodkey.py --self-test (D15: the key header written, read back, refused)"
+rc=0
+"${PYTHON:-/usr/bin/python3}" -B "$REPO/src/rlxboot/mkprodkey.py" --self-test \
+    > "$BD/mkprodkey.out" 2>&1 || rc=$?
+cat "$BD/mkprodkey.out"
+if [ "$rc" -ne 0 ]; then
+	echo "  FAIL   mkprodkey.py --self-test exited $rc"
+	exit 1
+fi
 
 echo "host suite: PASS"

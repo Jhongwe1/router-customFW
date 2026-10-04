@@ -20,8 +20,9 @@
 #
 # It links uClibc statically, so it is a Linux user-mode binary and not the
 # payload: the payload has no libc and is tested by `make payload` plus the
-# bench.  What the two share is every line of container.c, sha256b.c, ed25519.c
-# and sha512.c.
+# bench.  What the two share is every line of container.c, sha256b.c, ed25519.c,
+# sha512.c and slots.c -- whose flash window is a 4 MiB array here, so this run
+# models the window's CONTENTS and none of its behaviour.
 
 set -e
 REPO=${1:?repo}
@@ -49,12 +50,22 @@ $CC $ARCH -O2 -std=gnu99 $CWARN -Wno-sign-compare $DEFS \
 $CC $ARCH -O2 -std=gnu99 $CWARN -c -o sha512.o "$REPO/src/lib/sha512.c" 2> w_sha512.log
 $CC $ARCH -O2 -std=gnu99 $CWARN -c -o sha256b.o "$REPO/src/rlxboot/sha256b.c" 2> w_sha256.log
 $CC $ARCH -O2 -std=gnu99 $CWARN -c -o container.o "$REPO/src/rlxboot/container.c" 2> w_cont.log
+$CC $ARCH -O2 -std=gnu99 $CWARN -c -o slots.o "$REPO/src/rlxboot/slots.c" 2> w_slots.log
+$CC $ARCH -O2 -std=gnu99 $CWARN -DRLXBOOT_SLOTS=0 -c -o flashread_ram.o \
+    "$REPO/src/rlxboot/flashread.c"                    2> w_fr0.log
+$CC $ARCH -O2 -std=gnu99 $CWARN -DRLXBOOT_SLOTS=1 -c -o flashread_slots.o \
+    "$REPO/src/rlxboot/flashread.c"                    2> w_fr1.log
 $CC $ARCH -O2 -std=gnu99 $CWARN $DEFS -c -o t_crypto.o \
     "$REPO/src/rlxboot/test/t_crypto.c"                2> w_tc.log
 $CC $ARCH -O2 -std=gnu99 $CWARN $DEFS -c -o t_container.o \
     "$REPO/src/rlxboot/test/t_container.c"             2> w_tk.log
+$CC $ARCH -O2 -std=gnu99 $CWARN $DEFS -c -o t_slots.o \
+    "$REPO/src/rlxboot/test/t_slots.c"                 2> w_ts.log
 $CC $ARCH -static -o t_crypto t_crypto.o ed25519.o sha512.o sha256b.o
-$CC $ARCH -static -o t_container t_container.o container.o ed25519.o sha512.o sha256b.o
+$CC $ARCH -static -o t_container t_container.o container.o flashread_ram.o \
+    ed25519.o sha512.o sha256b.o
+$CC $ARCH -static -o t_slots t_slots.o slots.o container.o flashread_slots.o \
+    ed25519.o sha512.o sha256b.o
 set +x
 
 echo "=== gcc 3.4.6 warnings (read, not failed on)"
@@ -67,10 +78,19 @@ if ! file t_crypto | grep -q MSB; then
 fi
 echo "  ok     MSB (big-endian), which is the property this run exists for"
 
-echo "=== t_crypto under qemu-mips-static"
-qemu-mips-static ./t_crypto | tail -8
-echo "=== t_container under qemu-mips-static"
-qemu-mips-static ./t_container | tail -8
+# Each suite's status read with no pipe on it: `| tail -8` gave tail's 0 for a
+# red suite until 2026-10-05, the same defect `run-host-tests.sh` records.
+for t in t_crypto t_container t_slots; do
+	echo "=== $t under qemu-mips-static"
+	rc=0
+	qemu-mips-static "./$t" > "$t.out" 2>&1 || rc=$?
+	tail -8 "$t.out"
+	if [ "$rc" -ne 0 ]; then
+		echo "  FAIL   $t exited $rc under qemu-mips-static:"
+		grep '^FAIL' "$t.out" | head -10 | sed 's/^/         /'
+		exit 1
+	fi
+done
 echo "=== the derived public key, big-endian"
 qemu-mips-static ./t_crypto devkey
 echo "=== the verifier's stack depth, big-endian"

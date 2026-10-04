@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""ctrwin.py -- the counter's flash window against the forbidden list, through
-`tools/flashwin.py` rather than through a restatement of the rule.
+"""ctrwin.py -- the counter's flash window, and since R8b the two slot windows,
+against the forbidden list, through `tools/flashwin.py` rather than through a
+restatement of the rule.
 
 `CLAUDE.md`: *"new tools import `flashwin.overlaps_forbidden` rather than restate
 the rule."*  `src/rlxboot/flashread.c` cannot: it is C in a freestanding payload,
@@ -43,7 +44,8 @@ def main():
         sys.stderr.write("ctrwin: cannot import tools/flashwin.py: %s\n" % e)
         return 2
 
-    at = grab(os.path.join(repo, "src", "rlxboot", "rlxboot.h"), "RLXB_CTR_FLASH")
+    rh = os.path.join(repo, "src", "rlxboot", "rlxboot.h")
+    at = grab(rh, "RLXB_CTR_FLASH")
     n = grab(os.path.join(repo, "src", "rlxboot", "container.h"), "RLXU_CTR_BYTES")
 
     hit = flashwin.overlaps_forbidden(at, n)
@@ -52,6 +54,19 @@ def main():
         print("ctrwin: REFUSED -- it overlaps 0x%06X-0x%06X (%s)"
               % (hit[0], hit[1] - 1, hit[2]))
         return 1
+
+    # R8b: the two slot windows `slots.c` reads, through the same function.
+    # `slots.c`'s compile-time refusals restate the R8b layout; this asks
+    # `flashwin` itself, as the counter's check does.
+    size = grab(rh, "RLXB_SLOT_SIZE")
+    for name in ("A", "B"):
+        sat = grab(rh, "RLXB_SLOT_%s_FLASH" % name)
+        hit = flashwin.overlaps_forbidden(sat, size)
+        print("ctrwin: slot %s's window is 0x%06X + %d bytes" % (name, sat, size))
+        if hit:
+            print("ctrwin: REFUSED -- it overlaps 0x%06X-0x%06X (%s)"
+                  % (hit[0], hit[1] - 1, hit[2]))
+            return 1
 
     # THE CONTROL.  A checker that always says "clear" is not a checker: a window
     # placed inside H601 must come back forbidden, and one ending exactly at its

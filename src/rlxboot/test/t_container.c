@@ -21,6 +21,7 @@
 #include "../container.h"
 #include "../sha256b.h"
 #include "../devkey.h"
+#include "../rlxboot.h"
 #include "../../lib/ed25519.h"
 
 #define PAY 1024
@@ -636,6 +637,30 @@ static void test_counter(void)
 	}
 }
 
+/* D21: which bitmap decides.  This suite links `flashread.c` built BOOT=ram,
+ * and R8a's order must survive: the RAM-staged block when its magic reads
+ * RCNT, else the flash bitmap.  `t_slots` links it built BOOT=slots and shows
+ * the opposite, so between the two suites both builds are pinned. */
+static void test_ctr_source(void)
+{
+	static unsigned int ram[1 + RLXU_CTR_BYTES / 4];
+	unsigned char flash[RLXU_CTR_BYTES], out[RLXU_CTR_BYTES];
+	int mal = 0, src;
+
+	bitmap_with(flash, 0);                       /* flash erased: 0 */
+	ram[0] = RLXU_CTR_RAM_MAGIC;
+	bitmap_with((unsigned char *)(ram + 1), 5);
+	src = rlxb_counter_read(out, ram, flash);
+	ok("BOOT=ram honours a staged RCNT block over flash (5 over 0)",
+	   src == 1 && rlxu_counter_from_bitmap(out, &mal) == 5 && mal == 0);
+
+	bitmap_with(flash, 3);
+	ram[0] = RLXU_CTR_RAM_MAGIC ^ 0x100UL;       /* "RCOT": not the magic */
+	src = rlxb_counter_read(out, ram, flash);
+	ok("BOOT=ram without the RCNT magic reads the flash bitmap (3)",
+	   src == 0 && rlxu_counter_from_bitmap(out, &mal) == 3);
+}
+
 static void test_rollback(void)
 {
 	struct hdrspec s;
@@ -681,6 +706,7 @@ int main(void)
 	test_bitflips();
 	test_order();
 	test_counter();
+	test_ctr_source();
 	test_rollback();
 
 	printf("t_container %d checks, %d failures\n", checks, failures);

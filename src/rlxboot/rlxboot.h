@@ -8,9 +8,12 @@
  *   0x80400000 .. 0x8041FFFF   stage 2's code and data -- not a destination
  *   0x80500000                 where a normal payload's load_addr points
  *   0x81000000                 the container, staged by the loader's TFTP
+ *                              (BOOT=ram); slot A's buffer (BOOT=slots)
+ *   0x81200000                 slot B's buffer (BOOT=slots; R8b, not SPEC-R8a)
  *   0x81700000                 the RAM-staged counter: "RCNT" then 512 bytes
  *   0x81800000                 rlxboot itself, load and entry
  *   0xBD000000                 the flash MMIO read window (SPEC.md FLS-11)
+ *   0xBD070000, 0xBD190000     slots A and B through it (BOOT=slots)
  *   0xBD3F0000                 the 512-byte anti-rollback bitmap
  *
  * ⚠️ 0x81000000 IS THE ONE ADDRESS IN RAM THIS PROJECT HAS MEASURED BEING
@@ -45,9 +48,34 @@
  * through 0xBD000000 at the loader prompt from a bare-metal payload (`probe3`
  * Group F, seating 8), and independently the whole 4,194,304 bytes under Linux
  * byte-for-byte equal to the PIO path (`D3`, seating 16).  KSEG1, so uncached
- * and unbuffered; a cached read of an MMIO window is not a reading of it. */
+ * and unbuffered; a cached read of an MMIO window is not a reading of it.
+ *
+ * `#ifndef` for ONE caller: `test/run-qemu-payload.sh` moves the window into
+ * emulated RAM (Malta decodes nothing at 0x1D000000), the same way it moves the
+ * UART, and that build prints NOT A DEVICE BUILD.  The device recipe passes no
+ * such flag. */
+#ifndef RLXB_FLASH_WIN
 #define RLXB_FLASH_WIN    0xBD000000UL
+#endif
 #define RLXB_CTR_FLASH    0x003F0000UL   /* offset into the flash */
+
+/* R8b: THE TWO SLOTS (the R8b spec's D1, `notes/update-chain.md` s 6).  Flash
+ * offsets, and the RAM buffer each slot is copied into before it is verified.
+ * Nothing in this file names 0x000000-0x00FFFF, and `slots.c` refuses at
+ * compile time a slot that leaves [0x070000, 0x3F0000) or two that overlap.
+ *
+ *   0x070000 .. 0x18FFFF   slot A, 1,179,648 bytes
+ *   0x190000 .. 0x2AFFFF   slot B, 1,179,648 bytes
+ *   0x81000000             slot A's buffer (= RLXB_CONTAINER, which the
+ *                          slots build never reads as a staged container)
+ *   0x81200000             slot B's buffer -- its own, so the slot that wins
+ *                          is booted from the bytes that were verified and
+ *                          nothing is read from flash a second time */
+#define RLXB_SLOT_A_FLASH 0x00070000UL
+#define RLXB_SLOT_B_FLASH 0x00190000UL
+#define RLXB_SLOT_SIZE    0x00120000UL
+#define RLXB_SLOT_A_BUF   0x81000000UL
+#define RLXB_SLOT_B_BUF   0x81200000UL
 
 /* --- from tools/rlxprobe, reused unmodified ------------------------------- */
 /* `rlxprobe.h` is included by the payload for the real prototypes; these
@@ -71,11 +99,18 @@ void *rlx_memset(void *d, int c, unsigned long n);
 int rlx_memcmp(const void *a, const void *b, unsigned long n);
 
 /* flashread.c */
-/* Read the 512-byte counter bitmap into `out`.  Returns 1 when the RAM-staged
- * bitmap at 0x81700000 was used (its magic word read "RCNT"), 0 when the flash
- * window was.  READS ONLY.  There is no program or erase path in this payload;
- * `test/flashsafe.sh` is what proves that from the emitted image. */
+/* Read the 512-byte counter bitmap into `out`.  BOOT=ram: returns 1 when the
+ * RAM-staged bitmap at 0x81700000 was used (its magic word read "RCNT"), 0
+ * when the flash window was.  BOOT=slots: the flash window only, always 0 --
+ * the RAM source is not compiled (D21).  READS ONLY.  There is no program or
+ * erase path in this payload; `test/flashsafe.sh` is what proves that from the
+ * emitted image. */
 int rlxboot_read_counter_bitmap(unsigned char *out);
+/* The same with both sources as pointers, for the host suites: `ram` is the
+ * staged block (magic word, then the bitmap), `flash` the bitmap itself.  In
+ * BOOT=slots `ram` is never read. */
+int rlxb_counter_read(unsigned char *out, const volatile unsigned int *ram,
+                      const volatile unsigned char *flash);
 
 /* jump.S */
 /* Jump to `entry` with a0..a3 zeroed.  Does not return.  Every delay slot

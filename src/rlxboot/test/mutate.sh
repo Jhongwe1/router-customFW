@@ -25,6 +25,27 @@
 #       case catches it.  What catches it is the ORDER test: `r.trace` and
 #       `r.hashed`.  This is reported honestly either way -- if neither goes red,
 #       the test list is incomplete and that is the finding.
+#
+# Four more on `slots.c` (R8b, 2026-10-05), each the shape of a defect in the
+# slot choice that no single-container test could see:
+#
+#   M3  a tie boots B (`>` becomes `>=`).  EXPECTED: the tie case and the
+#       choice table go red.
+#   M4  the FLASH is verified and the BUFFER booted -- the "verify flash, boot a
+#       second copy" D4 rules out.  No accept/reject verdict changes (the two
+#       hold the same bytes), so what catches it is the digest-pointer check.
+#   M5  a claimed higher version counts as valid.  EXPECTED: the case where B
+#       claims version 9 with a broken signature, and the torn-body case.
+#   M6  the slot is verified without naming its own base as the destination.
+#       EXPECTED: the wrong-slot cases -- the DECISION's tests.
+#
+# And two on `flashread.c` (D21: the slots build's counter is the flash bitmap
+# only, BOOT=ram keeps R8a's RAM-first order), one per direction:
+#
+#   M7  the RAM source compiled into the slots build too.  EXPECTED: t_slots'
+#       "ignores a valid-looking RCNT block" cases.
+#   M8  the RAM source compiled out of the RAM build too.  EXPECTED:
+#       t_container's "BOOT=ram honours a staged RCNT block".
 
 set -e
 REPO=${1:?repo}
@@ -53,9 +74,41 @@ buildrun() {
 	$CC -c -O2 -std=gnu99 $CWARN -o "$o/s2.o" "$t/src/rlxboot/sha256b.c"
 	$CC -c -O2 -std=gnu99 $CWARN -o "$o/co.o" "$t/src/rlxboot/container.c"
 	$CC -c -O2 -std=gnu99 $CWARN $DEFS -o "$o/tk.o" "$t/src/rlxboot/test/t_container.c"
-	$CC -o "$o/t" "$o/tk.o" "$o/co.o" "$o/ed.o" "$o/s5.o" "$o/s2.o"
+	$CC -c -O2 -std=gnu99 $CWARN -o "$o/sl.o" "$t/src/rlxboot/slots.c"
+	$CC -c -O2 -std=gnu99 $CWARN $DEFS -o "$o/ts.o" "$t/src/rlxboot/test/t_slots.c"
+	$CC -c -O2 -std=gnu99 $CWARN -DRLXBOOT_SLOTS=0 -o "$o/fr0.o" "$t/src/rlxboot/flashread.c"
+	$CC -c -O2 -std=gnu99 $CWARN -DRLXBOOT_SLOTS=1 -o "$o/fr1.o" "$t/src/rlxboot/flashread.c"
+	$CC -o "$o/t" "$o/tk.o" "$o/co.o" "$o/fr0.o" "$o/ed.o" "$o/s5.o" "$o/s2.o"
+	$CC -o "$o/ts" "$o/ts.o" "$o/sl.o" "$o/co.o" "$o/fr1.o" "$o/ed.o" "$o/s5.o" "$o/s2.o"
 	"$o/t" > "$BD/out.txt" 2>&1 || true
-	grep -c '^FAIL' "$BD/out.txt" || true
+	"$o/ts" >> "$BD/out.txt" 2>&1 || true
+	# A suite that crashed prints no FAIL line and no summary.  A missing
+	# summary counts as a failure, or a crash would read as robust.
+	nf=$(grep -c '^FAIL' "$BD/out.txt" || true)
+	for s in t_container t_slots; do
+		grep -q "^$s [0-9]* checks, " "$BD/out.txt" || nf=$((nf + 1))
+	done
+	echo "$nf"
+}
+
+# mutate_slots <name> <perl expression> <grep proving it applied> <what> [file]
+# `file` is relative to src/rlxboot and defaults to slots.c.
+mutate_slots() {
+	mf=${5:-slots.c}
+	mkclone
+	perl -0pi -e "$2" "$BD/tree/src/rlxboot/$mf"
+	if ! grep -qF -- "$3" "$BD/tree/src/rlxboot/$mf"; then
+		echo "  REFUSED  $1 did not apply; $mf no longer has the shape"
+		echo "           this script edits"
+		exit 2
+	fi
+	n=$(buildrun)
+	if [ "$n" = "0" ]; then
+		echo "  FAIL     $1 applied and every test still passed: $4"
+		exit 1
+	fi
+	echo "  ok       $1 turned the suite red ($n failures):"
+	grep '^FAIL' "$BD/out.txt" | head -4 | sed 's/^/           /'
 }
 
 echo '=== step 0: the UNMUTATED suite must pass, or the run means nothing'
@@ -123,4 +176,42 @@ fi
 echo "  ok       M2 turned the suite red ($n failures) -- caught by:"
 grep '^FAIL' "$BD/out.txt" | head -6 | sed 's/^/           /'
 
-echo 'mutate: both mutations were applied and both were caught'
+echo '=== M3: a tie boots B'
+mutate_slots M3 \
+	's/return \(b->r\.version > a->r\.version\) \? b : a;/return (b->r.version >= a->r.version) ? b : a;/' \
+	'b->r.version >= a->r.version' \
+	'the tie rule is untested'
+
+echo '=== M4: verify the flash, boot the buffer'
+mutate_slots M4 \
+	's/s->reason = rlxu_verify\(b, s->copied,/s->reason = rlxu_verify((const unsigned char *)s->src, s->copied,/' \
+	'rlxu_verify((const unsigned char *)s->src' \
+	'nothing sees which bytes were verified'
+
+echo '=== M5: a higher claimed version counts as valid'
+mutate_slots M5 \
+	's/int ok_b = \(b->reason == RLXU_OK\);/int ok_b = (b->reason == RLXU_OK || b->r.version > a->r.version);/' \
+	'b->reason == RLXU_OK || b->r.version > a->r.version' \
+	'an unverified version can win'
+
+echo '=== M6: verify a slot without naming its base'
+mutate_slots M6 \
+	's/se\.write_at   = s->flash_off;/se.write_at   = RLXU_FLASH_NONE;/' \
+	'se.write_at   = RLXU_FLASH_NONE;' \
+	'the DECISION (flash_at must name the slot) is untested'
+
+echo '=== M7: the slots build reads the RAM counter after all (D21 undone)'
+mutate_slots M7 \
+	's/#if RLXBOOT_SLOTS \/\* D21: no RAM source \*\//#if 0 \/* D21: no RAM source *\//' \
+	'#if 0 /* D21: no RAM source */' \
+	'nothing sees a RAM counter reach the slots build' \
+	flashread.c
+
+echo '=== M8: the RAM build stops reading the RAM counter (R8a broken)'
+mutate_slots M8 \
+	's/#if RLXBOOT_SLOTS \/\* D21: no RAM source \*\//#if 1 \/* D21: no RAM source *\//' \
+	'#if 1 /* D21: no RAM source */' \
+	'nothing sees the RAM build lose its RAM source' \
+	flashread.c
+
+echo 'mutate: all eight mutations were applied and all eight were caught'
