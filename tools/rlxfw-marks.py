@@ -32,10 +32,17 @@ are load-bearing: without the second, a mark is not a discriminator, and
 `PROGRESS.md`'s anti-DoD is the record of what that costs -- 2026-08-25, a
 second `J 80500000` booted the vendor kernel and the banner looked like a pass.
 
+`--expect-present ROW` inverts ONE named conditional row's `absent:` for ONE
+run: `R8b` builds one image with CONFIG_MTD_RTL819X_WRITE=y and `MK5` then
+goes red, correctly.  Teaching the pairing rule below to read that value out
+of `config/rlxfw-kernel.delta` was rejected -- a second reader of what
+`tools/kconfig-delta.py` owns.  `W17c` keeps it honest: flag, no symbol, RED.
+
 Usage
     tools/rlxfw-marks.py apply    --decl F --tree DIR --src DIR
     tools/rlxfw-marks.py check    --decl F --tree DIR
     tools/rlxfw-marks.py verify   --decl F --image F [--absent F]... [--map F]
+                                  [--expect-present ROW-ID]...
     tools/rlxfw-marks.py self-test
 """
 
@@ -119,12 +126,7 @@ OBJ_RE = re.compile(r'^obj-y\s*\+=\s*[A-Za-z0-9_./-]+\.o$')
 # no home in config/, and this file's whole point is that every linked object
 # has a declared reason somewhere a reviewer can find it.
 #
-# ⚠️ The symbol here is NOT declared to kconfig, and that is deliberate and
-# stronger than `=n`: an undeclared CONFIG_ expands to empty in GNU Make, so
-# no menu, no defconfig and no `oldconfig` can turn it on.  The positive
-# control is a make-level override in a DISCARDED tree --
-# `make CONFIG_MTD_RTL819X_WRITE=y` -- because `obj-$(...)` is plain Make and
-# needs no kconfig at all to fire.
+# 🔄 R8b item 4: *not declared to kconfig* is RETRACTED -- see `_exempt_rows`.
 OBJ_COND_RE = re.compile(
     r'^obj-\$\(CONFIG_[A-Z0-9_]+\)\s*\+=\s*[A-Za-z0-9_./-]+\.o$')
 
@@ -159,8 +161,7 @@ class Row(object):
                 die("%s:%d: witness kind %r is not one of: %s"
                     % (self.file, lineno, k, ", ".join(WITNESS_KINDS)))
             if not v:
-                die("%s:%d: witness %r has an empty value" % (self.file,
-                                                              lineno, w))
+                die("%s:%d: witness %r has an empty value" % (self.file, lineno, w))
             self.wkind, self.wval = k, v
         m = CALL_RE.match(self.insert)
         if not m:
@@ -181,8 +182,7 @@ class Row(object):
                 if not (links_a_file or cond) and self.wkind:
                     die("%s:%d: %s inserts an #include, which links nothing, "
                         "so a witness here would be a claim about an object "
-                        "this row does not bring in"
-                        % (self.file, lineno, self.id))
+                        "this row does not bring in" % (self.file, lineno, self.id))
                 # The pairing, both ways round.  See the WITNESS_KINDS note.
                 if cond and self.wkind != "absent":
                     die("%s:%d: %s is a CONDITIONAL Kbuild line, so the object "
@@ -589,7 +589,91 @@ def _symbols(path):
     return out
 
 
-def verify_marks(decl, image, absent, mapfile=None):
+def _sym_present(syms, name):
+    """Is NAME in the symbol map?  ONE owner for that question.
+
+    `sym:` asserts this, `absent:` asserts its negation, and
+    `--expect-present` turns one `absent:` row back into this -- three callers
+    and one predicate.  A second, looser spelling here is the defect that
+    would matter: an exemption that passed on a symbol the `sym:` rows would
+    call missing, and nothing comparing the two.  `W17l` is that identity,
+    asserted rather than argued.
+
+    讀 2026-10-04: this predicate tests MEMBERSHIP ONLY.  It does not look at
+    the type letter, so `801a8a20 T rtl819x_spi_write_page` (the spelling
+    notes/spi-mtd-driver.md 5.2 records) and a file-local `t` read the same.
+    That is `_symbols`' existing behaviour -- `W7d` is its
+    field-not-substring control -- and it is KEPT rather than tightened: a
+    binding requirement added here and not to the `sym:` rows would make the
+    exemption stricter than the witness kind it borrows from, which is a
+    second owner by another route.
+    """
+    return name in syms
+
+
+def _exempt_rows(rows, names, decl):
+    """-> frozenset of row ids whose `absent:` assertion is INVERTED.
+
+    WHY THE EXEMPTION IS A CALL-SITE FLAG AND NOT A RULE THAT READS A VALUE.
+    `MK5` declares `obj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o`
+    and the pairing rule above requires `absent:` on it, because *conditional*
+    meant *not in the image*.  讀 `R8b` item 4: that symbol is no longer
+    undeclared -- `config/host-compat/0010` declares it `bool`/`default n` and
+    `config/rlxfw-kernel.delta` pins it `n` -- and `R8b` needs ONE image built
+    with it `y`, in which the symbol IS in System.map and this row goes red,
+    correctly.  The rejected remedy was to teach the pairing rule to read the
+    delta's value for the symbol: that makes this file a SECOND READER of a
+    value `tools/kconfig-delta.py` already owns, and it makes a row's verdict
+    depend on a file the row does not name.  This flag inverts ONE named row
+    for ONE run instead, so the exemption is in the run's own argv, is printed
+    by the run, and expires with it -- while the table keeps saying the TU is
+    not shipped.  The positive control for the armed build is unchanged and is
+    still a make-level override in a DISCARDED tree,
+    `make CONFIG_MTD_RTL819X_WRITE=y`, because `obj-$(...)` is plain Make.
+
+    ⚠️ WHAT IT IS NOT.  It is not `--skip`: an exempted row still needs
+    `--map` (`W17j`) and still goes RED when the symbol is not there
+    (`W17c`).  It names a ROW, never a symbol and never a pattern, which is
+    CLAUDE.md's *exempt a known defect by name*; and the four cells of its
+    truth table are swept in both directions (`W17a`..`W17d`).
+    """
+    by_id = dict((r.id, r) for r in rows)
+    out = []
+    for nm in names:
+        if nm in out:
+            die("--expect-present %s was given twice. Refused rather than "
+                "folded into a set: the flag is the whole record of which "
+                "rows were exempted on this run, and a repeated row id is a "
+                "typo or a second author, not an instruction" % nm)
+        r = by_id.get(nm)
+        if r is None:
+            die("--expect-present %s: %s declares no such row. A row id that "
+                "is not in the declaration would exempt nothing, and a flag "
+                "that silently exempts nothing is how a red row goes quiet"
+                % (nm, decl))
+        if not OBJ_COND_RE.match(r.insert):
+            die("--expect-present %s: that row's insert is %r, which is not a "
+                "conditional Kbuild line. Only a conditional row can be built "
+                "or not built, so only a conditional row has an assertion to "
+                "invert" % (nm, r.insert))
+        # 🔴 UNREACHABLE FROM ANY DECLARATION `parse_decl` ACCEPTS, and kept
+        # anyway.  The pairing rule above already refuses a conditional row
+        # whose witness is not `absent:` (`W13`), so by the time a row reaches
+        # this line it must carry one.  The requirement is stated here rather
+        # than inherited, because inheriting it means this flag's correctness
+        # depends on a rule 400 lines away that a later segment may relax --
+        # and relaxing it is precisely what was proposed and rejected above.
+        # `W17g` reaches the branch from the other direction, the way `A22`
+        # reaches `A4`'s state, so it is not a refusal that cannot fire.
+        if r.wkind != "absent":
+            die("--expect-present %s: that row's witness kind is %r, not "
+                "`absent:`. There is nothing to invert: only an `absent:` row "
+                "asserts a symbol is MISSING" % (nm, r.wkind))
+        out.append(nm)
+    return frozenset(out)
+
+
+def verify_marks(decl, image, absent, mapfile=None, expect_present=()):
     """Every mark string is in the image once, and in none of `absent`.
 
     The second half is what makes a mark a discriminator rather than a label.
@@ -599,8 +683,14 @@ def verify_marks(decl, image, absent, mapfile=None):
     MARK-1: build rows that link a file carry a `witness` and it is checked
     here too -- a `str:` against the same image and the same `absent` list, a
     `sym:` against `mapfile`.
+
+    `expect_present` is the row ids `--expect-present` named; see
+    `_exempt_rows` for why that is a call-site flag.  It inverts those rows'
+    `absent:` verdict and nothing else -- `W17k` is the control that an
+    exemption does not reach the row beside it.
     """
     rows, _ = parse_decl(decl)
+    exempt = _exempt_rows(rows, list(expect_present), decl)
     marks = [r for r in rows if r.kind == "mark"]
     wits = [r for r in rows if r.wkind]
     if not marks:
@@ -668,23 +758,30 @@ def verify_marks(decl, image, absent, mapfile=None):
 
     wres = []
     for r in wits:
+        inverted = False
         if r.wkind == "str":
             s = r.wval.encode("ascii")
             got = _count(image, s)
             outs = [(a, _count(a, s)) for a in absent]
             ok = got >= 1 and not any(n for _, n in outs)
         elif r.wkind == "sym":
-            got = 1 if r.wval in syms else 0
+            got = 1 if _sym_present(syms, r.wval) else 0
             outs = []
             ok = bool(got)
         else:
             # `absent:` -- the inverse.  `got` still reports what was found,
             # so a failure says WHICH symbol turned up rather than only that
             # the row went red.
-            got = 1 if r.wval in syms else 0
+            got = 1 if _sym_present(syms, r.wval) else 0
             outs = []
-            ok = not got
-        wres.append((r, got, outs, ok))
+            # 🔴 ONE reading, THREE verdicts, and the reading is the same
+            # `_sym_present` the `sym:` arm above calls.  `--expect-present`
+            # moves the verdict and never the measurement, so an exempted row
+            # with the symbol missing is still RED (`W17c`) -- the thing a
+            # `--skip` would have got wrong.
+            inverted = r.id in exempt
+            ok = bool(got) if inverted else not got
+        wres.append((r, got, outs, ok, inverted))
     return marks, res, wres
 
 
@@ -1091,6 +1188,140 @@ def self_test():
         ok, why = refuses(parse_decl, d33)
         ck("W15 a conditional row with no witness is refused", ok, why)
 
+        # ------------------------------------------------------------------
+        # W17 -- `--expect-present`, and THE FOUR CELLS OF ITS TRUTH TABLE.
+        #
+        # `R8b` needs ONE image built with CONFIG_MTD_RTL819X_WRITE=y.  The
+        # symbol is in System.map then and `MK5`'s `absent:` goes RED, which
+        # is the rule working rather than failing.  The flag inverts that one
+        # row for that one run; `_exempt_rows` holds why the exemption is at
+        # the call site and not in the rule.
+        #
+        #   image     flag               expected
+        #   armed     --                 RED     W17a
+        #   mainline  --expect-present    RED     W17c
+        #   armed     --expect-present   GREEN   W17b
+        #   mainline  --                 GREEN   W17d
+        #
+        # 🔴 ALL FOUR, and the two REDS are the half that matters: a flag
+        # exercised only where it is meant to pass is a flag that cannot
+        # fail, which is this file's own standard (`W16b`).  W17a and W17d
+        # are W11's and W10's cells re-taken through the new code path on
+        # purpose -- those two were written against a `verify_marks` with no
+        # `expect_present` parameter at all, and the table has to be read as
+        # one table.
+        # ------------------------------------------------------------------
+        mp_arm = os.path.join(tmp, "System.map.armed")
+        mp_main = os.path.join(tmp, "System.map.mainline")
+        # 讀 notes/spi-mtd-driver.md 5.2 for the address and the capital T,
+        # so the fixture is the line that file records and not an invention.
+        io.open(mp_arm, "w").write(
+            "80000000 T unrelated\n801a8a20 T rtl819x_spi_write_page\n")
+        io.open(mp_main, "w").write(
+            "80000000 T unrelated\n80000010 t other\n")
+        open(mine, "wb").write(b"..RLXFW-B0\n..")
+        open(theirs, "wb").write(b"..a vendor image..")
+
+        _m, _r, w = verify_marks(d30, mine, [theirs], mp_arm)
+        ck("W17a armed image, no flag: the absent: row is RED",
+           w[0][3] is False and w[0][4] is False, str(w[0][1:]))
+        _m, _r, w = verify_marks(d30, mine, [theirs], mp_arm, ["MK9"])
+        ck("W17b armed image + --expect-present: GREEN",
+           w[0][3] is True and w[0][4] is True, str(w[0][1:]))
+        _m, _r, w = verify_marks(d30, mine, [theirs], mp_main, ["MK9"])
+        ck("W17c mainline + --expect-present: still RED, the flag is not "
+           "`do not look`", w[0][3] is False and w[0][4] is True,
+           str(w[0][1:]))
+        _m, _r, w = verify_marks(d30, mine, [theirs], mp_main)
+        ck("W17d mainline image, no flag: GREEN",
+           w[0][3] is True and w[0][4] is False, str(w[0][1:]))
+
+        # W17e..W17j -- the flag itself is checked, each refusal with its own
+        # reason.  CLAUDE.md: exempt by NAME, and sweep the list both ways.
+        ok, why = refuses(verify_marks, d30, mine, [theirs], mp_arm, ["NOPE"])
+        ck("W17e a row id the declaration does not have is refused", ok, why)
+
+        # Not a conditional row -- two input classes, because the refusal has
+        # to hold for every shape a row can be and not only for the one that
+        # came to mind.  d20's MK9 is `obj-y += drv.o`; B0 is a mark.
+        ok, why = refuses(verify_marks, d20, mine, [theirs], mp_arm, ["MK9"])
+        ck("W17f an unconditional obj-y row is refused", ok, why)
+        ok, why = refuses(verify_marks, d30, mine, [theirs], mp_arm, ["B0"])
+        ck("W17g a MARK row is refused", ok, why)
+
+        # 🔴 W17h IS THE BRANCH NO DECLARATION CAN REACH, and it is a case
+        # rather than an argument for that reason.  The pairing rule
+        # guarantees a conditional row carries `absent:` (`W13` is that
+        # refusal), so no tsv `parse_decl` accepts can name a conditional row
+        # with a `sym:` witness.  The branch is kept because it states the
+        # requirement instead of inheriting it from a rule a later segment
+        # may relax -- relaxing that rule is exactly what was proposed and
+        # rejected.  Reached here from the other direction, by setting the
+        # field on a parsed row, which is how `A22` reaches `A4`'s state.
+        rr30, _ = parse_decl(d30)
+        rr30[1].wkind = "sym"
+        ok, why = refuses(_exempt_rows, rr30, ["MK9"], d30)
+        ck("W17h a named row whose witness is not absent: is refused",
+           ok, why)
+
+        ok, why = refuses(verify_marks, d30, mine, [theirs], mp_arm,
+                          ["MK9", "MK9"])
+        ck("W17i the same row id twice is refused", ok, why)
+
+        ok, why = refuses(main, ["check", "--decl", d30, "--tree", tree,
+                                 "--expect-present", "MK9"])
+        ck("W17j --expect-present on `check` is refused, not ignored",
+           ok, why)
+
+        # W17k -- 🔴 the exemption does NOT weaken W12.  An exempted row
+        # still reads a map, so a missing --map is still a refusal: the flag
+        # moves a verdict and never switches the reading off.
+        ok, why = refuses(verify_marks, d30, mine, [theirs], None, ["MK9"])
+        ck("W17k an exempted row with no --map still REFUSES", ok, why)
+
+        # W17l -- the exemption reaches the row it NAMES and no other.  A
+        # boolean `exempt` instead of a set passes W17b and fails here, which
+        # is the defect this case exists for.
+        d34 = os.path.join(tmp, "d34")
+        io.open(d34, "w").write(_decl(
+            markrow,
+            ("MK9", "sub/Makefile", "after", "obj-y += x.o",
+             "obj-$(CONFIG_MTD_RTL819X_WRITE) += w.o",
+             "absent:rtl819x_spi_write_page", "the exempted one"),
+            ("MKA", "sub/Makefile", "after", "obj-y += y.o",
+             "obj-$(CONFIG_MTD_RTL819X_ERASE) += e.o",
+             "absent:rtl819x_spi_erase_sector", "the row beside it")))
+        mp_both = os.path.join(tmp, "System.map.both")
+        io.open(mp_both, "w").write("801a8a20 T rtl819x_spi_write_page\n"
+                                    "801a8b40 T rtl819x_spi_erase_sector\n")
+        _m, _r, w = verify_marks(d34, mine, [theirs], mp_both, ["MK9"])
+        ck("W17l the exemption reaches the named row and not its neighbour",
+           w[0][3] is True and w[0][4] is True
+           and w[1][3] is False and w[1][4] is False,
+           str([(x[0].id, x[3], x[4]) for x in w]))
+
+        # W17m -- 🔴 ONE OWNER for *is this symbol in the map*.  A `sym:` row
+        # and an exempted `absent:` row naming the SAME symbol must agree on
+        # BOTH maps, because the inversion is a verdict and not a second,
+        # looser reading.  Asserted as an identity rather than argued from
+        # the source, which is `xcheck`'s shape one layer down.
+        d35 = os.path.join(tmp, "d35")
+        io.open(d35, "w").write(_decl(
+            markrow,
+            ("MK8", "sub/Makefile", "after", "obj-y += y.o",
+             "obj-y += sym.o", "sym:rtl819x_spi_write_page", "links it"),
+            ("MK9", "sub/Makefile", "after", "obj-y += x.o",
+             "obj-$(CONFIG_MTD_RTL819X_WRITE) += w.o",
+             "absent:rtl819x_spi_write_page", "declared, not built")))
+        _m, _r, wa = verify_marks(d35, mine, [theirs], mp_arm, ["MK9"])
+        _m, _r, wb = verify_marks(d35, mine, [theirs], mp_main, ["MK9"])
+        ck("W17m one owner: an exempted absent: row and a sym: row on one "
+           "symbol agree on both maps",
+           wa[0][3] is True and wa[1][3] is True
+           and wb[0][3] is False and wb[1][3] is False,
+           "armed %s/%s, mainline %s/%s"
+           % (wa[0][3], wa[1][3], wb[0][3], wb[1][3]))
+
         # W8 -- the column count is fixed at seven.  A six-field row is an
         # error and NOT a row with an empty witness: a dropped tab would
         # otherwise merge `witness` into `reason` silently, which is the shape
@@ -1310,17 +1541,33 @@ def main(argv):
     a = {"decl": None, "tree": None, "src": None, "image": None,
          "map": None, "absent": []}
     if_needed = False
+    # Repeatable, so it is parsed by name like `--absent` and NOT kept in `a`:
+    # the generic branch below matches on `x[2:] in a`, so a key here would
+    # also make the underscore spelling `--expect_present` a silent SETTER of
+    # a list-valued option.
+    expect_present = []
     i = 0
     while i < len(argv):
         x = argv[i]
         if x == "--absent":
             a["absent"].append(argv[i + 1]); i += 2
+        elif x == "--expect-present":
+            expect_present.append(argv[i + 1]); i += 2
         elif x == "--if-needed":
             if_needed = True; i += 1
         elif x.startswith("--") and x[2:] in a:
             a[x[2:]] = argv[i + 1]; i += 2
         else:
             die("unknown option %s" % x)
+
+    # 🔴 Refused rather than ignored on the other verbs.  `check` and `apply`
+    # read the TREE and have no `absent:` verdict to invert, so a flag
+    # accepted there would read as an exemption that was in force and was not.
+    if expect_present and cmd != "verify":
+        die("--expect-present is a `verify` flag and %r was given. It inverts "
+            "an `absent:` witness, which only `verify` evaluates -- accepted "
+            "here it would be an exemption that looks granted and did nothing"
+            % cmd)
 
     if cmd == "self-test":
         return self_test()
@@ -1372,11 +1619,18 @@ def main(argv):
         if not a["decl"] or not a["image"]:
             die("verify needs --decl and --image")
         rows, res, wres = verify_marks(a["decl"], a["image"], a["absent"],
-                                       a["map"])
+                                       a["map"], expect_present)
         print("rlxfw-marks %s" % VERSION)
         print("image       %s" % a["image"])
         if a["map"]:
             print("map         %s" % a["map"])
+        # An exemption that is in force says so on the face of the run, and
+        # the line is printed only when one was asked for -- so a run without
+        # the flag is byte-for-byte what it was before this flag existed.
+        if expect_present:
+            print("expect      \033[33m--expect-present %s\033[0m -- "
+                  "these rows assert the symbol IS in the map"
+                  % " ".join(expect_present))
         if not a["absent"]:
             print("  \033[31mno --absent file given\033[0m -- then `present in "
                   "mine` is a label, not a discriminator")
@@ -1396,31 +1650,52 @@ def main(argv):
             print("")
             print("witnesses   (MARK-1: what a build row leaves in the "
                   "artefact)")
-            for r, got, outs, ok in wres:
+            for r, got, outs, ok, inverted in wres:
                 o = " ".join("%s:%d" % (os.path.basename(f), n)
                              for f, n in outs)
                 if not ok:
                     wbad += 1
-                # The two kinds fail for OPPOSITE reasons, so one shared
-                # sentence would be wrong for half of them -- and the half it
-                # would be wrong for is D4's.
-                why = ("  <- must be 0 here: this symbol is in the map, so "
-                       "the conditional TU WAS built"
-                       if r.wkind == "absent"
-                       else "  <- must be >=1 here and 0 there")
-                print("  %-4s %-7s %-22s mine:%d %s%s"
+                # The kinds fail for OPPOSITE reasons, so one shared sentence
+                # would be wrong for some of them -- and an INVERTED row is
+                # the third case: printing D4's sentence over it would tell a
+                # reader the opposite of what was asked for.
+                if r.wkind != "absent":
+                    why = "  <- must be >=1 here and 0 there"
+                elif inverted:
+                    why = ("  <- must be >=1 here: --expect-present %s says "
+                           "this image CARRIES the conditional object" % r.id)
+                else:
+                    why = ("  <- must be 0 here: this symbol is in the map, "
+                           "so the conditional TU WAS built")
+                # The witness column keeps its spelling when a row is
+                # exempted -- `absent:` is still the row's declared kind, and
+                # tools/test-config-gates.sh G4d greps that column. The
+                # inversion is reported after the reading, never inside it.
+                print("  %-4s %-7s %-22s mine:%d %s%s%s"
                       % (r.id, r.wkind + ":", r.wval, got, o,
+                         "  (expect-present)" if inverted else "",
                          "" if ok else why))
         print("")
         if bad or wbad or not a["absent"]:
             print("RESULT: \033[31m%d mark(s) and %d witness(es) not a "
                   "discriminator\033[0m" % (bad, wbad))
             return 1
-        n_abs = sum(1 for r, _, _, _ in wres if r.wkind == "absent")
+        # An exempted row is NOT one of the rows confirmed absent, and saying
+        # so in the same sentence is the point: a green line reading
+        # `1 witness(es) confirmed ABSENT` on a run that inverted that very
+        # row would be the tool certifying the opposite of what it checked.
+        # One RESULT line still, because tools/rlxfw-kbuild.sh's gate_verdict
+        # calls anything but exactly one `refused`.
+        n_inv = sum(1 for r, _, _, _, inv in wres if inv)
+        n_abs = sum(1 for r, _, _, _, inv in wres
+                    if r.wkind == "absent" and not inv)
         print("RESULT: \033[32mall %d mark(s) present once in the image, %d "
-              "witness(es) present, %d witness(es) confirmed ABSENT, and "
+              "witness(es) present, %d witness(es) confirmed ABSENT,%s and "
               "absent from %d vendor artefact(s)\033[0m"
-              % (len(rows), len(wres) - n_abs, n_abs, len(a["absent"])))
+              % (len(rows), len(wres) - n_abs - n_inv, n_abs,
+                 "" if not n_inv else
+                 " %d confirmed PRESENT under --expect-present," % n_inv,
+                 len(a["absent"])))
         return 0
 
     die("unknown command %r" % cmd)

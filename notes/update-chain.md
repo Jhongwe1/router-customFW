@@ -389,6 +389,73 @@ spare — and a restore that fails partway leaves neither firmware. So *"gone"* 
 the right word to plan with, and the ordering `SPEC-R8a.md` § 0 already states —
 `R8b` is gated behind `R9` closing — is the consequence, not a preference.
 
+### 🆕 2026-10-04 (123rd segment, desk, no power): the barrier is not erased, and none of the five writes above reaches it
+
+The layout above has six regions and the table above has five writes. 🔴 **The
+one region no write reaches is the barrier** — and the layout calls it *erased*,
+which is a claim about bytes and not a name.
+
+量 2026-10-04, from both committed whole-chip dumps under `$FWRE_WORK/dumps/`,
+with a probe that imports `flashwin.overlaps_forbidden` rather than restating
+the forbidden list. Both dumps give identical readings:
+
+| window | bytes | reading `0xFF` | distinct values | first non-`0xFF` |
+|---|---|---|---|---|
+| the barrier `0x030000`–`0x06FFFF` | 262,144 | **883 (0.34 %)** | 256 | `0x030000` |
+| **positive control** — the erased tail `0x34C000`–`0x3FFFFF` | 737,280 | **737,280 (100.00 %)** | 1 | none, erased |
+| the vendor kernel's head `0x060000`–`0x060FFF` | 4,096 | 107 (2.61 %) | 192 | `0x060000` |
+
+The control reads 100.00 % on the same instrument in the same run, so the
+0.34 % is not the probe failing to find erased bytes: it can tell the two
+apart. And § 6's own two tables already held both halves of this without the
+subtraction being done — `w6cg` spans `0x010000`–`0x053A23`, so its body
+occupies `0x030000`–`0x053A23`, and the vendor kernel `cr6c` begins at
+`0x060000`, so its first sector fills the barrier's top.
+
+**What is missing is the provable property, not a live hole.** The barrier's
+requirement is that no candidate inside it boots. 量 the four-byte words at
+the loader's six candidates read `w6cg`, `ff386f17`, `5fa9bbc8`, `dff80a1d`,
+`82a6267c` and `cr6c`; and 量 this unit boots the vendor kernel at `0x060000`,
+which the loader reaches only after rejecting `0x010000`, `0x020000`,
+`0x030000`, `0x040000` and `0x050000` in that order — so `check_image()`
+rejects all five today, measured from the board's behaviour rather than from a
+signature table. The sixth, `0x060000`, is accepted, and slot A's write is what
+stops it being so. So the hole is zero and the gap is in the argument:
+`0x030000`–`0x06FFFF` is unbootable as a consequence of bytes nobody chose,
+where this section at *"an erased NOR word reads `0xFFFFFFFF`"* and
+`tools/mkcr6c.py`'s *"WHY AN ERASED BARRIER IS SAFE AND NOT MERELY
+UNBOOTABLE"* both argue from a chip this one is not.
+
+**So `R8b` has a sixth provisioning write and nothing had budgeted it:** an
+erase of the 262,144 bytes at `0x030000`–`0x06FFFF`, spanning four scan
+candidates. ⚠️ It is also a **second** point of no return, independent of slot
+A's, because it erases the vendor kernel's own `cr6c` header at `0x060000` —
+`check_image()` then stops returning 2 whether or not a byte of slot A was
+written. The write order therefore decides nothing about *whether* the vendor
+firmware survives `R8b`, only *which* write ends it.
+
+**Refutation conditions, written before the readings.** *The barrier is not
+erased today* is refuted by every byte in the window reading `0xFF`; it did not
+fire. *No listed write reaches it* is refuted by any tracked file placing an
+erase of that range among `R8b`'s writes; 量 a search over `notes/`, `docs/`,
+`SPEC.md`, `tools/`, `src/` and `config/` for the range and for the word finds
+only this section's prose and `tools/mkcr6c.py`'s producer-side refusal to
+stamp a header at a barrier candidate — and 讀 that file's own *"WHAT THIS FILE
+DOES NOT DO"* says it establishes nothing about physical flash.
+
+**What this does not establish.** That the window still reads this way *today*:
+these are the 2026-08-16 dumps, and 推 the region is unchanged because this
+project has issued no flash write since. That residual needs no new § 17 row —
+`CLAUDE.md` § Flash already owns it, in the rule that each destination is
+pre-read through `tools/flrbracket.py run` and that a pre-read equal to flash
+voids the round. It also does not establish that `0x030000`, `0x040000` or
+`0x050000` would be rejected *on their own*: the behavioural argument needs the
+loader to reach `0x060000`, which stops being true once `0x060000` is gone, so
+the first provisioning write removes the only present evidence for the three
+lower candidates and the erase is what has to replace it. And it says nothing
+about `bank_offset`, which this section already records as never read for this
+build; if it is not 0 the candidate table shifts and every number here moves.
+
 ### If two slots did not fit
 
 They do. The single-slot alternative is recorded because it is what a larger

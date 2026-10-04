@@ -1007,6 +1007,51 @@ rule taught to read the delta's value for the symbol. The second keeps the
 refusal and makes `rlxfw-marks.py` a second reader of
 `config/rlxfw-kernel.delta`; the choice between them is the owner's.
 
+#### 🆕 2026-10-04 (123rd segment): the owner chose a third, and the exemption lives in the run's own argv
+
+**Remedy C, and why the exemption is at the call site.** Both remedies above
+relax a containment check, which is why the choice was the owner's; a third was
+measured and taken instead. The second remedy — teach the pairing rule to read
+the symbol's value — was rejected on two grounds: it would make
+`tools/rlxfw-marks.py` a second reader of a value `tools/kconfig-delta.py`
+already owns, and it would make a row's verdict depend on a file the row does
+not name, so a delta edit could turn a containment check green with no diff in
+`config/rlxfw-marks.tsv` at all. The first was rejected because it puts the
+write translation unit in **every** image for good and retires `D4`'s
+build-time layer with it.
+
+Remedy C adds `verify --expect-present ROW-ID`, which **inverts one named
+row's `absent:` assertion for one run**. The table keeps saying the TU is not
+shipped; `MK5`'s own line and `tools/rlxfw-marks.py`'s parse-time rule are
+untouched, and 量 lines 187-192 are byte-identical to `c8980fd6` — which
+mattered, because 量 that range is cited from `PROGRESS.md`, from § 12.2 above
+and from `MK5`'s own data row, and a shift would have rotted a citation inside
+the very row the remedy exists for. The flag names a **row** and never a symbol
+or a pattern; it refuses a row that is not a conditional `absent:` row, and it
+refuses the same id twice. The "symbol is present" predicate is the one
+`sym:` already uses — one owner for one question — and 讀 that predicate is
+plain membership of a `System.map`'s third field, with no requirement on the
+symbol's type or binding, so an exemption is still satisfied by a local `t`.
+That is unchanged on purpose: tightening it is a containment change and the
+owner's.
+
+**Refutation conditions, written before the code.** With the flag given and a
+`System.map` that does **not** carry the symbol, the row must still go red —
+otherwise the flag is `--skip` under another name. With no flag at all, an
+armed map must still go red. Both are controls in the tool's own self-test
+beside the two green cells, so the four-cell table is the both-ways sweep
+`CLAUDE.md` asks of an exemption list; 量 the self-test goes 58 → 71 cases, and
+a mutation that makes the flag stop looking turns the first of those two red
+while the one-owner identity catches it independently.
+
+⚠️ **What this does not buy, stated rather than found later.** 讀
+`tools/rlxfw-kbuild.sh` passes no such flag, and its `gate_verdict` turns a red
+`verify` into `exit 6` / `NOT FOR UPLOAD` — so an armed image can be verified
+by hand and **still fails the build-path gate**. Closing that is a change to
+the build driver, not to this tool. And the tool can now be told the opposite
+of what the delta says: only the operator's argv keeps the two consistent,
+which is a habit and not a refusal.
+
 ### 12.3 The four decisions
 
 #### `W1` — declare `CONFIG_MTD_RTL819X_WRITE`, `default n`
@@ -1071,11 +1116,27 @@ This is still the one decision of the four the owner may want taken the other
 way, and it is one field of one row.
 
 **Second alternative rejected:** a fourth `kconfig-delta` variant
-(`quiet-write`). Blast radius, enumerated before deciding: 讀 41 rows of
-`config/rlxfw-kernel.delta` carry `@quiet,loud` (the `SWCORE=n` block), and a
-variant not named in each of them would build `SWCORE=y` — a 41-row retag of
-heavily cited lines against a one-row alternative. Worth revisiting if the write
-image must coexist with mainline in CI.
+(`quiet-write`). Blast radius, **re-enumerated 2026-10-04 because the first
+version of this paragraph priced it with the wrong cost.** 量 41 rows of
+`config/rlxfw-kernel.delta`'s 148 carry `@quiet,loud` (the `SWCORE=n` block —
+lines 380–420 of 420, contiguous and ending the file), and a variant not named
+in each of them would build `SWCORE=y`. 🔄 **But "a retag of heavily cited
+lines" is retracted, and it was never true.** 量 every line citation into that
+file from a tracked file lands on 2, 82, 83, 89, 90, 138, 139 or 175–178, so the
+intersection with those 41 rows — and with the `CONFIG_MTD_RTL819X_WRITE` row at
+`:59` — is **empty**; and a retag rewrites field 1 in place, which moves no line
+in either direction, so citation movement is not a cost of this route at all.
+**The cost that is real is a containment gate.** 讀 `:59` is **untagged**, so it
+is a row of every variant, and 讀 `tools/kconfig-delta.py:294-295` drops a row
+belonging to other variants **before** reaching the duplicate-symbol guard at
+`:308-311` — so an armed variant cannot simply add a `y` row beside it: it has
+to come out of the untagged set. Doing so makes `parse_delta(variant=None)` lose
+the symbol while `quiet-swcore` keeps it, which turns `E1c` of
+`tools/test-config-gates.sh` red — the case that asserts *quiet-swcore reads the
+untagged rows alone* (`same=yes`), and one of the owner's 2026-09-28 decisions
+rather than an edit to make quietly. So the comparison is one field of one row
+against a second owner decision on a gate, not against a renumbering. Worth
+revisiting if the write image must coexist with mainline in CI.
 
 **Refusal path:** the row. A `.config` disagreeing with it is refused before
 anything compiles. **Counter:** `wr_linked`, printed by `/proc/rtl819x-spi` in
@@ -1222,7 +1283,7 @@ what is instrumented is the layer behind it, by `trywrite`. **Refutation:**
 `/dev/mtdblockN` for this device being writable, or `open(O_WRONLY)` on an even
 minor of it succeeding.
 
-### 12.4 The erase granularity — one line, and a new second reading
+### 12.4 The erase granularity — one line, and why it stays 未定
 
 ```
 config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h
@@ -1240,11 +1301,20 @@ reading of the chip**:
 * 量 `/proc/mtd` reports `erasesize 00001000` on all three partitions
   (2026-10-04, `bench/2026-10-04/PRE-MTD`, `FW-187`) — but that number is
   `rtl819x-spi.c`'s own constant and the vendor map's partition constants.
-* 讀 🆕 **the second source this segment adds.** 量 at the desk 2026-10-04:
-  `0x1C7016` — the id `FW-191` measured — appears **nowhere in the GPL drop that
-  builds**. The Eon entries in `spi_common.c`'s table are `0x001c3115`,
-  `0x001c3116`, `0x001c3015`, `0x001c3016`. So `spi_regist()` takes its
-  **UNKNOWN** branch (`:570-574`) and calls `set_flash_info(..., SIZE_064K,
+* 🔄 **This bullet first called itself *the second source this segment adds*,
+  and that claim is withdrawn: `SPEC.md` `FLS-23` has owned this reading since
+  2026-08-31** — and owns more of it than either this bullet or `FW-209` does,
+  namely *29* table rows with no match and the `spi_probe.c:99` →
+  `mtdpart.c:471` inheritance that carries `sector_size` into every partition's
+  `erasesize`. The reading itself stands and is re-measured here. 量 at the desk
+  2026-10-04: `0x1C7016` — the id `FW-191` measured — appears **nowhere in any
+  of the three GPL drops**, 0 files each against a positive control of 2 files
+  each for `0x001c3016`, and the three drops' `spi_common.c` is one file
+  (sha256 `4d5a33e9…`). The Eon entries in that table are `0x001c3115`,
+  `0x001c3116`, `0x001c3015`, `0x001c3016`. So `spi_regist()` — `:547-589`,
+  with `:546` its comment — takes its **UNKNOWN** branch, whose test is at
+  `:565` rather than at the `:570-574` `FW-209` cites for it, and calls
+  `set_flash_info(..., SIZE_064K,
   SIZE_004K, SIZE_256B, "UNKNOWN", ComSrlCmd_SE, ...)`. The code that has driven
   this board since 2018 therefore erases with **SE, opcode 0x20**, calls the
   sector **4,096** bytes, and records a **65,536**-byte `block_size` that its own
@@ -1260,8 +1330,66 @@ forgetting the other is loud. And the forbidden test is applied to the
 grain-aligned block the erase would **clear**, not to the requested address: at a
 64 KiB grain an erase at `0x008000` clears from `0x000000`, and a check on the
 address alone would permit the loader's destruction while reading as a guard.
-That exact case is in the host suite, and the suite is green at both candidate
-grains.
+That exact case is in the host suite, and the suite's 51 cases are green at both
+candidate grains — `0x00001000` and `0x00010000` — with the three grain-derived
+cases recomputed for each.
+
+#### `R8b` item 1, the settlement: the count of readings of this die is zero
+
+The work order asks for two of ⟨the part's public datasheet, the driver
+constant, a measurement⟩ to agree, and expects the desk answer to be *two
+readings and a 未定 on the third*. 量 2026-10-04, that arithmetic does not hold:
+there is **one** number, read four times, and **no** reading of the chip.
+
+| source | state 2026-10-04 | mark | what would refute the state |
+|---|---|---|---|
+| the part's public **datasheet** | **not in hand.** 量 `refs/README.md` declares exactly two documents and both are Realtek SoC datasheets; no Eon document is in `refs/`, in `SOURCES.json` or in the tree. The part is nevertheless **named**: 量 `FLS-01`／`FLS-02` read `cFeon · QH32B-104HIP` off `U19`'s own package, so what is missing is a document, not an identification | 未定 | an EN25QH32B datasheet in `refs/` with its sha256 in `SOURCES.json`. It would enter as a `文`, and `SPEC.md` § 0 holds that a lone `文` never puts a value into code |
+| the **driver constant** | **four constants, all 4,096, and not one of them a reading of this chip.** 讀 the loader's fallback descriptor `+24` (`FLS-06`), the vendor kernel's fallback `sector_size` (`FLS-23`), rlxfw's `RTL819X_SPI_ERASESIZE` (`FW-187`) and `RLXFW_SPI_WR_ERASE_GRAIN` (`FW-208`). The last two were 讀 **from** the first two, so the four are one number with three re-readings | 讀 | any of the four being traceable to something this chip said. `RDID` is the only thing it has ever said, and 讀 `spi_regist` `:568-574` consumes its third byte as `device_cap` and nothing else — `0x16` is inside `[SIZE2N_128K, SIZE2N_128M]`, so it survives as `1 << 22` = 4 MiB and agrees with `FLS-03`, while every geometry argument of the same call is a literal. That is why `FW-187`'s *"not something the chip reports"* is a reading of the code path rather than an assumption: on this path the chip supplies a capacity and nothing about erase geometry |
+| a **measurement** | **partly taken, and not by rlxfw.** 量（行為）`FLS-13`: the loader's command set carries no erase verb, yet `FF` written over a written region reads back `FF`, so `FLW` erases for itself — which *points at* a 4 KiB read-modify-erase-program cycle and bounds no extent. 量 the vendor driver on this die prints `blkSize 10000h secSize 1000h pageSize 100h … UNKNOWN` through `prnFlashInfo` in its own boot banner (`bench/2026-08-30b/L3.log` and three later boots) — the 量 positive control that the UNKNOWN branch is the one taken **here**, which `FW-209` argues from code alone | 量（行為）, extent 未定 | an erase of one grain with the neighbouring grains digested either side of it, which `map 1 <group>` already resolves at 4 KiB |
+
+🔄 **So the work order's stated reason for the 未定 is not the binding one.** It
+says the blocker is that *a measurement is a write*. 量 three things against
+that: a write has already happened on this device and produced `FLS-13`;
+`FLS-26` proved flash bytes changed here; and § 17 carries a **third** row on
+this blank — `FLS-06`–`FLS-08`, re-assigned to `R8b` on 2026-10-04 — whose
+settling experiment is *"the EN25QH32B datasheet, or follow-on commands after
+`RDID`"*, and the second half of that is **not** a write. The binding reason is
+the table above: four constants that are one constant.
+
+🔴 **And that non-write route has never been tried.** A JEDEC SFDP read returns
+a parameter table whose erase-type entries each carry an opcode and a size,
+which is exactly this blank, and it is a **read**. 量 `0x5a` and `sfdp` occur
+**0** times in the vendor's `drivers/mtd/chips/rtl819x/` — positive controls in
+the same sweep: `0x9f` once, `SPICMD_SE` three times — and **0** times in
+rlxfw's own driver sources; 讀 `FLS-18`'s measured command set does not list it
+either. So whether this part answers that opcode at all is itself 未定, and what
+settles *that* is a read-only verb shaped like the existing `rdid` one, not an
+erase. 推 that it answers: this rests on no source in this repository and is
+written down to be refuted. **Refutation:** no `SFDP` signature word in the
+reply, which closes the route and leaves `FW-187` 殘留's *"the decisive 量 is an
+actual erase"* as the only way left.
+
+⚠️ **One correction to how the fallback should be read.** 量 the whole
+`spi_flash_registed[]` table (`:298-544`) is **29** rows, and the
+⟨`pfErase`, `sector_size`⟩ pair moves together in every one: **26** rows carry
+⟨`ComSrlCmd_SE` 0x20, `SIZE_004K`⟩ and **3** — all Spansion `S25FL` — carry
+⟨`ComSrlCmd_BE` 0xD8, `SIZE_064K`⟩, while `block_size` is `SIZE_064K` in all 29
+and no `pfErase` reads it. The UNKNOWN branch takes the 26-row pairing. So the
+fallback is a **matched** opcode-and-granularity pair rather than a stray
+number, and *"it is only a fallback"* does not make it arbitrary; what it does
+mean, and the whole of what it means, is that nothing in that table was
+consulted about `0x1C7016`. The two-source bar is therefore not *harder* than it
+was before `FW-209` — it was never met, and what `FW-209` removed was an
+apparent second source that is a fourth copy of the first.
+
+**What this settlement does not establish.** It does not narrow the value: both
+4,096 and 65,536 stay live, and `FW-187` 殘留's blast radius — at 64 KiB one
+erase block holds the loader, `H601`, COMPDS and COMPCS together — is unchanged.
+It does not establish that this part implements SFDP, that `FLS-13`'s behaviour
+came from a 4 KiB cycle rather than a larger one, or that the vendor driver's
+4,096 stride ever completed a multi-sector erase on this die. It is not a
+licence to erase: the measurement stays `R8b`'s, after the owner's dated
+`owner-yes` for that exact payload.
 
 ### 12.5 The page bound, 讀 rather than assumed
 

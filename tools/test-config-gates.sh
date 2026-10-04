@@ -528,12 +528,29 @@ ck "G3 verify that never reads the vendor image -> refuse" 2 "$?"
 # witness makes a verify with no System.map a REFUSAL rather than a skip --
 # a skip would print a green result over a check that did not run.  Without
 # it these five cases got exit 3 and empty output, and every grep below read
-# 0.  The tsv is handed to --map for the same reason it is handed to --image:
-# this case is about the DECLARATION parsing and the number of marks it
-# declares, not about an artefact.
+# 0.  The tsv is handed to --image because this case is about the DECLARATION
+# parsing and the number of marks it declares, not about an artefact.
+# 🔄 2026-10-04 (123rd segment): --map STOPS being the tsv, and the defect that
+# change repairs is this case's own explanatory prose.  Handing the tsv to
+# --map was sound for every claim here EXCEPT `G4d`'s second one, which asserts
+# something about the MAP'S CONTENT (`mine:0`) -- and a file that is not a map
+# cannot support that.  量 2026-10-04: `_symbols()` reads an nm line as
+# `<addr> <type> <name>` and keeps field 3 only, and config/rlxfw-marks.tsv's
+# line 192 is the comment sentence that EXPLAINS the absence, whose third
+# whitespace token is the very symbol the absence is about -- so the
+# explanation satisfied the thing it explained, and `G4d` read `mine:1`.
+# 讀 that line is byte-identical at `c8980fd6`, so this was red before this
+# segment: it is what turned the `text` job red on that push, and the previous
+# segment's closeout list did not include this suite, which is why nobody saw
+# it.  The fixture below is a real two-line map, and `G4e` is its other arm --
+# the same verify against a map that DOES carry the symbol must read `mine:1`,
+# so a fixture that silently stopped being read could not pass both.
+printf '80100000 T rlxfw_puts\n80100100 T _stext\n' > "$T/g4-absent.map"
+printf '80100000 T rlxfw_puts\n801a8a20 T rtl819x_spi_write_page\n' \
+       > "$T/g4-present.map"
 o="$("$PY" "$RM" verify --decl "$REPO/config/rlxfw-marks.tsv" \
      --image "$REPO/config/rlxfw-marks.tsv" \
-     --map "$REPO/config/rlxfw-marks.tsv" 2>&1)"
+     --map "$T/g4-absent.map" 2>&1)"
 ck "G4 the real declaration parses"        1 \
    "$(printf '%s\n' "$o" | grep -c 'RLXFW-B00')"
 ck "G4 and it declares eleven LADDER marks" 11 \
@@ -621,6 +638,16 @@ ck "G4d and ONE absent-witness build row"     1 \
    "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +absent: ')"
 ck "G4d and it reports the symbol as NOT found" 1 \
    "$(printf '%s\n' "$o" | grep -cE 'absent: +rtl819x_spi_write_page +mine:0')"
+# G4e -- the OTHER arm of G4d's fixture, and without it G4d is an assertion on
+# an instrument that has not been shown able to fail.  Same declaration, same
+# --image, one variable: a map that DOES carry the symbol.  A fixture that
+# stopped being read, or a reader that stopped looking, turns one of the two
+# red.  讀 CLAUDE.md: a guard is shown permitting as well as refusing.
+o_present="$("$PY" "$RM" verify --decl "$REPO/config/rlxfw-marks.tsv" \
+             --image "$REPO/config/rlxfw-marks.tsv" \
+             --map "$T/g4-present.map" 2>&1)"
+ck "G4e the same row reads mine:1 when the map DOES carry it" 1 \
+   "$(printf '%s\n' "$o_present" | grep -cE 'absent: +rtl819x_spi_write_page +mine:1')"
 # 🔄 2026-09-07: the pattern tolerates the witness column's width.  It was
 # `'sym: rlxfw_puts'` with ONE space, and adding `absent:` widened that column
 # from 4 to 7 -- so a deliberate formatting change silently broke a checker

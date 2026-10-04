@@ -553,7 +553,7 @@ tools/rlxfw-marks.py       one of the two tools that edit somebody else's source
                            a tree with some marks present builds, and what it builds is
                            not what the table describes. A20 requires plain `apply` to
                            still refuse a marked tree, so A4 is bypassed only when asked.
-                           58 controls, and the one that earns
+                           71 controls, and the one that earns
                            its keep is `verify` -- `check` reads the staged tree and
                            answers "did the insertion happen", which a mark can pass
                            while being absent from the image; `verify` reads the BUILT

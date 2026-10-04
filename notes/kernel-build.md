@@ -4555,3 +4555,71 @@ translation unit. It is a syntax-and-declaration gate, not a build.
 the shell tries to execute, printing `pound: command not found` to stderr. It
 does not affect the compile -- `COMPILE_RC` and the produced object are the
 readings.
+
+## 🆕 2026-10-04 (123rd segment, desk, no power): `RECIPE_ID` is reader-dependent, and the dependence is one byte per line
+
+`FW-99` above is that `RECIPE_ID` cannot separate two kconfig variants of one
+`config/`. This is the other direction, and it is about the derivation rather
+than the subject: the same `config/` gives a different id depending on which
+shell runs the pipeline.
+
+量 2026-10-04, one checkout at `c8980fd6`, with `tools/rlxfw-kbuild.sh`'s
+pipeline copied rather than retyped:
+
+| shell | `RECIPE_ID` | files found | symlinks under `config/` |
+|---|---|---|---|
+| WSL Ubuntu-24.04, `uname -s` `Linux` | **`22ef4e00`** | 56 | 0 |
+| the Bash tool's Git Bash, `MINGW64_NT-10.0-26200` | **`4431b417`** | 56 | 0 |
+
+**The positive control is what makes this a cause and not a coincidence**:
+discard the paths and digest only the 56 per-file digests, and both shells give
+`f00abcc25b32963f`. So the 56 digests agree and the whole difference sits on
+the path side of each line.
+
+讀 the cause, measured rather than assumed: Git Bash's `sha256sum` writes
+`<digest> *config/busybox` — one space then the binary-mode asterisk — on
+**56 of 56** lines, with **0** lines in the two-space text form, while WSL's
+writes two spaces. The outer `sha256sum` digests those lines, so one byte per
+line moves all eight characters.
+
+**The method reproduces values this repository already recorded**, which is
+the control on the measurement above rather than on the finding: `git archive`
+of `config/` at `18c90684` re-derives `8b5ae480` over 44 files, the default
+recipe `FW-157` and `LOG.md` record for `R6b-8` 8g; at `76d0a121` it
+re-derives `575da809` over 53 files, the `recipe_id` `FW-202` records for the
+`R9-5` pair. 量 `fa36f7a2` and `c8980fd6` both give `22ef4e00` over 56 files,
+so the newest commit moved no file under `config/`.
+
+🔴 **Why this is worth a section.** The comment above that pipeline says paths
+are hashed *relative to the repository root* so the stamp does not depend on
+where the clone lives — which is true, and silent about the coreutils. The
+script runs under WSL, so `22ef4e00` is the value that reaches
+`-DRLXFW_SRC_ID` and prints as `RLXFW-ID0`; a re-derivation done from Windows
+produces eight hexadecimal characters of the right shape and the right length
+that are wrong. That is the self-consistent-wrong-pair failure this repository
+keeps meeting, and what stops it reaching a board is `CLAUDE.md`'s existing
+rule that a booted image is identified by the tool comparing `RLXFW-ID0` with
+the build's digest and never by a typed value.
+
+**Refutation conditions, written before the readings.** *The id is
+reader-dependent* is refuted by the two shells agreeing; they do not. *The
+separator is the whole cause* is refuted by the digest-only control differing
+between shells; it does not.
+
+**What this does not establish.** Which committed `RECIPE_ID` values, if any,
+were ever derived on the wrong platform: the two checked above reproduce, and
+the rest are unchecked. It does not establish that any image carries a wrong
+stamp — the stamp is computed inside the build, which runs under WSL, so only
+a hand re-derivation can go wrong. And no tool refuses the wrong platform
+today; adding one would be a decision, and this section is the reading.
+
+⚠️ **A debt this reading uncovered and did not pay.** § 8 above still states
+*"41 rows in the file"* with `apply` reporting *"16 set + 23 derive"* for
+`quiet`, measured 2026-09-06. 量 2026-10-04 the file holds **148** data rows —
+105 untagged, 41 carrying `@quiet,loud` at lines 380–420, and 2 carrying
+`@loud`. The stale *"41 rows in the file"* is numerically identical to the
+live *"41 rows carry `@quiet,loud`"* one paragraph away, which is why no
+reading of that paragraph caught it. The set and derive figures are **not**
+corrected here: re-deriving them needs the vendor board template
+(sha256 `44f781de…`, 26,548 bytes) out of a staged tree, which costs a stage,
+and inventing them would be worse than leaving them dated.
