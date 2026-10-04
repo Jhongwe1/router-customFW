@@ -101,7 +101,15 @@ BUDGET = {
     "CLAUDE.md:lines": 351,
     "CLAUDE.md:bytes": 24200,
     "CLAUDE.md:maxline": 647,
-    "PROGRESS.md:bytes": 100000,  # 2026-10-04, R9's closing commit: the step
+    "PROGRESS.md:bytes": 105000,  # 2026-10-05, R8b's opening commit: R9's
+    #   comment below said the next gate's step list raises this, and it does.
+    #   量 101,746 B after this commit (R8b's list at the end of the file, the
+    #   board row's opening clause, section Now rewritten); x 1.03 = 104,798,
+    #   three significant figures up = 105,000 (3.2 % headroom; the floor,
+    #   52,500, is far below).  R8b's closing commit moves the list to
+    #   docs/history/steps-R8b.md and lowers this again.  The previous
+    #   budget's reasoning, kept as it was:
+    #   2026-10-04, R9's closing commit: the step
     #   list moved verbatim to docs/history/steps-R9.md, which is the
     #   ratchet-down the 106,000 comment promised and the 2026-09-30 closings
     #   owed.  量 97,100 B after this commit (12,706 B of step list out; section
