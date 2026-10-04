@@ -405,6 +405,17 @@ does not establish at greater length than what it does.
 **[`tools/rlxprobe/`](tools/rlxprobe/)** — bare-metal payloads. The build is
 gated: no payload exists unless `tools/hazlint` exited 0 on the linked image.
 
+**[`tools/modrecord.py`](tools/modrecord.py)** — `P4b`'s per-file modification
+record, generated from the four declarations rather than kept by hand, because a
+hand-kept list is a count about this repository's own contents in a second place.
+**13 controls**, taken from the suite's own output and not from prose. Its
+`emit` without `--tree` is a *listing* and the record it writes says so in its
+own header; `--tree` resolves every anchor against a staged tree and is the
+check that matters. 🔴 量 2026-10-04: `--tree` cannot be pointed at a tree a
+build has already used, because `tools/rlxfw-kbuild.sh` applies the patch series
+in place and the pre-images are then gone — the tool refuses with that reason,
+which is correct and means the check needs a tree staged for it.
+
 ## How the work is recorded
 
 Six files own six different things, and nothing restates what another owns.
@@ -939,6 +950,16 @@ citation from them.
 
 The flash dump is not here either. It contains this unit's MAC addresses and
 radio calibration; it identifies one physical device rather than a model.
+
+**Licences.** [`LICENSE`](LICENSE) is the MIT text and covers rlxfw's own
+userspace, tools and documents; [`config/rlxfw-src/LICENSE`](config/rlxfw-src/LICENSE)
+covers rlxfw's own kernel files, which are `GPL-2.0-only` because provenance
+forces it. [`NOTICE`](NOTICE) says what is under which licence and why, by
+provenance, and [`docs/offer.md`](docs/offer.md) is the written offer for
+corresponding source — it does not bind yet, and says so: 量 2026-10-04 there
+are five releases and none carries a binary asset.
+[`docs/vendor-modifications.md`](docs/vendor-modifications.md) is the per-file
+record of rlxfw's changes to vendor source, generated rather than kept by hand.
 
 ## Where it is going
 

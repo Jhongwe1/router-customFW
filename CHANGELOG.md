@@ -1473,58 +1473,56 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 **Contents, against [`README.md`'s version map](README.md#which-gates-make-which-version):**
 `R9` — the differential security proof, closed 2026-10-04 with zero flash-write commands issued.
-`v1.0` needs `R8b`, `P3` and `P4b` as well, and `R8b` has not opened.
+`P3`'s bring-up report and `P4b`'s three licence obligations land at `~` the same day.
+`v1.0` needs `R8b` as well, and `R8b` has not opened.
 
-🟢 **`R9`**: `docs/differential.md` publishes **16 rows** standing for the register's **141**
-upstream cases — one row per (mechanism class, anchor) pair, because ②③④ are one value per anchor —
-each carrying a mechanism class from a closed set, a vendor cell that is a reading or `⊘ Structural`
-naming a committed finding, an rlxfw cell **from the same instrument**, and a check that would have
-detected the opposite of the row's claim together with that check's reading. A row whose fourth
-cell has no reading publishes 未定: 量 **win 17, surface-absent 5, not comparable 42, 未定 77**.
-The gate's pass condition was **re-specified before it opened**, because the one it had — *a
-three-column table whose third column is not empty* — was satisfied by seven rows committed in the
-planning material before `R9` existed, which is the `R7` defect verbatim.
+🟢 **Licences, 2026-10-04 (`P4b`).** rlxfw's own **kernel** files are `GPL-2.0-only`, forced by
+provenance: they are compiled into and linked with a kernel whose own `COPYING` says version 2 and
+not "or later". Everything else of rlxfw's own — userspace, tools, scripts, declarations, assets and
+documents — is `MIT`, chosen, because MIT is compatible in both directions with the two licences the
+image combines it with (statically linked LGPL-2.1 uClibc, GPL-2.0 kernel headers), so the image
+carries no compatibility question to decide. Apache-2.0's patent clause is a real problem in this
+combination, which is why it was excluded rather than not considered. `LICENSE`, `NOTICE`,
+`config/rlxfw-src/LICENSE`. 量 the declaration closes **18** rows of `docs/sbom.md` — § 4 goes from
+8 resolved / 23 未定 to **24 / 7** and § 7 from 4 / 6 to **6 / 4**.
 
-🔴 **The live column speaks for 21 of 89 cases, and the table says so.** 讀 `config/fix-cases.toml`
-carries 89 rows at the tier that needs a live, network-facing reading; `config/r9-probes.toml`
-holds 27 probe cases citing **21** distinct rows, because 6 rows carry two cases each; the other
-**68** are exempted by name with a reason each, and 21 + 68 closes against 89. The renderer refuses
-if that sum does not close. Nothing in the table speaks for the 52 rows in the three static tiers
-beyond their tier and their verdict.
+🔴 **The written offer does not bind yet, and it says so rather than implying it binds.**
+量 2026-10-04: 5 releases, **0 assets** on every one of them; nothing is written to flash through
+`R9` and the image runs from RAM at `0x80500000`. So `docs/offer.md` names its own trigger — the
+first release carrying a binary asset — and names the two gaps (`SBOM-3`, iperf3's source tree;
+`SBOM-4`, no gcc or binutils source anywhere) that must close before a release carries the
+components they are about. 量 6 annotated tags, 5 releases, none signed and no `user.signingkey`
+configured, stated because an offer tied to a release is tied to something unsigned.
 
-🟢 **Both columns came from one instrument in one episode**, on one host, cable and port: 27 cases
-each way, **137 differing fields**; the vendor answers on 52869 and 52881 where rlxfw refuses, and
-serves its configuration blob unauthenticated under path-normalisation variants where rlxfw returns
-400, while rlxfw bounds request-header size where the vendor does not. The link was checked with a
-control first — 10.1.1.1 answered 3 of 3 and a second address on the same subnet did not — because
-a dead link makes every probe read *closed* and publishes a false column. Two vendor runs 60 s
-apart differ in exactly one field of 27 cases, a status page's header digest.
+🟢 **The per-file modification record is generated, not kept.** `tools/modrecord.py` reads four
+declarations of three different kinds — `config/rlxfw-marks.tsv`, `config/host-compat/*.patch`,
+`config/busybox-patches/*` and `config/rlxfw-kernel.delta` — and writes
+`docs/vendor-modifications.md`: **23 vendor files**, 28 marks rows, 9 + 1 patches, 147 delta rows.
+13 controls, all passing, five of them refusals (an anchor that moved, an anchor occurring twice, a
+hunk that does not apply, a wrong field count, a delta baseline whose sha256 differs). It caught one
+real defect in passing: `0001-udhcpd-drop-notify_file-system-hook.patch`'s `@@ -371,12 +370,6 @@` is
+short of its own body by 2/2, which GNU `patch` does not care about because it anchors on the body —
+reported, not repaired, because editing the patch would move `RECIPE_ID`.
+🔴 **What the record does NOT establish**: it is a *listing* of the declarations, and its own header
+says so, because `--tree` — the mode that resolves every anchor against a staged tree — was not run.
+量 it cannot be run against a tree a build has already used: `tools/rlxfw-kbuild.sh` applies the
+series in place, so the pre-images are gone and the tool refuses with that reason.
 
-🟢 **One power action, two independent containments, and a flash bracket equal at two
-granularities.** The vendor firmware writes flash on an unauthenticated request past an uptime
-threshold, so the probe list used only names the authorisation branch skips **and** the whole
-episode finished at J+61 s against a J+601 s threshold — the second bound holding whatever the list
-says. 量 whole-chip map digest equal before and after at 128 KiB, group 0 equal at 4 KiB,
-`n_writes` 0 on both sides. No `FLW`, `EW`, `EB`, non-zero `AUTOBURN` or `FLR` was issued. What
-that cannot see: two writes that cancel, every byte outside the units read, and `H601`, which is
-never hashed.
+🟢 **`SOURCES.json` carries iperf3**, which makes `README.md`'s *"records every external input with
+its URL and sha256"* true — 量 before this commit the file contained the word `iperf` **0** times
+while `/bin/iperf3` was in the image. Both origin URLs were **fetched once and compared**: 549,466 B
+/ `e34cf60c…` from GitHub and 546,899 B / `60d8db69…` from `archive.debian.org`, with a nonexistent
+version failing to fetch as the control, so those two fields are 量 and no longer 推.
+⚠️ The entry sits in `documents` after `tweetnacl` and not in `source_trees` where it belongs by
+topic, and its own `why_here` field says that: `source_trees` ends at line 174 and 量 all twelve
+line citations into this file point into 115–201, so the right array breaks twelve citations and the
+wrong one breaks none. `SBOM-3` stays 未定, on the unpack step and not for want of an entry.
 
-🔴 **A 推 written inside this gate was refuted inside it.** `FW-198` inferred that the one
-unexplained flash-map difference `P2` left behind was the vendor's own configuration write. 量 over
-46 committed captures spanning 26 days, every one carries the identical whole-chip digest, so there
-is no change to explain; and at 4 KiB the unit the inference needed reads SAME. `FW-201` records it
-and `FW-198`'s inference is retracted — in the gate that produced it, not in a later one.
-
-⚠️ **What `R9` did not establish.** That rlxfw is more secure: five classes of variable are
-uncontrolled — kernel config, libc, toolchain, userspace population, service set — and the rlxfw
-column cannot tell a design decision from any of them. That the vendor firmware was *tested*: it
-has no shell, so it was probed from the network and nothing was typed into it. That the held
-findings are answered: 16 rows are marked held and reach the table as counts only, because the
-report has not been sent. That `quiet-swcore` runs: it was built and read as an ELF, and has never
-booted. And that anything rlxfw writes survives — 量 there is no flash write path in any built
-image, which is `R8b`'s.
-
----
+⚠️ **What `P4b` has not done.** The corresponding-source archive does not exist; the release-process
+half of the row is untouched; six § 17 rows for `SBOM-2`…`SBOM-7` are owed and not paid here, which
+is a pre-existing debt (量 `SBOM-*` has 0 rows in `SPEC.md`) rather than one this commit creates;
+and `tools/modrecord.py` has no CI step yet, because a new tool's row needs a local census run
+first.
 
 ## v0.6 — 2026-10-04
 

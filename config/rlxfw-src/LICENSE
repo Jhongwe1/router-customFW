@@ -1,0 +1,29 @@
+rlxfw's own kernel files: SPDX-License-Identifier: GPL-2.0-only
+
+Copyright (c) 2026 Chung-Wei Lan
+
+Every file under this directory that is rlxfw's own -- that is, every file here
+with no imported source and no IMPORTED marker -- is licensed GPL-2.0-only.
+That is forced by provenance and is not a choice: these files are compiled into,
+and linked with, a kernel whose own COPYING says version 2 and not "or later".
+`NOTICE` section 2 carries the reading and the measurement behind it.
+
+WHY THIS FILE EXISTS INSTEAD OF A PER-FILE SPDX LINE AT THE TOP.
+量 2026-10-04 over `git ls-files '*.md'`: the twelve basenames under this
+directory are cited BY LINE NUMBER 213 times, 115 of them distinct, and 108 of
+those citing lines are in 15 files that `tools/citecheck.py` reads.  An
+`SPDX-License-Identifier` inserted as line 1 of those files shifts every line
+by one and rots all 108 at once, and `tools/spec-check.py`'s C11 token-checks
+the same population by basename, so both checkers would go red.  The remaining
+105 of the 213 are in LOG.md and in frozen bench/ cards, which resolve against
+the file as it was at their own commit and must not be renumbered at all.
+
+So the statement is here, where it moves no line.  A per-file comment at the
+END of each file would work equally well and is the alternative that was not
+taken, because one file naming the directory is one place to keep correct.
+
+WHAT THIS FILE DOES NOT ESTABLISH.
+Which files here are rlxfw's own: `docs/sbom.md` owns the component list and
+`docs/vendor-modifications.md` names the 23 vendor files rlxfw changes.  Where
+this file and either of those disagree, they own the fact and this file is
+wrong.  It is also not legal advice; `NOTICE` says the same and says why.

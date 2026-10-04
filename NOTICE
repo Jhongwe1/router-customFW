@@ -1,0 +1,330 @@
+# NOTICE — what is under which licence in rlxfw, and why
+
+**This is not legal advice.** It is a provenance-and-compatibility analysis:
+where each file came from, what licence travelled with it, and which choices
+that provenance leaves open. It was written by the author of the code, not by
+counsel, and a reader who needs a legal conclusion needs counsel.
+
+**Marks.** 讀 is read out of a file in this repository, a pinned source tree or
+a licence text. 量 is a desk measurement over the tree, a build artefact or a
+git object. 推 is inferred and says what would settle it. Nothing in this file
+is a reading off the device.
+
+**Scope.** This file names licences. It does not name components: `docs/sbom.md`
+is the component list, with 41 rows and their digests, and where this file and
+that one disagree, `docs/sbom.md` owns the component and this file is wrong.
+
+---
+
+## 1. The two licences, and the one sentence that decides each
+
+| what | licence | why that one |
+|---|---|---|
+| rlxfw's own **kernel** files | `GPL-2.0-only` | forced by provenance: they are compiled into, and linked with, a kernel whose own `COPYING` says version 2 and not "or later" (§ 2) |
+| rlxfw's own **userspace** programs, **tools**, scripts, declarations, web assets and documents | `MIT` | chosen. MIT is compatible in both directions with the two licences the image combines it with — statically linked LGPL-2.1 uClibc and GPL-2.0 kernel headers — so the image carries no compatibility question (§ 4) |
+
+**Why not one licence for both halves.** 讀 GPL-2.0 § 2(b): a work derived from
+a GPL-2.0 program, distributed as a whole, is licensed under that licence.
+rlxfw's kernel files are not a separate work that happens to sit beside the
+kernel; they are compiled against its headers, they call its functions, and the
+linker puts them in the same `vmlinux` (§ 2). The userspace programs are not:
+they reach the kernel through system calls, and the kernel's own `COPYING` says
+in so many words that this does not make them derived works 讀. So the two
+halves are two different provenance arguments, and writing one licence over
+both would hide that.
+
+**Why not Apache-2.0, which the project plan named.** `plan/` item `D10` said
+*kernel GPLv2, userspace Apache-2.0*. It is **stale** on two counts and was not
+followed: it names uClibc-ng and monocypher, and 量 the image has uClibc 0.9.30
+(§ 5) and TweetNaCl (§ 6) instead. On the licence itself, 推: Apache-2.0's
+patent-termination and patent-grant clauses are conventionally read as
+additional restrictions that GPL-2.0 § 6 does not permit, so an Apache-2.0
+userspace combined with GPL-2.0 kernel code and LGPL-2.1 library code raises a
+question that MIT does not raise at all. That reading is the common one and it
+is not this file's to settle; MIT was chosen so that nothing turns on it.
+
+---
+
+## 2. rlxfw's own kernel files — `GPL-2.0-only`, and the choice is forced
+
+**Covered:** every file under `config/rlxfw-src/`. 量 there are 16 of them —
+12 compiled sources, one declared-and-not-built (`rtl819x-spi-write.c`, behind
+`CONFIG_MTD_RTL819X_WRITE`, which is not set) and 3 headers.
+
+The 12 compiled sources are `rlxfw-devices`, `rlxfw_mark`, `rlxfw-entropy`,
+`rtl819x-timer`, `rtl819x-gpio`, `rtl819x-keys`, `rtl819x-spi`, `rtl819x-wdt`,
+`rtl819x-nic`, `rtl819x-switch`, `rtl819x-view` and `rlxfw-seam`
+(`docs/sbom.md` row `K6`).
+
+**Why GPL-2.0-*only* and not "or later".**
+
+1. 量 all 16 are paths the vendor drop does not have: they are additions to the
+   staged tree, not edits of vendor files. So nothing about them is inherited
+   file-by-file; the question is what the link decides.
+2. 讀 the drop's `linux-2.6.30/COPYING` is the GPL version 2 text with the
+   kernel's own preamble note, and the kernel is distributed under version 2
+   with no "or later" option. A file linked into that kernel and distributed as
+   part of it cannot be offered to the recipient under version 3.
+3. 量 the build links them into one monolithic `vmlinux`: in the configuration
+   the board ran, `CONFIG_MODULES` is not set and no `.ko` exists
+   (`docs/sbom.md` § 1), so there is not even a loadable-module argument to
+   have.
+4. 讀 one of the 12 already says so in the only machine-readable way the kernel
+   has: `rtl819x-wdt.c` carries `MODULE_LICENSE("GPL")`, which the kernel reads
+   as a declaration of GPL compatibility. 量 it is the only such declaration in
+   rlxfw's own code; the other 11 carry no licence text of any kind.
+
+So `GPL-2.0-only` records what the link already decided.
+
+**🔴 The per-file statement cannot go at the top of the file, and that is a
+measurement rather than a style choice.** 量 2026-10-04 over `git ls-files
+'*.md'`: these twelve basenames are cited **by line number 213 times, 115 of
+them distinct**, and **108 of the citing lines are in 15 files `citecheck`
+reads** — `SPEC.md` 28, `notes/nic-driver.md` 21, `docs/nic-vendor-diff.md` 17,
+`docs/KNOWN-ISSUES.md` 10, and eleven more. An `SPDX-License-Identifier` line
+inserted as line 1 shifts every line in the file by one and rots all 108 at
+once, and `spec-check`'s `C11` token-checks this exact population by basename,
+so both checkers would go red. The rest of the 213 are in `LOG.md` and in frozen
+`bench/` cards, which resolve historically and must not be renumbered at all
+(讀 `CLAUDE.md`).
+
+So the per-file statement is made where it moves no line: a licence comment at
+the **end** of each file, or one `config/rlxfw-src/LICENSE` naming the 16 paths.
+`SPDX-License-Identifier` wants line 1 by convention, and that convention
+postdates this 2.6.30 tree by eight years and is not enforced anywhere in this
+build — so the convention is what gives way, and this paragraph is why.
+
+**What this costs and where.** 🔴 讀 `tools/rlxfw-kbuild.sh` computes
+`RECIPE_ID` as a sha256 over **every file under `config/`**, comments included,
+and compiles it into the kernel as `-DRLXFW_SRC_ID`. Adding an SPDX line to a
+file under `config/rlxfw-src/` therefore moves `RECIPE_ID` and invalidates the
+identity assertion of any card that quotes the old value. 量 2026-10-04 it has
+**already moved** this gate — `bb0f1a5f`, against the `0e45c61d` that
+`docs/sbom.md` records for cell `f184a` — because `config/fix-cases.toml` and
+`config/r9-probes.toml` landed in `76d0a121`. So the headers cost a rebuild
+that is already owed, and nothing new. (量 computed with the formula at
+`tools/rlxfw-kbuild.sh`'s `RECIPE_ID` assignment, run under Git Bash on DrvFs;
+the two shells' `find` orderings were not cross-checked, so the claim that
+carries weight is *it is not `0e45c61d`*, not the exact eight hex digits.)
+
+---
+
+## 3. rlxfw's changes to Realtek's GPL-2.0 files — derivative where they touch
+
+**Covered:** `config/rlxfw-marks.tsv`, `config/host-compat/*.patch`,
+`config/busybox-patches/0001-udhcpd-drop-notify_file-system-hook.patch` and
+`config/rlxfw-kernel.delta`.
+
+These four files are not copies of vendor source; they are declarations of how
+to change it. 量 they describe changes to **23 distinct vendor files**: 11
+through 28 rows of `config/rlxfw-marks.tsv`, 9 through the 9 patches in
+`config/host-compat/`, 2 through the busybox patch, and 1 — the board
+configuration template `boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW` —
+through `config/rlxfw-kernel.delta`. `tools/modrecord.py` generates the per-file
+record, and that record, not this paragraph, is the thing to check.
+
+**The licence of the result** 推: where a hunk or a row changes a GPL-2.0 file,
+the changed file stays that file's licence, which is GPL-2.0 as the vendor
+directory's `COPYING` states it. Where a declaration is rlxfw's own prose — the
+reason column of every marks row, the reason column of all 147 delta rows, the
+explanatory header of each patch — it is rlxfw's text under MIT (§ 4). The two
+are in the same file on purpose, and that is a mixed file rather than a
+contradiction: a patch's `+`/`-` lines are a derivative of what they change,
+and its header is a document about them.
+
+**What is NOT established here.** 量 none of the four files, none of the 10
+patches and none of the scripts states a licence (`docs/sbom.md` row `K7`), and
+this file does not fix that by assertion: the per-file statement is a change to
+those files, not a sentence here.
+
+**殘留 `SBOM-2`, which this file cannot close.** 量 35 of the compiled kernel
+sources in Realtek's own directories carry **no licence text at all** in their
+headers, and 3 more in the loader stub. Their licence is read from the
+directory's `COPYING`, not from the files. That is the usual kernel convention
+讀, and it is still a reading of somebody else's release rather than a statement
+by its author. Nothing in this repository settles it (`docs/sbom.md` § 9).
+
+---
+
+## 4. rlxfw's own userspace, tools and documents — `MIT`
+
+**Covered, by directory:**
+
+| path | what |
+|---|---|
+| `src/init/`, `src/ifupd/`, `src/brokerd/`, `src/httpd/`, `src/dnsfwd/`, `src/cfgstore/` | the six programs in the image (`docs/sbom.md` `U1`–`U6`) |
+| `src/lib/` | the shared units compiled into them: `cfg`, `client`, `crc32`, `json`, `kdf`, `netutil`, `proto`, `schema`, `sha256`, `tlv` (`U7`) — **but not** `ed25519.c` and `sha512.c`, which are § 6's |
+| `src/rlxboot/` | the signed-update verifier payload (`X1`); not in the image |
+| `config/rlxfw-user/` | the `isaprobe` probes `uprobe` and `ucost`, `linkprobe`, and the iperf3 **recipe** (`U10`–`U12`; the recipe is rlxfw's, iperf3 is not — § 7) |
+| `config/mfgtest.sh` | the manufacturing test script (`U13`) |
+| `srv/www/` | the web UI: `index.html`, `static/style.css`, `static/app.js` (`U14`) |
+| `config/rlxfw-passwd`, `config/rlxfw-group`, `config/rlxfw-initramfs.tsv`, `config/rlxfw-busybox.config`, `config/image-commands.tsv` and the rest of `config/` that is not § 2's or § 3's | configuration and declarations (`U15`) |
+| `tools/` | every tool and test in this repository |
+| `dt/README.md`, `dt/unmatched-allow.tsv` | 量 `dt/` has 10 tracked files and **8 already carry their own SPDX tags** — six bindings `GPL-2.0-only OR BSD-2-Clause`, the `.dtsi` and the `.dts` `GPL-2.0-only OR MIT`. **Those 8 keep their own tags** (the kernel's dual-licensing convention for device trees), and 量 none of them is in any image. MIT covers only the other two |
+| `README.md`, `CLAUDE.md`, `PROGRESS.md`, `SPEC.md`, `LOG.md`, `CHANGELOG.md`, `RUNSHEET.md`, `SOURCES.json`, `docs/`, `notes/`, `study/`, `bench/` | the documents and the bench records |
+
+**Why MIT, as a compatibility argument rather than a preference.** The image
+links these programs with two other people's licences and nothing else:
+
+- **With statically linked LGPL-2.1 uClibc** (§ 5). 讀 LGPL-2.1 § 6 permits
+  combining a work that uses the Library with the Library and distributing the
+  combination *under terms of your choice*, subject to the conditions § 5
+  quotes. MIT is such terms, and it imposes no condition that collides with
+  § 6's.
+- **With GPL-2.0 kernel headers at compile time.** 讀 `linkprobe.c` includes
+  `<linux/ethtool.h>` and `<linux/sockios.h>` from the toolchain's sysroot; the
+  kernel's `COPYING` says its licence does not cover user programs that use
+  kernel services through normal system calls. MIT code can also be combined
+  into a GPL-2.0 work without relicensing the GPL side, which is what keeps
+  § 2's half and § 4's half from having to be one licence.
+
+**What MIT does not do.** It does not make the image rlxfw's to publish: §§ 5–8
+are other people's code, and 量 none of the 17 `file` rows of
+`config/rlxfw-initramfs.tsv` is a licence text or a source offer, so an image
+distributed as built today carries no notices at all. `offer.md` is the
+companion to this file and says what the first release carrying a binary owes.
+
+---
+
+## 5. uClibc 0.9.30 — LGPL-2.1, statically linked into every program
+
+**Covered:** no file in this repository. uClibc is in the image as object code
+inside each ELF, out of the pinned drop
+(`SOURCES.json` `rtl819x-toolchain`, directory
+`toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/`, source tree `config/uclibc/`).
+
+量 the facts that matter to the licence:
+
+- Every program in the image is **statically** linked: all 11 ELF files are
+  ELF32 big-endian MIPS with no `PT_INTERP` and no `PT_DYNAMIC`.
+- The library's objects are **inside** each ELF: 94 members of the drop's
+  `libc.a` have a relocation-free `.text` of at least 24 bytes, and each of the
+  11 ELFs contains between 3 and 31 of them byte for byte.
+- 讀 the version is 0.9.30, from `Rules.mak` in that tree, and its licence text
+  is the tree's own `COPYING.LIB` — the LGPL, version 2.1.
+- The source corresponds: 906 of 906 members of `libc.a` and 164 of 164 of
+  `libm.a` are byte-equal to an object the tree holds.
+
+**What LGPL-2.1 § 6 asks of a static link** 讀, as the text reads and not as
+advice: the combination may be distributed under terms of the distributor's
+choice, provided those terms permit modification of the combined work for the
+customer's own use and reverse engineering for debugging such modifications;
+and the distributor must accompany the work with the Library's own licence text
+and a prominent notice that the Library is used and is covered by it; and must
+do one of the things § 6 lists. The one that fits a static link is § 6(a):
+supply the complete corresponding machine-readable source of the Library
+**together with** the complete machine-readable "work that uses the Library",
+as object code or source, so that the recipient can modify the Library and
+relink to produce a modified executable.
+
+推 what that means here: a static link makes the *relink path* the obligation,
+not just the library source. rlxfw's side of it is already in this repository —
+each program's sources and its Makefile — and the library's side is in the
+pinned drop (§ 8 names why a pin is not yet an offer). `offer.md` states this as
+one of the things the first binary release must actually ship.
+
+**殘留 `SBOM-R1`** 量: object equality shows the in-drop tree built the archive.
+It does not show the tree's `.c` files are unmodified since. Recompiling a
+sample under `tools/vendor-tripwire.sh` and comparing objects settles it; that
+was not done.
+
+---
+
+## 6. TweetNaCl 20140427 — public domain
+
+**Covered:** `src/lib/ed25519.c` and `src/lib/sha512.c`, and nothing else under
+`src/lib/`.
+
+讀 `SOURCES.json` entry `tweetnacl`: the upstream file is
+`https://tweetnacl.cr.yp.to/20140427/tweetnacl.c`, sha256
+`02e65bc3013ff2168983365e55906bc783c4c7e0a60d8100f17bb303a17175c4`, licence
+**public domain**, authors Daniel J. Bernstein, Bernard van Gastel, Wesley
+Janssen, Tanja Lange, Peter Schwabe and Sjaak Smetsers.
+
+讀 `src/rlxboot/test/mk-import.sh` generates the two files from it by copying
+retained line ranges; no imported line is edited, and the changes are deletions
+only. `src/rlxboot/test/check-import.sh` regenerates both and fails on a
+one-byte difference, so the claim "these are TweetNaCl's lines" has a check
+behind it rather than a comment.
+
+Public domain imposes no condition, so these two files raise no compatibility
+question in either direction. They are listed here for the opposite reason: they
+are **not rlxfw's code**, § 4's MIT grant does not reach them, and the authors
+above are the ones to credit. 量 only `src/rlxboot/Makefile` names them, so they
+are not in the image (`docs/sbom.md` `X1a`).
+
+---
+
+## 7. Other people's programs in the image
+
+**busybox — GPL-2.0-only.** The binary at `/bin/busybox`, with the 11 applet
+symlinks `sh ash cat echo ls mount ps ifconfig ping mkdir sleep` 量. Its source
+is the drop's `busybox-1.13`; rlxfw's contribution is the recipe only —
+`config/busybox-patches/0001-udhcpd-drop-notify_file-system-hook.patch` (which
+removes udhcpd's `notify_file` hook and the `system()` call behind it),
+`config/rlxfw-busybox.config` and `tools/mkbusybox.sh`. The patch is a
+derivative of GPL-2.0-only source where it touches it (§ 3); the configuration
+and the script are rlxfw's under MIT.
+
+殘留 `SBOM-R2` 量: `notes/busybox-build.md` § 9 records that gate `G1` shows two
+Realtek drops **agree**, not that either is pristine upstream 1.13.4. Diffing
+against busybox.net's own 1.13.4 tarball settles it.
+
+**iperf 3.1.3 — LBNL three-clause BSD, with bundled notices.** The binary at
+`/bin/iperf3`, 252,644 bytes, sha256 `3144db60…` 量. 讀 the tree's `LICENSE` is
+the Lawrence Berkeley National Laboratory three-clause BSD licence with an
+enhancements paragraph, and it lists code bundled inside it: `cjson` (MIT, Dave
+Gamble), `net` (MIT, Russ Cox, with a Lucent permission notice), `queue.h`
+(three-clause BSD, Regents of the University of California),
+`tcp_window_size` and `units` (University of Illinois / NCSA permission text),
+`portable_endian.h` (public domain). 量 over the 16 compiled sources: 13 carry
+the LBNL header, 1 the cJSON text, 2 the Illinois text.
+
+🔴 量 iperf3's source tree is **not in this repository and not in
+`SOURCES.json`** (`SBOM-3`): the repository holds the recipe only,
+`config/rlxfw-user/iperf3/` (`Makefile`, `build.sh`, `probe.sh`,
+`iperf_config.h`), and that Makefile says a clean clone cannot build the target.
+The tree used is `$FWRE_WORK/iperf3-port/src313/`, outside any clone. The
+`SOURCES.json` entry that closes the gap is drafted in `sources-patch.md`; until
+it lands, iperf3's notices are not in anything this project distributes.
+
+**Realtek's kernel, loader stub and WLAN driver — GPL-2.0.** `docs/sbom.md` rows
+`W1` and `K1`–`K5`. The LZMA decoder in the loader stub (`W2`) is LGPL or CPL
+讀 and its source is in the drop. Of the Realtek WLAN driver's files, three
+carry a third party's notice (`K3a`–`K3c`), and 殘留 `SBOM-R3` asks whether the
+SSLeay text of `1x_rc4` is compatible with a GPL-2.0-**only** kernel at all:
+its own text says it cannot be relicensed, the GPL included. That is counsel's
+reading or a design change, not an edit to this file.
+
+**`libgcc.a` of gcc 3.4.6-1.3.6 — 未定 `SBOM-4`.** 推 GPL-2.0-or-later with the
+libgcc linking exception, from upstream gcc 3.4's `libgcc2.c` header. 🔴 It
+cannot be read here: 量 no pinned tree holds gcc or binutils source — names that
+only a compiler tree has (`libgcc2.c`, `reload1.c`, `ldlang.c`, `tc-mips.c`) are
+found in **0 of the 3 drops**, with the control (`fork.c` in each kernel tree)
+found in all three. 量 members of the default `libgcc.a` variant are found byte
+for byte in 7 of the 11 ELFs, so it is in the image. `offer.md` names this as
+the second thing the offer cannot supply.
+
+---
+
+## 8. What this file does not establish
+
+- **It is not a legal opinion**, and saying so once is the point of the first
+  paragraph rather than a disclaimer repeated per section.
+- **It does not establish who holds the copyright** in rlxfw's own code. "Own"
+  throughout is a statement about provenance — no imported source, no
+  `IMPORTED` marker, first commit in this repository — which is
+  `docs/sbom.md`'s definition, not a chain of title.
+- **It does not make the image distributable.** 量 0 of the 17 `file` rows in
+  `config/rlxfw-initramfs.tsv` is a notice, and 量 0 of 5 releases has an asset,
+  so nothing has been distributed and nothing has discharged an obligation.
+  `offer.md` states what the first release carrying a binary owes, and the two
+  gaps (`SBOM-3`, `SBOM-4`) that are open on the day it would bind.
+- **It does not close `SBOM-2`.** 35 Realtek-directory sources plus 3 in the
+  loader stub carry no licence text; their licence is read from a `COPYING` file
+  and that reading is not this project's to make authoritative.
+- **It does not cover the loader on the unit** (`SBOM-7`): the Realtek bootcode
+  2014.04.22 v1.3 is neither built nor shipped here.
+- **It settles no number.** Every count above is quoted from `docs/sbom.md` or
+  re-derived from the tree at the commit that adds this file; where a count has
+  moved, `docs/sbom.md` is the owner and this file is the stale copy.

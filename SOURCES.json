@@ -326,6 +326,44 @@
         "R8a"
       ],
       "fetch": "curl -fsSL https://tweetnacl.cr.yp.to/20140427/tweetnacl.c -o refs/tweetnacl-20140427.c  # then: src/rlxboot/test/check-import.sh, which regenerates both files and fails on a one-byte difference"
+    },
+    {
+      "id": "iperf3",
+      "role": "imported-source",
+      "kind": "file",
+      "url": "https://github.com/esnet/iperf/archive/3.1.3.tar.gz",
+      "dest": "refs/iperf-3.1.3.tar.gz",
+      "bytes": 549466,
+      "sha256": "e34cf60cffc80aa1322d2c3a9b81e662c2576d2b03e53ddf1079615634e6f553",
+      "url_verified": "量 2026-10-04 (P4b): this URL was fetched once and the bytes read back 549,466 with that sha256, so the field is a reading and not the canonical form of a route. The draft had it as 推; a control fetch of a nonexistent version (3.1.3 -> 9.9.9) failed, so a success here is a reading.",
+      "licence": "BSD-3-Clause (Lawrence Berkeley National Laboratory, with an enhancements paragraph), plus bundled notices: cjson MIT (Dave Gamble), net MIT (Russ Cox, with a Lucent permission notice), queue.h BSD-3-Clause (Regents of the University of California), tcp_window_size and units University of Illinois / NCSA permission text, portable_endian.h public domain",
+      "authors": "ESnet and Lawrence Berkeley National Laboratory",
+      "version": "3.1.3",
+      "second_origin": {
+        "url": "https://archive.debian.org/debian/pool/main/i/iperf3/iperf3_3.1.3.orig.tar.gz",
+        "bytes": 546899,
+        "sha256": "60d8db69b1d74a64d78566c2317c373a85fef691b8d277737ee5d29f448595bf",
+        "url_verified": "量 2026-10-04 (P4b): fetched once, 546,899 bytes with that sha256.",
+        "why": "A genuinely independent origin, and 量 all sixteen compiled .c files are byte-identical across it and the GitHub archive, so the source is not single-sourced (notes/iperf3-port.md section 1)."
+      },
+      "third_origin": {
+        "kind": "git",
+        "url": "https://github.com/esnet/iperf",
+        "clone": "--branch 3.1.3",
+        "commit": "274eaed5b17f664e4ac6c79f1ba854b55f15a3a3"
+      },
+      "why": "R6-5's throughput instrument, in the image as /bin/iperf3 (252,644 bytes, sha256 3144db60bd3895f582f84e61da306f96f6e668f07cf9a84fef0ebc6b971a97e8). This image cannot generate a byte stream otherwise: no nc, no dd, no /dev/zero, no mknod, and the largest readable source is /dev/mtd2ro at 1,040 KiB/s, which is BELOW the link -- so a userspace sender reading flash would measure the SPI controller and publish it as a network number (FW-48). 3.1.3 specifically: 量 `grep clock_gettime src/*.c` returns nothing, so the -lrt / CLOCK_MONOTONIC question a newer 3.x raises against uClibc 0.9.30 does not arise.",
+      "contains": "config/rlxfw-user/iperf3/ is the recipe only (Makefile, build.sh, probe.sh, iperf_config.h) and iperf_config.h replaces the file ./configure would have generated; every #define in it and every deliberate omission is a probe result. No imported line is edited.",
+      "matches_device": "not device code in the sense the drops are: it is a userspace program built with the same rsdk-1.3.6-4181-EB-2.6.30-0.9.30 toolchain and statically linked against that toolchain's libc.a and libm.a.",
+      "caveat": "downloads.es.net was unreachable from this host 量 2026-09-20, which is why the primary fetch is GitHub and not upstream's own mirror. A GitHub tag archive is not a release asset: GitHub regenerates it, and the sha256 above is this project's record of the bytes it read, not a promise GitHub makes. The Debian tarball is the origin that does not depend on that.",
+      "why_here": "By topic this belongs in source_trees. It is in documents, after tweetnacl, because source_trees ends at line 174 and 量 2026-10-04 twelve line-number citations in six files that citecheck reads point into the range 115-201; 0 of the 12 is moved by an insertion at line 330, and all 12 would move by an insertion into source_trees. tweetnacl is the other imported-source entry, so the second one sits beside the first.",
+      "needed_by": [
+        "R6-5",
+        "P2",
+        "P4b"
+      ],
+      "fetch": "curl -fsSL https://github.com/esnet/iperf/archive/3.1.3.tar.gz -o refs/iperf-3.1.3.tar.gz",
+      "fetch_gap": "未定. 量 2026-10-04: config/rlxfw-user/iperf3/build.sh neither fetches nor hashes -- it sets SRC=$W/src313/src, and the Makefile states that a clean clone cannot build this target (SRC ?= $(FWRE_WORK)/iperf3-port/src313/src). tools/fetch-sources.sh DOES plan entries whose dest is inside the repository, so the sha256 above starts being re-checked the moment this entry exists. What is still unwritten is the step that unpacks refs/iperf-3.1.3.tar.gz into a tree build.sh can point SRC at. Until that is written, this entry pins the bytes and does not make the target buildable from a clean clone, and SBOM-3 stays 未定 for that reason and not for want of an entry."
     }
   ],
   "reference_only": {

@@ -58,7 +58,14 @@ It is not rlxfw's code and not rlxfw's to describe as such. What would settle th
 
 ### 2.3 rlxfw's own code: does it carry a licence?
 
-**Answer: no.**
+**Answer: yes, since 2026-10-04 (`P4b`) — `GPL-2.0-only` for rlxfw's own kernel
+files, `MIT` for its userspace, tools, scripts, declarations, assets and
+documents.** 讀 `LICENSE` carries the MIT text, `NOTICE` § 1 carries the two
+clauses and the one sentence that decides each, and `config/rlxfw-src/LICENSE`
+carries the kernel clause where it cannot move a line number. The four
+measurements below are **kept as the record of what was absent** on 2026-10-04
+before that commit, and the first of them is the one that has changed: 量
+`git ls-files` now matches `LICENSE` and `NOTICE`.
 
 - 量 GitHub reports the repository's `license` as null (`gh api repos/Jhongwe1/router-customFW`, 2026-10-04). 量 no `LICENSE`, `LICENCE`, `COPYING`, `NOTICE` or `COPYRIGHT` file is tracked (`git ls-files`, 0 matches).
 - 量 8 files carry an `SPDX-License-Identifier` in their first 12 lines, of 16,061 tracked files at `d4d0dbcc` (the total moves with every capture commit: 15,476 of them are under `bench/` and 585 are not). All 8 are under `dt/`: six device-tree bindings (`GPL-2.0-only OR BSD-2-Clause`), `rtl8196e.dtsi` and `rtl8196e-totolink-n150rt.dts` (`GPL-2.0-only OR MIT`). None is in any image: 讀 the `f184a` manifest has no `.dts` or `.dtb` row, and the 2.6.30 port has no device-tree support (`SOURCES.json`, `reference_only`). A raw `git grep` finds a ninth line, in `tools/dtcheck.py`; it is a fixture string, not a tag.
@@ -100,7 +107,7 @@ The 11 ELF files total 1,206,012 bytes; busybox and iperf3 are 700,328 of them. 
 
 ## 4. Components in the image
 
-31 rows: 8 resolved, 23 未定 (16 of them only because rlxfw's own licence is undeclared, `SBOM-1`). A row is **resolved** when its version, licence, source location and relationship are all established; **未定** when one is not, with the register entry in § 9. Hashes are 8-hex prefixes; Appendix A has the full digests of the 17 files.
+31 rows: **24 resolved, 7 未定** 🔄 **re-derived 2026-10-04 (`P4b`), from 8 and 23**: `SBOM-1` closed and 量 **16** of this table's rows named it as their only reason, so 8 + 16 = 24 and 23 − 16 = 7. The seven are `W1`, `K2`, `K3`, `K4`, `K5` (`SBOM-2`), `U9` (`SBOM-3`) and `L3` (`SBOM-4`) — counted off the status column, not carried. A row is **resolved** when its version, licence, source location and relationship are all established; **未定** when one is not, with the register entry in § 9. Hashes are 8-hex prefixes; Appendix A has the full digests of the 17 files.
 
 | id | component | version | licence | source | relationship | status |
 |---|---|---|---|---|---|---|
@@ -170,7 +177,7 @@ The clause's premise is gone. Its conclusion, that the image is not all rlxfw's 
 
 ## 7. Built here but not in the image, and build-time only
 
-10 rows: 4 resolved, 6 未定.
+10 rows: **6 resolved, 4 未定** 🔄 **re-derived 2026-10-04 (`P4b`), from 4 and 6**: 量 `X1` and `X2` named `SBOM-1` as their only reason, so 4 + 2 = 6 and 6 − 2 = 4. The four are `B1` (`SBOM-4`), `B2` (`SBOM-5`), `B3` (`SBOM-6`) and `E1` (`SBOM-7`). 16 + 2 = 18 is what `SBOM-1`'s own row in § 9 claims, and it closes.
 
 | id | component | version | licence | source | relationship | status |
 |---|---|---|---|---|---|---|
@@ -191,13 +198,13 @@ The clause's premise is gone. Its conclusion, that the image is not all rlxfw's 
 
 | components | what a recipient would need | where it is today | whose offer |
 |---|---|---|---|
-| kernel and Realtek code (W1, K1 to K5), GPL-2.0 | complete corresponding source with the scripts that control compilation | the base drop at its pin (a third party's repository, § 2.4) plus this repository's K6, K7, `config/`, `tools/` | none: no written offer exists, `P4b` is not started |
-| busybox (U8), GPL-2.0-only | the same, with the patch, the configuration and the build script | the base drop plus `config/busybox-patches/`, `config/rlxfw-busybox.config`, `tools/mkbusybox.sh` | none |
-| uClibc (L1, L2), LGPL-2.1 | the library source, and what lets a recipient relink | the source is in the drop (§ 2.1); the programs' sources and Makefiles are in this repository | none |
-| LZMA decoder (W2), LGPL or CPL | its source | in the drop | none |
+| kernel and Realtek code (W1, K1 to K5), GPL-2.0 | complete corresponding source with the scripts that control compilation | the base drop at its pin (a third party's repository, § 2.4) plus this repository's K6, K7, `config/`, `tools/` | `docs/offer.md` 🆕, which 讀 takes effect on the first release carrying a binary asset and so does **not** bind today — 量 2026-10-04: 5 releases, 0 assets. ~~none: no written offer exists, `P4b` is not started~~ — 🔄 the offer exists as of this commit |
+| busybox (U8), GPL-2.0-only | the same, with the patch, the configuration and the build script | the base drop plus `config/busybox-patches/`, `config/rlxfw-busybox.config`, `tools/mkbusybox.sh` | `docs/offer.md` 🆕, which 讀 takes effect on the first release carrying a binary asset and so does **not** bind today — 量 2026-10-04: 5 releases, 0 assets |
+| uClibc (L1, L2), LGPL-2.1 | the library source, and what lets a recipient relink | the source is in the drop (§ 2.1); the programs' sources and Makefiles are in this repository | `docs/offer.md` 🆕, which 讀 takes effect on the first release carrying a binary asset and so does **not** bind today — 量 2026-10-04: 5 releases, 0 assets |
+| LZMA decoder (W2), LGPL or CPL | its source | in the drop | `docs/offer.md` 🆕, which 讀 takes effect on the first release carrying a binary asset and so does **not** bind today — 量 2026-10-04: 5 releases, 0 assets |
 | `libgcc` (L3) | probably nothing, if the linking exception applies; not decidable here | no source anywhere | not applicable until `SBOM-4` is settled |
 | iperf3, RC4, MD5, AES (U9, K3a to K3c) | the notices | the notices are in the sources (iperf3's only in `$FWRE_WORK`) | not applicable |
-| notices of every component above | each notice-bearing component's text beside the binary | 讀 the image carries none: 0 of 17 `file` rows is a licence text or an offer | none |
+| notices of every component above | each notice-bearing component's text beside the binary | 讀 the image carries none: 0 of 17 `file` rows is a licence text or an offer | `docs/offer.md` 🆕, which 讀 takes effect on the first release carrying a binary asset and so does **not** bind today — 量 2026-10-04: 5 releases, 0 assets |
 
 ## 9. What is 未定, and what settles it
 
