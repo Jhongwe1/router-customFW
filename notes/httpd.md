@@ -6,7 +6,13 @@ and 7; the privilege-separation argument is `plan/` § `D7` and the KDF budget i
 § `D8`'s v6 ruling 4.
 
 Marks: **量** measured, **讀** read out of code or a document, **推** inferred and
-pending a measurement. Nothing in this note has run on the device.
+pending a measurement. 🔄 **2026-10-04: this line read *Nothing in this note has
+run on the device*, and §§ 10 and 11 refute it.** `httpd` ran on the silicon on
+2026-09-30 as uid 100 inside a chroot, and § 11 is a defect only the device
+found. The narrower sentence that survives: every number in §§ 1–9 is 量 on the
+host or in qemu, or 讀 out of an ELF, and § 11 is the device's. Owners of the
+device half: `SPEC.md` `FW-175`, `FW-176`, `notes/userspace-integration.md`,
+`docs/GATE-RESULTS.md` entry 17.
 
 ---
 
@@ -759,17 +765,25 @@ and it was a compile error rather than a silent behaviour change only by luck.
 
 * **No TLS.** HTTP only: every password on this port crosses the LAN in clear.
   `SPEC-R7.md` puts R7g outside this gate, and the page says so in its footer.
-* **Almost nothing has run on the device.** § 11 is the exception: image `r78a`
-  served `/api/status` and refused `/api/login` on the silicon on 2026-09-30, and
-  that refusal was a defect. The privilege drop and a real KDF evaluation are
-  still unmeasured there. Every timing figure for the device is 推 with its
-  derivation written down; the qemu figures are measurements of qemu, and § 5.4
-  contains the evidence that they cannot even rank two nearby parameter sets.
-* **No broker has answered.** Every route test links a fake `bk_call`. The wire
-  bytes of `src/httpd/stub/client.c` are a second, independent encoding of
-  `SPEC-R7.md` § 6, and two independent encodings of the same table are exactly as
-  likely to disagree as to agree; the byte-level reconciliation against agent C's
-  `proto.c` has not happened.
+* 🔄 **2026-10-04: three clauses of this bullet were falsified by `R7-8` and are
+  corrected here.** ~~The privilege drop and a real KDF evaluation are still
+  unmeasured there. Every timing figure for the device is 推~~ — 量 2026-09-30,
+  two boots, no power action: the privilege drop **is** measured on the die
+  (`ps` shows `httpd`'s USER column as `httpd`, and the boot prints
+  `httpd: uid=100 gid=100 root=/srv/www`; `SPEC.md` `FW-175`), and **the KDF has
+  a device number for the first time** (`FW-176`; `docs/GATE-RESULTS.md`
+  entry 17). **What survives**: image `r78a` served `/api/status` and refused
+  `/api/login` on the silicon, and that refusal was a defect (§ 11); the qemu
+  figures are measurements of qemu, and § 5.4 contains the evidence that they
+  cannot even rank two nearby parameter sets.
+* 🔄 **2026-10-04: *No broker has answered* was falsified by the same boot.**
+  量 `docs/GATE-RESULTS.md` entry 17: the chain host → `httpd` (uid 100,
+  chrooted) → unix socket → `brokerd` (root) → typed op ran on the die, and the
+  `POST /api/login` reply was printed. **What survives**: every route *test*
+  here links a fake `bk_call`; the wire bytes of `src/httpd/stub/client.c` are a
+  second, independent encoding of `SPEC-R7.md` § 6, and two independent
+  encodings of the same table are exactly as likely to disagree as to agree;
+  the byte-level reconciliation against agent C's `proto.c` has not happened.
 * **The schema table is transcribed, not shared.** See § 6.4.
 * **No claim about side channels.** Only `ct_memeq()` and `route_ct_eq32()` are
   constant time; scrypt's access pattern is password-dependent by design, and

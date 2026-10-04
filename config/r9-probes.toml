@@ -1,0 +1,567 @@
+# r9-probes.toml -- `R9-6`'s probe list for `tools/diffprobe.py`.
+#
+# WHAT THIS FILE IS
+# =================
+# `config/fix-cases.toml` is `R9-1`'s REGISTER: one row per upstream case, with
+# a mechanism class, an evidence tier and a refutation.  量 2026-10-04: it has
+# 141 `[[row]]`, tiers V-A 89 / V-B 29 / V-C 10 / V-D 13, and not one row
+# carries a `port`, a `path` or a `method`.  It says which cases need live,
+# network-facing evidence; it does not say what request takes it.
+#
+# This file says what request takes it.  It is the case list `tools/diffprobe.py
+# probe --cases` reads, and every case cites the register row it is evidence
+# for.  Run it with `--register config/fix-cases.toml` so the coverage gate
+# fires BEFORE a packet leaves.
+#
+# THE ONE SEATING THIS LIST IS BUDGETED FOR
+# =========================================
+# The vendor column is one episode.  Returning to it costs a power action, and
+# after `R8b`'s first flash write the vendor firmware is gone.  So the order
+# below is load-bearing and is explained under ORDER.
+#
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║ 🔴 THE THREE REFUSALS THIS LIST IS BUILT ON                               ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+#
+# R1.  NO REQUEST WHOSE URI HOLDS `htm` UNLESS IT IS ONE OF THE GATE'S OWN
+#      EXEMPT NAMES.  讀 `upstream/notes/auth-flow.md`, `process_header_end` at
+#      instruction level: the authorisation block runs only when the URI holds
+#      the substring `htm` and matches none of seven exempt names -- and the
+#      FIRST thing inside that block is
+#
+#          if (nowuptime - beforeuptime > 600) {
+#              apmib_set(0x1ec, "0.0.0.0");
+#              system("flash set AUTHG_IP_ADDR \"0.0.0.0\"");
+#          }
+#
+#      讀 `upstream/notes/auth-session-ip.md` (`D-18`): `beforeuptime` has ONE
+#      reference in the whole binary and it is the read, so the difference is
+#      the uptime and the branch is taken by every gated request past 601 s.
+#      量 `P10-10` ties the same `apmib_set` + `flash` mechanism to a write of
+#      `COMPCS` at flash `0x00C000`.  This gate is titled zero flash writes, so
+#      a gated path is refused outright.  It is refused whatever the uptime,
+#      because a containment rule that holds only if the experiment comes out
+#      as expected is not a containment rule.
+#      ⚠️ `htm` is a SUBSTRING: `.html` holds it, so `/index.html` is gated.
+#      The exempt names, 讀 the same decompile, are `status.htm`, `login.htm`,
+#      `formLogin.htm`, `notice.htm`, `notice_frame.htm`, `countDownPage.htm`
+#      and `countDownPageWizard.htm`.  `C12` uses one of them and nothing else
+#      in this file holds `htm` in a path.
+#
+# R2.  NO REQUEST TO A KNOWN `/boafrm/` HANDLER NAME, BY ANY METHOD.  讀
+#      `upstream/notes/dispatch-table.md`, `handleForm` @ `0x004127f4`: a
+#      `/boafrm/` URI is matched against a 59-entry table by `strlen` then
+#      `memcmp` and, on a match, goes straight to `send_r_request_ok2()` and
+#      then `handler(req, 0, 0)` -- with no authorisation and no method test,
+#      so a GET fires a handler exactly as a POST does.  量 `P10-10`: firing
+#      one of them writes flash.  讀 `upstream/docs/disclosure.md` `D-11`: one
+#      well-formed POST to one handler removes the web server until the device
+#      is power-cycled, AND THAT HANDLER'S NAME IS HELD -- so the set to avoid
+#      cannot be enumerated and the whole prefix is refused.
+#      ⚠️ What IS permitted is a name the table cannot hold: matching is exact
+#      and a miss falls through to `send_r_not_found(req)`.  `C15` uses one.
+#
+# R3.  NO POST, NO PUT, NO DELETE, ANYWHERE IN THIS FILE, AND NO `send`.  Every
+#      case below is GET, HEAD or OPTIONS with no request body.  A login POST
+#      writes the session MIB (讀 `auth-flow.md`: `formLogin` does
+#      `apmib_set(0x1ec/0x1ed/0x1ee)`), a configuration POST writes `COMPCS`,
+#      and `PUT`/`DELETE` are methods `tools/diffprobe.py` can spell but this
+#      gate cannot afford.  `grep -c '^method = "POST"' ` on this file reads 0,
+#      and so does `grep -c '^send ='`.
+#
+# WITHHOLDING -- what may not be recorded
+# =======================================
+# 🔴 CLAUDE.md § Never: `H601`'s bytes, and this unit's identifying material,
+# do not enter this repository -- tracked or untracked.  Seven cases below are
+# bounded to `body = "none"`, so `tools/diffprobe.py` records their STATUS and
+# their LENGTH and never a digest or an excerpt:
+#
+#   C11  `/config.dat`   讀 `auth-flow.md`: unauthenticated, and it is the
+#                        serialised APMIB store -- this unit's whole
+#                        configuration, MAC and credentials included.
+#   C12  `status.htm`    the vendor's status page renders the unit's LAN/WAN
+#                        hardware addresses and WAN address.
+#   C13  `/ca.cer`       a certificate may be per-unit.
+#   C19  `//config.dat`  the same document through a normalisation variant.
+#   C20  `/./config.dat` the same.
+#   C23  52869 `/`       a UPnP description document carries a `UDN` uuid and
+#                        often a serial number.
+#   C24  52881 `/`       an unidentified daemon; bounded because the reply's
+#                        content is unknown rather than known-safe.
+#
+# `body = "digest"` elsewhere, never `"excerpt"`: a digest of an HTTP reply is
+# neither `H601`'s bytes nor their sha256, and the tool's own address gate
+# would withhold an excerpt anyway -- but `grep -c '^body = "excerpt"'` on this
+# file reading 0 does not depend on that gate working.  量 2026-10-04 on this
+# file: that count is 0, and so are `^method = "POST"`, `^method = "PUT"`,
+# `^method = "DELETE"` and `^send =`.
+#
+# CONTROLS -- both halves, in this list
+# =====================================
+# A port census that found nothing would be an instrument zero.  So `C01`-`C03`
+# are the three ports 量 open (`bench/2026-09-23/V1-NMAP.log`, re-read 量
+# `NET-115`/`NET-118`) and `C04`-`C09` are six 量 closed.  `tools/diffprobe.py`
+# additionally refuses to write a record when not one case connected, so a
+# cable fault cannot read as a closed device.
+#
+# ORDER -- what it optimises
+# ==========================
+# Irreplaceability first, then fragility last.  The episode can be cut short at
+# any point, so each block is a reading that stands on its own:
+#
+#   1. `C01`-`C03`  the three open ports, by `connect()`.  Milliseconds, and
+#                   the only readings a later probe can destroy: 讀 `D-19`, ONE
+#                   request terminates the UPnP daemon and nothing respawns it.
+#                   Bank the census before anything speaks to those ports.
+#   2. `C04`-`C09`  the six closed ports -- the census's negative control. A
+#                   positive claim without its control is not a reading.
+#   3. `C10`-`C13`  the highest-value boa reads: the server's own fingerprint
+#                   and the three unauthenticated documents.
+#   4. `C14`-`C18`  the surface boundary: four prefixes and a plain 404.
+#   5. `C19`-`C22`  normalisation and method handling.
+#   6. `C23`-`C24`  HTTP to the two non-boa ports.  Riskiest to the OTHER
+#                   daemons, so after everything that needs them alive.
+#   7. `C25`-`C27`  the three that stress boa's parser.  Last, because 讀
+#                   `D-9` a single well-formed request can hold this
+#                   single-process server for 4.7-9.7 s and nothing respawns
+#                   it, so a cheaper read must never queue behind one.
+#
+# WHAT THIS FILE DOES NOT ESTABLISH
+# =================================
+# * It covers 21 of the register's 89 `V-A` rows.  The other 68 have no case
+#   and each is named below with its reason; they are passed to
+#   `--allow-uncovered` so the run refuses rather than publishing a hole as a
+#   coverage count.  A row with a reason is still an uncovered row.
+# * Nothing here grades a reply.  `expect` is the reading registered BEFORE the
+#   measurement, carried as prose and never compared, so a surprise is a
+#   finding and not a failure.
+# * Nothing here is a timing claim.  `tools/hostprobe.py` and `NET-118` own the
+#   readiness axis; a `dur_ms` in this record is the exchange, not the wire.
+# * Nothing here settles which daemon owns 52869 or 52881.  量 `NET-118` has
+#   them 推 `miniigd`'s and 推 `wscd`'s and a reply does not settle it.
+# * The rlxfw column answers from `httpd` (量 `FW-175`: uid 100, chroot
+#   `/srv/www`, port 80), NOT from the zero-open-port image
+#   `bench/2026-09-23/P1-NMAP.log` read before `R7`.  A rerun of that census is
+#   part of this list's own rlxfw column, not an assumption behind it.
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# THE 68 `V-A` ROWS WITH NO CASE, BY REASON
+# ═══════════════════════════════════════════════════════════════════════════
+# Pass all of them to `--allow-uncovered`; the tool sweeps the list both ways,
+# so a row that later gets a case must come off it.  The one-line form is at
+# the end of this block.
+#
+# A. The stimulus is a `/boafrm/` handler or a named CGI, so `R2`/`R3` refuse
+#    it (31 rows).  Each would fire vendor code whose side effects this gate
+#    cannot bound, and `D-11`'s handler name is held so the dangerous subset
+#    cannot be named:
+#      FC-035 FC-040 FC-043 FC-045 FC-046 FC-048 FC-049 FC-050 FC-052 FC-053
+#      FC-054 FC-055 FC-056 FC-057 FC-058 FC-059 FC-060 FC-061 FC-062 FC-063
+#      FC-066 FC-068 FC-099 FC-104 FC-106 FC-108 FC-110 FC-116 FC-117 FC-018
+#      FC-027
+#    Three of these have a second, independent reason and it is recorded here
+#    rather than left implicit: `FC-040`'s own reading is impossible as well as
+#    unsafe -- 讀 `dispatch-table.md`, a `/boafrm/` miss answers through
+#    `send_r_not_found`, the same function a missing file uses, so an unknown
+#    name cannot tell the dispatcher's branch from a plain 404 and only a KNOWN
+#    name could; `FC-106` (Slowloris) needs a dribbled partial header and
+#    `tools/diffprobe.py` sends one `sendall`; `FC-068` needs a fuzzer this
+#    repository does not have pointed at a single-process server.
+#
+# B. Held upstream, and the discriminator IS the reproduction (7 rows).  讀
+#    `upstream/docs/disclosure.md` at the pin: 13 of 19 rows read `held` --
+#    `D-3`, `D-4`, `D-9` through `D-19`.  `plan/` § 15: a reproduction never
+#    appears here while the row says held.  Every one of these also needs a
+#    gated path, so `R1` refuses it independently:
+#      FC-028 FC-037 FC-042 FC-044 FC-077 FC-100 FC-118
+#    `FC-044` is `D-15`, the most serious row in that table; `FC-037` is `D-3`;
+#    `FC-042` is `D-18`; `FC-118` is `D-14`.
+#
+# C. The subject is not a TCP reply this instrument can send (11 rows).  UDP,
+#    802.11, ICMP, layer 2, or the host answering the device rather than asking:
+#      FC-014 FC-077 FC-080 FC-082 FC-083 FC-086 FC-087 FC-101 FC-107 FC-109
+#      FC-119
+#    A `tcp-connect` on a UDP service's port number would read `refused` on
+#    both columns for a reason unrelated to the row, which is a worthless probe
+#    and is dropped rather than counted.  `FC-119` is here because its
+#    precondition half is `D-14`'s and its own half is a redirect chain that
+#    only a gated request emits.
+#
+# D. Cut upstream, and no instrument here either (12 rows).  Eleven are 802.11
+#    and one is social engineering kept voluntarily out of scope by
+#    `plan/` § 17:
+#      FC-088 FC-089 FC-090 FC-091 FC-092 FC-093 FC-094 FC-095 FC-097 FC-098
+#      FC-103 FC-070
+#    `FC-070` is not cut but belongs to the same reason: its instrument is a
+#    compiler and libc capability probe under `tools/vendor-tripwire.sh`, not a
+#    reply.
+#
+# E. The subject is this project's own instrument or a lab condition, and its
+#    own `publish` already reads `not comparable` (6 rows):
+#      FC-006 FC-007 FC-012 FC-015 FC-126 FC-135
+#    `FC-015` is the readiness time, which `tools/diffprobe.py`'s own *what it
+#    does not establish* disclaims; `FC-126` and `FC-135` are the loader at its
+#    prompt, which 讀 `NET-95` answers only after `IPCONFIG` -- a console
+#    action in a different machine state.
+#
+# F. One row left, and it is the one this file's `R1` was written for:
+#      FC-036
+#    Its subject is the 601-second session window itself, so the only stimulus
+#    that reads it is the gated request whose first act past 601 s is
+#    `system("flash set AUTHG_IP_ADDR ...")`.  It cannot be probed inside a
+#    zero-flash-write gate by any request at all.  `FC-136` joins it: the
+#    reading needs the loader's rescue window, which is a power action.
+#
+# Rows appearing under two reasons are listed under both and passed once.
+#
+# --allow-uncovered takes 68 ids, comma-separated.  They are wrapped over seven
+#     lines here for reading and must be joined with NO space and NO newline
+#     before being passed -- `tools/diffprobe.py` splits the argument on `,`
+#     alone.  Re-derive the set rather than copying it: the tool sweeps the
+#     list both ways, so it names any id that is stale or missing.
+#   FC-006,FC-007,FC-012,FC-014,FC-015,FC-018,FC-027,FC-028,FC-035,FC-036,
+#   FC-037,FC-040,FC-042,FC-043,FC-044,FC-045,FC-046,FC-048,FC-049,FC-050,
+#   FC-052,FC-053,FC-054,FC-055,FC-056,FC-057,FC-058,FC-059,FC-060,FC-061,
+#   FC-062,FC-063,FC-066,FC-068,FC-070,FC-077,FC-080,FC-082,FC-083,FC-086,
+#   FC-087,FC-088,FC-089,FC-090,FC-091,FC-092,FC-093,FC-094,FC-095,FC-097,
+#   FC-098,FC-099,FC-100,FC-101,FC-103,FC-104,FC-106,FC-107,FC-108,FC-109,
+#   FC-110,FC-116,FC-117,FC-118,FC-119,FC-126,FC-135,FC-136
+
+# RUN -- the two columns, same instrument, same case file, same target.
+# `--allow-uncovered` below was DERIVED from the register by diffprobe's own
+# loaders and validated through check_coverage before it was written here (量
+# 2026-10-04: 68 ids, covered 21, uncovered-and-not-exempted 0).  Re-derive it
+# if either file changes; the tool names any id that has gone stale.
+#
+#   A=FC-006,FC-007,FC-012,FC-014,FC-015,FC-018,FC-027,FC-028,FC-035,FC-036,FC-037,FC-040,FC-042,FC-043,FC-044,FC-045,FC-046,FC-048,FC-049,FC-050,FC-052,FC-053,FC-054,FC-055,FC-056,FC-057,FC-058,FC-059,FC-060,FC-061,FC-062,FC-063,FC-066,FC-068,FC-070,FC-077,FC-080,FC-082,FC-083,FC-086,FC-087,FC-088,FC-089,FC-090,FC-091,FC-092,FC-093,FC-094,FC-095,FC-097,FC-098,FC-099,FC-100,FC-101,FC-103,FC-104,FC-106,FC-107,FC-108,FC-109,FC-110,FC-116,FC-117,FC-118,FC-119,FC-126,FC-135,FC-136
+#
+#   tools/diffprobe.py probe --cases config/r9-probes.toml \
+#       --register config/fix-cases.toml --allow-uncovered "$A" \
+#       --column vendor --target 10.1.1.1 --out bench/<date>/V-DIFF
+#   tools/diffprobe.py probe --cases config/r9-probes.toml \
+#       --register config/fix-cases.toml --allow-uncovered "$A" \
+#       --column rlxfw  --target 10.1.1.1 --out bench/<date>/R-DIFF
+#   tools/diffprobe.py compare bench/<date>/V-DIFF bench/<date>/R-DIFF
+#
+# 🔴 The vendor column is the one-shot one, and 讀 `NET-118` its readiness is
+# staggered: 52881 answers at J+17.1-17.4 s and 52869 only at J+31.3-32.5 s,
+# so a run started before J+33 s reads a closed port as closed when it is not
+# yet open.  Wait past the LATER of the two before `--column vendor`, and take
+# the readiness itself from `tools/hostprobe.py`, which owns that axis.
+# 🔴 Both columns answer on 10.1.1.1 (量 `bench/2026-09-23/V1-ICMP.log` for the
+# vendor, 量 `FW-175` for rlxfw), which is what lets `compare` accept them:
+# `target` is in the provenance set and a differing one refuses the table.
+# 🔴 So is `cases_sha256`.  Do not edit this file between the two columns: a
+# one-character change makes `compare` refuse two records that are otherwise
+# good, and the vendor column cannot be retaken.  Freeze the file, take both
+# columns, then change it.
+
+version = 1
+
+# ---------------------------------------------------------------------------
+# 1. The three ports 量 open.  `connect()` and close -- no request, so nothing
+#    these daemons could act on.  First, because 讀 `D-19` one request can take
+#    a daemon away for the rest of the episode.
+# ---------------------------------------------------------------------------
+
+[[case]]
+id = "C01"
+kind = "tcp-connect"
+port = 80
+register_id = "FC-016"
+why = "Discriminates whether the two firmwares open the SAME TCP ports. 80 is the one port both are expected to open, so it is the census's positive control on BOTH columns at once: a refusal here means the reading is about the cable, not the board. Cannot write: no byte is sent."
+expect = "vendor connect-ok (量 V1-NMAP 80/tcp open); rlxfw connect-ok (量 FW-175, httpd on 80). The UDP half of this row is outside this instrument."
+
+[[case]]
+id = "C02"
+kind = "tcp-connect"
+port = 52869
+register_id = "FC-076"
+why = "Discriminates whether the host port of the daemon this row's class-level claim is about exists at all. rlxfw ships no such daemon, so the claim is an absence; the vendor half is what keeps that absence from being an instrument zero. Cannot write: no byte is sent, so no value reaches any command path."
+expect = "vendor connect-ok (量 V1-NMAP); rlxfw no-connect/refused. Says nothing about which daemon owns the port (量 NET-118 has it 推 only) and nothing about any command path."
+
+[[case]]
+id = "C03"
+kind = "tcp-connect"
+port = 52881
+register_id = "FC-120"
+why = "Discriminates whether a second non-web daemon's port is reachable from the LAN at all. The row's residual limits it to the surface question -- WAN reachability is unmeasured on both firmwares -- and a connect() from the LAN is exactly that much. Cannot write: no byte is sent."
+expect = "vendor connect-ok (量 V1-NMAP); rlxfw no-connect/refused. Establishes LAN reachability only; the WAN half stays 未定 on both columns."
+
+# ---------------------------------------------------------------------------
+# 2. Six ports 量 closed -- the census's negative control.  Without these, three
+#    open ports are three open ports and not a census.
+# ---------------------------------------------------------------------------
+
+[[case]]
+id = "C04"
+kind = "tcp-connect"
+port = 23
+register_id = "FC-078"
+why = "Discriminates whether either firmware offers a remote shell port. 量 P2: the vendor has no getty and TELNET_ENABLED 0, so a closed 23 on the vendor is the predicted reading and its agreement is what makes the open ports above a measurement rather than a scan artefact. Cannot write: no byte is sent."
+expect = "both columns no-connect/refused. 量 V1-NMAP lists 23 among the 65,381 closed."
+
+[[case]]
+id = "C05"
+kind = "tcp-connect"
+port = 22
+register_id = "FC-078"
+why = "The second half of the same row, which predicts BOTH ports closed; one of the two read alone would leave the prediction half-tested. Discriminates an ssh surface on either firmware. Cannot write: no byte is sent."
+expect = "both columns no-connect/refused."
+
+[[case]]
+id = "C06"
+kind = "tcp-connect"
+port = 5555
+register_id = "FC-084"
+why = "Discriminates whether the named Realtek-SDK backdoor port is open on this build. A closed port on the vendor column refutes the row's own premise for this unit, which is a result and not a non-result. Cannot write: no byte is sent."
+expect = "both columns no-connect/refused; 量 V1-NMAP found only 80/52869/52881."
+
+[[case]]
+id = "C07"
+kind = "tcp-connect"
+port = 7547
+register_id = "FC-085"
+why = "Discriminates whether a remote-management surface is listening. The row also asks for an ACS URL, which only a reply could carry; a closed port answers the surface half and leaves the configuration half 未定. Cannot write: no byte is sent."
+expect = "both columns no-connect/refused."
+
+[[case]]
+id = "C08"
+kind = "tcp-connect"
+port = 9999
+register_id = "FC-079"
+why = "Discriminates whether a Realtek diagnostic port is listening on this build. Cannot write: no byte is sent."
+expect = "both columns no-connect/refused."
+
+[[case]]
+id = "C09"
+kind = "tcp-connect"
+port = 20005
+register_id = "FC-079"
+why = "The second diagnostic port the same row names; the row is about a SET of ports and one of them is not the set. Cannot write: no byte is sent."
+expect = "both columns no-connect/refused."
+
+# ---------------------------------------------------------------------------
+# 3. The highest-value boa reads.  Every path here is ungated under `R1` and
+#    outside `/boafrm/` under `R2`.
+# ---------------------------------------------------------------------------
+
+[[case]]
+id = "C10"
+kind = "http"
+method = "GET"
+port = 80
+path = "/"
+body = "digest"
+register_id = "FC-017"
+why = "Discriminates the serving program itself. 讀 notes/httpd.md § 2.3: rlxfw emits X-Frame-Options, Content-Security-Policy, X-Content-Type-Options and no Server header at all, while boa announces its version in one. `hdr_names` and `hdr_sha256` carry that difference without carrying a byte of either body. Cannot write: GET of the root, no handler, and `/` holds no `htm` so the gate does not run."
+expect = "vendor 200 with a Server header naming boa; rlxfw 200 index.html with the three security headers and no Server. A digest, not an excerpt."
+
+[[case]]
+id = "C11"
+kind = "http"
+method = "GET"
+port = 80
+path = "/config.dat"
+body = "none"
+register_id = "FC-024"
+why = "Discriminates the whole class this row is about: whether an unauthenticated GET can retrieve the serialised configuration store. 讀 auth-flow.md: this path holds no `htm`, so the authorisation gate never runs on it. rlxfw's equivalent is GET /api/config, which 讀 notes/httpd.md § 2 requires a session, so an unauthenticated read there is 401 and an unknown path is 404. Status and length alone separate 200-with-a-blob from 404-with-a-fixed-document. Cannot write: a GET of a served file; translate_uri reaches init_get, not handleForm."
+expect = "vendor 200 and a non-zero length; rlxfw 404 and 30 bytes of fixed JSON. 🔴 body = none: this document is this unit's configuration, so neither its bytes nor a digest of them is recorded. The length is the comparable field."
+
+[[case]]
+id = "C12"
+kind = "http"
+method = "GET"
+port = 80
+path = "/status.htm"
+body = "none"
+register_id = "FC-034"
+why = "Discriminates the gate's reach on its own exempt side. 讀 auth-flow.md: this is one of seven names the authorisation block tests with `!strstr`, so a match skips the block ENTIRELY -- including the 601-second branch -- and the page is served to a client with no credential. Paired with C14 it reads the gate's boundary from both sides without ever entering the gated branch. Cannot write: the exemption makes the block unreachable, so the `flash set` inside it cannot run; and the path is not under /boafrm/."
+expect = "vendor 200 with a non-zero length and no credential sent; rlxfw 404. 🔴 body = none: this page renders the unit's hardware and WAN addresses. Does NOT establish that the gate ever fires -- that reading needs a gated path, which R1 refuses."
+
+[[case]]
+id = "C13"
+kind = "http"
+method = "GET"
+port = 80
+path = "/ca.cer"
+body = "none"
+register_id = "FC-026"
+why = "Discriminates a SECOND unauthenticated non-htm document, which is what turns C11 from one file into a class. 讀 auth-flow.md names this path beside /config.dat as outside the gate for the same reason. The row asks for a dictionary of 20+ names; one hit on a second name settles the class and the rest are the same request shape, so the episode's budget goes elsewhere. Cannot write: a GET of a served file."
+expect = "vendor 200 or 404 -- either is a reading; rlxfw 404. 🔴 body = none: a certificate may be per-unit."
+
+# ---------------------------------------------------------------------------
+# 4. The surface boundary: four prefixes and a plain miss.
+# ---------------------------------------------------------------------------
+
+[[case]]
+id = "C14"
+kind = "http"
+method = "GET"
+port = 80
+path = "/nope-rlx-7e1"
+body = "digest"
+register_id = "FC-034"
+why = "The ungated side of the same boundary C12 reads from the exempt side: a path holding no `htm`, so 讀 auth-flow.md the authorisation block is skipped on the `beq` and the client reaches translate_uri with no credential. Discriminates what an unauthenticated miss looks like on each firmware. Also the control for rlxfw's own no-reflection property (讀 notes/httpd.md § 2.1 tests exactly this with a marker path): the digest changing between columns while the status matches is the finding. Cannot write: nothing exists at this path on either firmware."
+expect = "vendor 404, boa's own HTML; rlxfw 404 and exactly the fixed document {\"ok\":false,\"error\":\"notfound\"}. Neither reply should contain the request path."
+
+[[case]]
+id = "C15"
+kind = "http"
+method = "GET"
+port = 80
+path = "/boafrm/nope-rlx-7e1"
+body = "digest"
+register_id = "FC-022"
+why = "Discriminates whether the serving program carries a form-dispatch prefix at all -- this row's own subject. 🔴 Cannot write, and this is the one case that needs the argument spelled out: 讀 upstream/notes/dispatch-table.md, handleForm compares `strlen(uri+8) == strlen(name)` and then memcmp against a 59-entry table, so matching is EXACT and not prefix; a name the table cannot hold falls through to send_r_not_found(req) without reaching any handler. The name here is not a `form*` name. No handler runs, so neither the flash write of P10-10 nor D-11's loss of the server is reachable."
+expect = "vendor 404; rlxfw 404 with its fixed document. Does NOT establish the dispatcher's branch: send_r_not_found is the same function a missing file uses, so this reading is the prefix's PRESENCE and nothing about any handler."
+
+[[case]]
+id = "C16"
+kind = "http"
+method = "GET"
+port = 80
+path = "/goform/nope-rlx-7e1"
+body = "digest"
+register_id = "FC-023"
+why = "Settles this row's own stated precondition -- it applies only if a /goform/ prefix answers -- and the other half of C15's prefix comparison. Cannot write: /goform/ is not this build's dispatch prefix (讀 dispatch-table.md: handleForm greps for /boafrm/), so the request is a plain file lookup, and the name does not exist."
+expect = "vendor 404; rlxfw 404. A 404 here refutes the row's precondition for this build, which is the result."
+
+[[case]]
+id = "C17"
+kind = "http"
+method = "GET"
+port = 80
+path = "/cgi-bin/nope-rlx-7e1"
+body = "digest"
+register_id = "FC-047"
+why = "Discriminates whether a CGI prefix is served, which is the surface this row's named script would need. The script itself is NOT requested: a request that reached init_cgi would execute vendor code with side effects this gate cannot bound. A name that cannot exist reaches no interpreter whether the prefix is configured or not, so the reading is the prefix and the risk is none."
+expect = "vendor 404 (or 500 if a ScriptAlias exists and the exec fails -- also a reading); rlxfw 404. Does NOT establish whether the named script exists; that needs a request this gate refuses."
+
+[[case]]
+id = "C18"
+kind = "http"
+method = "GET"
+port = 80
+path = "/factory-test"
+body = "digest"
+register_id = "FC-021"
+why = "Discriminates whether an undeclared endpoint answers outside the documented UI -- the row's subject. One name, chosen to hold no `htm` and to sit under no dispatch or script prefix, so a 200 would be a finding and a 404 is the expected reading on both columns. Cannot write: a GET of a name that exists on neither firmware."
+expect = "both columns 404. A 200 on the vendor column is the finding this case exists for; the row stays 未定 if both are 404, because one name is not an enumeration."
+
+# ---------------------------------------------------------------------------
+# 5. Normalisation and method handling.
+# ---------------------------------------------------------------------------
+
+[[case]]
+id = "C19"
+kind = "http"
+method = "GET"
+port = 80
+path = "//config.dat"
+body = "none"
+register_id = "FC-038"
+why = "Discriminates the two parsers' normalisation. 讀 notes/httpd.md § 3.1: rlxfw refuses an empty segment before the byte is stored and then reads the whole decoded string again for `//`, so this is 400 by construction; the vendor runs stock boa alias.c. The target is a document C11 already reads, so the variant is the only variable and a 200 here means the normaliser accepted it. Cannot write: a GET, and the path reaches no handler and holds no `htm`."
+expect = "vendor 200 or 404; rlxfw 400. 🔴 body = none: the target is this unit's configuration. The row names ~30 variants; this and C20 take the two rlxfw refuses by independent rules."
+
+[[case]]
+id = "C20"
+kind = "http"
+method = "GET"
+port = 80
+path = "/./config.dat"
+body = "none"
+register_id = "FC-038"
+why = "The second variant, refused by rlxfw's OTHER rule: 讀 notes/httpd.md § 3.1 every `.` and `..` segment is refused, separately from the empty-segment test. A traversal that ESCAPED the document root was deliberately not written -- it would pull a file this gate has no business recording. Cannot write: a GET, no handler, no `htm`."
+expect = "vendor 200 or 404; rlxfw 400. 🔴 body = none."
+
+[[case]]
+id = "C21"
+kind = "http"
+method = "OPTIONS"
+port = 80
+path = "/"
+body = "digest"
+register_id = "FC-039"
+why = "Discriminates the method-handling layer, which is the only one of this row's four bypass axes a read can reach. 讀 notes/httpd.md § 2: rlxfw answers a known path with the wrong method 405 and names the methods in Allow. A header-based bypass was NOT written: Referer and X-Forwarded-For are ignored by both on an ungated path, so that probe would read the same on both columns for a reason unrelated to the row, and a crafted Host belongs to the held D-14 rows. Cannot write: OPTIONS reaches no handler and the root holds no `htm`."
+expect = "vendor 501 or 200 from stock boa; rlxfw 405 with Allow: GET, POST. PUT and DELETE are spellable by the instrument and are refused by R3."
+
+[[case]]
+id = "C22"
+kind = "http"
+method = "HEAD"
+port = 80
+path = "/config.dat"
+body = "none"
+register_id = "FC-039"
+why = "The same axis on a path that exists on one column only: whether a method change alters what the serving program will hand over. HEAD also reads C11's status and length with no body transferred at all, which is a second, independent reading of the same document under a different code path. Cannot write: HEAD, no handler, no `htm`."
+expect = "vendor 200 with a Content-Length matching C11's body_bytes; rlxfw 404 or 405. 🔴 body = none, and HEAD carries none regardless."
+
+# ---------------------------------------------------------------------------
+# 6. HTTP to the two non-boa ports.  After everything that needs those daemons
+#    alive: 讀 `D-19`, one request has taken one of them away before.
+# ---------------------------------------------------------------------------
+
+[[case]]
+id = "C23"
+kind = "http"
+method = "GET"
+port = 52869
+path = "/"
+body = "none"
+register_id = "FC-013"
+why = "Discriminates whether the daemon on this port serves a description document to an unauthenticated client -- the information-leak surface this row is about, as distinct from C02's bare reachability. Cannot write: a GET of the root. 🔴 It is NOT the control path: 讀 upstream/docs/disclosure.md D-16/D-19, the request that terminated this daemon was a SOAP POST carrying a value to a named control endpoint, and neither that endpoint nor any SOAP body appears in this file."
+expect = "vendor 200 or 404; rlxfw no-connect/refused. 🔴 body = none: a description document carries a UDN uuid and often a serial number. The row's SSDP half is UDP and outside this instrument."
+
+[[case]]
+id = "C24"
+kind = "http"
+method = "GET"
+port = 52881
+path = "/"
+body = "none"
+register_id = "FC-081"
+why = "Discriminates whether this port speaks HTTP at all, which is the precondition for the HTTP-method surface this row names; the method itself is not one tools/diffprobe.py can spell, so the surface question is what a read can settle. Cannot write: a GET of the root, no form handler, no parameter. Ordered after C03 so the reachability reading is already banked if this request costs the daemon."
+expect = "vendor malformed or a status line -- either is a reading; rlxfw no-connect/refused. 🔴 body = none: the daemon is unidentified, so the reply's content is unknown rather than known-safe."
+
+# ---------------------------------------------------------------------------
+# 7. Last: the three that stress boa's parser.  讀 `D-9` -- one well-formed
+#    request has held this single-process server for 4.7-9.7 s and nothing
+#    respawns it, so nothing cheaper may queue behind these.
+# ---------------------------------------------------------------------------
+
+[[case]]
+id = "C25"
+kind = "http"
+method = "GET"
+port = 80
+path = "/"
+headers = { Transfer-Encoding = "chunked" }
+body = "digest"
+register_id = "FC-041"
+why = "Discriminates the two parsers' strictness at the protocol layer. 讀 notes/httpd.md § 3: rlxfw answers 501 to Transfer-Encoding with ANY value, deliberately, because a tolerant parser in front of anything is a request-smuggling primitive; stock boa ignores the header. Cannot write: a GET with no body, so there is nothing chunked to decode. The row's HTTP/0.9 and version-number axes are outside the instrument, which hard-codes HTTP/1.1."
+expect = "vendor 200 (header ignored); rlxfw 501."
+
+[[case]]
+id = "C26"
+kind = "http"
+method = "GET"
+port = 80
+headers = { X-Rlx-Pad = "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy" }
+path = "/"
+body = "digest"
+register_id = "FC-067"
+why = "Discriminates the header-length bound, with the bound's NUMBER as the claim. 讀 notes/httpd.md § 3: rlxfw answers 431 past 1,024 bytes on one header line, and the value here is 1100 bytes, making the header line 1111 bytes with its name, so the line crosses that bound and nothing else. Deliberately NOT an overflow attempt: the row's parameter-count half is a request body, which R3 refuses, and a value chosen to reach a buffer rather than a declared bound would risk the server this episode needs. Cannot write: a GET with no body."
+expect = "vendor 200 or 400 from stock boa's own limit; rlxfw 431. Does NOT establish any bound on the vendor -- only what it did with 1,100 bytes."
+
+[[case]]
+id = "C27"
+kind = "http"
+method = "GET"
+port = 80
+path = "/"
+headers = { Range = "bytes=0-0" }
+body = "digest"
+register_id = "FC-067"
+why = "The Range axis the same row names, which is a read and carries no length risk at all. Discriminates whether each serving program implements partial content: stock boa does, and 讀 notes/httpd.md § 2 rlxfw's route table has no Range handling, so it answers the whole document. Cannot write: a GET of the root."
+expect = "vendor 206 with a Content-Range; rlxfw 200 with the full index.html. The status pair is the reading."

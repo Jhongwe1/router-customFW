@@ -272,11 +272,22 @@ staged onto ext4 first and every staged hash proved equal to the source:
 
 ## 10. What this does NOT establish
 
-* **Nothing has run on the device.** Every number here is 量 on the host or in
-  qemu, or 讀 out of an ELF. dnsfwd has never bound :53 on the RTL8196E, never
-  dropped privileges there, never talked to brokerd, and the privilege-drop
-  verification and `setuid(0)`-must-fail probe have never executed on the real
-  kernel. `docs/KNOWN-ISSUES.md` owns what depends on rlxfw's drivers.
+* 🔄 **2026-10-04: all four device clauses of this bullet were falsified by
+  `R7-8` on 2026-09-30, and the correction is `SPEC.md` `FW-175`'s.**
+  ~~dnsfwd has never bound :53 on the RTL8196E, never dropped privileges there,
+  never talked to brokerd, and the privilege-drop verification and
+  `setuid(0)`-must-fail probe have never executed on the real kernel.~~ 量 on
+  image `r78a`, two boots, no power action: `ps` shows `dnsfwd`'s USER column as
+  `dnsfwd`; the boot prints `dnsfwd: running as uid 101 gid 101; setuid(0)
+  refused (Operation not permitted)`, so the drop ran **and** the must-fail
+  probe executed on the real kernel; dnsfwd is one of the two broker peers in
+  those captures; and it **answered** a query — `R7-8`'s *shown running and
+  answering* is met. **What survives, narrower**: every *number* in this note is
+  量 on the host or in qemu, or 讀 out of an ELF — no coverage, fuzzing or
+  timing figure here was taken on the die. ⚠️ Why the device's reply was
+  `SERVFAIL` is 推. Owners of the device half: `SPEC.md` `FW-175`,
+  `notes/userspace-integration.md`, `docs/GATE-RESULTS.md` entry 17;
+  `docs/KNOWN-ISSUES.md` owns what depends on rlxfw's drivers.
 * **No DNSSEC.** No validation, no AD-bit meaning, no DS/RRSIG handling. A
   client setting CD or AD does not get those bits honoured, because the
   outbound query is freshly encoded.

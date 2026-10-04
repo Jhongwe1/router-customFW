@@ -1028,6 +1028,51 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-mkfw2.sh 2>&1 | tee ci-out/test-mkfw2.out; exit "${PIPESTATUS[0]}"
 
+      # R9's two desk instruments, arriving 2026-10-04 (120th segment).  Both are
+      # pure Python over the standard library and read no $FWRE_WORK, so they are
+      # in THIS job and not in `instruments`, which exists to install packages.
+      #
+      # diffprobe is R9-3: one request/reply row per probe, the SAME instrument on
+      # both columns of the differential table.  hostprobe records host events
+      # "and nothing else -- never a packet's contents", and its own `what it does
+      # not establish` names the gap -- `tcp result=ok` is a completed handshake
+      # and not an answer -- so R9-6/R9-7 had no instrument until this one.  It
+      # IMPORTS hostprobe's address gate (Redactor, the allowlist,
+      # canonical_mac, MAC_TEXT_RX, route_verdict) by path rather than restating
+      # it.  The self-test drives fake HTTP listeners and a FAKE `ip` on
+      # 127.0.0.1 only: no apt, no network beyond loopback, no device, no port of
+      # the board.  Its planted-mismatch control (U10) requires `compare` to name
+      # the case and the field and exit 1, with U11 -- the same server twice, zero
+      # differences -- as the half that makes U10's red the plant and not the
+      # instrument.  No skip: every case runs on a stock runner.
+      - name: diffprobe self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/diffprobe.py --self-test 2>&1 | tee ci-out/diffprobe.out; exit "${PIPESTATUS[0]}"
+
+      # fixcases is R9-1's: it checks and freezes config/fix-cases.toml, the
+      # per-case register.  `check` is the step that goes red when the committed
+      # register drifts from its own rules; `--self-test` is its mutation run,
+      # one planted row per rule plus three positive controls.
+      #
+      # 🔴 NEITHER has a row in tools/ci-expected.tsv, and that is deliberate
+      # rather than an omission.  量 2026-10-04 with ci-census's OWN parser over
+      # this suite's real output: 0 ok, 0 FAIL, 0 skip, 0 unparsable, 1 line
+      # case-shaped at the wrong indentation.  Its case lines are at THREE spaces
+      # and their first token is `M1`/`P1`, not `ok`/`FAIL`, so OK_RE and FAIL_RE
+      # match nothing and any total would read CENSUS-MISMATCH.  A table row
+      # becomes possible only when those prints carry `ok`/`FAIL` at exactly two
+      # spaces -- see the note at the end of tools/ci-expected.tsv.  Until then
+      # these two steps gate CI on their EXIT CODES, which is a real gate and not
+      # a case census, and ci-census iterates the table rather than the capture
+      # directory, so the captures they leave are ignored and nothing goes red.
+      - name: fixcases check
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/fixcases.py check 2>&1 | tee ci-out/fixcases-check.out; exit "${PIPESTATUS[0]}"
+
+      - name: fixcases self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/fixcases.py --self-test 2>&1 | tee ci-out/fixcases.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:

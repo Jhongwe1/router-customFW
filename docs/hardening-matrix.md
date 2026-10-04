@@ -1,0 +1,194 @@
+# hardening-matrix — which standard mitigations are on this part, and why the rest are not
+
+`R9-9`, 2026-10-04. The single-page answer to *which standard mitigations did
+you turn on?*, organised by mechanism rather than by defect class, which is how
+`plan/` § 8's table is organised. Row set from `plan/` § 8.4 and
+`plan/REVIEW-2026-08-22.md` item 14, kept whole — every one of the twenty
+mechanisms those two name has a row here, including the ones whose answer
+changed once a reading was required — plus **two** rows item 14 has no line for
+and this project does: the vendor WLAN driver, which `plan/` § 8.2 requires to
+be written down, and bounded kernel-register access from userspace, which is
+rlxfw's design answer to `SPEC.md` `FW-67`'s committed vendor finding.
+**Twenty-two rows.**
+
+**Two kinds of claim live in this file and they are not the same claim.** § 2 is
+about **the platform's limits** — the part, the core, the 2.6.30 kernel or the
+prebuilt `libc.a` makes the mechanism impossible, inapplicable, or unmeasured.
+§ 3 is about **rlxfw's design** — the mechanism is available on this platform and
+rlxfw either took it or did not. A ❌ in § 2 says nothing about rlxfw's
+engineering; a ❌ or ⚠️ in § 3 does.
+
+## 1. How to read a row
+
+Every row carries five things, and a row missing the fifth publishes **未定**:
+
+| | |
+|---|---|
+| **class** | the mechanism class, from the closed set ⟨架構性 / 有界化 / 服務不存在 / 不適用⟩. 架構性 = structural in rlxfw's design; 有界化 = bounded rather than removed; 服務不存在 = the surface is not present; 不適用 = the mechanism does not apply to this part, this kernel or this build shape. 🔴 **One row is marked ⊘ outside the set rather than bent to fit it** — read-only rootfs, where rlxfw's ❌ comes from this gate's own zero-flash-write rule and none of the four classes describes that. Forcing it into 不適用 would have read as *the platform cannot*, which is false |
+| **platform** | ✅ available, ⚠️ available with a cost, ❌ not available **with the reason it is not**, or 未定. *Not done yet* is never a platform reason |
+| **vendor** | a reading from tier `V-B` (static, from the dump-derived tree and vendor source) or `V-C` (the already-captured vendor boot consoles), naming its artefact — or **⊘ Structural** naming the committed finding, or **未定** |
+| **rlxfw** | a reading **from the same instrument** as the vendor cell, or 未定 |
+| **④** | a check that would have detected the **opposite** of what the row claims, together with that check's reading. A row with no such reading is 未定, never a win |
+
+No cell is filled from `plan/`'s intention. Marks are the house marks: **量**
+measured on the device, **讀** read out of code, a dump or a document, **文**
+read out of the draft datasheet, **推** inferred, **未定** open with a § 4 row
+saying what settles it.
+
+**The count, re-derived from the file by parsing it rather than remembered.**
+Twenty-two rows × four evidence cells (platform, vendor, rlxfw, ④) = **88**
+cells: **66** name an existing reading, **20** are **未定** with a § 4 row
+saying what settles them, and **2** are **⊘ Structural**. 66 + 20 + 2 = 88.
+
+⚠️ **No row here is tier `V-A`, and that is deliberate.** `V-A` is the live,
+network-facing tier and it costs the one vendor boot `R9-6` owns. Every vendor
+cell below is static or boot-console evidence, so **this file needs no vendor
+seating** — and it therefore cannot settle any question that needs the vendor
+running, which is why seven of its vendor cells are 未定 and two are ⊘ Structural.
+
+🔴 **Three things this file does not have, searched for rather than assumed.
+A search reporting 0 is making a claim, so each one below carries the control
+that shows the search works.** **①** NX / RIXI / execute-inhibit has **no
+reading anywhere in this repository outside `plan/`** — 讀 2026-10-04,
+`grep -rn -i rixi` over the whole working tree with `plan/` and `upstream/`
+excluded: **one** hit, and it is `PROGRESS.md`'s own `R9-9` step row.
+**Positive control, same command, same day**: the identical grep *inside*
+`plan/` returns **three** hits, so the instrument finds the token where the
+token is. **②** There is **no `checksec` step in
+`.github/workflows/ci.yml`** — 讀 the same way: **zero** hits in that file and
+**one** in the whole tree, again `PROGRESS.md`'s step row, against **one** hit
+inside `plan/` as the control. So no cell here cites *`R1`'s NX test* or *CI
+`checksec`*; both read 未定. **③** `SPEC.md` `CPU-49` 殘留 records NX as one of
+seven things deliberately left out of `R1a`'s population, named rather than
+missed, and ⊘ on 2026-09-30 as voluntarily out of scope — so the absence is a
+committed decision, not an oversight, and `docs/isa-payload.md` § 7 owns the
+seven with `tools/isapay.py`'s `DEFERRED_GROUPS` as their executable face.
+
+**Disclosure discipline.** Per-defect detail about the vendor follows
+`upstream/docs/disclosure.md`'s state at the pin `4d3ff26`. 讀 2026-10-04 from
+that file's status column: **thirteen** ids are marked held — `D-3`,
+`D-4`, `D-9`, `D-10`, `D-11`, `D-12`, `D-13`, `D-14`, `D-15`, `D-16`, `D-17`,
+`D-18`, `D-19` — and `D-19` is additionally marked NOT SEARCHED. So this file
+names no endpoint, no parameter, no payload and no reproduction, and where a
+vendor defect appears it appears as a class or as published prior art with a
+CVE id.
+
+## 2. The platform's limits
+
+Nothing in this section is a statement about rlxfw's engineering. Every ❌ here
+carries what about this part, this core, this kernel or this library makes the
+mechanism impossible or inapplicable.
+
+| mechanism | class | platform, and the reason | vendor | rlxfw | ④ the opposite-check, and its reading |
+|---|---|---|---|---|---|
+| **NX** (per-page execute-inhibit) | 不適用 推 | **未定.** The claim in `plan/` § 8.2 is that per-page execute-inhibit needs MIPS32r3's RIXI and this core is MIPS-I class. What this repository holds is the ISA *level*: `CPU-13` 文 from the draft datasheet, *Supports MIPS-1 ISA, MIPS16 ISA*. **No reading of a page-level execute permission exists on this die**, so the conclusion is 推 and the cell is 未定 | 未定 — the same reading is missing for the vendor's kernel | 未定 | **未定, and this is the row's whole weakness.** `docs/isa-payload.md` names the check — write an instruction word into a data page, flush the I side, execute it — and calls it *the only row here that would WRITE instructions*. It has never been run. `SPEC.md` `CPU-49` 殘留 |
+| **ASLR** | 不適用 推 | **未定.** `plan/` § 8.2 says 2.6.30's MIPS has no randomised `arch_pick_mmap_layout`. 讀 2026-10-04: `git grep -i` for `aslr`, `randomize_va` and `arch_pick_mmap` over `notes/`, `docs/` and `SPEC.md` returns **zero**, and the control for that zero is a looser pattern that does hit — `randomis` finds two, both `dnsfwd`'s source-port randomisation and neither about address space. The claim has no reading here | 未定 | 未定 | **未定.** The check is one grep over the tree that builds, with Linux 5.4.27 in `src-vendor/shibajee-linux-rtl8196e` as the positive control that has the feature — the instrument `notes/init.md` § 3 already used to settle devtmpfs. `SPEC.md` `TC-26` 殘留 ① |
+| **PIE** | 不適用 | ⚠️ **compilable, and it buys nothing without ASLR** — and that rationale inherits the ASLR row's 未定, so what is stated here is the build shape and not the value of the omission | ❌ 讀 `SPEC.md` `FW-18`: no canary, no RELRO, no PIE, no FORTIFY, and every ELF carrying `PT_GNU_STACK` marked `RWE`. Counted ELF by ELF | ❌ by construction. 量 2026-09-30 (`notes/httpd.md` § 8): the target ELF is *32-bit MSB, MIPS-I, statically linked, no `PT_INTERP`*, `e_flags` `0x1007` | `readelf`'s own `ET_DYN` / `PT_INTERP` fields are what would show the opposite, and they read static on rlxfw's side and `RWE` `PT_GNU_STACK` on the vendor's. Both cells have a reading; only the *worth* of the omission is 未定 |
+| **Stack canary** | 不適用 | ❌ **and the reason is the toolchain and the prebuilt library, not a flag anyone forgot.** 量 2026-09-13 (`SPEC.md` `TC-53`, `docs/toolchain-comparison.md` § 2.4), under `tools/vendor-tripwire.sh`: both 1.3.6 (gcc 3.4.6) toolchains **refuse** `-fstack-protector`; `rsdk-1.5.5` (gcc 4.4.5-1.5.5p4) **accepts** it, prints `warning: -fstack-protector not supported for this target`, emits **0** `__stack_chk` symbols and **exits 0**; `-fstack-protector-strong` is refused by all three | ❌ 讀 `FW-18` | ❌ — same toolchain, same result. ⚠️ No cell here cites CI `checksec`: there is no such step (§ 1 ②) | 🟢 **both directions, in the same run.** The same fixture through host gcc emits `U __stack_chk_fail` and through `mips-linux-gnu-gcc-12` emits **2** symbols, so the instrument works and this is not *MIPS cannot*; `-fzzz-not-a-flag` is refused by all three, so *accepted* is discrimination rather than blanket acceptance |
+| **RELRO + BIND_NOW** | 不適用 | ⚠️ **the lazy-binding half does not apply to a static link.** 量 2026-09-30: rlxfw's target ELFs are statically linked with no `PT_INTERP` (`notes/httpd.md` § 8), so there is no dynamic symbol resolution for `BIND_NOW` to make eager and no lazy GOT for RELRO to seal | ❌ 讀 `FW-18`, counted ELF by ELF: no RELRO, and every ELF carrying `PT_GNU_STACK` marked `RWE` | **未定 for the part that does apply.** 讀 `git grep` 2026-10-04: no `-z relro` and no `-z now` anywhere in this repository, so the flag is not passed — and the control for that zero is `-fno-if-conversion`, the one flag `config/rlxfw-cflags` does declare, which the same grep shape finds. Whether the linker emitted `PT_GNU_RELRO` over the static image's relocated sections has not been read | **未定.** One `readelf -l` over the shipped six names it. `SPEC.md` `FW-177` 殘留 ① |
+| **`_FORTIFY_SOURCE`** | 不適用 | ❌ **and the reason is the library.** 量 2026-09-13 (`TC-53`): `_FORTIFY_SOURCE` has nowhere to land on any of the three toolchains — all three `libc.a` carry **0** `__*_chk` entry points | ❌ 讀 `FW-18` | ❌ — the same three libraries are the only ones available | 🟢 **a non-zero denominator in the same scan**: `memcpy` reads **1** in each `libc.a`, so the zero is a finding about `__*_chk` and not a broken scan. This is what attributes `FW-18` to the library rather than to a build-flag choice |
+| **seccomp** | 不適用 推 | ❌ 推, **and it needs one grep to become 讀.** MIPS seccomp support arrives in 3.x; the kernel that builds is `2.6.30.9` (讀, `src-vendor/rtl819x-toolchain/linux-2.6.30`, cited by `notes/entropy.md` § 2). No reading of `CONFIG_SECCOMP`'s presence in this tree's `Kconfig` exists here | 未定 — the vendor runs a kernel from the same drop generation, but no reading was taken | 未定 | **未定.** One grep over the tree that builds, with the 5.4.27 tree as the positive control. `SPEC.md` `TC-26` 殘留 ② |
+| **`no_new_privs`** | 不適用 推 | ❌ 推 — `PR_SET_NO_NEW_PRIVS` is 3.5+; same kernel, same missing reading as seccomp | 未定 | 未定 | **未定**, same grep. `SPEC.md` `TC-26` 殘留 ② |
+| **LSM** (SELinux / Smack) | 不適用 推 | ❌ 推 for cost rather than for capability, and the reading that bears on it is **讀 `# CONFIG_MODULES is not set`** (`SPEC.md` `CLK-21`, `config/rlxfw-kernel.delta`): this kernel has no module loader, so an LSM would be a built-in and its cost is `.text` in a 4 MiB part | 未定 | ❌ **and rlxfw's substitute is named rather than implied**: authorisation is `brokerd`'s op table keyed on `SO_PEERCRED`, § 3's *privilege separation* row. That is 架構性 and it is not an LSM | **未定** for the LSM claim itself, same grep. `SPEC.md` `TC-26` 殘留 ②. The substitute's own ④ is in § 3 |
+| **Secure boot** (root of trust) | 不適用 | ❌ **and the reason is two readings plus one rule.** 讀 `SPEC.md` `LDR-18`: the ROM loader's `check_image()` is a 4-byte magic (`cs6c` → 1, `cr6c` → 2) plus a 16-bit halfword sum that must come to zero — an unkeyed integrity test, not a signature. 讀 `LDR-19`: this build has the **sys-image** failure strings compiled out while keeping the rootfs pair, so that half of the check fails silently. And the loader region `0x000000`–`0x005FFF` is permanently unwritable by this project's own rule, so it cannot be replaced | ❌ — the same loader is the vendor's | ❌ — rlxfw's own verification runs **after** the ROM loader, so it is a verified second stage and not a root of trust. `PROGRESS.md`'s `R8a` row says so in its own words: *not secure boot on a part with no evidence of a key-hash fuse* | 🟢 **and the reading is a refusal.** 量 `FW-166`: the stock loader does **not** accept rlxfw's container, read two independent ways — `mkfw2 verify --stock-loader` and `tools/rtkimage.py check` (not this project's code, exit 1), the latter correctly reading a vendor-shaped `linux.bin` as `sum16 0x0000` in the same run as its control. ⚠️ Whether this part has an OTP or key-hash fuse at all is **⊘ out of scope, not 未定** — and the distinction is the point. The current value is already owned and already committed: `PROGRESS.md`'s `R8a` row reads *not secure boot on a part with **no evidence of a key-hash fuse***. That is an absence of evidence, and no open gate depends on turning it into evidence of absence; a device-side probe would mean writing a one-time-programmable region on the only unit, which this project will not do. So it gets no § 17 row. The one `EFUSE` symbol in `config/rlxfw-kernel.delta` is the WLAN driver's and says nothing about a boot key |
+| **Secure random source** | 有界化 | ❌ for the hardware half: no TRNG and no RTC, and 量 `CPU-42` — CP0 `Count` reads 0 and does not move, with clock-gated and absent indistinguishable from that reading | **⊘ Structural, not deferred.** `plan/` § 8.3's headline experiment — 100 reads of `/dev/urandom` at boot compared across 20 boots — needs a shell, and **the vendor firmware has no shell** (`docs/GATE-RESULTS.md`, `P2`'s *⊘ Structural, not deferred*). It is not scheduled; it cannot be run | ⚠️ **fail-closed, and the refusal is the current behaviour.** 量 2026-09-30 on image `r6b8i`: `entropy_avail` **0** at 768 s and **0** at 1613 s with `poolsize` 4096, and **0** again before, during and after a burst in which 400 ICMP echoes round-tripped and IRQ 12 moved 279 → 1063 and IRQ 8 1048 → 9320. `brokerd` answers `NOENTROPY` to `LOGIN` and `PWSET` until `entropy_avail >= 128` has been seen once, so **on this board today rlxfw issues no session token at all** | 🟢 **the refutation was registered before the run and did not fire, and its control did.** *If `entropy_avail` rose above 0 on the unmodified image while a burst of aperiodic interrupts demonstrably landed, no kernel change would be needed* — it did not. 🔴 And round 1 of that control went **red** and is kept: the host pinged `10.1.1.1` while `rlx0` carried `10.1.1.3/8`, so 300 frames arrived only as broadcast ARP and IRQ 12 moved 15; no entropy figure from that round means anything. ⚠️ `rlxfw-entropy` is built and linked (量 on the artefact: four symbols in `entq1`'s `System.map`, **0** in the control `entq0`, witness string 3× against 0×) and **has never run on silicon** |
+| **Full-disk encryption** | 不適用 | ❌ **on two legs that each have a reading.** 量 `FLS-01`: the flash is an Eon EN25QH32B in an **SOP-8**, board marking `U19` — an attacker with the board reads it off-circuit. And there is nowhere to anchor a key: no secure storage, and the entropy row above means a key generated on this board today would come out of a pool the kernel reports as empty | ❌ | ❌ — and this is recorded as 不適用 rather than as undone work | The check that would show the opposite is a key store that survives an off-circuit read, and this part has none that any reading in this repository names. ⚠️ The OTP half of that statement is the secure-boot row's **⊘ out of scope**, carried here unchanged: `PROGRESS.md`'s `R8a` row owns *no evidence of a key-hash fuse*, and this file does not open a second owner for it |
+
+**On the NX row's three weaknesses, stated because the row is the one `plan/`
+leans on hardest.** `plan/` § 8.4 says that knowing RIXI is MIPS32r3-only is
+what separates engineering levels. It may be; it is still not a measurement of
+this die. `CPU-13`'s mark is **文** — a sentence in the draft datasheet, which
+carries its own declared limitations, owned by `plan/` § 3.5 — and **文** is
+neither 讀 nor 量. The ISA census that `R1-pub` ran on the silicon deliberately
+did not include NX, and `SPEC.md` `CPU-49` 殘留 says so by name. So the honest
+form of this row is *no page-level execute permission has been read or measured
+on this part*, not *this part cannot do NX*.
+
+## 3. rlxfw's design
+
+Every mechanism in this section is available on this platform. A ❌ or ⚠️ here
+is a statement about rlxfw.
+
+| mechanism | class | platform | vendor | rlxfw | ④ the opposite-check, and its reading |
+|---|---|---|---|---|---|
+| **Privilege separation** (chroot + drop) | 架構性 | ✅ | **未定.** `plan/REVIEW-2026-08-22.md` item 14 records the vendor's web server as root. `ps` on the vendor is **⊘ Structural** (`P2`, no shell), and the static substitute — the boot scripts' uid handling and `bin/boa`'s import list — has not been read here | 🟢 **✅, and it is verified by being reversed.** 量 2026-09-30 on the silicon (`SPEC.md` `FW-175`): `ps` shows `httpd`'s USER as `httpd` and `dnsfwd`'s as `dnsfwd`; the boot prints `httpd: uid=100 gid=100 root=/srv/www`; all three `/etc/passwd` rows carry `/bin/false`. Host-side, 量 24 of 24 cases read out of `/proc/<pid>/status` or off the wire (`notes/httpd.md` § 4): `Uid:`/`Gid:` 100/100, `Groups:` empty, `/proc/<pid>/root` the web root | 🟢 **`setuid(0)` and `setgid(0)` are required to FAIL, and the device printed the failure**: `dnsfwd: running as uid 101 gid 101; setuid(0) refused (Operation not permitted)` 量. The drop sequence also requires `stat("index.html")` to succeed **and** `stat("/etc/passwd")` to fail, so a chroot into the wrong directory is distinguishable from one into the right directory. ⚠️ The comparison with the vendor publishes **未定**: `SPEC.md` `FW-20` 殘留 ① |
+| **Read-only rootfs** | ⊘ outside the set | ✅ | ✅ 讀 `SPEC.md` `FW-08`: SquashFS 4.0 / LZMA, 128 KiB blocks, 567 inodes. ⚠️ And one reading undercuts it: 讀 `unsquashfs -ll` on the image (`notes/rootfs-census.md`) shows `/dev/mtdblock0`–`3` at `brw-rw-rw-` 31,0–31,3, so **`/dev/mtdblock0` is mode 0666 and covers the loader and `H601`**, with `bin/flash` on the same `PATH` | 🔴 **❌ today, and the reason is this gate's own rule rather than a design choice.** Mainline is zero flash write through `R9` (`plan/` `D3`), so the image boots from RAM and the root is an initramfs. 讀 `notes/init.md` § 3: `# CONFIG_TMPFS is not set` and `# CONFIG_SHMEM is not set`, yet `mount -t tmpfs` works because `mm/shmem.c`'s `#else` branch registers a `tmpfs_fs_type` whose `get_sb` is `ramfs_get_sb` — confirmed by dumping the struct out of `vmlinux`'s `.data`. So the four writable mounts are ramfs **with no size limit**, and each can grow until the board is out of RAM | 🟢 **`src/init/test_mounts.c` asserts no row carries a `size=`**, because `fs/ramfs/inode.c`'s option table is `mode=%o` with **no `default:`** in its switch, so a `size=512k` would read as a limit and be none. The assertion exists so the absence of the limit is recorded rather than accidentally claimed. ⚠️ Bounding it needs `CONFIG_TMPFS` and `CONFIG_SHMEM`, a kernel change, owner `R8b` |
+| **`nosuid` / `nodev` / `noexec`** | 有界化 | ✅ | ⚠️ 量 with its control (`docs/isa-prior-art.md` § 9.3): the token `noexec` occurs **exactly once in the whole extracted rootfs**, inside `bin/busybox`'s own option-name table, and in no script; 讀 the vendor mounts `ramfs` on `/var` with **no options at all** and `/tmp` is a symlink into it, so there is a writable, executable filesystem at runtime | ⚠️ **partly, and the gap is stated rather than rounded up.** 讀 `notes/init.md` § 3's mount table: `/proc` and `/sys` carry `nosuid,nodev,noexec`; the four tmpfs mounts (`/var`, `/run`, `/tmp`, `/srv/www/run`) carry `nosuid,nodev` and **not** `noexec` | The table is the artefact and `src/init/test_mounts.c` walks it, so a row that lost a flag is a test failure rather than a document error. ⚠️ What no check here covers is whether `noexec` on those four would break a running daemon; that is why the flag is absent and the absence is written down |
+| **No setuid binary** | 服務不存在 | ✅ | **未定, and the obvious reading is void.** 讀 `notes/rootfs-census.md`: `unsquashfs` without root creates no device nodes and its own log says `created 0 devices`, so reading the **extraction** rather than the image gives a false zero for modes. A mode census has to run on the image | ✅ **for the web root, 未定 image-wide.** 量 2026-09-30 (`notes/httpd.md` § 4.1): `chrootcheck` walks `/srv/www` with two independent detectors and refuses any execute bit, any setuid/setgid bit, any symlink, any device node, any FIFO, any world-writable file and `st_nlink > 1`. That covers the chroot, not the whole image | 🟢 **the refusal is shown before the pass**: a planted `/srv/www/bin/sh` is REFUSED with 3 findings (execute bit, begins with an ELF, extension the MIME table cannot name), a planted symlink with 1, the real tree clean, and `--self-test` refuses 6 planted offenders and passes a clean tree of 2. ⚠️ Image-wide: `SPEC.md` `FW-177` 殘留 ②; vendor: `SPEC.md` `FW-20` 殘留 ② |
+| **No shell inside the chroot** | 服務不存在 | ✅ | ❌ 讀 `SPEC.md` `FW-25`/`FW-26`: the vendor's own busybox lists **50 applets** including `sh` and `ash`, with 50 symlinks pointing at it. ⚠️ Whether the vendor's web server runs inside a chroot at all is the same 未定 as the privilege-separation row | 🟢 **✅ by two sources with a precondition.** 量 2026-09-30 (`notes/config-store.md` § 10): ① the unstripped link's symbol table carries **0** entries named `system`, `popen`, `pclose`, `execl`, `execlp`, `execvp`, `execv` or `posix_spawn`; ② a byte scan of the **shipped** bytes for `/bin/sh`, `/bin/bash`, `/bin/ash`, `/bin/dash` reads **0**; and the carry between them is `.text` having the same offset, size and sha256 in both files — it **refuses** rather than assuming if they differ | 🟢 **five controls, each shown holding before the verdict**, and the one that matters is the false positive that shaped the gate: 量 the token `system` appears **4 times** in the shipped `cfgstore.stripped` and all four are uClibc prose (`Interrupted system call` and three more), while the symbol table of the same link holds **0**. A name scan would have refused a clean binary. The gate was also shown reporting `VIOLATION` on a stripped build of its positive control, and refusing when `--positive` points at a clean ELF |
+| **`system()` / `popen()` = 0** | 架構性 | ✅ | ⚠️ **a shape, and it is not exploitability.** 讀 `SPEC.md` `FW-20`: **28 / 55** ELFs import `system` or `popen` by a `PT_DYNAMIC` → `DT_SYMTAB` walk, **31 / 55** by whole-string scan, over 161 files. Which of those call sites a request can reach is a different question and this row does not answer it (`plan/` § 8.1's `CVE-2014-8361` precedent: code shape present, effect absent) | 🟢 **✅ 量 2026-09-30 on the shipping bytes** (`SPEC.md` `FW-177`): six programs — `init`, `cfgstore`, `brokerd`, `httpd`, `dnsfwd`, `ifupd` — **0 forbidden names from both sources**, rc 0, with the permitted ones counted separately (`execve` two, `fork` three). rlxfw's busybox carries `execle` for udhcpc's script exec and is exempted **by name** | 🟢 **the exemption's control fires**: the same ELF under the default name table reads **rc 1 FINDING**. `--self-test` 30 of 30 with 0 skipped, `tools/test-uspacescan.sh` 70 of 70, the planted `system()` caught either side of `strip`, a name that exists nowhere reads 0, and the two sources disagreeing is an error rather than a vote. 🔴 And the honest limit is in the row: `FW-20` measured that the **published** string method misses `system` itself — libc stores `__libc_system` and `system` lands at +7 — and missed 317 of 3,752 (file, import) pairs over 61 distinct names |
+| **Signed update** | 架構性 | ✅ | ❌ at class level: the vendor's update path validates an image with an unkeyed checksum rather than a signature. Published prior art for the same SDK family: **CVE-2023-34435 / TALOS-2023-1874**. Per-defect detail follows `upstream/docs/disclosure.md`, where that row is held, so nothing further is written here | 🟢 **✅ 量 on the silicon, four rounds in one seating with no flash-write verb issued** (`SPEC.md` `FW-170`, `docs/GATE-RESULTS.md` entry 16): round 1 `HDR ok` / `SIG ok` / `DIGEST ok` / `VER cur=1 ctr=0 ok` / `BOOT` and the payload booted; round 2, one flipped payload bit, `SIG ok` then **`DIGEST bad`** / `REFUSE digest` and no `BOOT` | 🟢 **round 2 flips a payload bit and not a signature bit, on purpose** (`FW-171`): the same capture therefore reads `SIG ok` first, which is what shows Ed25519 ran and passed. A flipped signature bit would have been indistinguishable from a wrong key, a wrong byte order, and a container that never arrived. ⚠️ Ed25519 and SHA-512 are **imported** (TweetNaCl, in `SOURCES.json`), labelled as imports and not called rlxfw's code |
+| **Anti-rollback** | 架構性 | ✅ | ❌ at class level: no version floor on the vendor's update path. Same held row, same restraint | ⚠️ **the comparison is 量, the monotonicity is not.** 量 `FW-170` round 3: the **same** container as round 1 plus a RAM bitmap at count 5 reads `CTRSRC ram` / `SIG ok` / `DIGEST ok` then **`VER cur=1 ctr=5 bad`** / `REFUSE rollback` and does not boot; round 4, the same container with the bitmap at 0, boots. **Nothing in `R8a` advanced the counter**, so what was read is the comparison and not the bitmap's monotonicity (`docs/GATE-RESULTS.md` entry 16 ③). Owner `R8b` | 🟢 **round 4 is the control and rounds 3 and 4 differ only in the bitmap's value**, so round 3's refusal cannot be attributed to a bitmap merely having been staged. ⚠️ Driven from the **RAM** source deliberately: on the device an undecoded window and an erased region both give `ctr=0`, and the flash source cannot tell them apart |
+| **Bounded kernel-register access from userspace** | 有界化 | ✅ | **⊘ Structural (`V-D`), and the vendor finding is committed.** 讀 ×2 `SPEC.md` `FW-67`: `/proc/rtl865x/memory` is an **unbounded 32-bit peek/poke** the vendor kernel ships — `simple_strtol` on the address then `WRITE_MEM32` with no bound check — and the vendor's own `/bin/dw` and `/bin/ew` are two-line shell scripts that drive it. ⚠️ `FW-67`'s value stays **推 and unmeasured** because reading `/proc` on the vendor needs a shell, and the one evidenced path into vendor userspace writes flash (`P10-10`) | ⚠️ **a bounded, load-only node — and its counters are an exercise count of zero, not a demonstration.** 量 2026-10-04 (`bench/2026-10-04/PER-VIEW`): `/proc/rtl819x-view` reports `admit 311` with `n_mib 0 n_tbl 0 n_peek 0 refused 0 busy 0`, so **nothing peeked through the allow-list on that boot** — the 0 in `refused` is an unexercised guard. 讀 `notes/switch-driver.md` § 12.2 and § 17.5: 311 admitted words in 1.1, and `rtl819x_view_ld()` is its only load with **no store accessor at all**, so the node reads and can never write | 🟢 **the guard is shown refusing AND permitting, which is what makes the zero mean anything.** `tools/viewcheck.py` `V10`: each admitted word loads once and **every other word is refused `-EACCES`**; `V11`: a request spanning out of a run is refused **whole**, the first refused word named and the cache unchanged; `V23`: `0xBB804D48` refused beside admitted neighbours, three spans out of the new runs refused whole, and the three IBCRs **permitted**, at `admit 311`. ⚠️ Host-side against a sparse MMIO model, not on the die — so what is 量 on the die is only that nothing exercised it |
+| **Vendor WLAN driver, as code in the same kernel** | 不適用 | ⚠️ | — the driver is the vendor's in both columns | 🔴 **containment is near zero, and the three facts that bound the claim are readings rather than the plan's wording.** The driver that **builds** is `rtl8192cd/`, **not** `rtl8192e/`: 量 `SPEC.md` `FW-51`, `built-in.o` **820,910 bytes**; 讀 `FW-103`, `rtl8192e/` carries the same two print lines and that directory does not enter the image. At `SWCORE=n` — the mainline since `R6b-8` 8g — it is the **same source and not the same object** (讀, `docs/KNOWN-ISSUES.md`): the forty symbols the flip removes recompile it against a `struct sk_buff` four fields shorter, and five of the ten names the seam defines are its references. `R9` builds `quiet-swcore`, where it and the NIC driver are the vendor's objects as built at `SWCORE=y` | 🟢 **two readings that would have shown containment if there were any, and both show none.** 讀 `# CONFIG_MODULES is not set`, so the driver is linked into a monolithic kernel with no module boundary and no LSM behind it. 讀 `NET-153`: at `SWCORE=n` its `.bss` array `obj_buf` is **432,432 bytes** and covers the loader's whole RX DMA footprint. And 量 `FW-51`: four of its sites touch `WDTCNR` and `CONFIG_RTL_WTDOG=n` does **not** remove them, because they are gated on the board symbol — `CONFIG_RTL_8196E` — and not on the watchdog symbol. ⚠️ What this does not establish: that any of those is reachable by an attacker. It establishes that nothing in rlxfw bounds them |
+
+**One row of § 3 is worse than the vendor's and it is kept at the top of the
+list rather than buried.** The vendor ships a read-only SquashFS root; rlxfw
+today runs from an initramfs on ramfs with four unbounded writable mounts,
+because mainline writes no flash through `R9`. A matrix that reported that row
+as ✅ on the strength of `plan/`'s intention would be a claim about documents.
+
+## 4. The 未定 cells, and what settles each
+
+Every 未定 cell above cites a `SPEC.md` § 17 row. **This file does not write
+them**: `SPEC.md` owns `SPEC.md`, and the session that lands this file lands the
+rows in the same commit. Until a row exists, the cell it serves stays 未定.
+
+🔴 **No new `FW-` number is minted, and that is a correction.** This file was
+drafted against `FW-191` as the next free id; by the time it landed, `FW-191`
+and `FW-192` had been taken by other work in the same segment. So each open
+value is a **殘留 on a row that already exists** — `CPU-49`, `TC-26`,
+`FW-177`, `FW-20`, `LDR-25` — which anchors it to a definition row that already
+carries the value, keeps one owner per piece of state, and cannot collide with
+a concurrent commit. **Four insertions**, not seven: one open value needed no
+row because it already has an owner, and one is ⊘ rather than open.
+
+| § 17 row | what is missing | what would settle it | owning gate |
+|---|---|---|---|
+| `CPU-49` 殘留 — **already in § 17, cite it, do not reopen a second owner** | **NX / per-page execute-inhibit on this die.** `CPU-49` 殘留 already owns it: NX is one of seven things deliberately left out of `R1a`'s population, named rather than missed, with every reason and every settling experiment in `docs/isa-payload.md` § 7 and `tools/isapay.py`'s `DEFERRED_GROUPS` as the executable face | The payload `docs/isa-payload.md` names — one instruction word written into a data page, the I-side flush around it, executed; it is the only deferred row that WRITES instructions, so it is `R1d`'s sequence on one page in a step whose card says so. ⚠️ 🔴 **And this file is that row's own reopening condition**: `CPU-49` 殘留 was ⊘'d on 2026-09-30 because no open gate depended on the seven, and reopening is written as *a gate needing an unmeasured property of one of the seven*. `R9-9`'s NX row is such a gate. Whether to reopen it is `SPEC.md`'s owner's call, not this file's | ⊘ 2026-09-30 (`R1y`); reopening condition met by this file, decision pending |
+| `TC-26` 殘留 🆕 | **Four mitigation symbols in this 2.6.30 tree that nobody has asked about**: mmap randomisation (ASLR), `CONFIG_SECCOMP`, `PR_SET_NO_NEW_PRIVS`, and any LSM. `plan/` § 8.2 records the first two as *cannot be fixed* with reasons, but 讀 2026-10-04 the whole repository returns **zero** hits for `aslr`, `randomize_va` and `arch_pick_mmap` — control: the looser `randomis` hits twice, both `dnsfwd`'s source-port randomisation — so those reasons are 推 and not 讀 | **One desk grep, no power**: ask `src-vendor/rtl819x-toolchain/linux-2.6.30` whether each of the four is a symbol in any `Kconfig`, with Linux 5.4.27 in `src-vendor/shibajee-linux-rtl8196e` as the **positive control** that has all four — the same instrument and the same control `notes/init.md` § 3 used to settle devtmpfs | `R9-9` |
+| `FW-177` 殘留 🆕 | **Three properties of rlxfw's own shipping artefacts that were never read**: ① whether `PT_GNU_RELRO` is present at all in the six statically linked target ELFs — 量 2026-09-30 they are static with no `PT_INTERP`, so RELRO's lazy-binding half is 不適用, but nobody looked for the segment, and 讀 the repository passes no `-z relro` and no `-z now` (control: the one flag `config/rlxfw-cflags` does declare, `-fno-if-conversion`, is found by the same grep shape); ② the setuid/setgid and execute-bit census over the **whole** image rather than over `/srv/www` alone, which is all `notes/httpd.md` § 4.1's `chrootcheck` walks; ③ which address `httpd` binds — `notes/httpd.md` writes only `bind(:80)`, where `dnsfwd`'s equivalent is explicit about *UDP :53 on the LAN address* | **Three desk reads, none needing power**: ① one `readelf -l` over the shipped six; ② a mode census over `config/rlxfw-initramfs.tsv`'s declared modes **and** over the built `<name>.manifest.tsv`, which `test-kbuild-cflags`' `I1`–`I10b` already refuse a build without; ③ one read of `bind` in `src/httpd/serve.c`. ⚠️ ③ bounds `docs/threat-model.md`'s `T3` and does not close it: a WAN-side host probe needs a seating that brings a WAN interface up | `R9-9` for ① and ②; ③'s device half is `P3`'s |
+| `FW-20` 殘留 🆕 | **Two things about vendor userspace that can only be read statically, because the `ps` route is structurally absent**: ① which uid `bin/boa` runs as and whether it is chrooted — `plan/REVIEW-2026-08-22.md` item 14 records root, and that is the plan's assertion rather than a reading; ② the vendor rootfs's setuid/setgid and execute-bit census. 🔴 ② may not be read off the extracted tree: 讀 `notes/rootfs-census.md`, a non-root `unsquashfs` says `created 0 devices` in its own log, so a mode census over the extraction returns a false zero | ① `tools/uspacescan.py --vendor-census` already walks that tree — ask `bin/boa`'s import list for `setuid`/`setgid`/`chroot`, and read the boot scripts for a uid change on that path; ② `unsquashfs -ll` against the **image**, not the extraction. ⚠️ Both are `V-B`, and `V-B` carries no executable refutation — the vendor firmware has no shell (`docs/GATE-RESULTS.md`, `P2`'s ⊘ Structural) — so a result may say only that the surface is absent, or publish 未定; it may not claim a defect does not exist | `R9-4` |
+| `LDR-25` 殘留 🆕 | 🔴 **Whether the loader's TFTP server answers a network peer with no console access at all — and this is two committed rows contradicting each other, not merely a gap.** `LDR-25` 讀 says it is a server at a compiled-in `192.168.1.6` and *responds without `IPCONFIG`*; `NET-95` 量 says the loader does **not** answer ARP before `IPCONFIG`. The two have never been aligned by one experiment, and `docs/threat-model.md`'s `T6` reach turns on it: if `LDR-25` is right it is a remote position, and if `NET-95` bounds it, it needs the console and collapses into `T5` | **One seating, no extra power cycle**: cold power-on, ESC into the prompt, then an ARP probe and a TFTP request from the host **before** any `IPCONFIG` is typed, with the same probes after `IPCONFIG` in the same bracket as the **positive control** (`NET-95`'s own shape). ⚠️ `NET-165` applies — the board is never left at the prompt unattended — and the round issues no flash verb | `R9-6` if its bracket has room, otherwise the next seating that reaches the loader prompt |
+
+## 5. What this matrix does not establish
+
+* **Not that rlxfw is secure.** It is a per-mechanism inventory, and the count
+  re-derived from the rlxfw column of both tables rather than estimated:
+  **seventeen** of the twenty-two rows are ❌, ⚠️ or 未定 on rlxfw's side,
+  **four** are ✅ (privilege separation, no shell in the chroot,
+  `system()`/`popen()` = 0, signed update), and **one** — no setuid binary — is
+  ✅ for part of its population and 未定 for the rest. 17 + 4 + 1 = 22. A ✅ is
+  about a mechanism being present, never about an attack being impossible.
+* **Not that the ✅ rows hold under attack.** Each names a reading taken on a
+  cooperative system: a boot's `ps`, a `/proc/<pid>/status`, a symbol table, a
+  console line. None is a result of anyone trying to defeat the mechanism. The
+  one exception is narrow and stated as such: the privilege drop was verified by
+  reversing it, which is one adversarial step and not an adversary.
+* **Not a comparison with the vendor, for most rows.** Counted from the vendor
+  column: **seven** cells are 未定 (NX, ASLR, seccomp, `no_new_privs`, LSM,
+  privilege separation, no setuid binary), **two** are **⊘ Structural** (secure
+  random source, bounded kernel-register access), and one is a dash because the
+  driver is the vendor's in both columns — so **ten of twenty-two** vendor cells
+  carry no usable comparison. A row whose vendor cell is 未定 is **not** a
+  differential claim, and
+  `R9`'s re-specified pass clause says so: a probe passing on rlxfw whose vendor
+  cell is undetermined publishes undetermined.
+* **Not that the ❌ rows in § 2 are impossible.** Four of them — NX, ASLR,
+  seccomp, `no_new_privs` — are **推 or 未定**, not ❌ with a reading, and § 4
+  says what would settle each. `plan/` presented all four as established; they
+  are not, in this repository, today.
+* **Not that the row set is complete.** It is `plan/` § 8.4's and
+  `REVIEW-2026-08-22.md` item 14's twenty, plus two, written in 2026-08.
+  Mechanisms neither
+  document named — a W^X allocator policy, control-flow integrity, a heap
+  hardening allocator, `MAP_FIXED` discipline — have no row and were not
+  considered here.
+* **Not anything about the vendor's reachable attack surface.** The `system`
+  import census is a count of linked call sites, and `plan/` § 8.1's own
+  `CVE-2014-8361` entry is the precedent for why that is not exploitability:
+  the code shape was present and the effect was not.
+* **Not anything written from `plan/`.** Where a `plan/` cell and a reading
+  disagree, the reading is what appears above and the disagreement is named in
+  the row — NX, ASLR, seccomp, `no_new_privs`, CI `checksec`, the read-only
+  rootfs row, and the WLAN driver's directory.

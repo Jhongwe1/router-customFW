@@ -191,7 +191,7 @@ IDENTITY_TOL = 1e-6
 WALLCLOCK_QUANTUM = 1.0
 # Recorders whose `.meta.json` sits beside the captures and is not one.  NAMES,
 # not a pattern: a `tool` missing from this tuple is read as a capture.
-NON_CAPTURE_TOOLS = ('hostprobe', 'hostclock')
+NON_CAPTURE_TOOLS = ('hostprobe', 'hostclock', 'diffprobe')
 # The exact `clock` string console-capture 1.5 declares.  Compared with ==,
 # never `in`: CLOCK_MONOTONIC is a prefix of it.
 RAW_CLOCK = 'CLOCK_MONOTONIC_RAW'
