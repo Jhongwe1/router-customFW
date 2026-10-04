@@ -1,0 +1,97 @@
+Declare `CONFIG_MTD_RTL819X_WRITE` to kconfig, `default n`.
+
+`R8b` item 4's decision W1, 2026-10-04, 122nd segment.  This is the ONLY
+vendor-tree change the flash write path needs, and it changes no vendor
+behaviour at all: it adds one `bool` with `default n` and nothing in the drop
+reads the symbol except `drivers/mtd/devices/Makefile`'s row, which
+`config/rlxfw-marks.tsv` `MK5` owns.
+
+WHAT WAS TRUE BEFORE, AND IS BEING GIVEN UP ON PURPOSE.  `R5-5` (2026-09-07)
+put the write path in a separate translation unit behind
+`obj-$(CONFIG_MTD_RTL819X_WRITE)` and declared that symbol to kconfig
+**nowhere**.  An undeclared `CONFIG_` expands to empty in GNU Make, so no
+menu, no defconfig and no `oldconfig` could build the file -- a refusal
+stronger than `=n`, and `D4` proved it by symbol absence in `System.map` with
+`rlxfw-marks.py`'s `absent:` witness.  That refusal is weakened here, and the
+reason is that the ONLY remaining route to the file was
+`make CONFIG_MTD_RTL819X_WRITE=y` on the command line in a discarded tree.
+An override like that leaves **no trace in `.config`**, so
+`tools/kconfig-delta.py check` -- which reads the `.config` the compiler
+actually saw, and is the instrument this project built precisely because the
+copied-in file and the built file differ on 21 symbols -- could not see it.
+`R8b` has to build an image that can write flash.  A reviewed line in
+`config/rlxfw-kernel.delta`, checked by a tool, is a better switch than an
+unrecorded make argument.
+
+WHAT REPLACES IT, so the refusal is not merely removed:
+
+  * the delta row's value is `n`, so the TU is in no committed image;
+  * `MK5`'s `absent:rtl819x_spi_write_page` witness still reads the artefact
+    and still goes red if the object appears;
+  * `kconfig-delta check` now has an opinion about this symbol at all, which
+    it did not before;
+  * and in an image where the symbol IS `y`, the write path refuses every
+    operation until armed by a typed verb, and refuses the loader and `H601`
+    windows whatever the arming state (`rtl819x-spi-wrpolicy.h`).
+
+量 2026-10-04, at the desk, on the tree that builds
+(`src-vendor/rtl819x-toolchain/linux-2.6.30`):
+
+  * `drivers/mtd/devices/Kconfig` is 301 lines, 11,525 bytes, sha256
+    `0c0688ed1ba1cfc2e1cb29f25021a8195bd664dd5991b32b6ae1bb6880d32333`, and it
+    is **byte-identical** in all three Realtek drops that carry it
+    (`rtl819x-toolchain`, `saturn49-wecb`, `wecb-vz-gpl`); `shibajee`'s copy
+    differs.  So this is one source in three copies, the same shape
+    `config/rlxfw-kernel.delta` records for `mtdchar.c`.
+  * It is `source`d from `drivers/mtd/Kconfig:321`, inside
+    `menu "Self-contained MTD device drivers"` whose `depends on MTD!=n` at
+    `:4` covers every symbol in the file.  So this stanza carries **no**
+    `depends on` of its own: adding `depends on MTD` would be a second owner
+    of a dependency the menu already states.
+  * `MTD_RTL819X_WRITE` occurs nowhere else in the drop except the Makefile
+    row and comments in `rtl819x-spi.c` / `rtl819x-spi-write.c` -- so nothing
+    becomes newly reachable, which is `notes/kernel-build.md` § 6.6's trap.
+
+PREDICTION, written before any build: a `bool` with a prompt that the baseline
+`.config` does not mention makes `oldconfig` ask `(NEW)` **once**.  The row in
+`config/rlxfw-kernel.delta` pins it, exactly as `CONFIG_PRINTK_TIME` is
+pinned, so `(NEW)` reads **0** and no answer -- empty, `n`, `y` or EOF --
+changes the result.  REFUTED BY any `(NEW)` line in the `oldconfig` log naming
+this symbol, or `kconfig-delta check` reporting it undeclared or drifted.
+
+WHAT THIS PATCH DOES NOT ESTABLISH.  That the write path works.  Not one line
+of it has run anywhere: the TU is in no committed image, has never been on
+this die, and the only thing exercised at the desk is its refusals, on the
+host, through `tools/test-spi-wrpolicy.sh`.
+
+--- a/drivers/mtd/devices/Kconfig
++++ b/drivers/mtd/devices/Kconfig
+@@ -297,5 +297,28 @@
+ 	  LinuxBIOS or if you need to recover a DiskOnChip Millennium on which
+ 	  you have managed to wipe the first block.
+ 
++config MTD_RTL819X_WRITE
++	bool "rlxfw: build rtl819x-spi's flash WRITE path"
++	default n
++	help
++	  rlxfw's own SPI NOR driver, rtl819x-spi, is read-only: its
++	  mtd->write and mtd->erase refuse with -EOPNOTSUPP and mtd->flags is
++	  MTD_CAP_ROM.  Saying y here compiles rtl819x-spi-write.c -- the
++	  page-program and sector-erase path -- and routes those two pointers
++	  to it.
++
++	  The compiled path still refuses EVERY operation until it is armed
++	  through /proc/rtl819x-spi, and refuses 0x000000-0x007FFF (this
++	  board's bootloader and its per-unit MAC and radio calibration)
++	  whatever the arming state.
++
++	  Saying y puts a working flash-write path into the image.  On a board
++	  whose bootloader cannot be recovered if it is erased, that is not a
++	  default anybody should inherit.  Say n unless you are deliberately
++	  building an image to reflash this device with, and see
++	  config/rlxfw-kernel.delta for the one line that decides it.
++
++	  If unsure, say N.
++
+ endmenu
+ 

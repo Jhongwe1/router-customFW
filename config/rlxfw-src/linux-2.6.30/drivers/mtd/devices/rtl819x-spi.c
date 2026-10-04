@@ -158,6 +158,34 @@
  *      so mtdchar's mtd_open refuses an open for writing with -EACCES
  *      before L2 is ever consulted.
  *
+ * 🔄 R8b ITEM 4, 2026-10-04 (122nd segment).  ALL THREE LAYERS WERE RE-DECIDED
+ * AND THE SHAPE CHANGED, SO THE PARAGRAPHS ABOVE DESCRIBE THE MAINLINE AND NOT
+ * THE WHOLE RULE.  The four decisions are W1-W4 in rtl819x-spi-write.c's
+ * header; what they do to the three layers here:
+ *
+ *  L1  CONFIG_MTD_RTL819X_WRITE is now DECLARED to kconfig -- `bool`,
+ *      `default n`, config/host-compat/0010 -- so "no menu, no defconfig and
+ *      no oldconfig can turn it on" is NO LONGER TRUE and must not be quoted.
+ *      What replaces it is weaker and reviewable: the symbol is `n` in
+ *      config/rlxfw-kernel.delta, so the TU is in no committed image, and
+ *      kconfig-delta check is the instrument that says so about the .config
+ *      the compiler actually saw.  MK5's `absent:` witness still covers the
+ *      artefact.  A make-command-line override is no longer the only route,
+ *      and that is the point: an override leaves no trace in .config.
+ *  L2  The stubs still refuse in a mainline image, with -EOPNOTSUPP and the
+ *      same counter, and MT-FLASH-2 is untouched.  They now also take
+ *      rtl819x_spi_lock and ROUTE to the write TU when it is linked, where an
+ *      unarmed request refuses with -EACCES.  So no card may carry the errno
+ *      as a typed constant: `unarmed_rc` is printed below for that.
+ *  L3  UNCHANGED, and that is W4's decision rather than an omission.  See the
+ *      mtd_info below.
+ *
+ * ⚠️ AND THE HONEST SENTENCE ABOUT ALL OF IT: not one line of the write path
+ * has run anywhere.  It is not in any committed image and has never been on
+ * this die.  What was exercised at the desk is the POLICY's refusals, on the
+ * host, through tools/test-spi-wrpolicy.sh -- which says nothing about the
+ * silicon.
+ *
  * 🔴 L2 WAS ORIGINALLY "leave the pointers NULL, the core returns
  * -EOPNOTSUPP".  That is FALSE on this kernel, and checking it rather than
  * asserting it is the only reason this file does not ship a latent oops.
@@ -354,6 +382,14 @@
 #define RTL819X_SPI_SIZE	0x00400000u	/* FLS-14 */
 #define RTL819X_SPI_ERASESIZE	0x00001000u	/* sector, from the loader's
 						 * fallback descriptor */
+/* 🔴 THAT NUMBER IS 未定 AS A FACT ABOUT THIS PART, and this is the only place
+ * in this file that says so.  SPEC.md `FW-187` 殘留 / `FW-191` 殘留: it is what
+ * /proc/mtd reports (量 2026-10-04) and what the vendor's UNKNOWN fallback
+ * assumes, which are two readings of SOFTWARE and no reading of the chip.  The
+ * write path's own granularity is RLXFW_SPI_WR_ERASE_GRAIN in
+ * rtl819x-spi-wrpolicy.h -- ONE line, which is where item 1's settled value is
+ * substituted -- and rlxfw_spi_wr_chk_erase() refuses EVERY erase while the
+ * two disagree, so changing one and forgetting the other is loud. */
 
 /* H601 -- this unit's MAC and radio calibration.  CLAUDE.md's second Never
  * row.  Exactly two 4 KiB chunks, which is why the skip below has no
@@ -528,6 +564,37 @@ static unsigned long rtl819x_spi_n_writes;
 /* L2 firing.  Separate from n_writes because a REFUSED write is evidence the
  * layer works, and a write is evidence it did not. */
 static unsigned long rtl819x_spi_n_write_refused;
+
+/* R8b item 4.  ATTEMPTS, which n_write_refused is not: once the write TU can
+ * say yes, "how many times was mtd->write called" and "how many of those were
+ * refused" stop being the same question, and a single counter answering both
+ * would be a counter that cannot show a permitted write. */
+static unsigned long rtl819x_spi_n_mtd_write_calls;
+static unsigned long rtl819x_spi_n_mtd_erase_calls;
+
+#ifdef CONFIG_MTD_RTL819X_WRITE
+/* The write TU.  Declared here rather than in a shared header: there are
+ * exactly two callers, both below, and both are compiled under this same
+ * CONFIG_ as the definitions are. */
+extern int rtl819x_spi_write_page(struct mtd_info *mtd, loff_t to, size_t len,
+				  size_t *retlen, const u_char *buf);
+extern int rtl819x_spi_erase_sector(struct mtd_info *mtd,
+				    struct erase_info *instr);
+extern int rtl819x_spi_wr_do_arm(u32 lo, u32 hi, u32 budget);
+extern void rtl819x_spi_wr_do_disarm(void);
+extern int rtl819x_spi_wr_proc(char *p);
+extern int rtl819x_spi_wr_proc_max(void);
+
+/* What an UNARMED write answers in this build.  -EACCES, from the write TU's
+ * errno table.  It is printed as `unarmed_rc` so a card compares against the
+ * image's own number instead of a typed one -- the same rule as identifying a
+ * booted image by RLXFW-ID0 rather than by a typed digest. */
+#define RTL819X_SPI_UNARMED_RC	(-EACCES)
+#else
+/* No write TU: the stubs below are the whole answer and it is the one every
+ * committed image has given since 2026-09-07. */
+#define RTL819X_SPI_UNARMED_RC	(-EOPNOTSUPP)
+#endif
 
 /* `rdid` results.  n_rdid is SEPARATE from n_pio_bytes deliberately: that
  * counter means *bytes of the flash ARRAY read*, and RDID reads none -- it
@@ -803,6 +870,214 @@ static void rtl819x_spi_read_mmio(u32 addr, u32 len, u8 *buf)
 	}
 	rtl819x_spi_n_mmio_bytes += len;
 }
+
+#ifdef CONFIG_MTD_RTL819X_WRITE
+/* ------------------------------------------------------------------------
+ * W3.  The two register-level write primitives.
+ *
+ * THEY LIVE HERE AND NOT IN THE WRITE TU, and the reason is the claim/release
+ * pair above: it is the only thing in this project that saves SFCR/SFCR2/
+ * SFCSR, restores them, reads them back and latches `wedged` when the restore
+ * did not take -- and does NOT restore SFDR, because writing SFDR issues a
+ * command.  A second copy of that guard in another file would be a second
+ * owner of the one invariant that makes this driver survivable beside the
+ * vendor's.  So the policy is over there and the registers are here.
+ *
+ * THE ORDER IS THE VENDOR'S, 讀 from spi_common.c in the tree that builds, and
+ * docs/blind-write-ledger.md § 9.14 records every path.  What is NOT the
+ * vendor's: both spins below are BOUNDED.  spiFlashReady() (:728-742) is
+ * `while (1)` on the WIP bit with no ceiling and no counter, so a part that
+ * never clears WIP reboots this router through the watchdog; here it returns
+ * -ETIMEDOUT and counts.
+ *
+ * ⚠️ A VENDOR ODDITY THAT IS NOT COPIED.  SeqCmd_Order (:786-792) calls
+ * `SFCSR_CS_L(ucChip, ucIOWidth, IOWIDTH_SINGLE)` -- the io-width in the
+ * LENGTH argument and the length in the io-width argument, i.e. the two are
+ * swapped.  It is inert only because DATA_LENTH1 and IOWIDTH_SINGLE are both
+ * 0x00.  rtl819x_spi_cmd1() below passes a length of 0 on purpose rather than
+ * reproducing the swap, so a future reader is not left deciding whether the
+ * swap mattered.
+ * ------------------------------------------------------------------------ */
+
+#define RTL819X_SPI_CMD_WREN	0x06u	/* spi_common.c:129 */
+#define RTL819X_SPI_CMD_PP	0x02u	/* spi_common.c, SPICMD_PP */
+#define RTL819X_SPI_CMD_SE	0x20u	/* spi_common.c:138 */
+#define RTL819X_SPI_CMD_RDSR	0x05u	/* spi_common.c:132 */
+#define RTL819X_SPI_SR_WIP	0x01u	/* bit SPI_STATUS_WIP, :165 */
+
+/* The WIP ceiling.  Each spin is a full RDSR transaction, so this is NOT
+ * comparable with RTL819X_SPI_RDY_SPINS, which counts register reads.  推, and
+ * labelled as a guess: a 4 KiB sector erase on this part family is tens of
+ * milliseconds and a page program hundreds of microseconds, but this part's
+ * datasheet is not on hand (`FW-191`: the draft here is the SoC's).  At the
+ * ~2 us FW-34 Group F measured for an uncached access, 200,000 RDSR round
+ * trips is far past either.  It is a ceiling and not a delay, and
+ * n_wip_timeout is what says it was reached. */
+#define RTL819X_SPI_WIP_SPINS	200000u
+
+static unsigned long rtl819x_spi_n_wip_timeout;
+
+/* One opcode byte, CS down and up around it.  The vendor's SeqCmd_Order. */
+static int rtl819x_spi_cmd1(u32 cmd)
+{
+	int rc = rtl819x_spi_cs_low(0);
+
+	if (rc)
+		return rc;
+	rtl819x_spi_wr(RTL819X_SFDR, cmd << 24);
+	rtl819x_spi_cs_high();
+	return 0;
+}
+
+/* Poll RDSR bit 0 until WIP clears.  The vendor's spiFlashReady(), bounded.
+ * The shift is SeqCmd_Read's: with a 1-byte read phase the answer is in the
+ * TOP byte of SFDR (`ui >> ((4 - ucRDLen) * 8)`). */
+static int rtl819x_spi_wait_wip(void)
+{
+	unsigned int i;
+
+	for (i = 0; i < RTL819X_SPI_WIP_SPINS; i++) {
+		u32 v;
+		int rc = rtl819x_spi_cs_low(0);
+
+		if (rc)
+			return rc;
+		rtl819x_spi_wr(RTL819X_SFDR,
+			       (u32)RTL819X_SPI_CMD_RDSR << 24);
+		rc = rtl819x_spi_cs_low(0);
+		if (rc) {
+			rtl819x_spi_cs_high();
+			return rc;
+		}
+		v = rtl819x_spi_rd(RTL819X_SFDR) >> 24;
+		rtl819x_spi_cs_high();
+		if (!(v & RTL819X_SPI_SR_WIP))
+			return 0;
+		/* Preemptible: an erase is milliseconds and the TC0 interrupt that
+		 * pets the watchdog has to run.  Same reason the lock above is a
+		 * mutex and not a spinlock. */
+		cond_resched();
+	}
+	rtl819x_spi_n_wip_timeout++;
+	return -ETIMEDOUT;
+}
+
+/* n_writes, incremented from one place so the counter CLAUDE.md § Flash quotes
+ * has one owner.  🔴 IT IS BLIND TO A VENDOR-SIDE WRITE: spi_probe.c:101-103
+ * installs mtd_spi_write / mtd_spi_erase on the vendor's partitions
+ * unconditionally and nothing here counts those.  The breakdown into programs
+ * and erases is the write TU's wr_n_prog / wr_n_erase. */
+void rtl819x_spi_note_write(void)
+{
+	rtl819x_spi_n_writes++;
+}
+
+/*
+ * Page Program.  The vendor's ComSrlCmd_ComWrite with SPICMD_PP, ISFAST_NO,
+ * IOWIDTH_SINGLE, DUMMYCOUNT_0 (PageWrite_111002, :1070-1074), inside this
+ * driver's claim/release bracket.  The caller has already checked that
+ * [addr, addr+len) is inside one page and outside the forbidden window.
+ *
+ * The bytes are assembled into the word EXPLICITLY, big end first, instead of
+ * memcpy'ing a u32 the way the vendor does (:974-976) -- that is correct only
+ * because this core is big-endian, and a driver whose correctness depends on
+ * the host's endianness is a driver that breaks silently when it moves.
+ */
+int rtl819x_spi_pp_page(u32 addr, u32 len, const u8 *buf)
+{
+	struct rtl819x_spi_state s;
+	int rc, rc2;
+	u32 i, k, tail, v;
+
+	rc = rtl819x_spi_claim(&s);
+	if (rc)
+		return rc;
+	rtl819x_spi_n_xfer++;
+
+	rc = rtl819x_spi_cmd1(RTL819X_SPI_CMD_WREN);
+	if (rc)
+		goto out;
+
+	/* command, then three address bytes, no dummy, then a 4-byte phase */
+	rc = rtl819x_spi_cs_low(0);
+	if (rc)
+		goto out;
+	rtl819x_spi_wr(RTL819X_SFDR, (u32)RTL819X_SPI_CMD_PP << 24);
+	rc = rtl819x_spi_cs_low(0);
+	if (rc)
+		goto out;
+	rtl819x_spi_wr(RTL819X_SFDR, addr << 8);
+	rtl819x_spi_wr(RTL819X_SFDR, addr << 16);
+	rtl819x_spi_wr(RTL819X_SFDR, addr << 24);
+	rc = rtl819x_spi_cs_low(3);
+	if (rc)
+		goto out;
+
+	for (i = 0; i + 4u <= len; i += 4u) {
+		v = ((u32)buf[i] << 24) | ((u32)buf[i + 1] << 16) |
+		    ((u32)buf[i + 2] << 8) | (u32)buf[i + 3];
+		rtl819x_spi_wr(RTL819X_SFDR, v);
+	}
+	tail = len - i;
+	if (tail) {
+		/* A short final phase, LEN = tail-1, the bytes in the TOP of the
+		 * word -- which is what the vendor's memcpy of `tail` bytes into a
+		 * u32 produces on this core, written out instead of inherited. */
+		v = 0u;
+		for (k = 0u; k < tail; k++)
+			v |= (u32)buf[i + k] << (24 - 8u * k);
+		rc = rtl819x_spi_cs_low(tail - 1u);
+		if (rc)
+			goto out;
+		rtl819x_spi_wr(RTL819X_SFDR, v);
+	}
+	rtl819x_spi_cs_high();
+	rc = rtl819x_spi_wait_wip();
+out:
+	rc2 = rtl819x_spi_release(&s);
+	return rc ? rc : rc2;
+}
+
+/*
+ * Sector/block erase.  The vendor's ComSrlCmd_SE (:819-825) -> SeqCmd_Order
+ * WREN, SeqCmd_Write(SPICMD_SE, addr, 3), spiFlashReady.  SeqCmd_Write's
+ * shift is `uiValue << ((4 - ucValueLen) * 8)` = addr << 8 for a 3-byte
+ * value, and its phase length is ucValueLen-1 = 2.
+ *
+ * WHICH granularity this clears is 未定 -- see RLXFW_SPI_WR_ERASE_GRAIN -- and
+ * the opcode is SE 0x20, which is what the vendor's UNKNOWN fallback selects
+ * for this unrecognised part.  This function erases ONE block and the caller
+ * loops, so a wrong grain shows up as a refused request rather than as eight
+ * blocks cleared where one was asked for.
+ */
+int rtl819x_spi_se_block(u32 addr)
+{
+	struct rtl819x_spi_state s;
+	int rc, rc2;
+
+	rc = rtl819x_spi_claim(&s);
+	if (rc)
+		return rc;
+	rtl819x_spi_n_xfer++;
+
+	rc = rtl819x_spi_cmd1(RTL819X_SPI_CMD_WREN);
+	if (rc)
+		goto out;
+	rc = rtl819x_spi_cs_low(0);
+	if (rc)
+		goto out;
+	rtl819x_spi_wr(RTL819X_SFDR, (u32)RTL819X_SPI_CMD_SE << 24);
+	rc = rtl819x_spi_cs_low(2);
+	if (rc)
+		goto out;
+	rtl819x_spi_wr(RTL819X_SFDR, addr << 8);
+	rtl819x_spi_cs_high();
+	rc = rtl819x_spi_wait_wip();
+out:
+	rc2 = rtl819x_spi_release(&s);
+	return rc ? rc : rc2;
+}
+#endif	/* CONFIG_MTD_RTL819X_WRITE */
 
 /* ------------------------------------------------------------------------
  * sha256, and the known-answer test that makes it an instrument.
@@ -1236,27 +1511,67 @@ static int rtl819x_spi_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
 
 /*
  * Layer L2.  These exist BECAUSE leaving the pointers NULL is not a refusal
- * on this kernel -- mtdchar.c:457 calls mtd->erase with no NULL check.  They
- * hold no write code and reference nothing in the write TU; they are the
- * errno that a NULL would have been if the MTD core had checked.
+ * on this kernel -- mtdchar.c:457 calls mtd->erase with no NULL check.  In a
+ * mainline image they hold no write code and reference nothing in the write
+ * TU; they are the errno that a NULL would have been if the MTD core had
+ * checked.
+ *
+ * 🔄 R8b item 4.  TWO THINGS CHANGED AND BOTH ARE VISIBLE FROM OUTSIDE.
+ *
+ *  1. THEY TAKE THE LOCK.  In a CONFIG_MTD_RTL819X_WRITE image they issue a
+ *     transaction, so they have to.  🔴 AND THAT IS WHY `trywrite` BELOW NO
+ *     LONGER HOLDS IT: rtl819x_spi_lock is not recursive, so the old shape --
+ *     verb takes the lock, then calls through the pointers -- would have
+ *     DEADLOCKED on the first boot of the first write image, inside the one
+ *     verb whose job is to show the refusal works.  量 is impossible here (no
+ *     committed image links the TU), so this is a defect only reading finds,
+ *     and it is recorded rather than quietly fixed.
+ *  2. THE ATTEMPT AND THE REFUSAL ARE COUNTED SEPARATELY.  n_write_refused
+ *     still moves by exactly one per refused call, so config/mfgtest.sh's
+ *     MT-FLASH-2 (+2 across a trywrite) reads the same in BOTH builds: in a
+ *     mainline image both pointers refuse, and in a write image offset 0 is
+ *     inside the forbidden window so both refuse there too.  What changes is
+ *     the errno, which is why it is printed rather than typed into a card.
  */
 static int rtl819x_spi_mtd_write(struct mtd_info *mtd, loff_t to, size_t len,
 				 size_t *retlen, const u_char *buf)
 {
+	int rc;
+
+	mutex_lock(&rtl819x_spi_lock);
+	rtl819x_spi_n_mtd_write_calls++;
+#ifdef CONFIG_MTD_RTL819X_WRITE
+	rc = rtl819x_spi_write_page(mtd, to, len, retlen, buf);
+#else
 	(void)mtd; (void)to; (void)buf;
 	*retlen = 0;
-	rtl819x_spi_n_write_refused++;
-	return -EOPNOTSUPP;
+	rc = -EOPNOTSUPP;
+#endif
+	if (rc)
+		rtl819x_spi_n_write_refused++;
+	mutex_unlock(&rtl819x_spi_lock);
+	return rc;
 }
 
 static int rtl819x_spi_mtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 {
+	int rc;
+
+	mutex_lock(&rtl819x_spi_lock);
+	rtl819x_spi_n_mtd_erase_calls++;
+#ifdef CONFIG_MTD_RTL819X_WRITE
+	rc = rtl819x_spi_erase_sector(mtd, instr);
+#else
 	(void)mtd;
-	rtl819x_spi_n_write_refused++;
 	/* No callback is invoked: mtdchar only waits on one when erase()
 	 * returned 0, so refusing here does not leave a sleeper. */
 	instr->state = MTD_ERASE_FAILED;
-	return -EOPNOTSUPP;
+	rc = -EOPNOTSUPP;
+#endif
+	if (rc)
+		rtl819x_spi_n_write_refused++;
+	mutex_unlock(&rtl819x_spi_lock);
+	return rc;
 }
 
 static struct mtd_info rtl819x_spi_mtd = {
@@ -1264,7 +1579,34 @@ static struct mtd_info rtl819x_spi_mtd = {
 	/* MTD_CAP_ROM is 0: MTD_WRITEABLE is NOT set, which is layer L3.
 	 * mtdchar's mtd_open refuses an open for writing with -EACCES at :94,
 	 * separately from the odd-minor rule at :73, and mtdblock.c:421 reads
-	 * the same flag to mark the block device read-only. */
+	 * the same flag to mark the block device read-only.
+	 *
+	 * 🔄 R8b item 4's W4 RE-DECIDED THIS AND KEPT IT, WHICH IS A DECISION
+	 * AND NOT AN OMISSION.  量 from the tree that builds: MTD_CAP_ROM is 0
+	 * and MTD_WRITEABLE is 0x400 (include/mtd/mtd-abi.h:35, :29), and the
+	 * vendor's own spi_chip_setup sets MTD_CAP_NORFLASH =
+	 * MTD_WRITEABLE|MTD_BIT_WRITEABLE on ITS partitions (spi_probe.c:94).
+	 * What MTD_CAP_NORFLASH here would buy is NOTHING REACHABLE:
+	 * tools/mkinitramfs.py refuses to declare an even char minor over this
+	 * device, so mtdchar's :73 odd-minor rule refuses the open whatever
+	 * this flag says, and there is no `dd` and no mtd_debug in this image
+	 * (config/image-commands.tsv).  What it would cost is the one static
+	 * layer that cannot be armed away.  So the write path is reachable ONLY
+	 * through this file's own verbs, and mtdchar and mtdblock stay outside
+	 * the trust boundary entirely.
+	 *
+	 * ⚠️ THE OTHER ALTERNATIVE REJECTED: flipping the flag at run time
+	 * inside the arm verb.  mtd_open reads it ONCE, at open(), and
+	 * mtdblock.c:421 caches it into dev->readonly at add time -- so a
+	 * descriptor opened while armed would stay writable after the disarm,
+	 * and whether the refusal held would depend on WHEN the open happened.
+	 * A guard whose answer depends on timing is not a guard.
+	 *
+	 * 🔴 L3 STILL HAS NEVER BEEN OBSERVED FIRING, here or anywhere in this
+	 * project, and W4 does not change that: observing :94 needs an even
+	 * char minor over THIS device, which mkinitramfs refuses -- correctly,
+	 * since it can check the odd-minor rule from a declaration and cannot
+	 * check mtd->flags.  So L3 is 讀 and stays 讀. */
 	.flags		= MTD_CAP_ROM,
 	.size		= RTL819X_SPI_SIZE,
 	.erasesize	= RTL819X_SPI_ERASESIZE,
@@ -1498,9 +1840,46 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 			       rtl819x_spi_h601_mac_not_ff);
 		len += sprintf(page + len, "mac_group_bit %d\n",
 			       rtl819x_spi_h601_mac_group_bit);
+
+		/* R8b item 4.  FOUR LINES THAT EVERY IMAGE PRINTS, so a card can
+		 * tell a mainline image from a write image and can read this
+		 * image's own refusal errno instead of carrying one.  `wr_linked`
+		 * is the discriminator; `unarmed_rc` is what MT-FLASH-2 and any
+		 * trywrite gate compare against.  They are inside the budget's
+		 * guarded block, so RESERVE covers them: four lines at under 32
+		 * bytes is 128 against 512 - 380 = 132 of slack, which is 量 by
+		 * proc_bytes_before_this_line and not by this arithmetic. */
+#ifdef CONFIG_MTD_RTL819X_WRITE
+		len += sprintf(page + len, "wr_linked 1\n");
+#else
+		len += sprintf(page + len, "wr_linked 0\n");
+#endif
+		len += sprintf(page + len, "unarmed_rc %d\n",
+			       RTL819X_SPI_UNARMED_RC);
+		len += sprintf(page + len, "n_mtd_write_calls %lu\n",
+			       rtl819x_spi_n_mtd_write_calls);
+		len += sprintf(page + len, "n_mtd_erase_calls %lu\n",
+			       rtl819x_spi_n_mtd_erase_calls);
 	} else {
 		len += sprintf(page + len, "proc_truncated 1\n");
 	}
+#ifdef CONFIG_MTD_RTL819X_WRITE
+	/* The write TU's own fields, behind a SECOND budget check with the TU's
+	 * own declared maximum.  A separate `if` and not folded into the one
+	 * above on purpose: that block is 量 to fit and this one is in no image
+	 * yet, so a reader can see which of the two ran out of room.
+	 * wr_truncated is printed either way, for the reason the map's own guard
+	 * gives -- a short answer must never be ambiguous between "no room" and
+	 * "nothing to say". */
+	if (len + rtl819x_spi_wr_proc_max() <= RTL819X_SPI_PROC_BUDGET) {
+		len += rtl819x_spi_wr_proc(page + len);
+		len += sprintf(page + len, "wr_truncated 0\n");
+	} else {
+		len += sprintf(page + len, "wr_truncated 1\n");
+	}
+	len += sprintf(page + len, "n_wip_timeout %lu\n",
+		       rtl819x_spi_n_wip_timeout);
+#endif
 	/* Self-measuring, so the headroom is a reading a card can assert on
 	 * rather than an arithmetic nobody re-runs.  It reports the length
 	 * BEFORE its own line, which is why it is last and why it says so. */
@@ -1986,7 +2365,15 @@ static int rtl819x_spi_verb_trywrite(void)
 	u8 b = 0;
 	int rcw, rce, ok;
 
-	mutex_lock(&rtl819x_spi_lock);
+	/* 🔴 NO mutex AROUND THIS SINCE R8b ITEM 4, and that is why the
+	 * restructuring was not cosmetic.  mtd->write and mtd->erase now take
+	 * rtl819x_spi_lock themselves -- they must, because in a write image
+	 * they issue a transaction -- and this mutex is not recursive, so the
+	 * old shape would have deadlocked here on the first boot of the first
+	 * write image.  Nothing else can issue a verb concurrently: there is ONE
+	 * writable /proc entry and the shell that writes it is serial, so
+	 * reading the counters outside the lock is not a race on this board.
+	 * Said rather than left implicit, because it IS an assumption. */
 	r0 = rtl819x_spi_n_write_refused;
 	w0 = rtl819x_spi_n_writes;
 
@@ -1998,15 +2385,71 @@ static int rtl819x_spi_verb_trywrite(void)
 	ei.len = RTL819X_SPI_ERASESIZE;
 	rce = rtl819x_spi_mtd.erase(&rtl819x_spi_mtd, &ei);
 
-	ok = (rcw == -EOPNOTSUPP) && (rce == -EOPNOTSUPP) && (rl == 0) &&
+	/* 🔴 THE EXPECTED ERRNO IS NOT unarmed_rc IN A WRITE IMAGE, and getting
+	 * that wrong would have made this verb FAIL ON A CORRECT REFUSAL.  Both
+	 * calls are at offset 0, which is inside the forbidden window, so the
+	 * write TU refuses them FORBIDDEN (-EPERM) and never reaches the arming
+	 * test -- which is exactly the ordering rtl819x-spi-wrpolicy.h is built
+	 * around and the reason the forbidden check runs first.  So in a write
+	 * image both answers are -EPERM and in a mainline image both are
+	 * -EOPNOTSUPP; the conjunct asks that they AGREE with each other and
+	 * with this build's own constant, never for a value typed elsewhere. */
+	ok = (rcw == rce) &&
+#ifdef CONFIG_MTD_RTL819X_WRITE
+	     (rcw == -EPERM) &&
+#else
+	     (rcw == RTL819X_SPI_UNARMED_RC) &&
+#endif
+	     (rl == 0) &&
 	     (ei.state == MTD_ERASE_FAILED) &&
 	     (rtl819x_spi_n_write_refused == r0 + 2) &&
 	     (rtl819x_spi_n_writes == w0) && (rtl819x_spi_n_writes == 0);
-	mutex_unlock(&rtl819x_spi_lock);
 
 	rlxfw_markx("S-TRYW", (unsigned)ok);
 	return ok ? 0 : -EPROTO;
 }
+
+#ifdef CONFIG_MTD_RTL819X_WRITE
+/*
+ * `arm <lo> <hi> <budget>`.  THREE numbers, all three REQUIRED, and parsed
+ * with an end pointer like every other verb in this file -- simple_strtoul
+ * with a NULL end returns 0 for a malformed field, and 0 is a legal address.
+ *
+ * 🔴 NO DEFAULTS.  An omitted field is -EINVAL and not a zero: `arm 20000`
+ * must not arm [0x20000, 0) with budget 0, and it must not arm the whole chip
+ * either.  The owner types all three or nothing is armed.
+ *
+ * 🔴 AND THE VERB IS NOT THE AUTHORISATION.  CLAUDE.md's dated `owner-yes` per
+ * exact payload is; this is the mechanism that makes an UNDECLARED write
+ * impossible rather than merely discouraged.  rlxfw_spi_wr_chk_arm() refuses a
+ * window overlapping the loader or H601 here, and every use refuses it again,
+ * so the forbidden rule lives in two independent places.
+ */
+static int rtl819x_spi_verb_arm(const char *arg)
+{
+	unsigned long v[3];
+	char *end;
+	const char *p = arg;
+	int i;
+
+	for (i = 0; i < 3; i++) {
+		while (*p == ' ' || *p == '\t')
+			p++;
+		v[i] = simple_strtoul(p, &end, 0);
+		if (end == p)
+			return -EINVAL;
+		p = end;
+	}
+	while (*p == ' ' || *p == '\t')
+		p++;
+	/* Trailing rubbish is refused rather than ignored: `arm 20000 30000 1000 0`
+	 * is somebody's fourth idea about this interface and must not be read as
+	 * the first three. */
+	if (*p)
+		return -EINVAL;
+	return rtl819x_spi_wr_do_arm((u32)v[0], (u32)v[1], (u32)v[2]);
+}
+#endif
 
 /* `<n>` or `<n> <off>`.  Two numbers, parsed with an END POINTER rather than
  * by splitting on a space, because simple_strtoul with a NULL end silently
@@ -2107,6 +2550,14 @@ static int rtl819x_spi_write_proc(struct file *file, const char __user *buffer,
 		ret = 0;
 	} else if (!strcmp(buf, "trywrite"))
 		ret = rtl819x_spi_verb_trywrite();
+#ifdef CONFIG_MTD_RTL819X_WRITE
+	else if (!strncmp(buf, "arm ", 4))
+		ret = rtl819x_spi_verb_arm(buf + 4);
+	else if (!strcmp(buf, "disarm")) {
+		rtl819x_spi_wr_do_disarm();
+		ret = 0;
+	}
+#endif
 	else if (!strcmp(buf, "verify"))
 		ret = rtl819x_spi_verb_verify("");
 	else if (!strncmp(buf, "verify ", 7))

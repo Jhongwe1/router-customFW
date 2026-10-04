@@ -960,3 +960,412 @@ Not established: that a future version with a write path will count its writes �
 needs an increment site and a positive control that moves it before its 0 means anything.
 `CLAUDE.md` § Flash names the counter as part of a seating's claim; that rule is the owner's
 to change, and it is not changed here.
+
+## 12. 🆕 2026-10-04 (`R8b` item 4, 122nd segment, desk, no power): the write path exists and is in no image
+
+`R8b`'s precondition ④ read *there is no write path at all* (`docs/GATE-RESULTS.md`
+entry 16). Three layers refused: the write translation unit was declared behind a
+kconfig symbol nothing declared, `mtd->write`/`mtd->erase` were refusing stubs,
+and `mtd->flags` was `MTD_CAP_ROM`. This section is the four decisions that
+change that, each with its alternative rejected and its refutation condition, and
+the closing statement that matters more than any of them: **not one line of what
+follows has run anywhere.**
+
+### 12.1 The three layers, re-measured rather than quoted
+
+Checked against the tree that **builds** — cell `r95q2`, staged and built
+2026-10-04 15:27, which carries rlxfw's sources, the vendor's, and the objects
+the compiler produced.
+
+| layer | reading |
+|---|---|
+| **L1** | 讀 the staged `drivers/mtd/devices/Makefile:19-20` carries `obj-y += rtl819x-spi.o` then `obj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o`. 讀 the symbol occurs **0** times in the built `.config` and **0** times in `include/linux/autoconf.h`, against a positive control of `^CONFIG_MTD_CHAR=y` occurring once in the same run; **0** lines declare it in any `Kconfig` of the tree, against a positive control of `config MTD_CHAR` being found. 讀 the artefact: `rtl819x-spi.o` is 29,284 bytes and `rtl819x-spi-write.o` does not exist, while `rtl819x-spi-write.c` **is** staged — so the object's absence is the Kbuild row's doing, not a missing file |
+| **L2** | 讀 two `return -EOPNOTSUPP;` sites, each preceded by `rtl819x_spi_n_write_refused++;`, and 讀 that increment occurs at **exactly 2** sites |
+| **L3** | 讀 `include/mtd/mtd-abi.h`: `MTD_CAP_ROM` is **0** (`:35`), `MTD_WRITEABLE` is **0x400** (`:29`), `MTD_CAP_NORFLASH` is `MTD_WRITEABLE\|MTD_BIT_WRITEABLE` (`:37`). 讀 `mtdchar.c:73` (odd minor) and `:94` (`!MTD_WRITEABLE`) are two separate refusals; `:419`/`:423`/`:457` call `mtd->erase` with no NULL check; `mtdblock.c:421` reads the same flag. Every line number this driver's own header cites resolves to the line it claims |
+
+### 12.2 🔴 Two things the precondition's wording did not say
+
+**`docs/mfgtest.md` conflates L2 and L3, and has since `P1`.** Its text reads
+*"receives `-EOPNOTSUPP` from both **because `.flags = MTD_CAP_ROM`**"*. That
+causal clause is false: `trywrite` calls through the function pointers directly,
+`mtd->flags` is read only by `mtd_open`, and `mtd_open` is not on that path. The
+`-EOPNOTSUPP` is L2's alone and L3 is not consulted at all. The two
+`docs/mfgtest.md` lines are corrected in this commit; the same sentence in
+`docs/history/steps-P1.md` is a record and stays as it was written.
+
+**`tools/rlxfw-marks.py` structurally forbids the state "conditional Kbuild row,
+object present".** 讀 `tools/rlxfw-marks.py:187-192`: a row matching
+`OBJ_COND_RE` **must** carry an `absent:` witness, and `str:`/`sym:` there is a
+hard refusal with a reason. The rule encodes *conditional ⇒ not in the image*,
+which was true while the symbol was undeclared and stops being true the moment
+the delta row says `y`. So the moment `MK5`'s object is in an image, `MK5`
+cannot be declared in that file as it stands. That is a tool refusal rather than
+a documentation gap, and it is the largest consequence of this item: the flip
+from `n` to `y` needs either `MK5` converted to an unconditional `obj-y` row
+with a `sym:` witness (which retires `D4`'s build-time layer), or the pairing
+rule taught to read the delta's value for the symbol. The second keeps the
+refusal and makes `rlxfw-marks.py` a second reader of
+`config/rlxfw-kernel.delta`; the choice between them is the owner's.
+
+### 12.3 The four decisions
+
+#### `W1` — declare `CONFIG_MTD_RTL819X_WRITE`, `default n`
+
+`config/host-compat/0010` adds one `bool` stanza with `default n` and **no
+`depends on`** to `drivers/mtd/devices/Kconfig`; `config/rlxfw-kernel.delta`
+gains one row pinning it to `n`.
+
+讀 the stanza needs no `depends on`: the file is `source`d from
+`drivers/mtd/Kconfig:321` inside `menu "Self-contained MTD device drivers"`,
+whose `depends on MTD!=n` at `:4` already covers every symbol in it. An explicit
+`depends on MTD` would be a second owner of a dependency the menu states.
+
+讀 the file is 301 lines, 11,525 bytes, sha256
+`0c0688ed1ba1cfc2e1cb29f25021a8195bd664dd5991b32b6ae1bb6880d32333`, and is
+**byte-identical in all three Realtek drops** that carry it; `shibajee`'s copy
+differs. One source in three copies, the shape `config/rlxfw-kernel.delta`
+already records for `mtdchar.c`.
+
+**Alternative rejected:** leave it undeclared, which is *stronger* than `=n`.
+Rejected because the only remaining route to the file was
+`make CONFIG_MTD_RTL819X_WRITE=y` on the command line in a discarded tree, and
+an override like that leaves **no trace in `.config`** — so
+`tools/kconfig-delta.py check`, which exists precisely because the copied-in
+`.config` and the built one differ on 21 symbols, could not see it. 🔴 This is a
+weakening of `D4`'s refusal and is recorded as one.
+
+**Second alternative rejected:** skip kconfig and write `obj-y +=
+rtl819x-spi-write.o`. The TU would then be in every rlxfw image, `D4`'s
+`absent:` witness would die, and nothing would be left enforcing *a write
+needs my explicit yes* at build time at all — the TU would be in every image,
+and only the run-time arming would stand between a boot and a page program.
+
+**Refusal path:** `default n` plus the delta row's `n`. **Instruments:**
+`kconfig-delta check` and `rlxfw-marks verify`'s `absent:` witness; no counter,
+since this is a build-time decision. **Refutation:** an image whose `System.map`
+holds `rtl819x_spi_write_page` while the delta says `n`, or the converse; or a
+`(NEW)` line naming this symbol in an `oldconfig` log.
+
+#### `W2` — compile the TU: the row's value is `n`
+
+`set CONFIG_MTD_RTL819X_WRITE - n`. The write path ships compiled into nothing.
+
+**Alternative rejected:** ship `y`, so `R8b`'s seating has the image it needs.
+
+🔴 **This reason was re-derived mid-segment, and the first version of it is
+retracted.** It read *`R9-11` is outstanding, so `y` would put a live
+page-program into every image built before `R9` closes*. 量: `R9` closed at
+`fdf86da4`, between this item's read of the tree (`f3263d5a`) and its write-up.
+That premise is gone, and the decision is kept on two others:
+
+* `CLAUDE.md` § Never: *a write needs my explicit yes*, which is not conditional
+  on `R9`. A compiled write path is not a write, but it is one `echo` away from
+  one, and nobody has said yes to that.
+* § 12.2's tool refusal is now the binding reason. The flip to `y` makes
+  `config/rlxfw-marks.tsv` `MK5` go red and **cannot be re-witnessed** without
+  either retiring `D4`'s build-time layer or relaxing
+  `tools/rlxfw-marks.py`'s pairing rule. That is a choice about a containment
+  check, and `CLAUDE.md` makes it the owner's.
+
+This is still the one decision of the four the owner may want taken the other
+way, and it is one field of one row.
+
+**Second alternative rejected:** a fourth `kconfig-delta` variant
+(`quiet-write`). Blast radius, enumerated before deciding: 讀 41 rows of
+`config/rlxfw-kernel.delta` carry `@quiet,loud` (the `SWCORE=n` block), and a
+variant not named in each of them would build `SWCORE=y` — a 41-row retag of
+heavily cited lines against a one-row alternative. Worth revisiting if the write
+image must coexist with mainline in CI.
+
+**Refusal path:** the row. A `.config` disagreeing with it is refused before
+anything compiles. **Counter:** `wr_linked`, printed by `/proc/rtl819x-spi` in
+**every** image — `0` mainline, `1` write — so a card discriminates by reading
+the device, not by trusting a file name. **Refutation:** `wr_linked 1` on an
+image built from a tree whose delta says `n`.
+
+#### `W3` — implement page-program and sector-erase
+
+Three files. `rtl819x-spi-wrpolicy.h` is new and holds every refusal as pure
+arithmetic over `u32`, with **no `#include`**, so the kernel TU and
+`tools/test-spi-wrpolicy.c` compile the same code — a harness holding its own
+copy of the bounds test is the shape where a guard and its test agree with each
+other and both are wrong. `rtl819x-spi-write.c` is rewritten from 136 lines of
+`-EPERM` stubs to the policy, the per-reason counters, the arming state and the
+two MTD-shaped entry points; the names `rtl819x_spi_write_page` and
+`rtl819x_spi_erase_sector` and their `EXPORT_SYMBOL`s are kept, because `MK5`'s
+witness is a name and a symbol-absence proof over a `static` function proves
+nothing. `rtl819x-spi.c` grows 2,204 → 2,655 lines.
+
+**Why the split.** `claim()`/`release()` is the only thing in this project that
+saves `SFCR`/`SFCR2`/`SFCSR`, restores them, reads them back and latches
+`wedged` when the restore did not take — and deliberately does not restore
+`SFDR`, because writing `SFDR` issues a command. A second copy of that guard
+would be a second owner of the one invariant that makes this driver survivable
+beside the vendor's. So the policy is in the gated TU, where it can be
+desk-tested, and the two register-level primitives stay beside the guard under
+the same `#ifdef`.
+
+**The sequences are the vendor's**, 讀 from `spi_common.c` in the tree that
+builds: erase is `ComSrlCmd_SE` `:819-825` — `WREN` 0x06 (`:129`), `SE` 0x20
+(`:138`) with a 3-byte address, then `spiFlashReady()` `:728-742` polling `RDSR`
+0x05 bit 0; program is `PageWrite_111002` `:1070-1074` →
+`ComSrlCmd_ComWrite` `:964-991` → `ComSrlCmd_InputCommand` `:849-880` — `WREN`,
+then `PP` 0x02 with three address bytes and no dummy, then 4-byte `SFDR` phases
+and a short tail phase, then the same poll. `docs/blind-write-ledger.md § 9.14`
+records every path with its depth, so **this diff is not called blind**.
+
+🟢 **Four things are rlxfw's own, and each has a 讀 of the vendor's opposite:**
+
+1. **The forbidden window** `0x000000–0x007FFF`. 讀 `spi_cmd.c`
+   `mtd_spi_erase()` `:46-53`: the `skip 1st block erase` guard is inside
+   `#if 0`, so `instr->addr = 0` is accepted and sector 0 is erased. 量
+   `docs/loader-flash-write.md` 1: the loader's `burn()` has no lower bound
+   either.
+2. **Refusing a non-grain-multiple erase length.** 讀 `spi_cmd.c` `:57-60`: the
+   length-alignment check is commented out; `:71-78` then round the length
+   **up** — `len = len - (len & (mtd->erasesize-1)) + mtd->erasesize;` and
+   `if (len < mtd->erasesize) len = mtd->erasesize;`. Asking the vendor's driver
+   to erase one byte erases a whole sector, silently, and returns 0. Here that is
+   `-EINVAL` and a counter.
+3. **Bounded spins.** 讀 `spiFlashReady()` is `while (1)` on the WIP bit with no
+   ceiling and no counter; 量 this board arms a watchdog (`CLK-08`), so on the
+   vendor's driver a part that never clears WIP reboots the router. Here it is
+   `-ETIMEDOUT` and `n_wip_timeout`.
+4. **Explicit big-endian word assembly**, where 讀 the vendor's
+   `memcpy(&ui, puc, 4)` (`:974-976`) is correct only because this core is
+   big-endian.
+
+⚠️ **One vendor oddity deliberately not copied.** 讀 `SeqCmd_Order` `:786-792`
+calls `SFCSR_CS_L(ucChip, ucIOWidth, IOWIDTH_SINGLE)` — the io-width in the
+length argument and the length in the io-width argument. It is inert only
+because `DATA_LENTH1` and `IOWIDTH_SINGLE` are both `0x00`.
+`rtl819x_spi_cmd1()` passes a length of 0 on purpose and says so, so a later
+reader is not left deciding whether the swap mattered.
+
+**Alternative rejected: the compile switch alone, with no arming.** In the image
+`R8b`'s seating needs the switch is already `y` and protects nothing: every boot
+would carry a live page-program reachable from `/proc`. So the engine refuses
+unless armed by `echo 'arm <lo> <hi> <budget>' > /proc/rtl819x-spi`; all three
+fields are required, an omitted one is `-EINVAL` and not a zero; the budget is
+debited only on a **successful** operation; and reaching 0 disarms. The arm verb
+itself refuses a window overlapping the forbidden region, so that rule lives in
+two independent places. 🔴 Arming is **not** a security boundary — root types
+the verb and this board's only user is root. It is a containment rule for the
+failure this project has: a stray write, a wrong card cell, a payload whose
+destination nobody declared. `CLAUDE.md`'s dated `owner-yes` per payload remains
+the authorisation.
+
+**Alternative rejected: a second writable `/proc` entry for the write verbs.**
+Refused on this driver's own standing argument, which is not relaxed: *a second
+writable entry would be a second way to reach the controller.* `arm` and
+`disarm` dispatch from `rtl819x_spi_write_proc`, and the TU's fields print from
+`rtl819x_spi_read_proc` behind the existing page budget plus a second check
+against the TU's own declared maximum, with `wr_truncated` printed either way.
+
+**Nine refusals, nine counters**, printed as `wr_refused_by` in enum order on
+one line so adding a reason cannot silently drop it:
+
+| reason | errno | what it refuses |
+|---|---|---|
+| `FORBIDDEN` | `-EPERM` | any byte of `0x000000–0x007FFF`, **whatever the arming state** |
+| `RANGE` | `-EINVAL` | off the end of the chip, or a zero length |
+| `UNARMED` | `-EACCES` | no arm in force |
+| `OUTSIDE` | `-EPERM` | outside the armed window |
+| `BUDGET` | `-ENOSPC` | the arm's byte budget is spent |
+| `MISALIGNED` | `-EINVAL` | an erase address not grain-aligned |
+| `BADLEN` | `-EINVAL` | an erase length not a grain multiple; a program longer than a page |
+| `PAGECROSS` | `-EINVAL` | a program spanning two pages |
+| `GEOM` | `-EPROTO` | grain `!=` `mtd->erasesize`, or a grain that is not a sane power of two |
+
+beside `wr_n_prog`, `wr_n_erase`, `wr_n_bytes`, `wr_n_arm_ok` and
+`wr_n_engine_fail` — the last being the only counter that can move without a
+decision here being wrong.
+
+**The order of the checks is the design.** The forbidden test runs **first** and
+reads nothing but the request: not the arming state, not the budget, not the
+alignment, not the geometry. No sequence of other decisions reaches past it, and
+the host suite drives it **armed** on purpose — *refused while unarmed* would be
+a pass that proves nothing.
+
+**Refutation**, at the bench and after the owner's dated yes: a page program
+whose read-back does not match the bytes written; an erase that clears a range
+other than the one requested, which this driver's own `map 1 <group>` digests at
+4 KiB granularity; `n_writes` moving on a refused request; `wr_n_prog` moving
+while a refusal counter moves too; or the forbidden window's digest changing
+against the 2026-08-16 dump, which would mean the first check did not hold.
+
+#### `W4` — keep `mtd->flags = MTD_CAP_ROM`
+
+Unchanged, and that is a decision rather than an omission.
+
+**Alternative rejected: `MTD_CAP_NORFLASH`.** It buys nothing reachable: 讀
+`tools/mkinitramfs.py` refuses to declare an even char minor over this device,
+so `mtdchar:73`'s odd-minor rule refuses the open whatever this flag says, and
+讀 `config/image-commands.tsv`, there is no `dd` and no `mtd_debug` in this
+image. What it would cost is the one static layer that cannot be armed away. So
+the write path is reachable only through this driver's own verbs, and `mtdchar`
+and `mtdblock` stay outside the trust boundary.
+
+**Second alternative rejected: flip the flag at run time inside `arm`.** 讀
+`mtd_open` reads it once, at `open()`, and `mtdblock.c:421` caches it into
+`dev->readonly` at add time — so a descriptor opened while armed would stay
+writable after the disarm, and whether the refusal held would depend on *when*
+the open happened. A guard whose answer depends on timing is not a guard.
+
+**Refusal path:** `MTD_CAP_ROM` is 0, so `mtd_open:94` refuses `-EACCES` before
+any stub is consulted. **Counter:** none, and 🔴 **L3 has never been observed
+firing, here or anywhere in this project, and `W4` does not change that.**
+Observing `:94` needs an even char minor over this device, which `mkinitramfs`
+refuses — correctly, since it can check the odd-minor rule from a declaration
+and cannot check `mtd->flags`, a run-time property. So L3 is 讀 and stays 讀;
+what is instrumented is the layer behind it, by `trywrite`. **Refutation:**
+`/dev/mtdblockN` for this device being writable, or `open(O_WRONLY)` on an even
+minor of it succeeding.
+
+### 12.4 The erase granularity — one line, and a new second reading
+
+```
+config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h
+#define RLXFW_SPI_WR_ERASE_GRAIN	0x00001000u	/* 未定 FW-187/FW-191 */
+```
+
+It occurs exactly once in the header and nowhere else in any file this item adds
+or changes. Substituting a settled value means editing that line and setting
+`RTL819X_SPI_ERASESIZE` in `rtl819x-spi.c` to the same value in the same commit.
+
+`SPEC.md` `FW-187` 殘留 and `FW-191` 殘留 own the open value and already say the
+decisive 量 is an actual erase. Two readings are on hand and **neither is a
+reading of the chip**:
+
+* 量 `/proc/mtd` reports `erasesize 00001000` on all three partitions
+  (2026-10-04, `bench/2026-10-04/PRE-MTD`, `FW-187`) — but that number is
+  `rtl819x-spi.c`'s own constant and the vendor map's partition constants.
+* 讀 🆕 **the second source this segment adds.** 量 at the desk 2026-10-04:
+  `0x1C7016` — the id `FW-191` measured — appears **nowhere in the GPL drop that
+  builds**. The Eon entries in `spi_common.c`'s table are `0x001c3115`,
+  `0x001c3116`, `0x001c3015`, `0x001c3016`. So `spi_regist()` takes its
+  **UNKNOWN** branch (`:570-574`) and calls `set_flash_info(..., SIZE_064K,
+  SIZE_004K, SIZE_256B, "UNKNOWN", ComSrlCmd_SE, ...)`. The code that has driven
+  this board since 2018 therefore erases with **SE, opcode 0x20**, calls the
+  sector **4,096** bytes, and records a **65,536**-byte `block_size` that its own
+  `pfErase` never uses. That is the fallback's constant applied because the part
+  was not recognised; it does not settle `FW-187` 殘留. It does answer one half
+  of what that row asks — *read out of rlxfw's own source which opcode it
+  issues* — and the answer agrees: SE 0x20.
+
+**The guard against the placeholder being wrong is in the code, not in a
+comment.** `rlxfw_spi_wr_chk_erase()` refuses every erase with `-EPROTO` while
+`RLXFW_SPI_WR_ERASE_GRAIN != mtd->erasesize`, so changing one number and
+forgetting the other is loud. And the forbidden test is applied to the
+grain-aligned block the erase would **clear**, not to the requested address: at a
+64 KiB grain an erase at `0x008000` clears from `0x000000`, and a check on the
+address alone would permit the loader's destruction while reading as a guard.
+That exact case is in the host suite, and the suite is green at both candidate
+grains.
+
+### 12.5 The page bound, 讀 rather than assumed
+
+`RLXFW_SPI_WR_PAGE` is 256. 讀 the vendor's own write path:
+`ComSrlCmd_ComWriteSector` (`:1003-1007`) issues `pfPageWrite` exactly
+`page_cnt` times with `page_size` bytes each, advancing the address by
+`page_size`; `set_flash_info` (`:605-606`) sets `page_size` from the table's
+`SIZE_256B` and `page_cnt = sector_size / page_size`; every table entry and the
+UNKNOWN fallback pass `SIZE_256B`. And `ComSrlCmd_ComWriteData`'s `calAddr`
+(`:659-692`) splits by **sector**, with partial pieces going through
+`ComSrlCmd_BufWriteSector`, which read-modify-erase-writes the whole sector. So
+the vendor never issues a PP longer than 256 bytes.
+
+⚠️ 推, and the direction is the safe one: that a PP crossing a page boundary
+**wraps** to the start of the page is JEDEC's definition of the opcode, and this
+part's datasheet is not on hand (`FW-191`: the draft here is the SoC's, not the
+flash's). So a crossing request is **refused**, never split silently, and being
+wrong about the wrap costs a refused write. The vendor's `ComSrlCmd_ComWrite`
+(`:964`) bounds `uiLen` by nothing at all.
+
+### 12.6 🔴 A self-deadlock found by reading, which no run could have found
+
+`mtd->write` and `mtd->erase` must now take `rtl819x_spi_lock`, because in a
+write image they issue a transaction. That mutex is not recursive. The existing
+`trywrite` verb took the lock and *then* called through the function pointers —
+so the first boot of the first write image would have **hung inside the one verb
+whose job is to show the refusal works.** 量 is impossible here, because no
+committed image links the TU; nothing but reading could find it. `trywrite` now
+reads its counters outside the lock, and the assumption that makes that safe is
+written down rather than left implicit: there is one writable `/proc` entry and
+the shell that writes it is serial.
+
+`trywrite`'s expected errno also had to change, and getting it wrong would have
+made the verb **fail on a correct refusal**: both its calls are at offset 0,
+which is inside the forbidden window, so in a write image both answer `-EPERM`
+(FORBIDDEN, decided before the arming test is reached) and in a mainline image
+both answer `-EOPNOTSUPP`. The conjunct now asks that the two **agree with each
+other** and with this build's own constant, and `/proc` prints `unarmed_rc` so
+no card carries the number.
+
+### 12.7 What § 12 does not establish
+
+**Not one line of the write path has run anywhere.** It is in no committed
+image, has never been on this die, and all four decisions are unexercised code
+until the seating. The desk statement is: *the path is written and refuses
+correctly at the desk; whether it programs a page on this part is unmeasured.*
+
+What the controls do establish, exactly: the policy's nine refusals and twelve
+permissions hold **on x86-64, at both candidate grains**; the kernel code
+**compiles** with the project's own toolchain and flags in both arms, with the
+mainline object holding no engine symbol and the write object holding it; the
+kconfig symbol is **declared and settable** while an undeclared one is dropped
+by `oldconfig`; and the Kbuild row is what selects the TU. None of that is a
+reading of the flash.
+
+**No desk control exists for**: that a page program writes the bytes asked for;
+that an erase clears the block asked for and no other; the erase granularity of
+this part; that the WIP poll terminates on this part (`RTL819X_SPI_WIP_SPINS` is
+推, a guess, with no datasheet for this part); that the claim/release guard
+survives a **write** transaction, every reading of it so far being over reads;
+and L3 firing, which is unobservable on this image by construction.
+
+**`n_writes` is blind to a vendor-side write.** 量 2026-09-07 and unchanged:
+`CONFIG_RTL819X_SPI_FLASH=y`, and 讀 `spi_probe.c:101-103` installs
+`mtd->write = mtd_spi_write` and `mtd->erase = mtd_spi_erase` on the vendor's
+partitions unconditionally, reaching `PageWrite_111002` / `ComSrlCmd_SE`.
+Nothing in rlxfw counts those. What keeps them out of reach is the userspace
+surface — an odd char minor and a `0400` block node — which are access controls
+on a path that exists. `SPEC.md` `FLS-26` already proved *"not one flash byte is
+written"* false for this device. The accurate sentence is: **rlxfw's `n_writes`
+counts rlxfw's writes.**
+
+**`FW-142` becomes variant-dependent.** It says no committed `rtl819x-spi`
+increments `n_writes`, so its zero carries no information. That stays true of
+the three versions it names and of every **mainline** image, where no increment
+path is compiled. In a `CONFIG_MTD_RTL819X_WRITE=y` image there is one,
+`rtl819x_spi_note_write()`, so the zero starts carrying information there.
+
+### 12.8 Three defects in this segment's own instruments
+
+Kept because the next reader will meet them.
+
+* `-std=c89` has no `inline` keyword and rejected `rtl819x-spi-wrpolicy.h`
+  outright. The kernel TU is compiled by gcc 3.4.6 in **gnu89**, so that is the
+  dialect the harness uses. The cheapest possible reminder that this header is
+  compiled twice.
+* `-Wmissing-field-initializers` (from `-Wextra`) caught **two** harness table
+  rows one field short, which would have read as `mtd_erasesize = 0` and turned
+  two permitting cases into `GEOM` refusals — a suite greener than the code
+  deserved.
+* The first version of the kconfig control ran `conf -o Kconfig`, and 2.6.30 has
+  **no top-level `Kconfig`**: the entry point is `arch/$SRCARCH/Kconfig`, which
+  on this drop `source`s `"../target/config.in"` — a path one level **above** the
+  kernel directory, into the SDK's own target tree. conf printed *can't find
+  file Kconfig*, `|| true` swallowed the status, and both arms then read their
+  verdict off a `.config` nothing had regenerated. A false green in a control,
+  which is the one failure a control may not have. Its exit code is now read, and
+  the third arm — the same `y` against the **unpatched** file, which must be
+  dropped — would have caught it anyway.
+
+And one about the diff itself: the Kconfig hunk was written by hand, was
+byte-correct on every context line (量, `od -c` against the target's lines
+296-300) and arithmetically right, and GNU patch 2.7.6 still refused it with
+*Hunk #1 FAILED at 296*, with and without `-l`. `diff -u` places the same
+insertion at `-297,5 +297,28`. The hunk is now generated by `diff -u` from a
+scratch copy rather than typed, which is the project's own rule about never
+rebuilding a tool's output by hand.

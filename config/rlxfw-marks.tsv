@@ -188,18 +188,38 @@ MK3	linux-2.6.30/drivers/gpio/Makefile	after	obj-$(CONFIG_GPIOLIB) += gpiolib.o	
 # what reaches the image's .rodata -- the same reasoning as MK3's chip label.
 #
 # 🔴 MK5 IS THE FIRST CONDITIONAL ROW IN THIS FILE, and it is what D4 is
-# proved with.  CONFIG_MTD_RTL819X_WRITE is not declared to kconfig anywhere:
-# an undeclared CONFIG_ expands to empty in GNU Make, so the object is not
-# built and no menu, defconfig or `oldconfig` can build it -- which is
-# stronger than `=n`, because `=n` is a value something could change.  Its
-# `absent:` witness makes `rlxfw-marks.py verify` assert that the symbol is
-# NOT in System.map, and the POSITIVE CONTROL is a make-level override in a
-# discarded tree (`make CONFIG_MTD_RTL819X_WRITE=y`), which makes the symbol
-# appear and this row go red.  Without that control, `absent:` would be a
-# check that cannot fire.
+# proved with.  Its `absent:` witness makes `rlxfw-marks.py verify` assert
+# that rtl819x_spi_write_page is NOT in System.map, and the POSITIVE CONTROL
+# is a make-level override in a discarded tree
+# (`make CONFIG_MTD_RTL819X_WRITE=y`), which makes the symbol appear and this
+# row go red.  Without that control, `absent:` would be a check that cannot
+# fire.
+#
+# 🔄 R8b ITEM 4, 2026-10-04: THE SYMBOL IS NOW DECLARED TO KCONFIG, so the
+# paragraph this block used to carry -- "not declared to kconfig anywhere: an
+# undeclared CONFIG_ expands to empty in GNU Make, so no menu, defconfig or
+# `oldconfig` can build it, which is stronger than `=n`" -- IS NO LONGER TRUE
+# AND MUST NOT BE QUOTED.  config/host-compat/0010 declares it `bool`,
+# `default n`, and config/rlxfw-kernel.delta pins it to `n`.  What is given up
+# is a refusal no configuration act could lift; what is gained is a switch
+# tools/kconfig-delta.py can see at all, where a `make CONFIG_...=y` override
+# left no trace in .config.  The TU is still in no image and this row is still
+# the instrument that says so.
+#
+# ⚠️ AND THIS ROW CANNOT SURVIVE THE FLIP TO `y`.  讀 tools/rlxfw-marks.py
+# :187-192: a conditional Kbuild row MUST carry `absent:`, and `str:`/`sym:`
+# there is a hard refusal -- the rule encodes "conditional => not in the
+# image", which was true while the symbol was undeclared.  An image built with
+# CONFIG_MTD_RTL819X_WRITE=y therefore makes THIS ROW GO RED, correctly.  The
+# two remedies are in the R8b record: convert MK5 to an unconditional
+# `obj-y += rtl819x-spi-write.o` with `sym:rtl819x_spi_write_page` (which
+# retires D4's build-time layer), or teach the pairing rule to read the
+# delta's value for the symbol (which keeps it and makes this tool a second
+# reader of config/rlxfw-kernel.delta).  Neither is done here: a relaxation of
+# a containment check is the owner's call.
 # ----------------------------------------------------------------------------
 MK4	linux-2.6.30/drivers/mtd/devices/Makefile	after	obj-$(CONFIG_MTD_M25P80) += m25p80.o	obj-y += rtl819x-spi.o	str:rtl819x-spi-pio	rtl819x-spi.c is copied in by --src and needs a Kbuild line. obj-y and not obj-$(CONFIG_...) for MK2's reason: a new Kconfig symbol would have to be declared in config/rlxfw-kernel.delta too, and a driver that is in the tree but not in the image is the state rlxfw-marks.py verify exists to catch. The witness is the mtd_info's name, which reaches .rodata; the file name does not. The anchor is written with single spaces and matched normalised, because Kbuild lines are tab-aligned and this file is tab-separated
-MK5	linux-2.6.30/drivers/mtd/devices/Makefile	after	obj-y += rtl819x-spi.o	obj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o	absent:rtl819x_spi_write_page	R5-5 D4. The write path's designated home, declared and deliberately NOT built. CONFIG_MTD_RTL819X_WRITE is declared to kconfig nowhere, so this expands to empty in GNU Make and the TU cannot be built by any configuration act; the control build overrides it on the make command line in a discarded tree. The witness is absent: rather than str:/sym: because the claim is that the symbol is MISSING from System.map, and rlxfw-marks.py refuses the other two kinds on a conditional row so the two cannot be swapped
+MK5	linux-2.6.30/drivers/mtd/devices/Makefile	after	obj-y += rtl819x-spi.o	obj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o	absent:rtl819x_spi_write_page	R5-5 D4; 🔄 R8b item 4, 2026-10-04. The write path's designated home, now IMPLEMENTED and still NOT built. The witness is absent: rather than str:/sym: because the claim is that the symbol is MISSING from System.map, and rlxfw-marks.py refuses the other two kinds on a conditional row so the two cannot be swapped; the control build overrides the symbol on the make command line in a discarded tree. 🔄 WHAT CHANGED AND WHAT DID NOT: CONFIG_MTD_RTL819X_WRITE is no longer undeclared -- config/host-compat/0010 declares it bool/default n and config/rlxfw-kernel.delta pins it to n -- so the old sentence "the TU cannot be built by any configuration act" is RETRACTED; it can, by one reviewed line, and that is the point. The TU's bodies are no longer -EPERM stubs: rtl819x-spi-write.c holds a real page-program and sector-erase policy over rtl819x-spi-wrpolicy.h, and rtl819x-spi.c holds the two register primitives under the same CONFIG_. NONE OF IT HAS RUN ANYWHERE. ⚠️ THIS ROW GOES RED IF THE DELTA SAYS y, correctly: rlxfw-marks.py:187-192 requires absent: on a conditional row, so an image carrying the object contradicts this witness. See the comment block above for the two remedies; notes/spi-mtd-driver.md § 12.2 owns the finding
 # ----------------------------------------------------------------------------
 # MK6 is the first Kbuild row whose absence is SILENT.  MK2/MK3/MK4 all link
 # against a symbol the framework provides (clocksource_register, gpiochip_add,

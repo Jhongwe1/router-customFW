@@ -1525,3 +1525,56 @@ other credit path fired — § 5's three prohibitions are procedure, and nothing
 one; not that `RLX4181` lacks a cycle counter, since `CPU-42` 量 that CP0 `Count` reads 0 and does not
 move and clock-gated is indistinguishable from absent; nothing about `loud` or `quiet-swcore`, which
 were not built; and not that the bits are strong — this section bounds a *reading*, not a source.
+
+## § 9.14 — `R8b` item 4: the flash write path, and the vendor source it is built out of, 2026-10-04
+
+`R8b`'s precondition ④ needed a write path. Writing one meant reading the
+vendor's, and this section is the cost. 🔴 **`R5-5` could never have been
+claimed as blind against the vendor** (§ 4.5's verdict, 11 paths → 20), and this
+makes it worse by the only honest measure there is: the count. **20 → 26.**
+
+The transaction ORDER, the opcodes, the phase lengths, the status-poll shift and
+the page bound are all the vendor's, read out of the tree that compiles into this
+image. Pretending otherwise would be a worse driver told as a better story.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `drivers/mtd/chips/rtl819x/spi_common.c` | **line** | 🔴 **vendor** | 🔄 **deepened again 2026-10-04 from the read-only extract in § 4.5.** `ComSrlCmd_SE` `:819-825` — `SeqCmd_Order(WREN)` then `SeqCmd_Write(SPICMD_SE, addr, 3)` then `spiFlashReady()`. `ComSrlCmd_ComWrite` `:964-991` — `SeqCmd_Order(WREN)`, `ComSrlCmd_InputCommand`, the 4-byte `SFDR` data loop, the short tail phase at `LEN = i-1`, the closing `CS_H`, the poll. `spiFlashReady` `:728-742` — `while (1)` on `RDSR` bit 0 with no ceiling. `SeqCmd_Order` `:786-792`, `SeqCmd_Write` `:794-801`, `SeqCmd_Read`'s `ui >> ((4 - ucRDLen) * 8)`. `SPICMD_WREN` `:129`, `SPICMD_RDSR` `:132`, `SPICMD_SE` `:138`, `SPICMD_BE` `:139`, `SPI_STATUS_WIP` `:165`. `PageWrite_111002` `:1070-1074`. **decision-layer**: this is the order rlxfw issues |
+| `drivers/mtd/chips/rtl819x/spi_common.c` — the chip table and its fallback | **line** | 🔴 **vendor** | 🆕 **2026-10-04, and it is this section's one new FINDING rather than only a borrowing.** `spi_flash_registed[]` `:385-415` carries four Eon ids — `0x001c3115`, `0x001c3116`, `0x001c3015`, `0x001c3016` — and **not** `0x001C7016`, which is what `FW-191` 量 on this part; 量 the id appears nowhere in the drop. So `spi_regist()` takes its UNKNOWN branch `:570-574` and calls `set_flash_info(..., SIZE_064K, SIZE_004K, SIZE_256B, "UNKNOWN", ComSrlCmd_SE, SpiRead_11110B, ComSrlCmd_NoneQeBit, PageWrite_111002, 40)`. `SIZE_004K` and `SIZE_064K` at `:260-261`. `set_flash_info` `:591-616` — `block_cnt = ui / block_size`, `sector_cnt = ui / sector_size`, `page_cnt = sector_size / page_size`, and `pfWrite = ComSrlCmd_ComWriteData` unconditionally. **This is the second 讀 source `FW-187` 殘留 asked for** |
+| `drivers/mtd/chips/rtl819x/spi_common.c` — the page chunking | **line** | 🔴 **vendor** | 🆕 **2026-10-04.** `ComSrlCmd_ComWriteSector` `:993-1010` issues `pfPageWrite` exactly `page_cnt` times with `page_size` bytes, advancing by `page_size`; `ComSrlCmd_BufWriteSector` `:1012-1028` read-modify-erase-writes a whole sector for a partial piece; `ComSrlCmd_ComWriteData` `:1030-…` with `calAddr` `:659-692` splits a request by SECTOR. Taken: **the vendor never issues a PP longer than `page_size`**, which is why `RLXFW_SPI_WR_PAGE` is 256 and 讀 rather than 推 |
+| `drivers/mtd/chips/rtl819x/spi_cmd.c` | **line** | 🔴 **vendor** | 🆕 **2026-10-04, decision-layer, and the one path read to be CONTRADICTED rather than copied.** `mtd_spi_erase` `:39-91`: `:46-53` the `skip 1st block erase` guard is inside `#if 0`, so `instr->addr = 0` is accepted; `:55-56` refuses a non-aligned ADDRESS; `:57-60` the length-alignment check is **commented out**; `:71-78` then round the length **up** — `len = len - (len & (mtd->erasesize-1)) + mtd->erasesize;` and `if (len < mtd->erasesize) len = mtd->erasesize;`. `mtd_spi_write` `:115-134`: no bound of any kind beyond `chip_info->write` being non-NULL. `:163-170` the eight `EXPORT_SYMBOL`s. rlxfw refuses what this widens, and the refusal's reason is this reading |
+| `drivers/mtd/chips/rtl819x/spi_probe.c` | **line** | 🔴 **vendor** | 🔄 **deepened 2026-10-04.** `:94` `mtd->flags = MTD_CAP_NORFLASH` and `:98` `mtd->erasesize = chip_info->flash->sectorSize` — read for `W4`'s decision, which is that rlxfw does the opposite. `:101-108` the eight pointers installed unconditionally, already in § 4.5 |
+| `include/mtd/mtd-abi.h` | line | generic | 🆕 **2026-10-04.** `:29` `MTD_WRITEABLE 0x400`, `:30` `MTD_BIT_WRITEABLE 0x800`, `:35` `MTD_CAP_ROM 0`, `:37` `MTD_CAP_NORFLASH`. Generic Linux, and it is what makes `W4`'s *`MTD_CAP_ROM` is 0* a reading rather than a belief |
+| `drivers/mtd/devices/Kconfig` | **line** | 🔴 **vendor** | 🆕 **2026-10-04, and it is the only vendor file this item CHANGES.** 301 lines, 11,525 bytes, sha256 `0c0688ed…d32333`, byte-identical in all three Realtek drops. Read for its tail (`:288-301`), for the indentation convention of a `bool` stanza, and for the fact that `drivers/mtd/Kconfig:321` `source`s it inside `menu "Self-contained MTD device drivers"` whose `depends on MTD!=n` at `:4` covers every symbol in it — which is why `config/host-compat/0010`'s stanza carries no `depends on` |
+| `arch/rlx/Kconfig` | line | **the port's own** | 🆕 **2026-10-04, and it cost a control.** `:10` `source "../target/config.in"` — a path ONE LEVEL ABOVE the kernel directory, into the SDK's `target/` tree (8,033 bytes, no `source` of its own). So `scripts/kconfig/conf` cannot be run from a copy of the kernel tree alone. Already in § 4.9 for `R5-4`; cited here because it is what the Kconfig control had to satisfy |
+
+🔴 **Verdict: `R8b` item 4's write path is the LEAST blind thing in this
+repository, and the diff is not called blind.** The erase sequence, the program
+sequence, the status poll, the opcode values, the phase lengths, the big-endian
+word packing the vendor gets for free from the core, the page bound and the
+erase granularity's second reading are all the vendor's. There was never a
+version of this path that could have been written blind, for § 4.5's reason
+unchanged: the vendor's code is the tree it is compiled into.
+
+🟢 **What `docs/driver-diff.md` can still score, and all four have the vendor's
+opposite recorded beside them:**
+
+1. **The forbidden window** `0x000000–0x007FFF`, against `spi_cmd.c:46-53`'s
+   `#if 0`-ed guard and the loader's unbounded `burn()`.
+2. **Refusing a non-grain-multiple erase length**, against `spi_cmd.c:57-78`,
+   which comments the check out and rounds up.
+3. **Bounded spins** with counters, against `spiFlashReady()`'s `while (1)` on a
+   board that arms a watchdog.
+4. **The arming state with a window and a byte budget**, which has no vendor
+   counterpart at any depth.
+
+🟢 **Nothing in this block is a third-party port**, so the diff against
+`shibajee`/`ggbruno` is not directly spoiled — subject to § 6, which is the part
+of this that is undetermined.
+
+⚠️ **What this section cannot say.** Whether the sequences are *right* for this
+part. They are right for the part the vendor's UNKNOWN fallback assumes, which
+is the only part this board has ever been driven as. The decisive reading is an
+actual erase, which is a flash write, which belongs to `R8b` under the owner's
+dated yes — and until then the whole of `W3` is unexercised code. `ledgerscan`
+cannot see that distinction and is not asked to.
