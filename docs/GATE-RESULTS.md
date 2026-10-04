@@ -3508,7 +3508,282 @@ relaxation of 2026-09-27 and 2026-09-30, with the flash rules, `H601`, the power
 
 ---
 
-## The operating clause, re-run at eighteen entries
+## 2026-10-04 — `R9` (the differential table published on 16 rows with a mechanism class each, a live column that speaks for 21 of 89 cases and says so, and a 推 of its own retracted inside the gate that produced it)
+
+### One line
+
+**v0.6+, three segments — the 120th for the re-specification and eight of the twelve steps, the
+121st for three more, the 122nd for `R9-11` and this closing — and one power action, the vendor
+seating, shared with `R9-7`.** § Gate board
+costs `R9` at 16 segments; the actual is **3**, which measures the relaxation of 2026-09-27 and the
+fact that eight steps were desk work over files that already existed, not the difficulty of the
+question. The gate closes on `docs/differential.md`: **16 published rows** standing for the
+register's **141** rows, each carrying ① a mechanism class from the closed set, ② a vendor cell that
+is a reading from one of three evidence tiers or `⊘ Structural` naming a committed finding, ③ an
+rlxfw cell from the same instrument as ②, and ④ a check that would have detected the opposite of
+the row's claim together with that check's reading — a row without ④'s reading publishing 未定 and
+never a win. 量 over the rendered file: publish reads **win 17, surface-absent 5, not comparable 42,
+未定 77**. **Zero flash-write verbs and zero `FLR` were issued in either segment**, and the map
+bracket came back equal at two granularities.
+
+**The weakest thing here is that the live column speaks for 21 of 89 cases.** 讀, re-derived from
+both files rather than quoted: `config/fix-cases.toml` carries **89** rows at tier `V-A`, the tier
+whose refutation needs a live, network-facing reading; `config/r9-probes.toml` holds **27** probe
+cases citing **21** distinct register rows, the two numbers differing because **6** rows carry two
+cases each — `FC-034`, `FC-038`, `FC-039`, `FC-067`, `FC-078` and `FC-079` — so counting cases would
+overstate coverage by 6. The other **68** are exempted by name with a written reason each, and
+**21 + 68 = 89** closes against the 89. **So the published table says 21, not 89**, and the renderer
+refuses if that sum does not close, if an id is both probed and exempted, if an id is neither, or if
+either set names a row that is not `V-A`. Nothing here speaks for the **52** rows in tiers `V-B`,
+`V-C` and `V-D`.
+
+### Four claims that stand
+
+**① The gate's own instrument can fail, which is the whole reason the row was re-specified.** 讀
+`PROGRESS.md`'s `R9` row as it stood until today: the clause was *a three-column table whose third
+column is not empty*, and seven rows of that column were committed in `plan/` § 8.2 **before `R9`
+existed**. That is the `R7` defect verbatim — a gate whose instrument cannot fail — and it was
+caught before the gate opened rather than at its close. The replacement is a per-row requirement
+whose fourth clause is a reading that may be absent: 量 over the register, **109 of 141** rows have
+a reading on ④ and **32** read 未定, and `tools/fixcases.py` `C7` refuses a `win` on a 未定 ④ with
+mutation `M8` showing it fire and `P2` showing it permit. ⚠️ What this does not establish: that the
+re-specification made the gate harder or easier. It made the outcome decidable, which is a different
+property, and the owner may read the swap as having lowered the bar.
+
+**② Both firmwares were read by one instrument, on one host, cable and port, in one episode.**
+量 2026-10-04 (`FW-197`, `FW-198`; `bench/2026-10-04`): 27 cases on each column, **137 differing
+fields**; the vendor connects on 52869 and 52881 where rlxfw refuses outright; six closed ports
+separate *closed* from *never ran*; rlxfw answers 431 where the vendor answers 200, so rlxfw bounds
+header size and the vendor does not; the vendor serves its configuration blob under
+path-normalisation variants **unauthenticated** where rlxfw returns 400; and `C21` agrees on both
+sides, which is published too. The link was checked with a control before any probe — 10.1.1.1
+answered 3 of 3 and 10.1.1.77 on the same subnet did not — because without it a dead link makes all
+27 probes read *closed* and publishes a false rlxfw column. The instrument's own repeat control
+found something rather than passing cleanly: two vendor runs 60 s apart differ in **exactly one
+field of 27 cases**, `C12`'s header digest over `/status.htm`, a page whose headers vary by
+construction; 26 of 27 reproduce byte for byte. ⚠️ One episode, one seating, one cable. A
+config-bearing case records status and length only — no body and no digest — because this unit's own
+configuration may not enter the repository.
+
+**③ The one vendor boot was contained twice, and the second containment does not depend on the
+experiment coming out as expected.** `FW-196` says 讀 the vendor writes flash on an
+*unauthenticated* request past an uptime threshold, and `CLAUDE.md` refuses a containment that holds
+only if the result is as predicted. Path: 讀 every `path =` in the probe list, exactly one carries
+`htm` — `/status.htm`, the third of the seven names the authorisation branch excludes — and the
+three prefix probes use an impossible handler name, which matters because `handleForm` has no method
+test. Timing: 量 the whole vendor HTTP episode finished at **J+61 s** against a **J+601 s**
+threshold, and that bound holds whatever the list says. The lower bound was measured too, not
+guessed: `NET-118` has 52869 answering only at J+31.3–32.5 s, so an earlier start reads an opening
+port as closed. The board was never left at the loader prompt (`NET-165`), and getting into the
+vendor firmware used two measured halves — `busybox reboot -f` with an ESC catch (`FW-37`) then
+`J BFC00000` — in one invocation, so the script does not jump if the catch fails.
+
+**④ `R9-5` built `quiet-swcore` for the first time and found 0 differences outside the `SWCORE`
+set — and, in the same measurement, that both drivers the controlled-variable claim calls *the same*
+are not the same object.** 量 2026-10-04, three builds one at a time with one `config/` so all three
+carry `RECIPE_ID` `575da809` (the comparator refuses if they differ, because a moved `RECIPE_ID`
+changes a `-D` on every C object): `r95q` (`quiet`, `SWCORE=n`) 4,257,403 B, `r95y`
+(`quiet-swcore`, `SWCORE=y`) 4,567,218 B, and `r95q2` as the reproducibility control, byte-identical
+to `r95q` over `vmlinux` and over 735 of 735 objects. The set `S` is **41** kconfig symbols — 量 the
+installed `.config` differs on **1**, `CONFIG_RTL_819X_SWCORE`, and the `.config` each build *used*
+differs on **41**, equal in both directions to the delta's own 41 `@quiet,loud` rows. **173 object
+differences** (29 presence, 144 content) classify inside `S` by three rules that each name what they
+read, and **0** fall outside; 1,042 symbol-level differences trace to a defining object with **0**
+owners outside the same bucket, which is a second independent route to the same answer. 🔴 And 量
+`drivers/net/wireless/rtl8192cd/built-in.o` is 816,475 B against 820,910 B, while
+`drivers/net/rtl819x-nic.o` and `drivers/net/rlxfw-seam.o` differ and the other ten of rlxfw's
+twelve built drivers are byte-identical: **the NIC driver and the WLAN driver — the two the claim
+names as the same — are exactly the two that are not the same object.**
+
+### The board row's clauses, read one at a time
+
+| the row said, re-specified 2026-10-04 before opening | verdict |
+|---|---|
+| **every published row carries a mechanism class from the closed set ⟨架構性／有界化／服務不存在／平台限制／不適用⟩** | 🟢 **met** on 16 of 16 rows. 量 the register's classes are 架構性 35, 有界化 15, 服務不存在 18, 不適用 73 and **平台限制 0**. 🔴 A 0 is a claim: the renderer's `--self-test` `P1` plants a `平台限制` row and requires it to be **accepted**, so the 0 means the register carries none and not that the renderer cannot represent one. 🔄 **2026-10-04, re-measured at the close: `tools/fixcases.py`'s own `CLASSES` now holds **five** and carries `平台限制`** — 量 `tools/fixcases.py`, the set is `{架構性, 有界化, 服務不存在, 不適用, 平台限制}`. The defect this row recorded (a `平台限制` row the renderer accepts and the register's checker refuses) was repaired in `b1b5e8db`, so the two checkers now agree on the closed set and the 0 stands on both |
+| **a vendor cell that is a reading from `V-A`/`V-B`/`V-C` naming its capture or artefact, or `⊘ Structural` naming the committed finding** | 🟢 **met** on 16 of 16. Tiers 量 V-A 89, V-B 29, V-C 10, V-D 13 over 141 rows; `V-D` resolves to `⊘ Structural` cited from `P2` and never re-derived |
+| **an rlxfw cell from the same instrument as ②** | 🟢 **met**, and it is the clause that cost the seating: `R9-7` ran the same tool, host, cable and port as `R9-6`, in the same episode. ⚠️ Two anchors publish an rlxfw cell from the `P2` image, which predates `R7`, and say so in the cell |
+| **a check that would have detected the opposite of the row's claim, with that check's reading; a row without the reading publishes 未定** | 🟢 **met as a refusal rather than as a count**: 量 publish × ④ over 141 rows gives `win`/reading 17 and `win`/no-reading **0**, with zero rows missing the field. 🔴 The clause's value is that 77 rows publish 未定, which is the outcome the old clause could not produce |
+| **the gate fails if the renderer accepts a planted row saying 「我的設計修好了這條」, a mechanism outside the closed set, or an evidence link that does not resolve — all shown firing before any real row renders** | 🟢 **met**: the five guards are shown firing on planted rows, and the permitting side is shown too (`P1` accepts a `平台限制` row, `P5` renders the two anchors that publish vendor symbols in full) |
+| **the vendor column is static, network-facing or boot-console evidence and never a test run on the vendor firmware** | 🟢 **met**: 量 no command was typed into the vendor firmware, because 讀 it has no shell; every vendor cell is `V-A` (a host-side request), `V-B` (the dump-derived tree) or `V-C` (a boot console already captured) |
+| **a row whose tier carries no executable refutation may not claim absence at all** | 🟢 **met**: 量 5 rows publish `surface-absent` and 42 publish `not comparable`, neither of which is an absence claim about behaviour |
+
+### The questions this gate must be able to answer
+
+The plan's `R9` row is the differential proof. Entry 19 answers *what does rlxfw do differently, by
+mechanism class, with both columns from one instrument* at class level on 16 rows. It does **not**
+answer *is rlxfw more secure*: that question needs the five uncontrolled variables controlled, and
+they are not. 讀 `docs/differential.md` § 2 names them — kernel config, libc, toolchain, userspace
+population and service set — and column ③ cannot tell a design decision from any of the five.
+
+### What `R9` did not establish
+
+🔴 **That the live column covers the cases it is drawn from.** 68 of 89 `V-A` rows have no probe,
+and nothing in the published table speaks for the 52 rows in `V-B`, `V-C` and `V-D` beyond their
+tier and their publish verdict. The exemptions are named and reasoned, in six blocks — 31 whose
+stimulus is a `/boafrm/` handler or named CGI that the probe list's own refusals bar, 7 held
+upstream, 11 whose subject is not a TCP reply this instrument can send, 12 cut upstream, 6 whose
+subject is this project's own instrument, and 2 — but a named exemption is not a reading.
+
+🔴 **That the vendor firmware's behaviour was tested.** It was *probed*, from the network, with no
+command typed into it. Every statement about the vendor's internals here is 讀 — from its own
+shipped bytes, its boot console or upstream's instruction-level work, which is not this repository's
+instrument and has not been reproduced here on the same population.
+
+🔴 **That the flash bracket would detect a small write.** 量 the level-0 digest `ae87ac03…` is equal
+before and after, and group 0 at 4 KiB is equal at `44355799…`, with `n_writes` 0 on both sides and
+`map_hashed` 4,186,112 bytes with `H601`'s 8,192 skipped. 推 nothing about sensitivity: two equal
+digests over unchanged flash say nothing about whether a small write would show, and a sensitivity
+control needs a known change, which is a write. It cannot see two writes that cancel, or any byte
+outside the units read. `FLS-26`'s ledger does not move, and `H601` is never hashed (`FLS-31`).
+
+🔴 **That the held items are answered.** 量 16 of 141 rows are marked held and they name 12 of the
+13 held upstream ids — `D-11` is named by no row, which is why the guard keys on the id set as well
+as the flag. Those rows reach the table as counts. Whether rlxfw answers their mechanisms is not
+published and will not be while they read held: the report has not been sent, and `plan/` § 15
+forbids a class-level row that is in substance a named reproduction.
+
+🔴 **That `quiet-swcore` runs.** 量 neither arm of `R9-5` has booted; `quiet-swcore` has never
+booted on the silicon, and `rtkimage` was never run on either. `.bss` grows 1,356,544 bytes at
+`SWCORE=y` and no measurement here bounds what that does to a running board. "0 differences outside
+`S`" is an **attribution, not a cause**: rule `R3` reads kbuild's own dependency stamps, so it
+establishes that the flip *can* explain a difference, not that it *is* the difference; a per-object
+preprocessed-output diff would settle it and was not run. The 12,629 address-only symbol differences
+were counted and set aside, not explained.
+
+🔴 **That the DoD's two figures for the WLAN driver are right — and one of them is not.** The step's
+own DoD said *40 symbols gone, shorter `sk_buff`*. 量: the loss is **11** symbol-table entries —
+four functions (`rtl8192cd_isIgmpV1V2Report`, `rtl8192cd_isMldV1Report`, `rtl8192cd_proc_vlan_read`,
+`rtl8192cd_proc_vlan_write`) plus their section and relocation symbols — and **6** undefined
+references, not 40. 推 the 40 in the DoD is the kconfig count (量 840 − 800 = 40), which counts a
+different kind of object. `sk_buff` is **8** bytes shorter, 量 off `skb_init`'s instruction stream
+(192 against 200, cross-checked by the fclone immediate 388 against 404) against 讀 12 bytes of
+declared field — and the remaining 4 are **未定**, 推 alignment padding, unmeasured. The qualitative
+half of the DoD stands and is now quantified; its arithmetic did not.
+
+🔴 **That `R9-4` produced a column.** The step's brief was *the `V-B` static column from instruments
+that already exist*, and 量 that column was already complete when the step opened: `R9-1` and `R9-2`
+had put all 141 rows' ②③④ in the register, and `tools/fixcases.py` `C4`/`C7` already passed over it.
+Closing the step on the column's existence would have been the same defect as the old `通過` clause,
+one level down. So `R9-4`'s content became `FW-20`'s two 殘留 — the only `V-B` facts the register
+had not read — which landed as `FW-199` (`bin/boa` neither drops privilege nor chroots, 讀 from four
+independent sources) and `FW-200` (the setuid/setgid census off the image itself). ⚠️ An import
+census is not exploitability: `system` being linked is not `system` being reachable from a request,
+and the row that would claim otherwise publishes undetermined.
+
+🔴 **That a 推 this gate wrote survived it.** `FW-198` carried the inference that `P2`'s unexplained
+31-same/1-DIFFER in group 0 is explained by `FW-196`'s write to `AUTHG_IP_ADDR` at `0x00C000`. 量
+inside the same gate, over committed captures and with no power at all: the population is every
+`bench/**/*.log` carrying `^map_level 0`, compared only when the matched body-line count equals the
+capture's own `map_lines`; **46 captures qualify** across 22 date directories from
+`bench/2026-09-08b` to `bench/2026-10-04`, and **all 46 carry the identical 32-line body digest
+`ae87ac03269985d6`**. So the whole-chip map at 128 KiB has not moved once in 26 days, including both
+of `P2`'s vendor seatings, and there is no change for `FW-196` to explain; the single `DIFFER` is a
+standing device-versus-dump difference whose own fourth field reads `dump`, present already in the
+earliest qualifying capture. At 4 KiB it fails a second way: 讀 group 0 is 30 same / 2 DIFFER and
+the two differing units are `009000` and `00D000` — **`00C000`, where `FW-196` writes, is SAME.**
+`FW-201` records the measurement and `FW-198`'s 推 is retracted. 🔴 **Two of the extraction patterns
+that produced plausible numbers first had to be caught**: `^DIFFER` missed lines carrying two
+leading spaces, and `[0-9a-f]{6}` missed the 12 of 32 offsets with an uppercase hex letter, while
+the positive control passed because it used `000000`, which is all digits. A control has to carry
+the characteristic that varies. The residual is not nothing: `00D000` *is* inside COMPCS, so a
+vendor configuration write before the dump baseline stays a live candidate for the dump divergence
+— it simply cannot be attributed to `P2` or to this segment's episode. `009000` is unexplained and
+`FLS-26` holds it ⊘.
+
+🔴 **That `R8b` is any closer.** Nothing here writes flash, so nothing rlxfw writes has been shown
+to survive anything — the same residual `R8a` → `R7` → `R8` have each carried. 量 there is no write
+path in any built image: 讀 `config/rlxfw-marks.tsv` `MK5` gates `rtl819x-spi-write.o` on
+`CONFIG_MTD_RTL819X_WRITE`, and 量 `R9-5` found that object absent from both staged trees.
+
+### `R9-11`: the five deliverables that do not complete, and the one test they all fail
+
+Plan § 17 keeps three categories apart — `出於自願的範圍外`, `卡在儀器上（會產出可檢查的事實，只是
+現在做不到）` and `刻意換掉（前置都滿足了，但不划算）` — on its own stated ground that collapsing
+them is how *I chose not to* becomes *I could not*, which is the flattering direction. The test
+applied to each item is: **does the blocker survive the owner's dated yes, or an act of the
+owner's?**
+
+| item | the blocker | survives a yes? | category |
+|---|---|:---:|---|
+| `cvewatch` | the owner's rule of 2026-09-26 — a new checker only for bricking, an `H601` leak or a misjudged result | **no** | `出於自願的範圍外` |
+| `docs/disclosure.md`'s findings half | the report has not been sent | **no** | `出於自願的範圍外` |
+| the demo recording | nobody has pressed record | **no** | `出於自願的範圍外` |
+| `study/QA.md` as a repository deliverable | `.gitignore`'s `study/` line, and `CLAUDE.md`'s rule against a committed file written for a hiring panel | **no** | `出於自願的範圍外` |
+| `VDR-1`/`FW-67`'s silicon halves | a flash write, barred by the zero-write mainline and by the owner's serial order | **no** | `出於自願的範圍外` |
+
+🔴 **All five come out the same way, and that is the finding rather than a coincidence: not one of
+them is waiting on an instrument.** Each blocker is a decision — the owner's rule, the owner's send,
+the owner's camera, the owner's `.gitignore`, the owner's zero-write mainline — and filing any of
+them `卡在儀器上` would be exactly the substitution plan § 17's header warns about. 🔴 The test's
+boundary is shown rather than asserted: `FLS-24` (`SPEC.md` § 17) is the one row that survives it,
+because what is missing there is **money, not permission** — a second unit of this model — and plan
+§ 17 item 8 already filed *reproduction on a second machine / a spare / the first thing bought when
+the budget loosens* under `卡在儀器上`, so that row follows the precedent rather than re-deciding it.
+
+**What is not ⊘'d, item by item, because naming the half matters:** citing CVE ids as prior art
+continues and the register keeps its rows — what is declined is a *watcher*; `docs/disclosure.md`'s
+**process** half is desk-doable and resolves a dangling pointer, 量 § Release clock points at a file
+that does not exist; the demo **script** is committable as data, bounded by two things — plan
+`ARTIFACTS.md`'s 0:15 and 2:15 beats cannot be committed captures, because every evidenced path into
+vendor userspace opens with a flash write, and `tools/replay-capture.py` hardcodes one reel path, so
+a second reel file is read by no control; `study/QA.md` can be written at the desk tonight, and
+*cannot complete* is simply false for it; and `VDR-1`'s qemu-user rehearsal costs neither flash nor
+power. ⚠️ Each of those is a half **named**, not delivered. And 讀 **no tool reads a category**: the
+set is held by convention, so a mis-filed one is invisible to every check in this repository.
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner continued the relaxation of 2026-09-27 and 2026-09-30 and asked for the decisions to be
+taken; the flash rules, `H601`, the power handshake and `NET-165` are the owner's own and are not
+listed.
+
+1. **`R9-4` re-scoped from *produce the `V-B` column* to *read `FW-20`'s two 殘留***, because the
+   column already existed and was already guarded, so closing on its existence could not fail. The
+   alternative — close `R9-4` on the register as delivered — was rejected for that reason.
+2. **The vendor seating was taken in the 120th segment rather than the next**, and in the reverse
+   order to the plan: rlxfw's column first, because the board was already running rlxfw, which took
+   the one-shot resource off the critical path. One power action, for the single reason that the
+   vendor firmware has no shell and cannot be told to reboot.
+3. **`FW-198`'s 推 was retracted by measurement inside the gate that wrote it**, rather than carried
+   to a later gate. A record keeps what it said: `FW-198`'s own entry stands and `FW-201` is the new
+   row.
+4. **The ⊘ list files all five items as `出於自願的範圍外` and none as `卡在儀器上`**, on the test
+   above. The owner may hold that the zero-write mainline is a constraint rather than a choice; the
+   ruling says it is a choice because `CLAUDE.md` makes a flash write exactly the owner's explicit
+   yes and `cardcheck` already carries the mechanism (`FW-113`).
+5. **`P3`'s row moves to `~` and not to `✓`.** 讀 `README.md` owns version → contents and defines
+   `v1.0` as `R8` + `R8b` + `R9` + `P3` + `P4b`, and the `P3` row closes at `v1.0`, so `R8b` sits
+   between `P3`'s report and `P3`'s close. Marking it `✓` would also orphan `LA-1`, whose only owner
+   is `P3`.
+
+### The booking: what moved to another gate, and what was declined
+
+**Re-owned in the closing commit, because leaving them on a closed `R9` makes each read `ORPHAN` in
+`cfcensus`** — 量 three § Carried forward rows named only `R9` as a live owner:
+
+| row | to | why |
+|---|---|---|
+| `FLW-1` | **`P4b`** | the scanner it asks for guards a **publication**: `flashwin scan` runs only at the desk, and the moment a committed digest of a forbidden window matters is the push. ⚠️ The owner's rule of 2026-09-26 names this row **in** rather than out — an `H601` leak is one of the three things a new checker may be written for — so it needs no ⊘ |
+| `LEDGER-1` | **`P4b`** | and the first re-owning's reason was an analogy rather than a requirement: `R9`'s differential is between two *firmwares*, not two *commits*. The row's own open decision ③ — whether *in history, not in `HEAD`, in scope* is red — is a question about what the published per-file modification record must contain |
+| `VDR-1` | **a standing instruction**, `R9` struck, with the **silicon half only** ⊘ | the qemu-user rehearsal the row itself names costs neither flash nor power and is unscheduled, so a whole-row ⊘ would retire work that is merely unscheduled |
+
+**Declined in the closing commit**, both in `SPEC.md` § 17: `FW-67`'s remaining half — the vendor
+*shipped object's* runtime exposure — with its 推 narrowed in the same commit rather than left wide
+(量 `NET-33` and `NET-100` drove that handler on this die, but on rlxfw's own build of the vendor
+source, and 讀 `CONFIG_RTL_DEBUG_TOOL` is `dep-unmet` in today's derivations, so the instrument is
+absent from the current image); and `FLS-24`, the one row filed `卡在儀器上`.
+
+⚠️ **Flash.** 量 across both segments: one power action, the vendor seating of 2026-10-04; uploads
+each made after `DW 8040D4A0` read `00000000` with the loader answering ARP and the staged head read
+back equal to the file before each `J`; **no `FLW`, `EW`, `EB`, non-zero `AUTOBURN` or `FLR`
+issued**. `n_writes` reads 0 on both sides and is stated as carrying no information (`FW-142`) and as
+blind to the vendor's own write path. What that cannot see: two writes that cancel, every byte
+outside the units read, and `H601`, which is never hashed. The `FLR` bracket stays at 1,024 of
+4,194,304 bytes = **0.0244 %**.
+
+---
+
+## The operating clause, re-run at nineteen entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -3518,7 +3793,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs. Re-run 2026-10-04 with `R9` appended, which adds exactly one pair — **and that pair FIRES on the same thing a third consecutive time**.)*
 
 | pair | shared? |
 |---|---|
@@ -3539,6 +3814,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R1y` → `R8a` 🆕 | **no — and this run makes that verdict a run late, because entry 16 wrote no sixteen-entry run.** `R1y`'s residuals are text in this repository and the tools that read it; `R8a`'s are a second-stage loader on the silicon, flash, a counter, keys and a cache, and no step of `R8a` took an `R1y` residual on in writing, which the guard written at eight entries decides. ⚠️ The nearest candidate is a reading the tree does not hold — `FW-119`'s pre-commit reading, done by scripts kept outside the repository, beside `SPEC-R8a.md` and the verdict script — and it is declined as a shape: one is a **procedure** the tree does not repeat, the others are **artefacts** the tree does not hold. The flash boundary is not counted, for the thirteen-entry run's reason |
 | `R8a` → `R7` 🆕 | **yes — that nothing rlxfw writes survives, because there is no write path and `R8b` owns the half that would give it one.** `R8a` carries *"Nothing in `R8a` writes one byte"* and *"the monotonicity the design rests on is asserted and never exercised"*; `R7` carries *"That the config store survives anything"*, and `notes/config-store.md` § 11 takes it on in writing and names the gate — *"R8 supplies the MTD backing"* — so `R7` built an A/B store with a monotonic `seq`, an erased-value exclusion and a read-back verify **for a medium it never touched**. 🔴 This is **not** the flash boundary the thirteen-entry run declined: that is the § Flash bookkeeping sentence `CLAUDE.md` requires of every entry, while this has a board row of its own and the row is open. ⚠️ Weaker than `P1` → `R6` in that neither entry names the other's gate — both point at a third, `R8` — and `R8b` is already booked behind `R9`, so the firing adds evidence and not an instruction |
 | `R7` → `R8` 🆕 | **yes — the same thing as `R8a` → `R7`: persistence, that nothing rlxfw writes survives because there is no write path, and `R8b` owns the half that would give it one.** `R7` carries *"That the config store survives anything"* and names `R8` in it as the gate that supplies the MTD backing; `R8`'s entry carries persistence and the ten power cuts, moved to `R8b`'s row. ⚠️ The weakest firing in this table: `R8`'s list holds it because the decision that closed `R8` moved it there, so it adds no evidence the seventeen-entry run had not, and its instruction — *that thing is the next gate* — points at a gate booked behind `R9` |
+| `R8` → `R9` 🆕 | **yes — the same thing a third consecutive time: that nothing rlxfw writes survives, because there is no write path, and `R8b` owns the half that would give it one.** `R8` carries *"That anything can be written to flash and read back after a reset"* and *"the monotonicity the design rests on is asserted and never exercised"*; `R9` carries *"That `R8b` is any closer"* — 讀 `MK5` gates `rtl819x-spi-write.o` on `CONFIG_MTD_RTL819X_WRITE` and 量 `R9-5` found the object absent from both staged trees. 🔴 **The clause's instruction is already carried out**: `R8b` is booked as a gate of its own and is the next gate in the owner's serial order, so this firing adds evidence and not an instruction — the third consecutive firing on one subject, which is itself the reading. ⚠️ What it does not establish: a rule that fires more often because the ledger got longer is measuring length, not repetition, and whether the clause should stop counting a subject already booked as a gate is an open question about the clause that this entry does not decide |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,

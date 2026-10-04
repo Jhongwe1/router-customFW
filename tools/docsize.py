@@ -101,14 +101,20 @@ BUDGET = {
     "CLAUDE.md:lines": 351,
     "CLAUDE.md:bytes": 24200,
     "CLAUDE.md:maxline": 647,
-    "PROGRESS.md:bytes": 106000,  # 2026-10-04, R9-0: R9's step list open, and
-    #   R9 is the project's acceptance gate, so its list is the longest a single
-    #   gate has needed: 102,637 B +3 %.  Up from 103,000 -- which was
-    #   R7-0/R8a-0's 100,140 +3 % and which the 2026-09-30 closing commits
-    #   should have taken DOWN when R7's and R8a's lists moved verbatim to
-    #   docs/history/ and did not, so this raise is smaller than it looks and
-    #   part of it is a ratchet-down that was owed.  R9's closing commit takes
-    #   it down again: a closed list moves out.
+    "PROGRESS.md:bytes": 100000,  # 2026-10-04, R9's closing commit: the step
+    #   list moved verbatim to docs/history/steps-R9.md, which is the
+    #   ratchet-down the 106,000 comment promised and the 2026-09-30 closings
+    #   owed.  量 97,100 B after this commit (12,706 B of step list out; section
+    #   Now, the board row, three re-owned debts and the census in).
+    #   🔴 ONE DEPARTURE, STATED RATHER THAN HIDDEN: 97,100 x 1.03 = 100,013.00,
+    #   and three significant figures rounded UP is 101,000, not 100,000 --
+    #   because the 3-s.f. grid coarsens from 100 to 1,000 at 10^5 and the
+    #   product lands 13 B past it.  101,000 would give 4.0 % of headroom
+    #   where the convention asks for 3 %; 100,000 gives 2.99 %, clears the
+    #   measure, and is the tighter of the two numbers on that grid, which is
+    #   what a ratchet is for.  The floor is 50,000 against 97,100, so this is
+    #   safe both ways.  The commit that opens the next gate's step list raises
+    #   it again -- that is the mechanism working, not a defect.
     "PROGRESS.md:maxline": 9870,
     "PROGRESS.md#Now:bytes": 6000,
     "PROGRESS.md#Now:maxline": 1000,

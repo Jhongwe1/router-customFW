@@ -1471,7 +1471,58 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
-Nothing since `v0.6`.
+**Contents, against [`README.md`'s version map](README.md#which-gates-make-which-version):**
+`R9` — the differential security proof, closed 2026-10-04 with zero flash-write commands issued.
+`v1.0` needs `R8b`, `P3` and `P4b` as well, and `R8b` has not opened.
+
+🟢 **`R9`**: `docs/differential.md` publishes **16 rows** standing for the register's **141**
+upstream cases — one row per (mechanism class, anchor) pair, because ②③④ are one value per anchor —
+each carrying a mechanism class from a closed set, a vendor cell that is a reading or `⊘ Structural`
+naming a committed finding, an rlxfw cell **from the same instrument**, and a check that would have
+detected the opposite of the row's claim together with that check's reading. A row whose fourth
+cell has no reading publishes 未定: 量 **win 17, surface-absent 5, not comparable 42, 未定 77**.
+The gate's pass condition was **re-specified before it opened**, because the one it had — *a
+three-column table whose third column is not empty* — was satisfied by seven rows committed in the
+planning material before `R9` existed, which is the `R7` defect verbatim.
+
+🔴 **The live column speaks for 21 of 89 cases, and the table says so.** 讀 `config/fix-cases.toml`
+carries 89 rows at the tier that needs a live, network-facing reading; `config/r9-probes.toml`
+holds 27 probe cases citing **21** distinct rows, because 6 rows carry two cases each; the other
+**68** are exempted by name with a reason each, and 21 + 68 closes against 89. The renderer refuses
+if that sum does not close. Nothing in the table speaks for the 52 rows in the three static tiers
+beyond their tier and their verdict.
+
+🟢 **Both columns came from one instrument in one episode**, on one host, cable and port: 27 cases
+each way, **137 differing fields**; the vendor answers on 52869 and 52881 where rlxfw refuses, and
+serves its configuration blob unauthenticated under path-normalisation variants where rlxfw returns
+400, while rlxfw bounds request-header size where the vendor does not. The link was checked with a
+control first — 10.1.1.1 answered 3 of 3 and a second address on the same subnet did not — because
+a dead link makes every probe read *closed* and publishes a false column. Two vendor runs 60 s
+apart differ in exactly one field of 27 cases, a status page's header digest.
+
+🟢 **One power action, two independent containments, and a flash bracket equal at two
+granularities.** The vendor firmware writes flash on an unauthenticated request past an uptime
+threshold, so the probe list used only names the authorisation branch skips **and** the whole
+episode finished at J+61 s against a J+601 s threshold — the second bound holding whatever the list
+says. 量 whole-chip map digest equal before and after at 128 KiB, group 0 equal at 4 KiB,
+`n_writes` 0 on both sides. No `FLW`, `EW`, `EB`, non-zero `AUTOBURN` or `FLR` was issued. What
+that cannot see: two writes that cancel, every byte outside the units read, and `H601`, which is
+never hashed.
+
+🔴 **A 推 written inside this gate was refuted inside it.** `FW-198` inferred that the one
+unexplained flash-map difference `P2` left behind was the vendor's own configuration write. 量 over
+46 committed captures spanning 26 days, every one carries the identical whole-chip digest, so there
+is no change to explain; and at 4 KiB the unit the inference needed reads SAME. `FW-201` records it
+and `FW-198`'s inference is retracted — in the gate that produced it, not in a later one.
+
+⚠️ **What `R9` did not establish.** That rlxfw is more secure: five classes of variable are
+uncontrolled — kernel config, libc, toolchain, userspace population, service set — and the rlxfw
+column cannot tell a design decision from any of them. That the vendor firmware was *tested*: it
+has no shell, so it was probed from the network and nothing was typed into it. That the held
+findings are answered: 16 rows are marked held and reach the table as counts only, because the
+report has not been sent. That `quiet-swcore` runs: it was built and read as an ELF, and has never
+booted. And that anything rlxfw writes survives — 量 there is no flash write path in any built
+image, which is `R8b`'s.
 
 ---
 

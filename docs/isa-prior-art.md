@@ -930,9 +930,22 @@ this unit's own decompressed kernel with `priveSkbDebug` -- a neighbouring
 `/proc` entry under a different `#if` -- reading **0** as the negative control.
 **§ 9's open residual *"reaching `TC0CNT` from userspace needs `/dev/mem` or a
 `/proc` file, and which one is `R1-pub-4`'s decision"* therefore had an answer
-this repository was already holding.** ⚠️ 推 and unmeasured: its *read* output
-goes to `rtlglue_printf`, i.e. to the console, not back to the reading process,
-so it is a write-side primitive plus a console-side read.
+this repository was already holding.** 🔄 **2026-10-04 (`R9`'s close): this 推 was wider than the facts, and the
+measurements that narrow it were already in the repository.** 量 `NET-33`
+(2026-09-17, image `p11e`) and `NET-100` (2026-09-21): the same handler was
+driven on this die -- `echo read <addr> 4` printed **one** word and not four,
+and a write of `0xC4400000` to `0xB8010000` came back on the console from the
+handler itself. So *the read output goes to the console rather than back to the
+reading process* is **no longer 推**. 🔴 But both readings were taken on rlxfw's
+own images, built from the staged vendor source at `SWCORE=y`, and `R9-5`'s rule
+is that the same source is not the same object -- so they are readings about
+**this project's build** of the vendor handler, not about the vendor's shipped
+object. 讀 `config/rlxfw-kernel.delta`: `CONFIG_RTL_DEBUG_TOOL` is `dep-unmet`
+in today's `quiet`/`loud` derivations, because it sits inside
+`if RTL_819X_SWCORE`, so the instrument that measured it is **absent from the
+current image** and the reading cannot be repeated today. What stays 推 is the
+narrower claim: the **vendor shipped object's** runtime behaviour. `SPEC.md`
+`FW-67`.
 
 **⚠️ Two safety findings that travel with the route and are worth more than it.**
 讀 `unsquashfs -ll` on the image: `/dev/mtdblock0` ships at mode **0666** and
