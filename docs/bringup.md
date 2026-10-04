@@ -119,7 +119,8 @@ Bring-Up 報告*, which lists exactly ten sections. §§ 1–5 and § 13.1 preda
 *一份只有「規格」的 bring-up 報告是抄的；一份有「這顆的坑在哪、我怎麼撞到的、
 怎麼繞過」的才是做過的* — a bring-up report that holds only specification was
 copied; one that holds where the part bites, how it was hit and how it was
-worked around was done. Every row in § 14 therefore carries how it was hit.
+worked around was done. Every row in § 14 therefore carries how it was hit
+and how it was worked around — or says that it was not.
 
 ---
 
@@ -369,12 +370,13 @@ register contents.
 |---|---|:-:|:-:|---|
 | product | TOTOLINK N150RT, hardware `V2.0` | 量 | — | `IDN-01`, `IDN-02` |
 | SoC | Realtek RTL8196E | 量 | 量 | `CPU-01` — **three sources**: package, boot banner, and the boot code's own id comparison |
-| CPU core | Lexra **RLX4181** rev 1, `PRId 0x0000CD01` | 量 | 讀 | `CPU-04`; the name must be quoted with its three recorded weaknesses (`CLAUDE.md`) |
+| CPU core | Lexra **RLX4181** rev 1, `PRId 0x0000CD01` | 量 | 讀 | `CPU-04`; the name must be quoted with its three recorded weaknesses (`CLAUDE.md`). ⚠️ `CPU-04`'s own V cell reads `—` while its value text records `PRId` 量 2026-08-25b; this row follows the value text, and the mark cell is `SPEC.md`'s to correct |
 | CPU clock | 400 MHz | 量 | — | `CPU-11`, `CLK-01` — banner string plus `D`; see § 8 for what is and is not measured |
 | SDRAM | Winbond W9825G6KH-6, 256 Mbit, 16M × 16, 16-bit bus | 量 | 讀 | `MEM-01`, `MEM-03` |
 | SDRAM fitted / seen | **32 MiB** fitted; loader reports `32M`; Linux is given **26,052 kB** | 量 | 量 | `MEM-04`, `MEM-05`, `MEM-06` |
 | memory controller | `MCR` at `0xB8001000` | 讀 | 讀 | `MEM-07` — 🔴 **never read on this device**; its settings are `MEM-08` `⊘` |
-| NOR flash | Eon (cFeon) EN25QH32B, SOP-8, board `U19`, **4 MiB / 32 Mbit** | 量 | 量 | `FLS-01`, `FLS-03` — three sources for the size |
+| NOR flash part | Eon (cFeon) EN25QH32B, SOP-8, board `U19` | 量 | 讀 | `FLS-01` |
+| NOR flash size | **4 MiB / 32 Mbit** | 量 | 量 | `FLS-03` — three sources for the size |
 | flash JEDEC id | `0x1C7016` | 量 | 讀 | `FLS-04`; re-read under Linux 2026-10-04 as `rdid_id 1C7016` (`FW-191`) |
 | switch | 5-port 10/100, integrated in the SoC | 量 | 讀 | `NET-01`; 4 × LAN + 1 × WAN sockets (`NET-03`) |
 | PHYs | exactly five, at MDIO addresses 0–4 | 量 | 讀 | `NET-39` — four registers that share no line of code |
@@ -386,7 +388,8 @@ register contents.
 | front-panel button | a GPIO on `PABCD` bit 5, active low — **not `RESET#`** | 量 | 讀 | `BRD-05` — three sources; its loader-state `XOR 00000020` must be masked `& 0x20` under Linux |
 | console | 4-pin 2.54 mm header, factory-fitted, `VCC` · `TX` · `RX` · `GND`, **38400 8N1** at 3.3 V | 量 | 量 | `BRD-08`, `BRD-09`, `BRD-10` — no soldering anywhere in this project |
 | EJTAG | datasheet says 5-signal P1149.1 | 文 | 讀 | `BRD-11` — **never located on the board**, no adapter |
-| PCB marks | `0422C` beside the SDRAM; `JL-2` · UL `94V-0`; date code `18.15` | 量 | 推 | `IDN-04`–`IDN-06`; assembly **not earlier than 2018-09** (推, five agreeing date codes, `IDN-07`) |
+| PCB marks | `0422C` beside the SDRAM; `JL-2` · UL `94V-0` | 量 | — | `IDN-04`, `IDN-05` |
+| PCB date code | `18.15` — 2018, week 15 | 量 | 推 | `IDN-06`; assembly **not earlier than 2018-09** (推, five agreeing date codes, `IDN-07`) |
 | serial number | *deliberately absent* | — | — | `IDN-03` — it identifies this unit (`SPEC.md` § 18) |
 
 ⚠️ **What this section does not establish.** `BRD-01` and `RF-01` each rest on a
@@ -474,10 +477,10 @@ pin against ground, thirty seconds* — and its recorded reopen condition is
 **"`P3` wants the power tree written as 量, or a seating that is already powered
 does it in passing, with the owner's nod"**. This section does not reopen it: it
 is written as 讀 and 推 with one clip-side 量, which is what the evidence
-supports. 🔴 **The multimeter work needs the owner's word before it happens** —
-it touches pins on the only powered board — and until then the plan's 實測 for
-this section is **not delivered**, which is stated here rather than hidden
-behind the numbers that do exist.
+supports. 🔴 **The plan's 實測 for this section is not delivered**: the owner
+decided on 2026-10-05 that `R8b`'s seating takes no multimeter readings, and the
+multimeter work touches pins on the only powered board, so it needed that word.
+This is recorded here rather than hidden behind the numbers that do exist.
 
 ⚠️ `MEM-09` 讀: the power-on strapping pins are the DRAM pins — `MA[10:8]` at
 44/52/53 and `RAS#`/`CAS#` at 51 — **not the `SF_*` pins**. That is a datasheet
@@ -553,8 +556,10 @@ method that does not go through CPI, and this core has no CP0 `Count`
 
 ### 8.3 There is no crystal row
 
-🔴 **未定 — the reference oscillator.** 量 by grep over `SPEC.md`: there is **no
-row for a crystal, oscillator or reference frequency**. `CLK-02` mentions
+🔴 **未定 — the reference oscillator, `CLK-50` 殘留.** 量 by grep over `SPEC.md`:
+there is **no value row for a crystal, oscillator or reference frequency** — the
+one row that names the oscillator is `CLK-50`, the § 17 entry recording that
+absence. `CLK-02` mentions
 ordinary crystal tolerance only to explain its own +24 ppm; no source in this
 project names the part, the frequency or the multiplier chain that produces
 either 400 MHz or 200 MHz. ⚠️ So § 8 is a tree **read downward from the
@@ -607,8 +612,9 @@ reach them. 量 **zero**: no strap pin has ever been probed on this board.
 | `0xB800000C` | `0x0000000F` | loader | 量 | 讀 | `REG-30` |
 
 🔴 **The third word's address is an inference, and no file in this repository
-states it.** 量 `git grep B8000008` over every tracked file outside `upstream/`
-returns **nothing**: what is recorded is *word 3 of a `DW B8000000 1` dump*.
+but this one states it.** 量 2026-10-05, `git grep B8000008` over every tracked
+file outside `upstream/` returns **this file alone**: what is recorded is *word 3
+of a `DW B8000000 1` dump*.
 `LDR-07` 讀 gives `DW` word semantics — four words to a line, length counted in
 words — so the address is `0xB8000008` **推**. ⚠️ Anyone quoting `0xB8000008` is
 quoting an inference; the honest citation is `REG-29`'s word 3.
@@ -618,9 +624,10 @@ already holds, and nothing had connected them.** 讀 the draft datasheet
 § 8.2.9, in `WDTCNR`'s own table, under bit 19 `NRFRstType`: *"This bit has
 been taken over by System_Register hw_strap. Offset: 0xB800_0008h~B800_000bh"*.
 **So `D` places a register called `hw_strap` at exactly the address of word 3**,
-and `SPEC.md` `REG-29` calls that word 無名 — unnamed. ⚠️ 量 by `git grep`:
-`hw_strap` and `NRFRstType` appear in **no** tracked file outside `upstream/`,
-so the link is new here and § 9.5 says what it owes. 🔴 **This does not make the
+and `SPEC.md` `REG-29` calls that word 無名 — unnamed. ⚠️ 量 2026-10-05 by
+`git grep`: outside `upstream/`, `hw_strap` and `NRFRstType` appear only in this
+file and in `SPEC.md`'s `REG-40` 殘留, which the commit that landed this file
+added, so the link is new here and § 9.5 says what it owes. 🔴 **This does not make the
 word's contents known**: D names exactly one field in it, bit 19, the NOR-flash
 reset type, and gives an initial value that this unit's reading **does not
 match** — which is § 0 ①'s whole point, since D is a draft for a different
@@ -632,9 +639,8 @@ not cite it.** 量: `bench/2026-08-24b/B7b.log` (`DW B8000000 1`, 2026-08-24) an
 four words**, and `bench/2026-09-27d/CELLS-A.md` § 5 puts the second at the cold
 loader prompt with a gate that fails the capture if it contains `Booting...`,
 `---RealTek` or `Linux version`. ⚠️ `REG-29`'s source cell names only `B7b`, so
-**this row is `n = 2` and its owner says `n = 1`** — § 9.5 and `open-items`
-carry it as something the landing commit owes `SPEC.md`, not as a finding this
-file may hold.
+**this row is `n = 2` and its owner says `n = 1`** — a debt on that cell, still
+unpaid on 2026-10-05 and `SPEC.md`'s to pay, not a finding this file may hold.
 
 🟢 **`REG-30` is the one strap on this board whose field, value and consequence
 are all established**, and it is worth the space because it is what a strap
@@ -674,13 +680,15 @@ because the vendor sets bit 6 of `PABCD_DIR` and turns it into a moving output
 
 ### 9.5 What § 9 does not establish
 
-🔴 **未定 — `hw_strap`'s field layout and its reset value.** 量 by `git grep`
-over every tracked file outside `upstream/`: `hw_strap`, `NRFRstType`,
-`reg_iocfg` and D § 6.1's own strap-function names — `ck_cpu_freq_sel`,
-`ck_freq_sel`, `Bootpinsel`, `DDR_TYPE`, `DRAM_TYPE`, `External_Reset`,
-`Sel_40M` — appear in **zero** files. So the layout exists in a document this
-project holds and **has never been transcribed**, and `SPEC.md` has **no row**
-for the register at all. ⚠️ The initial value is 文 ×1 from a *draft* for a
+🔴 **未定 — `hw_strap`'s field layout and its reset value, `REG-40` 殘留.** 量
+2026-10-05 by `git grep` over every tracked file outside `upstream/`:
+`hw_strap`, `NRFRstType`, `reg_iocfg` and D § 6.1's own strap-function names —
+`ck_cpu_freq_sel`, `ck_freq_sel`, `Bootpinsel`, `DDR_TYPE`, `DRAM_TYPE`,
+`External_Reset`, `Sel_40M` — appear in **no file but this one and `SPEC.md`**,
+whose hits are the § 17 rows `REG-40` and `NET-170` recording this same
+absence. So the layout exists in a document this project holds and **has never
+been transcribed**, and `SPEC.md` has **no definition row** for the register —
+only `REG-40` 殘留, which says what one needs. ⚠️ The initial value is 文 ×1 from a *draft* for a
 *different variant* (§ 0 ②), below the two-source bar, so **this file names the
 register and its address and deliberately does not print its initial value** —
 doing that needs a new `SPEC.md` row in the same commit (`CLAUDE.md`).
@@ -756,8 +764,9 @@ die yet*.
 
 ⚠️ **The `L` dump returned four words and the last two are unowned.** The line
 reads `00000006 00000000 2702DFF1 0A8D8ED0`, so `0xB8000048` and `0xB800004C`
-have 量 readings and **no name, no owner and no `SPEC.md` row** — the same shape
-as § 9.2's words 2 and 3.
+have 量 readings and **no name, no owner and no `SPEC.md` value row** — the same
+shape as § 9.2's words 2 and 3, and `REG-40` 殘留 names both among the
+neighbours its desk read would settle.
 
 🟢 **The names are 讀 and they came from a committed instrument rather than from
 a guess.** `tools/hdrcensus.py` (in CI since 2026-09-17) reads the register
@@ -790,9 +799,10 @@ would have to be chased in `stage2.bin`, not in Linux.
 
 ### 10.3 What § 10 does not establish
 
-🔴 **未定 — the field layout, and 量 by `git grep` the token `reg_iocfg` — the
-prefix D uses for every field in these two words — appears in no tracked file
-outside `upstream/`.** So `00000006` means bits 1 and 2 are set and **nothing in
+🔴 **未定 — the field layout, `NET-170` 殘留, and 量 2026-10-05 by `git grep`
+the token `reg_iocfg` — the prefix D uses for every field in these two words —
+appears outside `upstream/` only in this file and in `SPEC.md`'s § 17 rows that
+record its absence.** So `00000006` means bits 1 and 2 are set and **nothing in
 this repository says which pins those bits select.** The datasheet has
 Tables 35–36 for it, cited by `rtl819x-view`'s own table, and the layout has
 never been transcribed. The row is a value with a name and no decode.
@@ -838,7 +848,7 @@ and `SPEC.md` § 13 owns the third.
 | `0xB8000000` | SoC peripheral register space | 讀 | 讀 | `MAP-03` |
 | `0xB8001000` | memory controller `MCR` | 讀 | 讀 | `MAP-04` — 🔴 never read on this device (§ 13) |
 | `0xB8001200` | SPI flash controller | 讀 | 讀 | `MAP-05` — **three sources** |
-| `0xB8002000` | UART; DLAB switches at `0xB8002100`/`2000` | 讀 | 讀 | `MAP-06` — 🔴 no register in `0xB8002000`–`0xB80020FF` has ever been read here (§ 13.2) |
+| `0xB8002000` | UART; DLAB switches at `0xB8002100`/`2000` | 讀 | 讀 | `MAP-06` — one register in `0xB8002000`–`0xB80020FF` has been read here, the loader-state `LCR` (§ 13.2) |
 | `0xB8003000` | interrupt controller | 讀 | 讀 | `MAP-07` |
 | `0xB8003100` | timer / watchdog | 讀 | 讀 | `MAP-08` |
 | `0xB8003500` | GPIO — `PABCD_CNR` `3500`, **`3504` unnamed**, `PABCD_DIR` `3508`, `PABCD_DAT` `350C` | 文 · 量 | 讀 | `MAP-09`; `3504`'s first reading is `REG-36` |
@@ -938,15 +948,19 @@ changed twice**, and both rejections are the useful part.
 * 🔴 **Never accessed at the loader prompt.** The loader's own `FLR` reads
   through `SFDR` programmed I/O (`LDR-42`), so **loader-state decode of this
   window is unmeasured**, and `notes/rlxboot.md` § 10 says the same for
-  `0xBD3F0000` specifically — which is 4,128,768 bytes beyond the 4,096 the
-  bare-metal cell covered, and where *erased* and *undecoded* both read `ctr=0`.
+  `0xBD3F0000` specifically — 4,128,768 bytes into the window, 4,124,672 past
+  the end of the 4,096 the bare-metal cell covered, and where *erased* and
+  *undecoded* both read `ctr=0`.
 
 ### 11.4 What § 11 does not establish
 
 ⚠️ **The flash rows describe the reference dump, not the live part.** `FLS-26`
-量 found the live flash differing from that dump; § 14.5 is the row and
-`[0x9000, 0xA000)` is the first difference. **99.02 % of the part is 未定
-against that dump** by `FLS-26`'s own coverage accounting.
+量 found the live flash differing from that dump at `[0x9000, 0xA000)` and
+`[0xD000, 0xE000)`; § 14.5 is the row. Its final accounting, seating 18 on
+2026-09-09, is **4,177,920 B (99.61 %) proven the same as the dump, 8,192 B
+(0.195 %) proven different and 8,192 B (0.195 %) undetermined** — the last being
+`H601`, skipped by rule. *Proven the same* is a digest match: it cannot see two
+writes that cancel, and no whole-part `FLR` re-read was run.
 
 ⚠️ **No row here states a physical address.** Everything is KSEG0, KSEG1 or a
 flash offset. The physical numbers this project has are elsewhere: the kernel's
@@ -995,7 +1009,8 @@ repository: `LDR-02` puts `stage2.bin`'s load base at `0x80400000` while
 | 6 | ESC window | `doBooting()` at `0x80408690` calls `user_interrupt(0x3B023380)`. On ESC: prints `---Escape booting by user`, sets `GIMR0 = 0`, enters the `<RealTek>` prompt. Without ESC: `goToLocalStartMode()` and `Jump to image start=0x80500000...` | loader | `LDR-15`, `LDR-20` |
 | 7 | kernel self-decompress | the `rtkload` stub: `decompressing kernel:` → `done decompressing kernel.`, then `start address: 0x…` | decompress | `docs/boot-time-table.md` § 2, `FLM-10` |
 | 8 | kernel init | the three interrupt domains come up in `rlx_cpu_irq_init`, `rlx_vec_irq_init`, `bsp_ictl_irq_init`; `bsp_timer_init` reprogrammes `CDBR` and `TC0DATA` **before** `rtl819x_timer_init`, so § 8's Linux column is the vendor's doing | Linux | `IRQ-05`, `REG-05`, `REG-11`, `docs/interrupt-map.md` § 3.5 |
-| 9 | userspace | the vendor's path is BusyBox `init` → `rcS`, and 讀 `FW-04`: the compiled-in command line is `console=ttyS0,38400 root=/dev/mtdblock1` with **no `init=`**, and the string `Kernel command line` is absent so the boot log never prints it. ⚠️ rlxfw's own compiled PID 1 is `notes/init.md` § 2, which states **nothing in it has run on the device** | Linux | `FW-04`, `notes/init.md` § 2 |
+| 9a | userspace, the vendor's image | BusyBox `init` → `rcS`, and 讀 `FW-04`: the compiled-in command line is `console=ttyS0,38400 root=/dev/mtdblock1` with **no `init=`**, and the string `Kernel command line` is absent so the boot log never prints it | Linux | `FW-04` |
+| 9b | userspace, rlxfw's image | 量 2026-09-30, image `r78a` from RAM (`R7`): **PID 1 is rlxfw's compiled `/init`**, and `ps` reads `brokerd` as root, `httpd` under user `httpd`, `dnsfwd` under `dnsfwd`, and `udhcpd` and `sh` as root. The boot prints `rlxfw: lan up, rlx0 10.1.1.1/24`, `httpd: uid=100 gid=100 root=/srv/www …`, `brokerd: listening on /srv/www/run/broker.sock mode 0666`, `dnsfwd: running as uid 101 gid 101; setuid(0) refused (Operation not permitted)` — the drop checked by trying to undo it — and two `*** BENCH PROFILE: A ROOT SHELL IS ENABLED ON /dev/console ***` lines. The order `/init` works in — console, rung-1 discriminator, signals, mounts, config store, hostname, LAN, `udhcpd.conf`, then the child table — is 讀 from its source | Linux | `FW-175`, `FW-181`, `docs/GATE-RESULTS.md` entry 17; the design is `notes/init.md` § 2 |
 
 ⚠️ `CLAUDE.md`, `FW-37`: a reset must be `busybox reboot -f` — a watchdog bite —
 because plain `reboot` signals PID 1, **which on the vendor image is a shell
@@ -1108,12 +1123,19 @@ a 推 that the old scatter was the host clock; on the RAW clock warm reads
 0.356060 s (n=13) against cold 0.355865 s (n=12), **so cold is not slower** —
 and that comparison is unverified.
 
-⚠️ **No instruction of stage 0 has been disassembled in this project**, and the
-stage-1 UART setting is 讀 with the measurement outstanding (§ 13.2).
+⚠️ **No instruction of stage 0 has been disassembled in this project.** The
+stage-1 UART setting is 讀 ×2 and 量 once at the loader prompt — `LCR` reads
+`0x03000000`, 8N1 (`FW-70`, § 13.2); Linux's own `LCR` is 讀 only.
 
 ⚠️ **`loader.esc` is `n = 1` in each class** and `docs/boot-time-table.md` calls
 it *not stable*. `FW-04` is single-source (C) and describes the **vendor**
 kernel, not rlxfw's.
+
+⚠️ **Stage 9b is two boots from RAM on one day** — `r78a`, `RLXFW-ID0`
+`BF182DE2`, then its rebuild, `0E45C61D` — and no rlxfw userspace has started
+from flash. The privilege separation's refusal half was never returned on the
+board: the only peers in those captures are in the authorisation table, so a
+refusal rests on the host's matrix (`docs/GATE-RESULTS.md` entry 17, claim ②).
 
 ---
 
@@ -1218,15 +1240,20 @@ agree rather than assuming it.
   `btn_pressed 0`. This is the shape `CLAUDE.md` warns of: Linux reprograms
   `PABCD`'s CNR and DIR, so a loader-state constant does not predict it.
 
-#### One row this hands to `R9`
+#### One row this handed to `R9`
 
 `rtl819x-view` reports `admit 311`, `n_mib 0`, `n_tbl 0`, `n_peek 0`,
 `refused 0`, `busy 0`. rlxfw ships a register viewer with a **bounded
 311-entry allow-list**, and nothing had peeked through it on this boot. That is
-the design answer to `FW-67`'s vendor finding of an unbounded peek/poke, so the
-differential row's mechanism class is 有界化 and its rlxfw cell has a reading.
-Its vendor half stays `V-D`: reading `/proc` on the vendor firmware needs a
-shell, which it has not got.
+the design answer to `FW-67`'s vendor finding of an unbounded peek/poke, and
+this section proposed the differential row as 有界化 with an rlxfw reading.
+🔄 **`R9`, closed 2026-10-04, did not record it that way.** 讀
+`config/fix-cases.toml`: the two register rows that name `FW-67` are `FC-079`
+(服務不存在, whose residual calls the vendor's peek/poke *the asymmetry rlxfw
+has NOT removed*) and `FC-105` (不適用, tier `V-D`, rlxfw cell pending, same-instrument pair
+incomplete), and neither carries this reading. The vendor half is `V-D` there
+as it was here: reading `/proc` on the vendor firmware needs a shell, which it
+has not got.
 
 #### What this section does not establish
 
@@ -1242,22 +1269,29 @@ hardware cannot do those things.
 § 13.1's own closing paragraph states what its one boot does not establish.
 Two more limits belong to the census rather than to that reading:
 
-⚠️ **A block having a driver is not the block being characterised.** Four
-drivers have executed on this die (§ 4) and each one's limits are its own
-file's: `docs/KNOWN-ISSUES.md` owns what depends on rlxfw's drivers, and it is
-the place to read before quoting any row of § 13.0 as a capability.
+⚠️ **A block having a driver is not the block being characterised.** Every
+driver § 13.0's *what has run against it* column names has executed on this die
+— `rtl819x-timer`, `-gpio`, `-spi`, `-wdt`, `-nic`, `-switch` and `-keys`, and
+upstream `leds-gpio` — as has § 13.1's `rtl819x-view`, and each one's limits
+are its own file's. (§ 4's table is `R5`'s text, kept byte-identical,
+and its steps 4 and 5 still read *not written*: § 5's 🔄 line and § 13.0
+supersede them.) `docs/KNOWN-ISSUES.md` owns what depends on rlxfw's drivers,
+and it is the place to read before quoting any row of § 13.0 as a capability.
 
-🔴 **Three blocks in the table have no reading in any state, and they are not
+🔴 **Two blocks in the table have no reading in any state, and they are not
 the same kind of gap.** `MCR` at `0xB8001000` has never been read although it is
 reachable from the loader prompt with one `DW` (`MEM-07`, `MEM-08` `⊘`); the
-radio's attachment has never been traced and would need new work (`RF-04` `⊘`);
-and the UART block's own registers have never been read as registers at all.
-量 by `notes/console-link.md` § 1.1: a sweep of every `DW` address in `bench/`
-finds sixty distinct addresses and **not one** in `0xB8002000`–`0xB80020FF`, so
-the line setting is 讀 ×2 with the measurement outstanding. What *is* measured
-is the **link** — 38400 8N1 at 3.3 V (量 `BRD-10`) — which is a different claim
-from the `LCR` and divisor-latch contents, and § 1.2 of that file holds the
-one-cell experiment that would close it.
+radio's attachment has never been traced and would need new work (`RF-04` `⊘`).
+⚠️ **The UART has exactly one register reading.** 量 2026-09-15 at the loader
+prompt, `bench/2026-09-15/C1-LCR`: `DW B800200C 1` returned `03000000` — `LCR`,
+top byte `03`, 8N1, with neither refutation value (`07`, `0B`) — and the
+loader's `DW` printed three more words, `+0x10`–`+0x18` `00000000 00000000
+10000000`, uninterpreted (`FW-70`; `notes/console-link.md` § 2b owns it). 量
+2026-10-05, it is the only `DW`/`DB` into `0xB8002000`–`0xB80020FF` anywhere in
+`bench/`. So the loader's line setting is 讀 ×2 and 量 ×1; Linux's `LCR` and
+the divisor latch are 讀 only, and § 15.5 says why no shell reaches them. The
+**link** — 38400 8N1 at 3.3 V (量 `BRD-10`) — is a different claim from the
+register contents, and it is measured in both states.
 
 ---
 
@@ -1266,8 +1300,10 @@ one-cell experiment that would close it.
 `plan` § 6 `P3` section 9 — Errata / 陷阱, and the plan calls it this report's
 soul: a bring-up report holding only specification was copied, one holding where
 the part bites, how it was hit and how it was worked around was done. **So every
-row below carries how it was hit, and where the project's own first statement of
-a trap was later narrowed, the narrowing is in the row.**
+row below carries how it was hit and how it was worked around — *not worked
+around* is an answer, and it is given where it is the true one — and where the
+project's own first statement of a trap was later narrowed, the narrowing is in
+the row.**
 
 ### 14.1 `F46` — the load delay slot is architecturally exposed
 
@@ -1278,12 +1314,15 @@ anyway is unspecified. **This core does not interlock at distance 0.**
 `docs/isa-hazard.md` § 5.3, and `docs/rlx-isa.md` § 5 is the consolidated
 write-up.
 
-⚠️ **`CPU-14` *is* `F46`, and no tracked file says so.** 量 by grep: the string
-`F46` appears **nowhere in `SPEC.md`**, and `docs/rlx-isa.md` § 5 never names it
-either. The identity is settled by git history — in the commit that created the
-table, `CPU-14`'s owner cell named `F46` in `plan/` — and `F`-ids live in
-`plan/`, which is gitignored, so **a reader with only a clone cannot check the
-correspondence.** That is why this section leads with the `SPEC.md` id.
+⚠️ **`CPU-14` *is* `F46`, and no tracked file pairs the two ids.** 量 2026-10-05
+by `git grep` outside `upstream/`: `F46` appears **nowhere in `SPEC.md`** or
+`docs/rlx-isa.md`, while `docs/isa-hazard.md` — one of `CPU-14`'s owners — and
+`qemu/README.md` name it for the substance, *qemu interlocks the load delay slot
+and this core does not*, without the `SPEC.md` id. The pairing is settled by git
+history — in the commit that created the table, `CPU-14`'s owner cell named
+`F46` in `plan/` — and `F`-ids live in `plan/`, which is gitignored, so **a
+reader with only a clone cannot check the pairing.** That is why this section
+leads with the `SPEC.md` id.
 
 **How it was hit.** Not by reading a manual — by a **16-byte truncation** that
 made no sense. The tracked statements of it are `tools/hazlint`'s own docstring
@@ -1323,12 +1362,12 @@ none of this can be re-measured under Linux.
 
 ### 14.2 The core's other four
 
-| # | the trap | how it was hit | V | owner |
-|---:|---|---|:-:|---|
-| ① | 🔴🔴 **`rotr` is decoded as `srl` — no exception, and a wrong value.** Encoding `0x00291202` (SPECIAL, `rs=1`, `sh=8`); input `12345678` should rotate to `78123456` and read **`00123456`** instead. MIPS32r2 separates `rotr` from `srl` by one bit of the `rs` field and **this core ignores it** | `probe4`, 量 2026-09-14 (seating 21), `cause` column **empty**. 🟢 Value, mechanism and purpose were written into `tools/isa-payload.tsv` **before power-on**, and the same value was then reproduced in Linux **user** mode, so it is not a privilege artefact. ⚠️ The row warns it is **one encoding** — WRONG is 1 of 75 — not a verdict on all of mips32 | 量 | `CPU-55`, `docs/isa-payload.md` § 6 |
-| ② | 🔴🔴 **`mfc0 $x,$14` reads `EPC` and `mtc0 $x,$14` does not write it**, so `EPC` cannot be used as scratch and the whole `cp0` hazard family is **not measurable with this register on this part** | `probe5`'s `cp0` family, three rungs all **VOID**, control word `80500270` — neither the `5A5A5A50` written nor the old `A5A5A5A0`. Identified by disassembly as **the address of the image's one `break`**, so the hardware wrote `EPC` on that exception and every later `mtc0` left it alone. Five independent readings, one value. ⚠️ The payload's own `aux.zero` check was blind here because it tests `== 0` | 量 | `CPU-56`, `docs/isa-hazard.md` § 7 |
-| ③ | 🔴 **CP0 `Count` (9) and `Compare` (11) are not implemented and read 0 without trapping**, so any timing method built on them silently measures nothing | 量 2026-08-25b, bare metal. `Count` reads `00000000` with `S_ZERO`; across a 100,000-iteration loop `before == after`, `delta = 0`, `traps = 0`. 🟢 **The zero is a real zero**: both destinations were primed with *different* values first, `CPU-38`'s `nowrite = 0` covers all 256 rows, and the **positive control** is row `0x08`, `Random`, reading `S_MOVES` | 量 | `CPU-42` |
-| ④ | 🟢 **`lwl`/`lwr`/`swl`/`swr` all exist on this die — which contradicts the public Lexra claim that the family lacks them.** A decision built on that public claim is wrong for this part | `probe4`, 量 2026-09-14, four rows all `RIGHT` computing the desk-derived constants; the negative control `special0e` trapped with `ExcCode 10` in the same capture and the seven MIPS-I baseline rows were all `RIGHT`. ⚠️ The LX5280 claim is untouched | 量 | `CPU-15`, `notes/lwl-mystery.md` |
+| # | the trap | how it was hit | how it was worked around | V | owner |
+|---:|---|---|---|:-:|---|
+| ① | 🔴🔴 **`rotr` is decoded as `srl` — no exception, and a wrong value.** Encoding `0x00291202` (SPECIAL, `rs=1`, `sh=8`); input `12345678` should rotate to `78123456` and read **`00123456`** instead. MIPS32r2 separates `rotr` from `srl` by one bit of the `rs` field and **this core ignores it** | `probe4`, 量 2026-09-14 (seating 21), `cause` column **empty**. 🟢 Value, mechanism and purpose were written into `tools/isa-payload.tsv` **before power-on**, and the same value was then reproduced in Linux **user** mode, so it is not a privilege artefact. ⚠️ The row warns it is **one encoding** — WRONG is 1 of 75 — not a verdict on all of mips32 | **By a build rule, not a code habit**: `CLAUDE.md` forbids `-march=mips32`, and this row is that ban's first-hand evidence — its reason, *mips32 miscompiles silently*, was inherited until this reading (`CPU-55`) | 量 | `CPU-55`, `docs/isa-payload.md` § 6 |
+| ② | 🔴🔴 **`mfc0 $x,$14` reads `EPC` and `mtc0 $x,$14` does not write it**, so `EPC` cannot be used as scratch and the whole `cp0` hazard family is **not measurable with this register on this part** | `probe5`'s `cp0` family, three rungs all **VOID**, control word `80500270` — neither the `5A5A5A50` written nor the old `A5A5A5A0`. Identified by disassembly as **the address of the image's one `break`**, so the hardware wrote `EPC` on that exception and every later `mtc0` left it alone. Five independent readings, one value. ⚠️ The payload's own `aux.zero` check was blind here because it tests `== 0` | **Not worked around — recorded.** The `cp0` family's verdict is *not measurable with this register on this part*: `Status` has reserved bits, so its read-back is no self-contained constant, and writing an unidentified CP0 register is refused by `tools/isa-payload.tsv`'s own doctrine. The safety half held — nothing trapped and the handler was not misled (`docs/isa-hazard.md` § 7, item 4) | 量 | `CPU-56`, `docs/isa-hazard.md` § 7 |
+| ③ | 🔴 **CP0 `Count` (9) and `Compare` (11) are not implemented and read 0 without trapping**, so any timing method built on them silently measures nothing | 量 2026-08-25b, bare metal. `Count` reads `00000000` with `S_ZERO`; across a 100,000-iteration loop `before == after`, `delta = 0`, `traps = 0`. 🟢 **The zero is a real zero**: both destinations were primed with *different* values first, `CPU-38`'s `nowrite = 0` covers all 256 rows, and the **positive control** is row `0x08`, `Random`, reading `S_MOVES` | Time from the SoC's own timer/counter block instead (§ 8): `CPU-42` records that this made `R5-0`'s SoC timer driver a prerequisite rather than an extra, and cost `R1c` its first timing route | 量 | `CPU-42` |
+| ④ | 🟢 **`lwl`/`lwr`/`swl`/`swr` all exist on this die — which contradicts the public Lexra claim that the family lacks them.** A decision built on that public claim is wrong for this part | `probe4`, 量 2026-09-14, four rows all `RIGHT` computing the desk-derived constants; the negative control `special0e` trapped with `ExcCode 10` in the same capture and the seven MIPS-I baseline rows were all `RIGHT`. ⚠️ The LX5280 claim is untouched | **None needed on this die**: the trap is the public claim, so a decision is taken from `probe4`'s reading. ⚠️ An aligned load or store at an *unaligned address* is a different case — `AdEL`, emulated in Linux user mode at 915.5 ns a round trip (`CPU-15`, `CPU-75`) | 量 | `CPU-15`, `notes/lwl-mystery.md` |
 
 🔴 **① is the shape that matters most for bring-up**: no fault, no warning,
 wrong arithmetic. It is the same shape as § 14.1 one layer up, and it is why
@@ -1339,16 +1378,16 @@ way to separate `f` from CPI, which is exactly what `CLK-03` `⊘` records.
 
 ### 14.3 The loader will write anything you ask it to, and some things you did not
 
-| # | the trap | how it was hit | V | owner |
-|---:|---|---|:-:|---|
-| ① | 🔴 **`EW` writes four bytes anywhere with no bound check, completely silently**, writes exactly `argc − 1` words, and **rounds an unaligned address UP** — so a write to the wrong place looks identical to success | 量 2026-08-24: `C3` sent `EW 81000102 11111111` and it landed at `0x81000104`. `C7a`/`C7b` sent twelve and eleven values; both landed in order and both guard words (`0x81000430`, `0x8100046C`) were byte-identical before and after, with the refutation conditions written before the cells ran. **Workaround: align the address yourself and confirm every write with a separate `DW` read-back** | 量 | `LDR-08` |
-| ② | 🔴 **`EB` writes one byte, no bound check, silent, and never rounds** — **the opposite of `EW`, and the asymmetry is the thing to remember**: the two write primitives disagree about what an unaligned address means | 量: `C4` sent `EB 81000200 41 42 43` and the three bytes landed at `…200`/`…201`/`…202` | 量 | `LDR-09` |
-| ③ | 🔴🔴 **Half the command table does not check its argument count, and a bare `PHYR` hangs the board until a power cycle.** The table at `0x8040DBC0` is 17 entries × 16 bytes, `{char *name; int argc; int (*func)(int,char**); char *help}` — and **the `argc` field is dead**: the dispatcher at `0x80409144` reads only offsets 0 and 8 | 讀 2026-09-19 over `stage2.bin`, **and then measured**: `bench/2026-09-19/X11-phyr.log`, 82 bytes, printed `cp0_cause=00000028, cp0_epc=80000000, ra=00000000Undefined Exception happen.` (`ExcCode` 10) and then went silent; an 8 s ESC probe returned **0 bytes** with the link healthy. Unchecked: `EB`, `EW`, `AUTOBURN`, `LOADADDR`, `FLR`, `FLW`, `PHYR`, `PHYW`. Checked: `DB`, `DW`, `CMP`, `IPCONFIG`, `J`, `MDIOR`, `MDIOW`. ⚠️ `PHYR <phyid> <reg>` is safe and parses base 16; `MDIOR` parses base **10** | 讀 + 量 | `LDR-44`, `LDR-12` |
-| ④ | 🔴 **`AUTOBURN` starts at `1`, and exactly one instruction in the whole image reads it** (`0x80401B9C`), on the upload-complete path. **Finish an upload without having typed `AUTOBURN 0` first and it is burned into flash** | 量 `B6`: `DW 8040D4A0 1` read `00000001` at the prompt, single writer `0x80409944`. **Workaround (`LDR-23b`): `AUTOBURN 0` with a space — `AUTOBURN: 0` answers `Unknown command !` — and confirm *both* the `AutoBurning=0` echo and a `0x8040D4A0` readback of `00000000`**, because every reset restores `1` | 量 | `LDR-23`, `LDR-23b`, `REG-23` |
-| ⑤ | 🔴 **A line of exactly 128 characters is left unterminated.** `readline` at `0x8040708C` has three exits and only the CR one writes a NUL (`0x804070FC`); the LF exit and the length-exhausted exit (`0x80407194`, `count < 128`) do not. The caller's `memset` only saves lines **shorter** than 128. So the tokenizer at `0x80407248` scans past `sp+143` into an 8-byte stack gap and then into the saved `s0` at `sp+152` | 讀 the disassembly, re-derived 2026-08-30 — and it **caught a 173-character `EW` line in `RUNSHEET.md` `C7` before it ran**, which was rewritten to twelve values and 119 characters. The 128-byte buffer size itself surfaced when ESC streaming was answered `Unknown command !` after exactly 128 bytes, seven times (`LDR-06c`). **Workaround: no command line anywhere may be exactly 128 characters.** ⚠️ **The row was right while its own owner file was wrong** — both exits of the three-way branch had been annotated with the same empty character, so *only one writes a terminator* named neither; found by `spec-check` C9 | 讀 | `LDR-06d` |
-| ⑥ | 🔴 **`DB`/`DW` mix bases**: the address is hexadecimal and **the length is decimal**, and `DW <addr> N` prints `4 × ceil(N/4)` words — the length rounds **up** silently, while the start address is **not** rounded down | 讀 + 量 at the prompt. It is why `DW … 1` returns four words, which is what § 9.2's third word rests on. ⚠️ An address with bit 31 clear is forced into KSEG0 | 量 | `LDR-07` |
-| ⑦ | 🔴 **An MDIO read is not read-only.** `phy_read()` writes `MDCIOCR` **and sets `GIMR` bit 8 (`TCIE`, at `0x80402FB8`), and never restores it** | 讀 the code — and the planned read-only test `E5` was **void on arrival**, because `GIMR` already read `00008100` at the prompt. `C5` recovered it as a *write* experiment: `DW` → `EW B8003000 8000` → `DW` → `PHYR 0 2` → `DW` returned `00008100` · (silent) · `00008000` · `UID=0x0000001c` · `00008100`, with `GISR` moving `88000004` → `88000104` → `88000004`. **A bit cleared by hand came back** — the causal control, predicted from the code before the visit | 讀 | `NET-16` |
-| ⑧ | 🔴 **The MDIO completion wait has no timeout and no loop bound** — a `bltz v1` at `0x80402FD8` spinning on `MDCIOSR` bit 31. **An address that never answers would end the seating** | 讀 the disassembly, **never hit**: the risky cell (`PHYR 5 2`) was deliberately run last, and `NET-24`'s 32-point scan shows addresses 0–4 reading `0x001c`, 5–31 reading `0x0000`, and **every read completing** — under Linux's `mdiobus_read` as well | 讀 | `NET-17` |
+| # | the trap | how it was hit | how it was worked around | V | owner |
+|---:|---|---|---|:-:|---|
+| ① | 🔴 **`EW` writes four bytes anywhere with no bound check, completely silently**, writes exactly `argc − 1` words, and **rounds an unaligned address UP** — so a write to the wrong place looks identical to success | 量 2026-08-24: `C3` sent `EW 81000102 11111111` and it landed at `0x81000104`. `C7a`/`C7b` sent twelve and eleven values; both landed in order and both guard words (`0x81000430`, `0x8100046C`) were byte-identical before and after, with the refutation conditions written before the cells ran. | Align the address yourself and confirm every write with a separate `DW` read-back | 量 | `LDR-08` |
+| ② | 🔴 **`EB` writes one byte, no bound check, silent, and never rounds** — **the opposite of `EW`, and the asymmetry is the thing to remember**: the two write primitives disagree about what an unaligned address means | 量: `C4` sent `EB 81000200 41 42 43` and the three bytes landed at `…200`/`…201`/`…202` | As ①: confirm every byte with a separate `DW`. `CLAUDE.md` § Flash counts `EB` among the verbs that can write flash, because it writes any address with no bound check, so it needs the owner's dated yes and `cardcheck` refuses it without one | 量 | `LDR-09` |
+| ③ | 🔴🔴 **Half the command table does not check its argument count, and a bare `PHYR` hangs the board until a power cycle.** The table at `0x8040DBC0` is 17 entries × 16 bytes, `{char *name; int argc; int (*func)(int,char**); char *help}` — and **the `argc` field is dead**: the dispatcher at `0x80409144` reads only offsets 0 and 8 | 讀 2026-09-19 over `stage2.bin`, **and then measured**: `bench/2026-09-19/X11-phyr.log`, 82 bytes, printed `cp0_cause=00000028, cp0_epc=80000000, ra=00000000Undefined Exception happen.` (`ExcCode` 10) and then went silent; an 8 s ESC probe returned **0 bytes** with the link healthy. Unchecked: `EB`, `EW`, `AUTOBURN`, `LOADADDR`, `FLR`, `FLW`, `PHYR`, `PHYW`. Checked: `DB`, `DW`, `CMP`, `IPCONFIG`, `J`, `MDIOR`, `MDIOW`. ⚠️ `PHYR <phyid> <reg>` is safe and parses base 16; `MDIOR` parses base **10** | Never type the unchecked commands bare: `RUNSHEET.md`'s *Do not type* list names them with the price, a power cycle (`LDR-12`), and `PHYR` is only ever typed as `PHYR <phyid> <reg>` | 讀 + 量 | `LDR-44`, `LDR-12` |
+| ④ | 🔴 **`AUTOBURN` starts at `1`, and exactly one instruction in the whole image reads it** (`0x80401B9C`), on the upload-complete path. **Finish an upload without having typed `AUTOBURN 0` first and it is burned into flash** | 量 `B6`: `DW 8040D4A0 1` read `00000001` at the prompt, single writer `0x80409944`. | `LDR-23b`: `AUTOBURN 0` with a space — `AUTOBURN: 0` answers `Unknown command !` — and confirm *both* the `AutoBurning=0` echo and a `0x8040D4A0` readback of `00000000`, because every reset restores `1`; `CLAUDE.md` § Flash makes the readback the evidence, not the echo (`C-6`) | 量 | `LDR-23`, `LDR-23b`, `REG-23` |
+| ⑤ | 🔴 **A line of exactly 128 characters is left unterminated.** `readline` at `0x8040708C` has three exits and only the CR one writes a NUL (`0x804070FC`); the LF exit and the length-exhausted exit (`0x80407194`, `count < 128`) do not. The caller's `memset` only saves lines **shorter** than 128. So the tokenizer at `0x80407248` scans past `sp+143` into an 8-byte stack gap and then into the saved `s0` at `sp+152` | 讀 the disassembly, re-derived 2026-08-30 — and it **caught a 173-character `EW` line in `RUNSHEET.md` `C7` before it ran**, which was rewritten to twelve values and 119 characters. The 128-byte buffer size itself surfaced when ESC streaming was answered `Unknown command !` after exactly 128 bytes, seven times (`LDR-06c`). ⚠️ **The row was right while its own owner file was wrong** — both exits of the three-way branch had been annotated with the same empty character, so *only one writes a terminator* named neither; found by `spec-check` C9 | No command line anywhere may be exactly 128 characters, and `CLAUDE.md` caps a `--send` at 127 | 讀 | `LDR-06d` |
+| ⑥ | 🔴 **`DB`/`DW` mix bases**: the address is hexadecimal and **the length is decimal**, and `DW <addr> N` prints `4 × ceil(N/4)` words — the length rounds **up** silently, while the start address is **not** rounded down | 讀 + 量 at the prompt. It is why `DW … 1` returns four words, which is what § 9.2's third word rests on. ⚠️ An address with bit 31 clear is forced into KSEG0 | Predict every reply's length before reading it: `tools/reply-size.py` derives it from the command, 598 of 598 with 0 unexplained on 2026-09-19 (`LDR-07`), so a length that rounded up shows as a reply of the wrong size. Over a register block whose reads have side effects, a card fixes the **start address**, not the word count (`FW-70`) | 量 | `LDR-07` |
+| ⑦ | 🔴 **An MDIO read is not read-only.** `phy_read()` writes `MDCIOCR` **and sets `GIMR` bit 8 (`TCIE`, at `0x80402FB8`), and never restores it** | 讀 the code — and the planned read-only test `E5` was **void on arrival**, because `GIMR` already read `00008100` at the prompt. `C5` recovered it as a *write* experiment: `DW` → `EW B8003000 8000` → `DW` → `PHYR 0 2` → `DW` returned `00008100` · (silent) · `00008000` · `UID=0x0000001c` · `00008100`, with `GISR` moving `88000004` → `88000104` → `88000004`. **A bit cleared by hand came back** — the causal control, predicted from the code before the visit | **Not avoidable at the prompt — ordered around.** Take loader-state `GIMR` before the session's first PHY access, or record what was typed before it (§ 15.6), because the loader never restores bit 8 | 讀 | `NET-16` |
+| ⑧ | 🔴 **The MDIO completion wait has no timeout and no loop bound** — a `bltz v1` at `0x80402FD8` spinning on `MDCIOSR` bit 31. **An address that never answers would end the seating** | 讀 the disassembly, **never hit**: the risky cell (`PHYR 5 2`) was deliberately run last, and `NET-24`'s 32-point scan shows addresses 0–4 reading `0x001c`, 5–31 reading `0x0000`, and **every read completing** — under Linux's `mdiobus_read` as well | **By ordering**: the one risky cell (`PHYR 5 2`) went last in its seating, so a hang would have cost only that cell. Nothing of rlxfw's depends on this loop: `rtl819x-switch` sends no MDIO command at boot (§ 13.0) | 讀 | `NET-17` |
 
 ⚠️ **⑦ has a consequence for § 15 that is easy to miss**: `GIMR`'s loader-state
 value is **not a constant** — it reads `00008100` after any PHY read, and the
@@ -1357,14 +1396,14 @@ loader-state `GIMR` therefore depends on what was typed earlier in the session.
 
 ### 14.4 The drivers' traps, measured under Linux
 
-| # | the trap | how it was hit, and how the first statement of it was narrowed | V | owner |
-|---:|---|---|:-:|---|
-| ① | 🔴 **A loader-state clock constant produced a watchdog table wrong by 76×.** `RTL819X_WDT_HZ` carried 14,965,000 — the loader-state rate — while under Linux the same counter runs near **200,180 Hz** | 量 at the bench over two `OVSEL` points. 🔴 **It survived three segments because the frequency had no owner**: the watchdog read it out of the timer's registers and no layer was in a position to disagree (§ 1.1). ⚠️ `CLAUDE.md` keeps the wrong constant **on purpose** — `/proc` prints it and bench cards predict against it — so it must not be "fixed" | 量 | `CLK-08b`, `docs/KNOWN-ISSUES.md` |
-| ② | 🔴 **Re-opening an already-open `rlx0` does not re-arm the descriptor bases**, so the DMA engine resumes from its old position — outside the ring — and can write frame data into arbitrary DRAM | 量 2026-09-20 (`X12`): `ifconfig down ; ifconfig … up` printed `N-ENGOFF`, `N-NDSTOP`, `N-ENGON=C4000000`, `N-NDOPEN` and **neither `N-ALLOC` nor `N-ARM`** — `ndo_open` skips both when `nic_allocated`/`nic_armed` are set. 量 `X23`: `rpdcr0_pos` walked `A15B1C00` → `A15B1C64` while `rx_ring` is `A15B8000`. **Workaround: `engine off ; arm ; engine on`, *not* `ndo_stop`/`ndo_open`** — `X16` re-broke an interface that had already been recovered | 量 | `NET-58` |
-| ③ | 🔴🔴 **A multi-frame burst desynchronises the engine's two RX position registers while the driver indexes both with one `i`**, so a frame is delivered carrying another frame's length | 量 2026-09-20 (seating 30): a datagram lost exactly one fragment, `seen_iisr` moved `0000320E` → `0001320E` (`MBUF_RUNOUT`), and `InTruncatedPkts` read 1250 — one per failed datagram — while switch port 3 counted 13,541 clean frames. 🔴 **Two first statements were struck.** *Δ is always 4* is **retracted**: seating 31 saw 1/2/3 and transient, committed dumps show `dsync_last_d` taking every value 1–7, and a single sample is a **lower bound**. *Permanent* is retracted too. ⚠️ **And on an 8-entry ring, 4 is its own negative** (`C16` is rp 6 / rm 2, `C17` rp 1 / rm 5), so *which* ring lags is **未定**. The trigger is bracketed at two points: six frames do **not** do it, fourteen do. ⚠️ A draft also misused 1.88 MB/s as a copy rate — it is a ping-bound lower bound | 量 | `NET-61` |
-| ④ | 🔴 **A flood-induced inbound stall survived a watchdog reset**, and the one time it happened only a cold power-on cleared it | 量 2026-09-19, by elimination: TX fine (the workstation captured both raw frames), interrupts fine (`n_irq 2`), the host really sending (15,004 packets, 0 errors), the port's `PSRP3` reading `000000F9` with `LinkUp` set. 🔴 **The clause that the vendor's own driver was the control is STRUCK** — `eth4`'s counters *are* port 3's MIB counters, so it is not an independent control, and the location survives only as *at or below port 3's receive counters*. ⚠️ `n = 1`: *the flood caused it* was never proven, and `NET-56` offers a competing re-attribution to a marginal cable | 量 | `NET-54` |
-| ⑤ | 🟢 **And ④'s sweeping half is refuted: a fresh `arm` takes a wedged TX ring back, so *only a cold boot clears it* is false for that fault** | 量 2026-09-21 on an already-wedged board, at zero cost: after `engine off ; arm ; engine on` all four TX descriptors' bit 0 cleared and returned to the CPU, `tx_stopped` 1 → 0, `n_tx_wake` 0 → 1, `n_tx` 26 → 31. 🔄 **And this row's own *recovery is not durable / only 2 of 4* was then narrowed**: `NET-72` attributes that to the ordering of *that* seating rather than to `arm`, reaching 4 of 4 at 1.307 ms on its third rung, and block 50 ran arm 12 / fire 12 / ok 12 / fail 0 under 120 s of load. ⚠️ Still *until the next fault* | 量 | `NET-68`, `NET-72` |
-| ⑥ | 🔴 **`PABCD_DAT` bit 6 is a vendor-driven output under Linux**: it alternates with a 1 s half-period while the button is held, rests at 1 released, and **after a long-press release latches 0 or 1 by the parity of the last pressed tick** | 量 seating 15, three states with one instrument. 🔴 **The card predicted a released-against-held XOR of `00000020` and both boots read `00000060`** — because bit 6 moved too. Released: 27 samples all `0000007C`; held at 1 s: `5C 1C 5C 1C…`; 15 no-gap samples all `1C`; after a ~8 s hold the word read `0000003C`. **Workaround: mask bit 5 only** — `(dat ^ dat) & 0x20` gives `00000020` — and use the driver's single-bit `btn_raw`/`btn_pressed` fields; **do not predict the post-release latch**. ⚠️ `C1-L2` read `0000007C` minutes after release and is **unexplained**; the stable interval was corrected from 152.1 s to 139.251 s | 量 | `REG-37`, `BRD-13` |
+| # | the trap | how it was hit, and how the first statement of it was narrowed | how it was worked around | V | owner |
+|---:|---|---|---|:-:|---|
+| ① | 🔴 **A loader-state clock constant produced a watchdog table wrong by 76×.** `RTL819X_WDT_HZ` carried 14,965,000 — the loader-state rate — while under Linux the same counter runs near **200,180 Hz** | 量 at the bench over two `OVSEL` points. 🔴 **It survived three segments because the frequency had no owner**: the watchdog read it out of the timer's registers and no layer was in a position to disagree (§ 1.1). | The timer carries no clock constant: `rtl819x-timer` 2.0 derives its rate at init and reports `hz_agree 1` (§ 8.1). The watchdog's table is kept wrong **on purpose** — `/proc` prints it and bench cards predict against it, so it must not be "fixed" (`CLAUDE.md`) — and its error runs the safe way: `kick_ms 250` against `OVSEL` 9 is a 335× margin, not the 4.48× believed (`notes/watchdog-driver.md` § 10.2) | 量 | `CLK-08b`, `docs/KNOWN-ISSUES.md` |
+| ② | 🔴 **Re-opening an already-open `rlx0` does not re-arm the descriptor bases**, so the DMA engine resumes from its old position — outside the ring — and can write frame data into arbitrary DRAM | 量 2026-09-20 (`X12`): `ifconfig down ; ifconfig … up` printed `N-ENGOFF`, `N-NDSTOP`, `N-ENGON=C4000000`, `N-NDOPEN` and **neither `N-ALLOC` nor `N-ARM`** — `ndo_open` skips both when `nic_allocated`/`nic_armed` are set. 量 `X23`: `rpdcr0_pos` walked `A15B1C00` → `A15B1C64` while `rx_ring` is `A15B8000`. | `engine off ; arm ; engine on`, *not* `ndo_stop`/`ndo_open` — `X16` re-broke an interface that had already been recovered | 量 | `NET-58` |
+| ③ | 🔴🔴 **A multi-frame burst desynchronises the engine's two RX position registers while the driver indexes both with one `i`**, so a frame is delivered carrying another frame's length | 量 2026-09-20 (seating 30): a datagram lost exactly one fragment, `seen_iisr` moved `0000320E` → `0001320E` (`MBUF_RUNOUT`), and `InTruncatedPkts` read 1250 — one per failed datagram — while switch port 3 counted 13,541 clean frames. 🔴 **Two first statements were struck.** *Δ is always 4* is **retracted**: seating 31 saw 1/2/3 and transient, committed dumps show `dsync_last_d` taking every value 1–7, and a single sample is a **lower bound**. *Permanent* is retracted too. ⚠️ **And on an 8-entry ring, 4 is its own negative** (`C16` is rp 6 / rm 2, `C17` rp 1 / rm 5), so *which* ring lags is **未定**. 🔄 The trigger's first bracket — six frames do **not** do it, fourteen do — narrowed twice: seating 31's ladder, zeroed by `arm` before each level, read Δ`n_dsync` 0 at 7 frames and 1 at **8 = `NIC_RX_DESC`** (9 → 4, 10 → 3, 14 → 5, one burst per level), and block 46 fired it with **two** loopback frames per run at seven wrong lengths, +1 each, and not at 60, 276, 1,513 or 1,514 — so burst size is not the only trigger. Block 47 confirmed that length prediction at E2's eleven lengths; which ring lags stays ⊘ (`NET-61` 殘留). ⚠️ A draft also misused 1.88 MB/s as a copy rate — it is a ping-bound lower bound | Two layers, neither a cure. Since `rtl819x-nic` 1.3 the harvest follows `ph_mbuf` (`NET-102`), so which position register lags no longer decides which buffer is read — 量 `n_ph_bad 0` over 107,041 frames (block 45, `D1-N4`); and since 1.6 the vendor's length convention is the driver's default (`docs/GATE-RESULTS.md` entry 14), under which block 47 read Δ`n_dsync` 0 at all eleven of E2's lengths. ⚠️ Neither establishes that the fault class is gone under `ph_follow 1` (`NET-61` 殘留 ②) | 量 | `NET-61` |
+| ④ | 🔴 **A flood-induced inbound stall survived a watchdog reset**, and the one time it happened only a cold power-on cleared it | 量 2026-09-19, by elimination: TX fine (the workstation captured both raw frames), interrupts fine (`n_irq 2`), the host really sending (15,004 packets, 0 errors), the port's `PSRP3` reading `000000F9` with `LinkUp` set. 🔴 **The clause that the vendor's own driver was the control is STRUCK** — `eth4`'s counters *are* port 3's MIB counters, so it is not an independent control, and the location survives only as *at or below port 3's receive counters*. ⚠️ `n = 1`: *the flood caused it* was never proven, and `NET-56` offers a competing re-attribution to a marginal cable | **Not worked around.** A cold power-on cleared it the one time it happened; the flood half was re-run twice without a stall (`L2-after`, `M7-after`), and the mechanism is ⊘ — so what exists is an order of readings for the next time, not a rule that avoids it (`NET-54` 殘留) | 量 | `NET-54` |
+| ⑤ | 🟢 **And ④'s sweeping half is refuted: a fresh `arm` takes a wedged TX ring back, so *only a cold boot clears it* is false for that fault** | 量 2026-09-21 on an already-wedged board, at zero cost: after `engine off ; arm ; engine on` all four TX descriptors' bit 0 cleared and returned to the CPU, `tx_stopped` 1 → 0, `n_tx_wake` 0 → 1, `n_tx` 26 → 31. 🔄 **And this row's own *recovery is not durable / only 2 of 4* was then narrowed**: `NET-72` attributes that to the ordering of *that* seating rather than to `arm`, reaching 4 of 4 at 1.307 ms on its third rung, and block 50 ran arm 12 / fire 12 / ok 12 / fail 0 under 120 s of load. ⚠️ Still *until the next fault* | This row *is* a recovery — ②'s `engine off ; arm ; engine on` — and it holds until the next fault; it is not a cure for ④'s inbound stall | 量 | `NET-68`, `NET-72` |
+| ⑥ | 🔴 **`PABCD_DAT` bit 6 is a vendor-driven output under Linux**: it alternates with a 1 s half-period while the button is held, rests at 1 released, and **after a long-press release latches 0 or 1 by the parity of the last pressed tick** | 量 seating 15, three states with one instrument. 🔴 **The card predicted a released-against-held XOR of `00000020` and both boots read `00000060`** — because bit 6 moved too. Released: 27 samples all `0000007C`; held at 1 s: `5C 1C 5C 1C…`; 15 no-gap samples all `1C`; after a ~8 s hold the word read `0000003C`. ⚠️ `C1-L2` read `0000007C` minutes after release and is **unexplained**; the stable interval was corrected from 152.1 s to 139.251 s | Mask bit 5 only — `(dat ^ dat) & 0x20` gives `00000020` — and use the driver's single-bit `btn_raw`/`btn_pressed` fields; **do not predict the post-release latch** | 量 | `REG-37`, `BRD-13` |
 
 🔴 **③, ④ and ⑤ together are the pattern this section exists to show.** Each
 began as a confident statement and each was narrowed by a later measurement:
@@ -1412,8 +1451,13 @@ falsely reported a difference, 1279 against 1280 bytes.
 ⚠️ **The claimable sentence, and what it cannot see.** *Commands issued, rlxfw's
 own `n_writes`, and the bracket's reach against the named dump* — never a global
 negative. 🔴 And `n_writes` reading 0 is **only a counter not moving**: what
-actually stands is that this driver's write and erase paths are **refusing
-stubs** (`FW-142`). ⚠️ A prefix digest finds the **first** difference and
+actually stands, in every committed image, is that this driver's write and
+erase paths are **refusing stubs** (`FW-142`, `FW-210` ③). Since 2026-10-04
+the write path exists in source behind `CONFIG_MTD_RTL819X_WRITE`, which
+`config/rlxfw-kernel.delta` pins `n`, so no committed image links it (`FW-207`);
+in an image built `=y`, `rtl819x_spi_note_write()` increments the counter and
+its 0 starts to carry information — and it stays blind to the vendor's own
+write path (`FW-210` ③). ⚠️ A prefix digest finds the **first** difference and
 nothing past it (`CLAUDE.md`), and `FLS-26` `⊘` keeps `[0x9000, 0xA000)`'s and
 `0x00D000`'s contents open.
 
@@ -1432,10 +1476,11 @@ lands on flash. **The mechanism belongs to a held disclosure (`D-18`), so this
 row records the class and the operational consequence and nothing more.**
 ⚠️ **And rlxfw's `n_writes` cannot see it**, because it is the vendor's write
 path. The consequence: a zero-flash-write claim about a seating that boots the
-vendor firmware **does not stand without containment**, and the two
-containments `R9-6` owes are *path* — a probe list using only names that branch
-skips — and *time* — finishing the whole vendor HTTP episode inside the
-post-boot threshold. `FW-196`, `docs/threat-model.md`.
+vendor firmware **does not stand without containment**, and `R9-6` applied
+both on 2026-10-04: *path* — a probe list using only names that branch skips —
+and *time* — the whole vendor HTTP episode finished inside the post-boot
+threshold (`docs/GATE-RESULTS.md` entry 19, claim ③). `FW-196`,
+`docs/threat-model.md`.
 
 ### 14.6 What § 14 does not establish
 
@@ -1591,11 +1636,11 @@ reader should not mistake for absent hardware.
 | `0xB8001000` `MCR` | 🔴 **never read**; `MEM-08` `⊘` for the timing settings | one `DW B8001000 …` at the prompt for the words; reading the loader's writes, at the desk, for the settings |
 | `0xB8001208` bit 27 `SPI_RDY` | *(未讀)*, `V = —` — ⚠️ but **this unit's own `ComSrlCmd_RDID()` waits on this bit**, which is code depending on the semantics rather than a document asserting them. ⚠️ And `REG-13`'s decode of `D8050000` **already reads this bit as 1**, so § 17's framing is the precise one: *nobody has seen it flip* | `REG-14`, `REG-13` |
 | `0xB8001210` `SFDR2` | *(未讀)* — the `DW B8001200 4` that produced `REG-13`'s four words stops at `0x120C` | `REG-13` |
-| `0xB8000048`, `0xB800004C` | 量 `2702DFF1` and `0A8D8ED0` at the prompt, **and no name, no owner and no `SPEC.md` row** — the same shape as § 9.2's words 2 and 3 | § 10.1 |
-| `0xB8002000`–`0xB80020FF` UART | 🔴 **no register ever read**; 量 zero over every `DW` address in `bench/` | `notes/console-link.md` § 1.2's one cell: `DW B800200C 1`, expect top byte `03`; `07` is 8N2 and `0B` is 8N1 with parity |
-| the strapping register's layout | 未定 — datasheet § 6.1 exists, **no layout or initial value is in any file here** | § 9.5; it needs a `SPEC.md` row before the number can be quoted |
+| `0xB8000048`, `0xB800004C` | 量 `2702DFF1` and `0A8D8ED0` at the prompt, **and no name, no owner and no `SPEC.md` value row** — the same shape as § 9.2's words 2 and 3 | § 10.1; `REG-40` 殘留 |
+| `0xB8002000`–`0xB80020FF` UART, apart from `LCR` | 🔴 **no other register read**: 量 2026-10-05, the only `DW`/`DB` into this range in all of `bench/` is 2026-09-15's `DW B800200C 1`, which read the loader-state `LCR` as `03000000` — 8N1 — and printed `+0x10`–`+0x18` beside it, uninterpreted (§ 13.2) | Linux's `LCR` and the divisor latch have no path from the shell: no applet reads a register (`FW-70`), and 讀 2026-10-05 `rtl819x-view.c` admits no address in this block. ⚠️ Never a `DW` from `+0x00` or `+0x08`: reading `RBR` pops a received byte and reading `IIR` clears the pending interrupt id (`FW-70`) |
+| the strapping register's layout | 未定, `REG-40` 殘留 — datasheet § 6.1 exists, **no layout or initial value is in any file here** | § 9.5; it needs a § 9 definition row before the number can be quoted, and `REG-40` says what settles one |
 | the radio's attachment | `RF-04` `⊘` | § 13.0 |
-| the reference oscillator | 未定 — **there is no row** | § 8.3 |
+| the reference oscillator | 未定, `CLK-50` 殘留 — **there is no value row** | § 8.3 |
 | `0xB8003504`'s name | 量 `0x00000000` but **N = `—`** | `REG-36` — a value with no name is not a known-good register |
 
 ### 15.6 What § 15 does not establish

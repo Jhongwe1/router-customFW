@@ -79,9 +79,9 @@ come from.
 
 | # | binaries in the asset | licence class 讀 | what is supplied | where it comes from |
 |---|---|---|---|---|
-| 1 | the kernel inside `nfjrom`: Realtek's `linux-2.6.30` tree, `arch/rlx`, the board BSP, the `rtl8192cd` WLAN driver, the NAT fast path, the MTD/SPI and GPIO code (`docs/sbom.md` `K1`–`K5`) | GPL-2.0 | the complete staged tree as built, including every file rlxfw's declarations changed, **plus the scripts that control compilation**: `tools/rlxfw-kbuild.sh`, `config/rlxfw-marks.tsv`, `config/host-compat/`, `config/rlxfw-kernel.delta`, the built `.config`, and `tools/modrecord.py`'s generated per-file modification record | `SOURCES.json` `rtl819x-toolchain` at pin `5c9be5d943318fdb4d048ae22078129594eb5a10`, re-staged and re-declared; the declarations are in this repository |
+| 1 | the kernel inside `nfjrom`: Realtek's `linux-2.6.30` tree, `arch/rlx`, the board BSP, the `rtl8192cd` WLAN driver, the NAT fast path, the MTD/SPI and GPIO code (`docs/sbom.md` `K1`–`K5`) | GPL-2.0 | the complete staged tree as built, including every file rlxfw's declarations changed, **plus the scripts that control compilation**: the build driver `tools/rlxfw-kbuild.sh` and what it calls — `tools/rlxfw-marks.py` with `config/rlxfw-marks.tsv` and `tools/rlxfw-marks-absent.tsv`, `config/host-compat/`, `tools/kconfig-delta.py` with `config/rlxfw-kernel.delta`, `tools/vendor-tripwire.sh`, and `tools/mkinitramfs.py`, whose initramfs is linked into the kernel — the built `.config`, and `tools/modrecord.py`'s generated per-file modification record. ⚠️ 讀 that list is the driver's text at `c7716fbe` and can drift; a build's own record is the authority | `SOURCES.json` `rtl819x-toolchain` at pin `5c9be5d943318fdb4d048ae22078129594eb5a10`, re-staged and re-declared; the declarations are in this repository |
 | 2 | the loader stub in `nfjrom`: `rtkload` (`W1`) and the LZMA decoder (`W2`) | GPL-2.0; LZMA LGPL or CPL 讀 | that directory's source as built, with `tools/rtkimage.py` as the script that wraps it | the same drop, `linux-2.6.30/rtkload/` |
-| 3 | rlxfw's own 12 compiled kernel sources (`K6`) | GPL-2.0-only (`NOTICE` § 2) | the 16 files of `config/rlxfw-src/`, which are already in this repository | this repository |
+| 3 | rlxfw's own 12 compiled kernel sources (`K6`) | GPL-2.0-only (`NOTICE` § 2) | every file under `config/rlxfw-src/` at the release's commit, which is already in this repository | this repository |
 | 4 | `/bin/busybox` (`U8`) and its 11 applet symlinks | GPL-2.0-only | the drop's `busybox-1.13` as staged, plus `config/busybox-patches/`, `config/rlxfw-busybox.config` and `tools/mkbusybox.sh` | the same drop; the recipe is in this repository |
 | 5 | uClibc 0.9.30, statically linked into all 11 ELF files (`L1`, `L2`) | LGPL-2.1 | the library's complete source **and the relink path**: each program's own sources and Makefiles, so a recipient can modify uClibc and relink (讀 LGPL-2.1 § 6(a); `NOTICE` § 5) | the drop's `toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/config/uclibc/`; the programs are in this repository |
 | 6 | rlxfw's six userspace programs, the probes, `mfgtest`, the web UI and the configuration files (`U1`–`U7`, `U10`–`U15`) | MIT (`NOTICE` § 4) | already published: this repository, at the release's commit | this repository |
@@ -128,11 +128,13 @@ is written, and both are 未定 rows of `docs/sbom.md` § 9.
 
 ### Gap 1 — `SBOM-3`: iperf3's source tree is not held by this project
 
-🔴 量 2026-10-04: `SOURCES.json` contains the word `iperf` **0 times**. The
-repository holds `config/rlxfw-user/iperf3/` — 4 files, the recipe — and that
-Makefile says in so many words that a clean clone cannot build this target. The
-tree that was compiled lives at `$FWRE_WORK/iperf3-port/src313/`, which no
-clone has.
+🔴 量 2026-10-05: `SOURCES.json` carries an `iperf3` entry — role
+`imported-source`, `dest refs/iperf-3.1.3.tar.gz` — since `01cff02b`; the word
+`iperf` occurs in it 0 times before that commit and 16 times after. The tree
+itself is not in this repository: it holds `config/rlxfw-user/iperf3/` — 4
+files, the recipe — and that Makefile says in so many words that a clean clone
+cannot build this target. The tree that was compiled lives at
+`$FWRE_WORK/iperf3-port/src313/`, which no clone has.
 
 **What that costs the offer.** iperf3 is BSD-licensed, so the licence asks for
 notices rather than source 讀. But 量 the image carries **no** notices: 0 of 17
@@ -140,15 +142,18 @@ notices rather than source 讀. But 量 the image carries **no** notices: 0 of 1
 real in the direction that matters — a recipient of the binary gets neither the
 notice nor a way to find the tree it came from.
 
-**Settled by** the `SOURCES.json` entry drafted in `sources-patch.md`: the three
-origins that agree on all sixteen compiled files (讀 `notes/iperf3-port.md` § 1 —
-the GitHub tag archive, sha256 `e34cf60c…`; the Debian orig tarball, sha256
-`60d8db69…`; a clone at tag 3.1.3, commit `274eaed5…`) plus a copy this project
-holds, fetchable from a clean clone.
+**Settled by** a copy this project holds, fetchable from a clean clone. The
+entry records the three origins that agree on all sixteen compiled files (讀
+`notes/iperf3-port.md` § 1 — the GitHub tag archive, sha256 `e34cf60c…`; the
+Debian orig tarball, sha256 `60d8db69…`; a clone at tag 3.1.3, commit
+`274eaed5…`). What is missing is the unpack step its `fetch_gap` key names, and
+a fetch at all: 量 2026-10-05 `tools/fetch-sources.sh --list` does not plan this
+entry — 讀 it plans an entry only when the entry's `fetch` value is `now` or
+`later`, and this one's is a command line.
 
-**Until it lands, this offer's row 8 reads: the notices are in the upstream
-tree, this project does not serve them, and a release carrying `/bin/iperf3`
-must either land the entry or drop the binary.**
+**Until then, this offer's row 8 reads: the notices are in the upstream tree,
+this project does not serve them, and a release carrying `/bin/iperf3` must
+either close this gap or drop the binary.**
 
 ### Gap 2 — `SBOM-4`: no gcc or binutils source is held anywhere
 
@@ -189,7 +194,7 @@ list.
 | # | condition | how it is checked |
 |---|---|---|
 | 1 | a contact channel exists and the release links to it | 量 the file exists and the release notes name it; § 1's 未定 is closed |
-| 2 | `SOURCES.json` has the iperf3 entry and `tools/fetch-sources.sh` fetches it from a clean clone | 量 `fetch-sources.sh` reports success on a fresh clone; gap 1 closed |
+| 2 | `SOURCES.json` has the iperf3 entry and `tools/fetch-sources.sh` fetches it from a clean clone | 量 `fetch-sources.sh` reports success on a fresh clone; gap 1 closed. ⚠️ 量 2026-10-05: the entry exists and the planner does not plan it (gap 1), so this line needs the planner changed as well as the unpack step written |
 | 3 | the release's archive is served by this project, not by a pin on a third party's repository | 量 the asset exists and its sha256 is in the release notes (§ 2's note) |
 | 4 | the archive's uClibc half includes the relink path: each program's sources and Makefiles | 量 the archive contains them (讀 LGPL-2.1 § 6(a)) |
 | 5 | `NOTICE`, `LICENSE` and this file are in the archive **and reachable from the running image** | 🔴 量 today 0 of 17 `file` rows is a notice; closing this is a change to `config/rlxfw-initramfs.tsv`, not to this document |

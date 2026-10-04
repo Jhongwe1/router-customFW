@@ -4,9 +4,13 @@ R7, segment 118, 2026-09-30.  Owner of: the boot sequence, the mount table, the
 supervision policy, the bench-shell decision, and `ifupd`'s event table.
 Sources: `src/init/`, `src/ifupd/`, `src/lib/netutil.{c,h}`.
 
-**Nothing in this file has run on the device.**  Every number is 讀 (read out of
-a source tree, a `.config` or a built artefact) or a desk measurement of a host
-build.  What is 量 on the silicon is quoted from `SPEC.md` and marked.
+**Written before anything in it had run on the device**, so every number here is
+讀 (read out of a source tree, a `.config` or a built artefact) or a desk
+measurement of a host build.  🔄 Both programs have since run on the die: 量
+2026-09-30, image `r78a` from RAM, PID 1 is `/init` (`FW-175`), and `ifupd`
+applied one hand-fed lease and refused two by name (`FW-181`);
+`notes/userspace-integration.md` § 7 owns those readings.  What is 量 on the
+silicon is quoted from `SPEC.md` and marked.
 
 ## 1. What replaced what
 
@@ -300,11 +304,14 @@ reason.
 
 ## 8. What this does NOT establish
 
-* **Nothing has run on the device.**  Not one line of either program has
-  executed on the RTL8196E.  Every claim here is 讀 or a host measurement.  The
-  host tests run on little-endian x86-64 with glibc; the target is big-endian
-  MIPS-I with uClibc 0.9.30, and `plan` D14 is explicit that a host test
-  verifies logic and not codegen.
+* **What ran on the device is narrower than what this file describes.**  Both
+  programs have executed on the RTL8196E since it was written (量 2026-09-30,
+  `FW-175`, `FW-181`); the readings are their boot lines, `ps`, one respawn of
+  `brokerd` and `httpd` after a `kill`, and three hand-fed leases, one applied
+  and two refused (`docs/GATE-RESULTS.md` entry 17).  Every other claim here is
+  讀 or a host measurement.  The host tests run on little-endian x86-64 with
+  glibc; the target is big-endian MIPS-I with uClibc 0.9.30, and `plan` D14 is
+  explicit that a host test verifies logic and not codegen.
 * **No service dependency ordering beyond start order.**  Children start in
   table order and nothing waits for anything.  `brokerd` may not have its socket
   up when `httpd` first connects; `httpd`'s client code has to cope.  There is
@@ -321,11 +328,14 @@ reason.
 * **No WAN interface is proven to exist.**  `RLXFW_WAN_IF` defaults to `eth4`
   and is 未定 pending `R6-6` (per-port VLAN, not met).  `wan.mode` defaults to
   0, so `udhcpc` is not started and the name is never used — which also means
-  `ifupd` has never been invoked by `udhcpc`, only by its own tests.
-* **`udhcpc`/`udhcpd` do not exist on this image.**  量: this busybox is v1.13.4
-  from the unit's own flash and `config/image-commands.tsv` lists no `udhcp*`
-  applet at all.  Both children will go `SV_ABSENT` with one line each until
-  rlxfw's own busybox is built (plan's R7f item 1).
+  `ifupd` has never been invoked by `udhcpc`, only by its own tests and, on the
+  device, by hand (`FW-181`).
+* **`udhcpd` runs and `udhcpc` never has.**  🔄 This bullet used to say neither
+  existed, which was true of the unit's own busybox; rlxfw's busybox enables
+  both (讀 `config/rlxfw-busybox.config`, and `config/image-commands.tsv` lists
+  both applets), and 量 2026-09-30 `ps` showed `udhcpd` running as root
+  (`FW-175`).  `udhcpc` is not started while `wan.mode` is 0, so it has never run
+  on this board (`docs/GATE-RESULTS.md` entry 17).
 * **The tmpfs mounts are unbounded** (§ 3), and nothing measures how much RAM
   they take.
 * **`reboot(RB_POWER_OFF)`'s behaviour on this SoC is 讀, not 量.**  Nothing has
