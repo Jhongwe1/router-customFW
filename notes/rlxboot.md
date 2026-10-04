@@ -38,7 +38,11 @@ and `header_len`, so a boot between the upload and the `J` corrupts the containe
 into `RLXBOOT-HDR bad=format`. That is visible rather than silent, but it is a
 constraint on the card: **upload the container after the prompt is reached, and do
 not let the board reset between the upload and the jump.** The spec pins the
-address; this note records what pinning it costs.
+address; this note records what pinning it costs. ⚠️ The word reads
+`00020060` for format 2 and read `00010060` for format 1 — the 2026-09-30
+captures and `FW-171`'s discriminator hold the older value, as a record of the
+containers that seating used, and a card re-using that expectation has to
+recompute it.
 
 `rlxboot`'s own range is taken from the linker symbols `_rlxboot_start` and
 `_stack_top`, not from a constant, so a payload that grows cannot end up
@@ -83,9 +87,47 @@ the rollback decision is the only one an attacker gains from flipping.
 
 `short`, `magic`, `format`, `header_len`, `version`, `payload_len`, `flags`,
 `reserved`, `load_addr`, `entry_addr`, `dst_self`, `dst_buf`, `dst_loader`,
-`truncated`, `sig`, `digest`, `rollback`. Every one is a separate case in
-`t_container.c` and every case asserts the reason by name, so a refusal for the
-wrong reason is a failure and not a pass.
+`truncated`, `sig`, `digest`, `rollback`, `flash_dst`, `flash_match`,
+`flash_form`. Every one is a separate case in `t_container.c` and every case
+asserts the reason by name, so a refusal for the wrong reason is a failure and
+not a pass. The last three arrived with format 2 and their numbers are
+**appended** to the enum, so no existing reason's value moved and a capture of
+`RLXBOOT-HDR bad=…` reads the same before and after.
+
+### The three format-2 bounds, and what each one is for
+
+`flash_form` refuses a declared destination with no landing form, a form with
+no destination, and a word that is not one of the three — before any
+arithmetic is done with it, because the form is what fixes how many bytes
+land, and a form nobody checked is a length nobody checked.
+
+`flash_dst` refuses a declared **landing range** inside the loader region,
+inside `H601`, or running off the end of the part. It depends on no
+caller-supplied value, so no caller can turn it off, and it fires in the boot
+path too — where nothing is written at all. It is deliberately **not** the
+whole of `tools/flashguard.py`'s table: the rescue slot is licensable, so the
+format permits a container that declares it and the host build is where the
+owner's dated licence is demanded. `RLXU_FLASH_KEEPOUT_END` and
+`RLXU_CHIP_SIZE` are the only flash numbers in `container.h`, and
+`test-mkfw2.sh` `G1` reads both out of the header and requires them to equal
+what `flashguard.check_unrecoverable` enforces — probed, not grepped for a
+literal — with `G2` as the control that the comparison can fail.
+
+`flash_match` compares the signed `flash_at` **and** `flash_form` with
+`env.write_at` and `env.write_form`, where and as what the caller says it is
+writing. A mismatch in either is refused, and so is a container that declares
+nothing. The form half is the one that matters most and is the easiest to
+leave out: 量 2026-10-04, a container over a `cr6c`-headed payload reads
+`RLXU` at offset 0 and `cr6c` at offset 160, so whether the writer strips the
+160-byte prefix decides whether what lands at `0x020000` can boot at all
+(`FW-168`). `t_container.c`'s case *declared 0x020000 PAYL, caller writing
+0x020000 WHOL* is where that is refused — the base agrees and only the form
+differs — and `test-mkfw2.sh` `M7`, which compares the offset alone, is the
+mutant that must turn it red.
+
+`RLXU_FLASH_NONE` is `0xFFFFFFFF` and `RLXU_FORM_NONE` is `0`, so a zeroed
+`struct rlxu_env` says *I am writing flash offset 0 in no form*, which every
+container is refused against. A field somebody forgot fails safe.
 
 Four are additions to `SPEC-R8a` § 2 and are listed as such: `payload_len == 0`
 refused by name; `load_addr` and `entry_addr` required to be word aligned (an

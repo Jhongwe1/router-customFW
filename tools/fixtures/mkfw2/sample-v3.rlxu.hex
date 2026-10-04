@@ -1,7 +1,15 @@
-# An RLXU container, 416 bytes, built by mkfw2 1.0 from
+# An RLXU container, 416 bytes, built by mkfw2 1.1 from
 # sample-payload.hex with the PUBLISHED development seed (32 x 0x42),
-# version 3, load/entry 0x80500000, recipe 3685a3a4.  Hex rather than
-# binary so a reader can diff it and so nothing binary enters the tree
-# that a reader has to take on trust.  A5 rebuilds it byte for byte; if
-# that ever fails, the FORMAT changed and every signed container did too.
-524c585500010060000000030000010080500000805000000000000040aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf9448803685a3a40000000000000000000000000000000000000000000000000000000000000000a9fe6d958add934b053d15050a7cd241e6d86f09faf2b72b38867b97ee0211178f6cc8a98bd49a830ab2a9d27274c0971ea61bb247f77034e38f269124696b07000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
+# version 3, load/entry 0x80500000, recipe 3685a3a4, and
+# --not-for-flash: bytes 64..67 read FFFFFFFF and bytes 68..71 read
+# 00000000, format 2's pair of sentinels for `this container has no
+# flash destination, so it has no landing form either`.  Hex rather
+# than binary so a reader can diff it and so nothing binary enters the
+# tree that a reader has to take on trust.  A5 rebuilds it byte for
+# byte; if that ever fails, the FORMAT changed and every signed
+# container did too.
+# 🔴 Its predecessor was format 1 and also 416 bytes: word 1 read
+# 00010060 and bytes 64..95 were 32 zeros.  The 2026-09-30 bench
+# captures and `FW-171`'s discriminator hold that older word and are
+# not corrected -- they are a record of format-1 containers.
+524c585500020060000000030000010080500000805000000000000040aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf9448803685a3a4ffffffff000000000000000000000000000000000000000000000000000000004356f77eecee8bd8908241f32202a6aa28103cad5db0ce40f56dbee63953e4d7d2696c24cb67631aa2caa4984ae15edf663b38c3b520aaadea8d85db76224c0a000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff

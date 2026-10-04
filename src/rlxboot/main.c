@@ -206,6 +206,13 @@ void rlxprobe_main(void)
 	env.buf_limit = RLXB_CONTAINER_LIMIT;
 	env.ldr_base  = RLXB_LDR_BASE;
 	env.ldr_end   = RLXB_LDR_END;
+	/* rlxboot's boot path writes no flash byte, so it declares no write and
+	 * the container's signed `flash_at` is compared against nothing.  It is
+	 * still CHECKED: a container declaring the loader region or H601 is
+	 * refused as `flash_dst` here too, in a path that writes nothing.
+	 * `R8b`'s install path is what will set this to a real offset. */
+	env.write_at   = RLXU_FLASH_NONE;
+	env.write_form = RLXU_FORM_NONE;
 	ctr_value     = rlxu_counter_from_bitmap(ctr_bitmap, &malformed);
 	env.counter   = ctr_value;
 	env.pk        = rlxboot_devkey;

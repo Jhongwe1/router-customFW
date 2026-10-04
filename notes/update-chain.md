@@ -19,7 +19,7 @@ bytes, then the payload. `tools/mkfw2.py` is the only producer.
 | off | size | field | rule |
 |---|---|---|---|
 | 0 | 4 | magic | `0x524C5855` = `RLXU` |
-| 4 | 2 | format | 1 |
+| 4 | 2 | format | 2 — format 1 is refused by name at step 1 |
 | 6 | 2 | header_len | 96 |
 | 8 | 4 | version | the anti-rollback ordinal, 1..`0xFFFFFFFE` |
 | 12 | 4 | payload_len | 1..`0x00300000` (3 MiB) |
@@ -28,13 +28,73 @@ bytes, then the payload. `tools/mkfw2.py` is the only producer.
 | 24 | 4 | flags | 0 in `R8a`; bit 0 reserved for "payload is LZMA"; any unknown bit set rejects |
 | 28 | 32 | payload SHA-256 | |
 | 60 | 4 | recipe id | the four bytes whose hex `RLXFW-ID0` prints |
-| 64 | 32 | reserved | all zero; any non-zero byte rejects |
+| 64 | 4 | flash_at | the DECLARED flash destination, or `0xFFFFFFFF` for "not for flash" |
+| 68 | 4 | flash_form | `WHOL` (`0x57484F4C`), `PAYL` (`0x5041594C`), or `0` when there is no destination |
+| 72 | 24 | reserved | all zero; any non-zero byte rejects |
 | 96 | 64 | signature | Ed25519 over bytes 0..95 |
 | 160 | payload_len | payload | |
 
 A container is `160 + payload_len` bytes and no other length is accepted: a
 trailing byte is rejected as `2/container_len`, which is what stops a container
 from carrying a second image nobody verified.
+
+### The destination is inside what is signed — format 2, 2026-10-04
+
+Format 1 had 32 reserved bytes at offset 64 and no flash destination anywhere
+in the container. `--flash-at` was an optional argument to `mkfw2 build`, so
+量 on format 1, three readings:
+
+- `build` with no `--flash-at` exited 0 and emitted a container;
+- the container it emitted had the **same sha256** as the one built with
+  `--flash-at 0x030000`, so the destination was in no byte of the file;
+- `--flash-at 0x020000` exited 3 — the positive control that the guard it fed
+  was real and not a crash.
+
+That is `R8b`'s precondition ③ half-met: a check that can be skipped by
+omission, and nothing downstream able to tell a checked container from an
+unchecked one. Format 2 spends 8 of those 24 bytes:
+
+- **`--flash-at` and `--not-for-flash` — exactly one is required.** Omitting
+  both is a refusal, so the declaration cannot be skipped; whichever is given
+  is signed.
+- **`--flash-form whole|payload` is required with `--flash-at`.** It says what
+  lands: the whole `160 + n` container, or the `n` payload bytes with the
+  prefix stripped by the writer. It fixes the landing LENGTH, which is the
+  length `flashguard` is asked about and the length a licence names.
+- **`verify --write-at ADDR --write-form F`** refuses a container whose signed
+  `flash_at` is not `ADDR` **or** whose `flash_form` is not `F`, and refuses
+  one that declares nothing. An undeclared container may never be written to
+  flash.
+
+**Why the form is signed and not the writer's choice.** 量 2026-10-04: a
+container built over a `cr6c`-headed payload reads `RLXU` at offset 0 and
+`cr6c` at offset 160. `rlxboot-rescue` at `0x020000` is one of the six bases
+the stock loader scans and it must carry a `cr6c` header there or it cannot
+boot (`FW-168`, § 5). So if the container lands at `0x020000` the base reads
+`RLXU`, `check_image()` returns 0, and the rescue is dead while every guard
+passed; if the payload lands there it boots. For a slot the opposite is
+wanted, because a slot must carry no header the loader recognises. Two
+opposite requirements for two destinations is exactly the choice that must not
+be left to whichever code does the write, so it is declared, signed, and
+compared against the writer's own `--write-form`.
+
+**What this does not decide.** Which destinations must boot. That is
+work-order item 5's — `FW-168`'s two opposite properties, each with its own
+control. `mkfw2` *reports* the landing base, the landing length, the four
+bytes that land and whether that base is one of the six scan candidates, and
+refuses nothing on that basis.
+
+The committed fixtures are the proof that the declaration is signed:
+`tools/fixtures/mkfw2/sample-v3.rlxu.hex` (`--not-for-flash`) and
+`sample-v3-at030000.rlxu.hex` (`--flash-at 0x030000 --flash-form whole`) carry
+the same payload and differ in **72 bytes: the 8 declaration bytes and the 64
+signature bytes, and nowhere else**. In format 1 the same two builds differed
+in 0. `test-mkfw2.sh` `N3` is that count, driven.
+
+⚠️ The 2026-09-30 bench captures and `FW-171`'s discriminator word read
+`524C5855 00010060` — format 1, the containers that seating used. They are a
+record and are not corrected; a format-2 container reads `00020060` there, and
+any card that re-uses that expectation has to recompute it.
 
 ## 2. The verification order, and why it is part of the format
 
@@ -120,8 +180,56 @@ Restating the ranges in a second file is how one of them drifts.
 |---|---|---|
 | `0x000000`–`0x005FFF` | loader | The boot loader. `burn()` at `0x80401318` has **no lower bound** at all (`docs/loader-flash-write.md` § 1) and `boot` is one of the eight section signatures it accepts, so the vendor's own upgrade path will write offset 0 if a section header asks it to. A partial write here is an unrecoverable brick and there is no spare unit. |
 | `0x006000`–`0x007FFF` | `H601` | This unit's MAC and radio calibration, which no reset restores. **Delegated**, not restated: `flashguard` asks `flashwin.overlaps_forbidden`, and `F3` is the case that goes red if that delegation is ever replaced by a copy. |
-| `0x020000`–`0x02FFFF` | rescue | The read-only rescue slot (plan § D6). The stock loader scans `0x020000`, so this is the one image that still boots when `0x010000` is broken; the update path never writes it. |
+| `0x020000`–`0x02FFFF` | rescue | The read-only rescue slot (plan § D6). The stock loader scans `0x020000`, so this is the one image that still boots when `0x010000` is broken; the update path never writes it. **LICENSABLE** since 2026-10-04 — see below. |
 | `0x400000`– | off-chip | Not a region but the same class of hazard: `burn()`'s only bound is the chip capacity and it **truncates** at it rather than refusing, so a destination running past the end is a silently short write. |
+
+### The ruling of 2026-10-04 — the rescue slot became licensable
+
+`R8b` has to write `rlxboot-rescue` at `0x020000`, which `flashguard` forbade
+outright, so `mkfw2 build --flash-at 0x020000` was refused: 量 exit 3, no file
+written. A containment rule that is relaxed because the experiment needs it is
+not a containment rule, so **the blanket refusal was not removed**. What was
+added is a second, narrower gate, and the division is in the API:
+
+- **`check()` is unchanged.** It takes no licence argument — a function that
+  can be handed a permission is a function every later caller has to be
+  audited for — and 量 over 65,600 probes (16,400 offsets × 4 lengths) its
+  verdict is identical to the version before the ruling, with a deliberately
+  shifted oracle differing in 133 of 200 as the control that the comparison
+  can fire at all.
+- **`LICENSABLE` holds one region id: `rescue`.** `UNRECOVERABLE` holds
+  `loader`, `H601` and `off-chip`, and for a range touching one of those
+  `check_licensed()` returns `check()`'s refusal **without reading the licence
+  at all** — not parsing it, not reporting on it.
+- **A permit inside a licensable region needs four things**: the region is in
+  `LICENSABLE`; the range lies **wholly inside that region's own bounds**; a
+  licence is presented and every row in it parses; and one row names this
+  base, this landing length, this region id and this payload's SHA-256, under
+  a real calendar date. The row lives in the `owner-yes` fence
+  `cardcheck.py` already owns — the same compiled regex object, so `F18` can
+  assert the delegation by identity.
+
+The containment property, stated so it can be refuted: **a permit from
+`check_licensed()` implies the range is disjoint from `0x000000`–`0x007FFF`
+and ends at or before the chip's end**, because the third conjunct bounds it
+inside `0x020000`–`0x02FFFF` whatever a row says. `L4` builds a
+correct-looking licence for every corner of the loader region and of `H601`
+(18 probes) and requires the blanket refusal to stand; `L6` sweeps 4,110
+probes under the most permissive licence the file can construct and requires
+the permitted set to be **exactly** the complement of the three unrecoverable
+ranges — 37 refused, 4,073 permitted, 0 wrong. `M4` is the mutant: letting
+the licence be read for every range turns `L4` red, and `M6` — emptying
+`LICENSABLE` — turns `L1`, `L2`, `L6` and `L9` red, so neither arm is passing
+for some other reason.
+
+What a licence is not: it is not a write, and it is not provenance. The tools
+enforce that a row exists, parses and names exactly this write; only the
+owner's own words on the date they were said make one real
+(`cardcheck.owner_yes`'s own note, and `flashguard.parse_licence` repeats it).
+One divergence from the card rule is deliberate: an **unused** row is reported
+and is not a defect, because a licence file may legitimately carry rows for
+builds other than this one, while a **malformed** row anywhere in the file is
+a defect and permits nothing.
 
 **A guard is shown permitting as well as refusing.** `flashguard table` prints
 the forbidden ranges *and* seven probed neighbours, and `test-mkfw2.sh` `B2`

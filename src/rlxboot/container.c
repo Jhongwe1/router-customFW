@@ -41,6 +41,33 @@
  * the anti-rollback decision is the only one an attacker gains anything from
  * flipping.  Checking it before the signature would mean the counter policy
  * ran on a number nobody had authenticated.
+ *
+ * THE DECLARED FLASH DESTINATION (format 2, 2026-10-04).  `flash_at` at offset
+ * 64 and `flash_form` at offset 68 are inside the signed header, and this file
+ * makes three separate decisions about them, in this order:
+ *
+ *   flash_form   the pair must be CONSISTENT: a destination with no form, or
+ *                a form with no destination, or a form that is not one of the
+ *                three words, is refused before any arithmetic is done with
+ *                it.  The form decides how many bytes land, so a form nobody
+ *                checked is a length nobody checked.
+ *   flash_dst    the DECLARATION is refused if the LANDING RANGE names
+ *                something nothing can license -- the boot loader, `H601`, or
+ *                past the end of the part.  This refusal does not depend on
+ *                any caller-supplied value, so no caller can turn it off; it
+ *                fires in the boot path too, where nothing is written at all.
+ *   flash_match  the declaration is compared with `e->write_at` and
+ *                `e->write_form`, where and as what the CALLER says it is
+ *                about to write.  A mismatch in EITHER is refused, and so is
+ *                a container that declares nothing -- because "nobody checked
+ *                a destination for this container" is exactly what an
+ *                undeclared container means.
+ *
+ * `flash_dst` is deliberately NOT the whole of `tools/flashguard.py`'s table:
+ * the rescue slot is licensable, so the format permits a container that
+ * declares it and the host build is where the owner's dated licence is
+ * demanded.  A fence that could be opened by a licence would not be a fence,
+ * and a fence that duplicated the whole policy would drift from it.
  */
 
 #include "container.h"
@@ -114,7 +141,10 @@ static const char *const reason_names[RLXU_R__COUNT] = {
 	"truncated",
 	"sig",
 	"digest",
-	"rollback"
+	"rollback",
+	"flash_dst",
+	"flash_match",
+	"flash_form"
 };
 
 const char *rlxu_reason_name(int reason)
@@ -190,6 +220,7 @@ int rlxu_verify(const unsigned char *c, unsigned long avail,
 	r->magic = r->version = r->payload_len = 0;
 	r->load_addr = r->entry_addr = r->flags = r->recipe_id = 0;
 	r->format = r->header_len = 0;
+	r->flash_at = r->flash_form = r->flash_len = 0;
 	r->digest = 0;
 	r->reason = RLXU_OK;
 	r->stage = 0;
@@ -228,6 +259,8 @@ int rlxu_verify(const unsigned char *c, unsigned long avail,
 	r->flags       = rlxu_be32(c + 24);
 	r->digest      = c + 28;
 	r->recipe_id   = rlxu_be32(c + 60);
+	r->flash_at    = rlxu_be32(c + RLXU_FLASH_OFF);
+	r->flash_form  = rlxu_be32(c + RLXU_FORM_OFF);
 
 	if (r->version < RLXU_VER_MIN || r->version > RLXU_VER_MAX)
 		return refuse(r, rep, RLXU_T_BOUND, RLXU_R_VERSION);
@@ -242,8 +275,8 @@ int rlxu_verify(const unsigned char *c, unsigned long avail,
 	 * turning it on is a format change, not a flag flip. */
 	if (r->flags != 0)
 		return refuse(r, rep, RLXU_T_BOUND, RLXU_R_FLAGS);
-	for (i = 0; i < 32; i++)
-		if (c[64 + i] != 0)
+	for (i = 0; i < RLXU_RESV_LEN; i++)
+		if (c[RLXU_RESV_OFF + i] != 0)
 			return refuse(r, rep, RLXU_T_BOUND, RLXU_R_RESERVED);
 
 	/* The whole container must be present before one payload byte is read.
@@ -254,6 +287,49 @@ int rlxu_verify(const unsigned char *c, unsigned long avail,
 	buf1 = A32(e->buf_base + body);
 	if (buf1 < e->buf_base || buf1 > e->buf_limit)
 		return refuse(r, rep, RLXU_T_BOUND, RLXU_R_TRUNCATED);
+
+	/* The destination and the form must agree about whether there is one,
+	 * and the form fixes how many bytes land.  `flash_len` is derived HERE
+	 * and nowhere else, so the length `flash_dst` bounds, the length the
+	 * host guard checked and the length a writer would program are one
+	 * number. */
+	if (r->flash_at == RLXU_FLASH_NONE) {
+		if (r->flash_form != RLXU_FORM_NONE)
+			return refuse(r, rep, RLXU_T_BOUND, RLXU_R_FLASH_FORM);
+		r->flash_len = 0;
+	} else if (r->flash_form == RLXU_FORM_WHOLE) {
+		r->flash_len = body;
+	} else if (r->flash_form == RLXU_FORM_PAYLOAD) {
+		r->flash_len = r->payload_len;
+	} else {
+		return refuse(r, rep, RLXU_T_BOUND, RLXU_R_FLASH_FORM);
+	}
+
+	/* The DECLARED landing range, against the two ranges that cost the
+	 * device and the end of the part.  `flash_at >= RLXU_CHIP_SIZE` is
+	 * tested FIRST so that `flash_at + flash_len` cannot wrap: after it,
+	 * flash_at < 4 MiB and flash_len <= 3 MiB + 160, so the sum is under
+	 * 8 MiB.  `flash_at < RLXU_FLASH_KEEPOUT_END` then covers both ways in,
+	 * because a range starting at or above the keepout cannot extend down
+	 * into it. */
+	if (r->flash_at != RLXU_FLASH_NONE) {
+		if (r->flash_at >= RLXU_CHIP_SIZE)
+			return refuse(r, rep, RLXU_T_BOUND, RLXU_R_FLASH_DST);
+		if (A32(r->flash_at + r->flash_len) > RLXU_CHIP_SIZE)
+			return refuse(r, rep, RLXU_T_BOUND, RLXU_R_FLASH_DST);
+		if (r->flash_at < RLXU_FLASH_KEEPOUT_END)
+			return refuse(r, rep, RLXU_T_BOUND, RLXU_R_FLASH_DST);
+	}
+	/* And against where -- and as what -- this caller says it is writing.
+	 * Equality in BOTH is the whole rule: a container declaring nothing
+	 * (RLXU_FLASH_NONE) is refused against every write, which is the point
+	 * of making the declaration non-optional in the producer, and a caller
+	 * that would strip a prefix the container did not ask it to strip is
+	 * refused even when the offset agrees. */
+	if (e->write_at != RLXU_FLASH_NONE
+	    && (r->flash_at != e->write_at
+	        || r->flash_form != e->write_form))
+		return refuse(r, rep, RLXU_T_BOUND, RLXU_R_FLASH_MATCH);
 
 	dst0 = r->load_addr;
 	dst1 = A32(r->load_addr + r->payload_len);
@@ -287,7 +363,7 @@ int rlxu_verify(const unsigned char *c, unsigned long avail,
 	passed(r, rep, RLXU_T_BOUND);
 
 	/* ---- step 3: the header's own signature ---------------------------- */
-	/* Everything above read only the 96 header bytes and the 32 reserved
+	/* Everything above read only the 96 header bytes and the 24 reserved
 	 * bytes inside them.  Nothing has been copied and nothing has been
 	 * hashed.  From the next line on, the header is trusted. */
 	trace(r, RLXU_T_SIG);

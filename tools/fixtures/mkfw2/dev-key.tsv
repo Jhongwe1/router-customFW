@@ -6,6 +6,8 @@
 dev_seed_hex	4242424242424242424242424242424242424242424242424242424242424242
 dev_public_key_hex	2152f8d19b791d24453242e15f2eab6cb7cffa7b6a5ed30097960e069881db12
 dev_public_key_source	SPEC-R8a 3; cross-checked against OpenSSL 3.0.13 (rlxsign --self-test O1)
-sample_v3_sha256	d896a75acd932cd33f0294453eb73987b18bfce1074eeb8bcac05d123ecbf9e8
+sample_v3_sha256	d36832f97751c6fb5d9189188d14b6407dd8fd987c6e77f8ffe80cd7b702ebee
 sample_v3_bytes	416
 sample_payload_sha256	40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880
+sample_v3_at030000_sha256	d8ceda210918a02668f999ff178508f5d4e95dd078ca86681178b152ec1bee46
+sample_v3_format	2  (format 1's 416-byte container had no flash destination and no landing form in it; see the hex files' own headers)

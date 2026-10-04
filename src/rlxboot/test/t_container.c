@@ -47,6 +47,11 @@ static void setenv_default(unsigned long counter)
 	env.ldr_base  = 0x80400000UL;
 	env.ldr_end   = 0x80420000UL;
 	env.counter   = counter;
+	/* Nothing in the host suite writes flash, so the default caller writes
+	 * nothing and `flash_at` is checked but not compared.  `test_flash`
+	 * sets this per case, in both directions. */
+	env.write_at   = RLXU_FLASH_NONE;
+	env.write_form = RLXU_FORM_NONE;
 	env.pk        = rlxboot_devkey;
 }
 
@@ -74,6 +79,7 @@ static void be16(unsigned char *p, unsigned int v)
 
 struct hdrspec {
 	unsigned long magic, version, payload_len, load, entry, flags, recipe;
+	unsigned long flash_at, flash_form;
 	unsigned int format, header_len;
 };
 
@@ -88,6 +94,8 @@ static void spec_default(struct hdrspec *s)
 	s->entry = 0x80500000UL;
 	s->flags = 0;
 	s->recipe = 0xAABBCCDDUL;
+	s->flash_at = RLXU_FLASH_NONE;
+	s->flash_form = RLXU_FORM_NONE;
 }
 
 /* Build a container from a spec: fill the payload, digest it, write the header,
@@ -113,8 +121,10 @@ static void build(const struct hdrspec *s, int resv_nonzero)
 	sha256b(d, C + RLXU_BODY_OFF, s->payload_len <= PAY ? s->payload_len : PAY);
 	memcpy(C + 28, d, 32);
 	be32(C + 60, s->recipe);
+	be32(C + RLXU_FLASH_OFF, s->flash_at);
+	be32(C + RLXU_FORM_OFF, s->flash_form);
 	if (resv_nonzero >= 0)
-		C[64 + resv_nonzero] = 0x01;
+		C[RLXU_RESV_OFF + resv_nonzero] = 0x01;
 
 	rlx_ed25519_sign(C + RLXU_HDR_LEN, C, RLXU_HDR_LEN, sk);
 }
@@ -160,8 +170,15 @@ static void test_fields(void)
 
 	spec_default(&s); s.magic = 0x524C5856UL; build(&s, -1);
 	expect("magic RLXV", CAP, RLXU_R_MAGIC);
-	spec_default(&s); s.format = 2; build(&s, -1);
-	expect("format 2", CAP, RLXU_R_FORMAT);
+	/* 🔴 Format 1 is the OLD format -- the one with no signed flash
+	 * destination -- and it must be refused BY NAME rather than
+	 * reinterpreted: its zero bytes at 64..67 would read as "declared
+	 * destination 0x000000", which is a sentence that container never said. */
+	spec_default(&s); s.format = 1; build(&s, -1);
+	expect("format 1, the old one with no signed destination", CAP,
+	       RLXU_R_FORMAT);
+	spec_default(&s); s.format = 3; build(&s, -1);
+	expect("format 3", CAP, RLXU_R_FORMAT);
 	spec_default(&s); s.format = 0; build(&s, -1);
 	expect("format 0", CAP, RLXU_R_FORMAT);
 	spec_default(&s); s.header_len = 95; build(&s, -1);
@@ -192,8 +209,9 @@ static void test_fields(void)
 
 	spec_default(&s); build(&s, 0);
 	expect("reserved byte 0 non-zero", CAP, RLXU_R_RESERVED);
-	spec_default(&s); build(&s, 31);
-	expect("reserved byte 31 non-zero", CAP, RLXU_R_RESERVED);
+	spec_default(&s); build(&s, RLXU_RESV_LEN - 1);
+	expect("reserved byte 23, the last of the 24, non-zero", CAP,
+	       RLXU_R_RESERVED);
 
 	/* load_addr.  Each case keeps entry_addr inside the payload so the
 	 * refusal cannot be the entry check wearing load_addr's name. */
@@ -246,6 +264,129 @@ static void test_fields(void)
 	spec_default(&s); build(&s, -1);
 	C[RLXU_BODY_OFF + 500] ^= 0x08;
 	expect("a flipped payload bit", CAP, RLXU_R_DIGEST);
+}
+
+/* ------------------------------------------- the declared flash destination */
+
+/* BOTH ARMS, FOR BOTH DECISIONS.  `flash_dst` refuses a declaration naming
+ * what nothing can license and PERMITS everything else; `flash_match` refuses
+ * a declaration that is not where the caller says it is writing and PERMITS
+ * one that is.  A guard shown only refusing is not shown to be a guard.
+ *
+ * CAP is 1,184 bytes here, so the last base that fits is 0x400000 - 0x4A0 =
+ * 0x3FFB60 and the first base above the keepout is 0x008000. */
+static void test_flash(void)
+{
+	struct hdrspec s;
+
+	setenv_default(1);
+
+	/* ---- flash_form: the destination and the form must agree ---------- */
+	spec_default(&s); s.flash_at = 0x030000UL; build(&s, -1);
+	expect("a destination with form none", CAP, RLXU_R_FLASH_FORM);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE; build(&s, -1);
+	expect("form WHOL with no destination", CAP, RLXU_R_FLASH_FORM);
+	spec_default(&s); s.flash_form = RLXU_FORM_PAYLOAD; build(&s, -1);
+	expect("form PAYL with no destination", CAP, RLXU_R_FLASH_FORM);
+	spec_default(&s); s.flash_at = 0x030000UL;
+	s.flash_form = 0x57484F4DUL; build(&s, -1);
+	expect("a form word that is not one of the three", CAP,
+	       RLXU_R_FLASH_FORM);
+	spec_default(&s); build(&s, -1);
+	expect("no destination and form none (the consistent pair)", CAP,
+	       RLXU_OK);
+
+	/* ---- flash_dst: the classes nothing can license.  Every case
+	 * declares a form, or flash_form would refuse it first and the case
+	 * would be scored for the wrong reason. */
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x000000UL; build(&s, -1);
+	expect("flash_at 0x000000, the loader's own base", CAP,
+	       RLXU_R_FLASH_DST);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x005FFFUL; build(&s, -1);
+	expect("flash_at 0x005FFF, the loader's last byte", CAP,
+	       RLXU_R_FLASH_DST);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x006000UL; build(&s, -1);
+	expect("flash_at 0x006000, H601's base", CAP, RLXU_R_FLASH_DST);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x007FFFUL; build(&s, -1);
+	expect("flash_at 0x007FFF, H601's last byte", CAP, RLXU_R_FLASH_DST);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x3FFB61UL; build(&s, -1);
+	expect("flash_at one byte too high for the WHOLE container to fit",
+	       CAP, RLXU_R_FLASH_DST);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x400000UL; build(&s, -1);
+	expect("flash_at at the end of the part", CAP, RLXU_R_FLASH_DST);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0xFFFFFF00UL; build(&s, -1);
+	expect("flash_at 0xFFFFFF00, where flash_at + flash_len would wrap",
+	       CAP, RLXU_R_FLASH_DST);
+
+	/* ---- and the positive controls, or flash_dst refuses everything */
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x008000UL; build(&s, -1);
+	expect("flash_at 0x008000, the first byte above the keepout", CAP,
+	       RLXU_OK);
+	spec_default(&s); s.flash_form = RLXU_FORM_PAYLOAD;
+	s.flash_at = 0x020000UL; build(&s, -1);
+	expect("flash_at 0x020000 PAYL: the FORMAT permits the rescue slot, "
+	       "the host licence is what gates it", CAP, RLXU_OK);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x3FFB60UL; build(&s, -1);
+	expect("flash_at 0x3FFB60 WHOL, ending exactly at the part's end",
+	       CAP, RLXU_OK);
+	/* 🔴 THE FORM CHANGES THE LENGTH, and this pair is where that is
+	 * visible: 0x3FFC00 fits the 1,024-byte PAYLOAD and does not fit the
+	 * 1,184-byte container.  Same base, same payload, opposite verdicts. */
+	spec_default(&s); s.flash_form = RLXU_FORM_PAYLOAD;
+	s.flash_at = 0x3FFC00UL; build(&s, -1);
+	expect("flash_at 0x3FFC00 PAYL: 1,024 bytes fit", CAP, RLXU_OK);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x3FFC00UL; build(&s, -1);
+	expect("flash_at 0x3FFC00 WHOL: 1,184 bytes do not", CAP,
+	       RLXU_R_FLASH_DST);
+
+	/* ---- flash_match: the declaration against the caller's own write */
+	spec_default(&s); s.flash_form = RLXU_FORM_PAYLOAD;
+	s.flash_at = 0x020000UL; build(&s, -1);
+	env.write_at = 0x020000UL; env.write_form = RLXU_FORM_PAYLOAD;
+	expect("declared 0x020000 PAYL, caller writing 0x020000 PAYL", CAP,
+	       RLXU_OK);
+	env.write_at = 0x030000UL;
+	expect("declared 0x020000, caller writing 0x030000", CAP,
+	       RLXU_R_FLASH_MATCH);
+	/* 🔴 THE FOURTH DECISION'S OWN CASE: the offset agrees and only the
+	 * form differs.  If the form were signed but not compared, the writer
+	 * would choose whether the 160-byte prefix is stripped -- and that
+	 * choice is whether `rlxboot-rescue` can boot at all (FW-168). */
+	env.write_at = 0x020000UL; env.write_form = RLXU_FORM_WHOLE;
+	expect("declared 0x020000 PAYL, caller writing 0x020000 WHOL", CAP,
+	       RLXU_R_FLASH_MATCH);
+	env.write_form = RLXU_FORM_NONE;
+	expect("declared 0x020000 PAYL, a caller that names no form", CAP,
+	       RLXU_R_FLASH_MATCH);
+	/* 🔴 The forgotten-field case: a zeroed `struct rlxu_env` says "I am
+	 * writing offset 0 in form none", and every container must be refused
+	 * against it.  That is why RLXU_FLASH_NONE is 0xFFFFFFFF and not 0. */
+	env.write_at = 0x000000UL; env.write_form = RLXU_FORM_NONE;
+	expect("declared 0x020000, a ZEROED write_at/write_form", CAP,
+	       RLXU_R_FLASH_MATCH);
+	spec_default(&s); build(&s, -1);
+	env.write_at = 0x030000UL; env.write_form = RLXU_FORM_WHOLE;
+	expect("an UNDECLARED container against a write to 0x030000", CAP,
+	       RLXU_R_FLASH_MATCH);
+	spec_default(&s); s.flash_form = RLXU_FORM_WHOLE;
+	s.flash_at = 0x030000UL; build(&s, -1);
+	env.write_at = RLXU_FLASH_NONE; env.write_form = RLXU_FORM_NONE;
+	expect("declared 0x030000 WHOL, caller writing nothing: still "
+	       "bootable", CAP, RLXU_OK);
+	env.write_at = 0x030000UL; env.write_form = RLXU_FORM_WHOLE;
+	expect("declared 0x030000 WHOL, caller writing 0x030000 WHOL", CAP,
+	       RLXU_OK);
+	setenv_default(1);
 }
 
 /* ------------------------------------------------------ truncation, 0..CAP */
@@ -535,6 +676,7 @@ int main(void)
 	   memcmp(pk, rlxboot_devkey, 32) == 0);
 
 	test_fields();
+	test_flash();
 	test_truncation();
 	test_bitflips();
 	test_order();

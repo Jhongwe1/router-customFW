@@ -8,7 +8,8 @@
  * that is only findable if they are independent.  It signs with the development
  * key of `SPEC-R8a.md` s3 and nothing else.
  *
- *   mkfixture container OUT PAYLOAD VERSION LOAD ENTRY RECIPE
+ *   mkfixture container OUT PAYLOAD VERSION LOAD ENTRY RECIPE [FLASHAT FORM]
+ *       FORM is `whole` or `payload`; the two arguments go together.
  *   mkfixture rcnt      OUT CLEARED_BITS
  *   mkfixture flip      OUT IN BYTEOFF BIT
  */
@@ -59,8 +60,9 @@ int main(int argc, char **argv)
 		unsigned long n, ver, load, entry, recipe;
 		unsigned char d[32];
 
-		if (argc != 8)
-			return die("container OUT PAYLOAD VERSION LOAD ENTRY RECIPE");
+		if (argc != 8 && argc != 10)
+			return die("container OUT PAYLOAD VERSION LOAD ENTRY "
+			           "RECIPE [FLASHAT whole|payload]");
 		f = fopen(argv[3], "rb");
 		if (!f)
 			return die("cannot open the payload file");
@@ -85,6 +87,22 @@ int main(int argc, char **argv)
 		sha256b(d, buf + RLXU_BODY_OFF, n);
 		memcpy(buf + 28, d, 32);
 		be32(buf + 60, recipe);
+		/* Format 2's declared destination.  The default is
+		 * RLXU_FLASH_NONE and NOT zero: four zero bytes here would
+		 * declare the boot loader's own base, and `container.c`
+		 * refuses that as `flash_dst`. */
+		be32(buf + RLXU_FLASH_OFF,
+		     argc == 10 ? strtoul(argv[8], 0, 16) : RLXU_FLASH_NONE);
+		if (argc == 10) {
+			if (strcmp(argv[9], "whole") == 0)
+				be32(buf + RLXU_FORM_OFF, RLXU_FORM_WHOLE);
+			else if (strcmp(argv[9], "payload") == 0)
+				be32(buf + RLXU_FORM_OFF, RLXU_FORM_PAYLOAD);
+			else
+				return die("FORM is whole or payload");
+		} else {
+			be32(buf + RLXU_FORM_OFF, RLXU_FORM_NONE);
+		}
 		rlx_ed25519_sign(buf + RLXU_HDR_LEN, buf, RLXU_HDR_LEN, sk);
 
 		f = fopen(argv[2], "wb");
