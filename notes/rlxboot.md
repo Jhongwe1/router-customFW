@@ -427,3 +427,56 @@ And four more this file adds:
   any of this into a reading;
 * that the timing is bounded. Ed25519 over 96 bytes and SHA-256 over 3 MiB have
   been timed on nothing that resembles this core.
+
+## 🆕 2026-10-05 (123rd segment, desk, no power): `BUILD_ID` moved at format 2, and every committed copy of it is the old one
+
+`src/rlxboot/Makefile` writes, above the recipe, that the id is **re-derivable**
+and that the main session identifies a booted image by recomputing it rather
+than by comparing a number someone typed. 量 2026-10-05 that this is exactly
+what the tree had stopped doing.
+
+量, with `make -pn`, which evaluates the immediate assignment and runs no rule,
+so no compiler and no vendor binary is invoked:
+
+| tree | `BUILD_ID` |
+|---|---|
+| `457b2314`, `f353b7b8` | **`6395889d`** — **the positive control** |
+| `c7e27842` (format 1 → 2) | **`a9727473`** |
+| `c8980fd6`, `66ec2abe` | **`a9727473`** |
+
+The control is what makes the rest a reading: `6395889d` is the value `SPEC.md`
+`FW-170`, `FW-172` and `FW-215`, three lines of `docs/GATE-RESULTS.md` and four
+`bench/2026-09-30/R8A-*j.log` captures record, and the recipe reproduces it at
+the commits those readings were taken from. 量 `a9727473` occurs in **0**
+tracked lines.
+
+🔴 **What this costs `R8b`, and it is not a bookkeeping point.** `FW-215` 量s
+the rescue payload at 16,240 bytes with build id `6395889d` and reasons from
+that id that *this build touched no source reaching the image*. Both halves
+were true of the tree it was built from; 量 `c7e27842` landed in the same
+segment and moved the id, so **the recorded rescue artefact cannot be
+reproduced from the committed tree** — a rebuild from `66ec2abe` compiles a
+different `-DRLXBOOT_BUILD`, so the payload bytes, its sha256, the `cr6c`
+length and the 16-bit sum all move with it. This note's own `Makefile` comment
+states the stake: *"a rescue that differed in C would carry a different id …
+and would stop being the known-good copy a rescue slot exists to hold"*. The
+difference here is not in C — 讀 the id is a digest of the sources, and
+`c7e27842`'s change to them was a container-format change the rescue payload
+does not use — but the instrument cannot tell those apart, which is the whole
+reason it is a digest.
+
+**Refutation conditions, written before the readings.** *The id moved* is
+refuted by HEAD giving `6395889d`; it did not. *The recipe is being read
+correctly* is refuted by the control failing to reproduce a recorded value; it
+reproduced two. *The move happened at format 2* is refuted by `457b2314` or
+`f353b7b8` already giving `a9727473`; neither does.
+
+**What this does not establish.** That any image was ever built or booted with
+the wrong id: every committed reading of `6395889d` was taken from a tree that
+produces it, so no record here is a misreading of its own artefact. It does not
+establish which source file of `c7e27842` moved the digest — the id is one
+digest over twenty-two files and this reading does not attribute it. It does
+not establish what the rescue slot should hold: whether `R8b` writes the
+`FW-215` artefact (reproducible only from `457b2314`-era sources) or a rebuild
+at HEAD's id is a decision about what *known-good* means, and it is the
+owner's. And nothing was built or compiled for this reading.
