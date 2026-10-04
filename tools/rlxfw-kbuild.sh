@@ -38,19 +38,19 @@
 #     --dry-run          print the declared inputs -- flags, stamp, recipe id
 #                        -- and exit 0 BEFORE staging anything.  Every guard
 #                        above the stage is testable through it.
+#     --expect-present ROW-ID   inverts that row's absent: in `rlxfw-marks
+#                        verify`, this run only, forwarded verbatim (R8b, FW-228)
 #
 # WHY THE TREE IS RE-STAGED EVERY TIME AND NOT `rm vmlinux`.
 # `r2ab-build.sh` learned this on userspace and it is worse here: a kernel
 # build that failed with the wrong flags leaves .o files newer than their .c,
 # and kbuild's .cmd files make the next run believe they were built with the
 # flags now in force.  `make clean` does not remove include/config/auto.conf or
-# .config, which is exactly the state R3-4 is measuring.  Only a fresh copy is
-# single-variable.
+# .config, which is exactly the state R3-4 is measuring.  Only a fresh copy is single-variable.
 #
 # WHY cwd IS A SCRATCH DIRECTORY.
 # `rsdk-linux-*` is a wrapper that writes `offset.tmp` into the current
-# directory.  On 2026-08-28 one landed in the repository root, which no
-# vendor-tree check watches.
+# directory.  On 2026-08-28 one landed in the repository root, which no vendor-tree check watches.
 set -o nounset
 
 FWRE_WORK=${FWRE_WORK:-/home/key/fwre-work}
@@ -87,6 +87,7 @@ NOCFLAGS=0
 CFLAGS_GIVEN=0
 NOSTAMP=0
 DRYRUN=0
+EXPECT_PRESENT=()
 # 🔴 `napplied` has TWO writers -- the host-compat loop and the marks block --
 # and the second silently shadows the first.  Nothing read it after the fact
 # until the manifest below did, so it was harmless and invisible; the manifest
@@ -109,6 +110,7 @@ while [ $# -gt 0 ]; do
         --no-cflags)     NOCFLAGS=1; shift ;;
         --no-stamp)      NOSTAMP=1; shift ;;
         --dry-run)       DRYRUN=1; shift ;;
+        --expect-present) EXPECT_PRESENT+=("${2-}"); shift; [ $# -eq 0 ] || shift ;;
         *) echo "unknown option $1" >&2; exit 3 ;;
     esac
 done
@@ -133,8 +135,7 @@ done
 # version was not: the `case` that rejects an unknown value sat beside the make
 # invocation, so `--id-scope typo` would have staged 480 MB, run oldconfig and
 # built 592 objects before saying the word was wrong.  Found on 2026-09-02 by
-# reading this file's own comment above, in the same session that added the
-# flag.
+# reading this file's own comment above, in the same session that added the flag.
 case "$ID_SCOPE" in
     global|main) ;;
     *) echo "$CELL: unknown --id-scope '$ID_SCOPE' (global|main)" >&2
@@ -249,7 +250,6 @@ case "${VARIANT:-quiet}" in
        exit 3 ;;
 esac
 
-
 # ------------------------------------------------------ the recipe's identity
 # What `ID0` prints on the console, and it is derived rather than typed.  The
 # anti-DoD's build-stamp leg loses its "WHICH of my builds" role the moment the
@@ -289,6 +289,64 @@ if [ -n "$INITRAMFS" ]; then
     echo "== $CELL: initramfs contents <- $IRFS_MANIFEST"
 fi
 
+# ----------------------------------------- --expect-present ROW-ID, R8b FW-228
+# R8b's armed image is mainline with config/rlxfw-kernel.delta's
+# CONFIG_MTD_RTL819X_WRITE flipped to y on a branch.  rtl819x_spi_write_page is
+# then in System.map, config/rlxfw-marks.tsv's MK5 (`absent:`) goes RED in
+# verify -- correctly -- and run_gates makes that exit 6.  rlxfw-marks.py's
+# `--expect-present ROW` inverts ONE named conditional row for ONE run (its W17
+# table).  This script only FORWARDS the flag, verbatim, when it is given, and
+# never derives it from the .config: reading the delta here would make this
+# file a second reader of a value tools/kconfig-delta.py owns, and an armed
+# build that forgot the flag must stay RED.  The exemption is printed below, on
+# the verify verdict line and on the last line, and appended to the manifest;
+# with no flag not one of those changes by a byte.
+#
+# 🔴 THE ROW IDS ARE CHECKED HERE, ABOVE THE STAGE, AND BY rlxfw-marks ITSELF.
+# Checked only by the post-build verify, a typo costs a 480 MB stage and 592
+# objects before it is refused -- the --id-scope defect above.  So the tool is
+# asked now, with the declaration as a stand-in image and an empty map: it
+# checks the names (_exempt_rows) before it reads either, and exits 3 with its
+# own sentence on a bad one.  Its verdict on the stand-ins means nothing and is
+# discarded -- only a refusal is read -- so which ids are valid keeps ONE owner
+# and this file holds no list of them.
+MARKS_DECL="$REPO/config/rlxfw-marks.tsv"
+MARKSPY="$HERE/rlxfw-marks.py"
+EP_ARGV=()
+for ep in "${EXPECT_PRESENT[@]}"; do
+    case "$ep" in
+        "") echo "$CELL: --expect-present was given no ROW-ID. It takes one id from" >&2
+            echo "  config/rlxfw-marks.tsv's first column -- MK5 for R8b's armed image." >&2
+            exit 3 ;;
+        -*) echo "$CELL: --expect-present '$ep': that is an option, not a ROW-ID --" >&2
+            echo "  the flag took the next argument as its value." >&2
+            exit 3 ;;
+    esac
+    EP_ARGV+=(--expect-present "$ep")
+done
+if [ "${#EP_ARGV[@]}" -gt 0 ]; then
+    if [ "$TARGET" = none ]; then
+        echo "$CELL: --expect-present with --target none. Nothing is built, so verify" >&2
+        echo "  never runs and the exemption would look granted and do nothing --" >&2
+        echo "  rlxfw-marks refuses the flag on its other verbs for the same reason." >&2
+        exit 3
+    fi
+    ep_err="$("$PY" "$MARKSPY" verify --decl "$MARKS_DECL" --image "$MARKS_DECL" \
+              --map /dev/null "${EP_ARGV[@]}" 2>&1 >/dev/null)"
+    ep_rc=$?
+    if [ "$ep_rc" = 3 ]; then
+        echo "$CELL: rlxfw-marks refused the exemption, above the stage:" >&2
+        printf '%s\n' "$ep_err" | sed 's/^/  /' >&2
+        exit 3
+    elif [ "$ep_rc" -gt 1 ] || [ -n "$ep_err" ]; then
+        echo "$CELL: the --expect-present probe exited $ep_rc without a refusal:" >&2
+        printf '%s\n' "${ep_err:-(nothing on stderr)}" | tail -n 5 | sed 's/^/  /' >&2
+        exit 3
+    fi
+    echo "== $CELL: --expect-present ${EXPECT_PRESENT[*]} <- argv, this run only:" \
+         "verify requires that row's absent: symbol to BE in System.map"
+fi
+
 # --dry-run answers "what would this build be" without copying anything.  It
 # exists so every guard above it is testable for free, and it is the only exit
 # in this script that reports success without producing an image.
@@ -303,9 +361,9 @@ fi
 # Each reads the SAME file its generator half applies -- one variable per
 # declaration, so the generator and the auditor cannot be pointed apart.
 DELTA_FILE="$REPO/config/rlxfw-kernel.delta"
-MARKS_DECL="$REPO/config/rlxfw-marks.tsv"
 KDELTA="$REPO/tools/kconfig-delta.py"
-MARKSPY="$HERE/rlxfw-marks.py"
+# MARKS_DECL and MARKSPY are set above --dry-run, where the --expect-present
+# probe reads them first: still one variable each, not a second spelling.
 # `verify`'s --absent inputs.  Under tools/, not config/: config/ is what
 # RECIPE_ID digests, and this list changes no byte of any image (its header).
 ABSENT_DECL="$REPO/tools/rlxfw-marks-absent.tsv"
@@ -658,6 +716,11 @@ run() {          # run() <logsuffix> <cmd...>
 #   verdict              green, or not-green -- overall_verdict, the one rule
 #                        that also decides the exit status and whether the
 #                        `manifest ->` line is printed
+#   marks_verify_expect_present  the row ids --expect-present named, space
+#                        separated.  🔴 WRITTEN ONLY WHEN THE FLAG WAS GIVEN, last,
+#                        so a run without it writes the same thirty lines as
+#                        before; `marks_verify green` beside it means that row
+#                        was confirmed PRESENT, the opposite of its absent:.
 #
 # 🔴 WHAT THE TWO INITRAMFS DIGESTS COVER, 2026-09-23.  `initramfs_sha256` is
 # the SPEC's digest: its text -- each entry's path, mode and owner and the
@@ -717,6 +780,8 @@ write_manifest() {          # write_manifest <vmlinux path>
         printf 'marks_verify_absent\t%s\n'  "${MVERIFY_ABSENT:--}"
         printf 'initramfs_manifest_sha256\t%s\n' "$irm"
         printf 'verdict\t%s\n'              "$(overall_verdict)"
+        [ -z "${EXPECT_PRESENT[*]-}" ] || \
+            printf 'marks_verify_expect_present\t%s\n' "${EXPECT_PRESENT[*]}"
     } > "$m"
 }
 
@@ -786,7 +851,7 @@ gate_verdict() {
 # An input that is missing is `refused` with the reason and the tool is not
 # run: a traceback is not a verdict.
 run_gates() {
-    local kargs margs line pairs i
+    local kargs margs line pairs i ep ep_tag=""
     KCHECK_RC=-;  KCHECK_VERDICT=refused;  KCHECK_RESULT=-
     MVERIFY_RC=-; MVERIFY_VERDICT=refused; MVERIFY_RESULT=-; MVERIFY_ABSENT=-
     # The .config the build USED, not the one copied in (kconfig-delta's C6).
@@ -818,12 +883,16 @@ run_gates() {
             pairs="$pairs${pairs:+,}${ABSENT_NAMES[$i]}=${ABSENT_SHAS[$i]}"
         done
         MVERIFY_ABSENT="$pairs"
+        # Verbatim and only if given; the block above --dry-run says why this
+        # is never derived from the .config.
+        for ep in "${EXPECT_PRESENT[@]}"; do margs+=(--expect-present "$ep"); done
         "$PY" "$MARKSPY" "${margs[@]}" > "$log.marks-verify.log" 2>&1
         MVERIFY_RC=$?
         line="$(gate_verdict "$MVERIFY_RC" "$log.marks-verify.log")"
         MVERIFY_VERDICT="${line%%$'\t'*}"; MVERIFY_RESULT="${line#*$'\t'}"
     fi
-    echo "== $CELL: rlxfw-marks verify $MVERIFY_VERDICT (rc=$MVERIFY_RC): $MVERIFY_RESULT"
+    [ -z "${EXPECT_PRESENT[*]-}" ] || ep_tag="[--expect-present ${EXPECT_PRESENT[*]}] "
+    echo "== $CELL: rlxfw-marks verify $ep_tag$MVERIFY_VERDICT (rc=$MVERIFY_RC): $MVERIFY_RESULT"
 }
 
 # overall_verdict -- the ONE rule.  The manifest's `verdict`, the exit status
@@ -840,14 +909,18 @@ overall_verdict() {
 # finish_build -- print the line looprun reads, or one it cannot mistake for
 # it, and return the exit status.
 finish_build() {
-    local m="$log.manifest"
+    local m="$log.manifest" ep="${EXPECT_PRESENT[*]-}"
     if [ "$(overall_verdict)" = green ]; then
+        # A line of its own: looprun's MANIFEST_RX anchors on the whole next one.
+        [ -z "$ep" ] || echo "== $CELL: green UNDER --expect-present $ep: that" \
+            "row's absent: was inverted for this run, and the manifest says so"
         echo "== $CELL: manifest -> $m"
         return 0
     fi
     echo "== $CELL: NOT FOR UPLOAD -- build rc=${BUILD_RC:--}," \
          "kconfig-delta check ${KCHECK_VERDICT:--}," \
-         "rlxfw-marks verify ${MVERIFY_VERDICT:--}; the record is $m"
+         "rlxfw-marks verify ${MVERIFY_VERDICT:--}${ep:+ under --expect-present $ep};" \
+         "the record is $m"
     [ "${KCHECK_VERDICT:-}" = green ] || [ ! -f "$log.kconfig-check.log" ] \
         || tail -n 12 "$log.kconfig-check.log" >&2
     [ "${MVERIFY_VERDICT:-}" = green ] || [ ! -f "$log.marks-verify.log" ] \

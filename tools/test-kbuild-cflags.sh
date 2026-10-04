@@ -31,6 +31,9 @@
 # the two gates with the real tools on synthetic inputs, down to the line
 # looprun's S2 reads; I1-I10 the initramfs recorded by CONTENT, not by spec
 # text.  All of them run anywhere bash and python3 do.
+# 🔄 2026-10-05 (R8b, FW-228): X1-X12d, `--expect-present ROW-ID` -- its
+# refusals above the stage, and the four cells of its truth table through the
+# gate, mainline and armed, with and without the flag.  Same: no drop needed.
 #
 # Usage:  tools/test-kbuild-cflags.sh
 set -o nounset
@@ -627,6 +630,97 @@ gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 2
 ck "R8 build step not 0 (rc 2), both gates green -> exit 2, no line" \
    "green/green/not-green/2/0" \
    "$(mf kconfig_check)/$(mf marks_verify)/$(mf verdict)/$(fin)/$(mrx)"
+
+echo
+echo "=== X1-X12d: --expect-present ROW-ID (R8b, FW-228) -- forwarded, never derived ==="
+# R8b's armed image flips config/rlxfw-kernel.delta's CONFIG_MTD_RTL819X_WRITE
+# to y, so rtl819x_spi_write_page is in its System.map and MK5's `absent:` goes
+# RED, correctly.  rlxfw-marks.py's `--expect-present ROW` inverts that one row
+# for one run (its own W17a-W17d); the driver forwards the flag verbatim when
+# it is given and never otherwise.  X1-X8b are the flag's refusals and their
+# positive control, above the stage through --dry-run -- every one of them
+# carries --dry-run, so a refusal that stopped firing exits at the dry-run and
+# stages nothing.  X9-X12d are the four cells of the truth table END TO END
+# through the extracted gate (run_gates, write_manifest, finish_build) with the
+# REAL rlxfw-marks.py, down to the exit status and the line looprun's
+# MANIFEST_RX reads.  The two REDS are the half that matters: a flag shown only
+# where it passes is a flag that cannot fail.
+xrun () { out="$(bash "$K" "$@" 2>&1)"; rc=$?; }
+xhas () { printf '%s\n' "$out" | grep -c -- "$1"; }
+xrun gcf-x1 --variant quiet --dry-run --expect-present
+ck "X1 --expect-present with nothing after it -> 3, a reason" \
+   "3/1/0" "$rc/$(xhas 'was given no ROW-ID')/$(xhas 'unbound variable')"
+xrun gcf-x2 --variant quiet --dry-run --expect-present ""
+ck "X2 an EMPTY row id -> 3, the same reason" "3/1" "$rc/$(xhas 'was given no ROW-ID')"
+# The flag swallows the first --dry-run; the second is the one in force, so a
+# guard that stopped firing would end at the dry-run instead of staging.
+xrun gcf-x3 --variant quiet --expect-present --dry-run --dry-run
+ck "X3 an option taken as the row id -> 3, before the dry-run exit" "3/1/0" \
+   "$rc/$(xhas "'--dry-run': that is an option")/$(xhas 'nothing staged and nothing built')"
+# X4-X6 -- which ids are valid is the TOOL's to say, above the stage: each
+# refusal carries rlxfw-marks' own sentence and the driver keeps no list.
+xrun gcf-x4 --variant quiet --dry-run --expect-present MK55
+ck "X4 an unknown row id -> 3 in rlxfw-marks' words, before the dry-run" "3/1/1/0" \
+   "$rc/$(xhas 'rlxfw-marks refused the exemption, above the stage')/$(xhas 'MK55: .* declares no such row')/$(xhas 'nothing staged and nothing built')"
+xrun gcf-x5 --variant quiet --dry-run --expect-present MK4
+ck "X5 an unconditional row (MK4, obj-y) -> 3, it has nothing to invert" "3/1" \
+   "$rc/$(xhas 'which is not a conditional Kbuild line')"
+xrun gcf-x6 --variant quiet --dry-run --expect-present MK5 --expect-present MK5
+ck "X6 the same row id twice -> 3, refused by the tool" "3/1" "$rc/$(xhas 'MK5 was given twice')"
+xrun gcf-x7 --variant quiet --dry-run --target none --expect-present MK5
+ck "X7 with --target none -> 3: no gate runs, so nothing to exempt" "3/1" \
+   "$rc/$(xhas 'with --target none')"
+# X8 -- the positive control: a guard that refused everything would pass X1-X7.
+# X8b -- and without the flag the output does not mention it at all.
+xrun gcf-x8 --variant quiet --dry-run --expect-present MK5
+ck "X8 --expect-present MK5 is accepted, printed, and the dry-run reached" "0/1/1" \
+   "$rc/$(xhas '--expect-present MK5 <- argv, this run only')/$(xhas 'nothing staged and nothing built')"
+xrun gcf-x8b --variant quiet --dry-run
+ck "X8b no flag: not one line of the output mentions it" "0/0" "$rc/$(xhas 'expect-present')"
+
+# X9-X12d -- one declaration holding a mark and an MK5-shaped conditional row,
+# two maps that differ in that one symbol, and the exemption set the way the
+# argument loop sets it, as EXPECT_PRESENT, through `gates`' hook.
+{ printf '# id\tfile\tposition\tanchor\tinsert\twitness\treason\n'
+  printf 'B00\tinit/main.c\tafter\tstart_kernel();\trlxfw_mark("B00");\t\tthe first mark\n'
+  printf 'MK5\tdrivers/mtd/devices/Makefile\tafter\tobj-y += rtl819x-spi.o\tobj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o\tabsent:rtl819x_spi_write_page\tdeclared, conditional\n'
+} > "$RT/marks-cond.tsv"
+printf '80000000 T _text\n80100000 T rtl819x_spi_read_page\n'  > "$RT/map-mainline"
+printf '80000000 T _text\n801a8a20 T rtl819x_spi_write_page\n' > "$RT/map-armed"
+cell () {   # cell <map> [row id] -- the exemption is in force iff a row id is given
+    local hook='MARKS_DECL="$RT/marks-cond.tsv"; cp "$RT/'"$1"'" "$log.System.map"'
+    [ -z "${2:-}" ] || hook="$hook; EXPECT_PRESENT=($2)"
+    gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0 "$hook"
+}
+vlog () { sed 's/\x1b\[[0-9;]*m//g' "$RT/c.marks-verify.log"; }
+vline () { grep '^== rcell: rlxfw-marks verify ' "$RT/fin.gates"; }
+lastrow () { tail -n 1 "$RT/c.manifest" | tr '\t' ' '; }
+
+cell map-mainline
+ck "X9 mainline, no flag: GREEN, exit 0, a line MANIFEST_RX reads" \
+   "green/0/green/0/1" "$(mf marks_verify)/$(mf marks_verify_rc)/$(mf verdict)/$(fin)/$(mrx)"
+ck "X9b and no trace of the flag: tool argv, verdict line, last line, manifest" \
+   "0/0/0/30" "$(vlog | grep -c 'expect-present')/$(vline | grep -c 'expect-present')/$(grep -c 'expect-present' "$RT/fin.out")/$(wc -l < "$RT/c.manifest" | tr -d ' ')"
+cell map-mainline MK5
+ck "X10 mainline + --expect-present MK5: RED, exit 6, no MANIFEST_RX line" \
+   "red/1/not-green/6/0" "$(mf marks_verify)/$(mf marks_verify_rc)/$(mf verdict)/$(fin)/$(mrx)"
+ck "X10b the tool got the flag; the verdict, last line and manifest name it" \
+   "1/1/1/marks_verify_expect_present MK5" \
+   "$(vlog | grep -c '^expect *--expect-present MK5')/$(vline | grep -c 'verify \[--expect-present MK5\] red (rc=1)')/$(grep -c 'rlxfw-marks verify red under --expect-present MK5; the record is' "$RT/fin.out")/$(lastrow)"
+cell map-armed
+ck "X11 armed, no flag: RED, exit 6 -- the exemption is never derived" \
+   "red/1/not-green/6/0" "$(mf marks_verify)/$(mf marks_verify_rc)/$(mf verdict)/$(fin)/$(mrx)"
+ck "X11b and the red row is MK5, its symbol found where it must not be" 1 \
+   "$(vlog | grep -cE '^  MK5 +absent: +rtl819x_spi_write_page +mine:1 .*must be 0 here')"
+cell map-armed MK5
+ck "X12 armed + --expect-present MK5: GREEN, exit 0, a line MANIFEST_RX reads" \
+   "green/0/green/0/1" "$(mf marks_verify)/$(mf marks_verify_rc)/$(mf verdict)/$(fin)/$(mrx)"
+ck "X12b the verdict line names it, and so does the line before the manifest" "1/1" \
+   "$(vline | grep -c 'verify \[--expect-present MK5\] green (rc=0)')/$(sed -n 1p "$RT/fin.out" | grep -c 'green UNDER --expect-present MK5')"
+ck "X12c the manifest records it last, after the same thirty lines" \
+   "31/marks_verify_expect_present MK5" "$(wc -l < "$RT/c.manifest" | tr -d ' ')/$(lastrow)"
+ck "X12d and verify's own RESULT says one row was confirmed PRESENT" 1 \
+   "$(mf marks_verify_result | grep -c '1 confirmed PRESENT under --expect-present')"
 rm -rf "$RT"
 
 echo
