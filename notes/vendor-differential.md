@@ -44,23 +44,84 @@ only if the probe list is right.
 | 0 | 32 x 131,072 B | `ae87ac03269985d6…` | `ae87ac03269985d6…` | **same** |
 | 1, group 0 | 32 x 4,096 B | `44355799377e731e…` | `44355799377e731e…` | **same** |
 
-`map_hashed` 4,186,112 with `map_h601_skipped 8192` at level 0, and 122,880 +
+`map_hashed` 4,186,112 with `map_h601_skipped 8192` at level 0 — the driver
+prints the pair verbatim as `map_hashed 4186112` and `map_unit 131072`, without
+separators — and 122,880 +
 8,192 = 131,072 at level 1 — group 0 fully accounted for. `n_writes` 0 before
 and 0 after. The level-0 digest also equals the rehearsal taken at 04:52 the
 same day (`FW-192`), so flash did not move across the whole day.
 
-### 2.1  推 — and it would explain a result `P2` left open
+### 2.1  The 推 this section used to carry is REFUTED
 
-`P2` bracketed nine vendor boots and got **31 same / 1 DIFFER in group 0**,
-never explained. `FW-196`'s branch writes `AUTHG_IP_ADDR`, which lives in
-COMPCS at `0x00C000` — and `0x00C000` is **inside group 0**. `P2` was not
-avoiding gated paths; this seating was, and group 0 did not move.
+The current value: **the device's whole-chip map at 128 KiB granularity has not
+changed once across 46 readings spanning 26 days**, so there is no change for
+`FW-196` to explain. `SPEC.md` `FW-201` owns the measurement; the story of the
+retraction is in `LOG.md` 2026-10-04.
 
-**This is 推, not a result.** What decides it, both desk reads of committed
-captures with no device: ① whether `P2`'s probing touched any path carrying
-`htm`, and ② which unit index `P2`'s DIFFER named, against the one `0x00C000`
-falls in. Until both are read, the honest claim is the narrow one: *this*
-episode changed no unit at either granularity.
+量 2026-10-04 at the desk, by program, over the committed captures, with the
+capture's own fields as the gate: the population is every `bench/**/*.log`
+carrying `^map_level 0`, and a row is compared only when the number of body
+lines the pattern matches **equals that capture's own `map_lines`**, with
+`map_truncated` read beside it — so a partial capture is marked and skipped
+rather than compared short. **46 captures qualify**, over **22** date
+directories from `bench/2026-09-08b` to `bench/2026-10-04`, every one
+`map_lines 32` and `map_truncated 0`, and **all 46 carry the identical 32-line
+body digest `ae87ac03269985d6`** under § 2's normalisation (`tr -d '\r'`, each
+line newline-terminated; without the trailing newline it reads `eec0ff39…` and
+a reader concludes flash moved). That span includes both of `P2`'s vendor
+seatings and the 2026-10-04 vendor episode with its 27 unauthenticated probes.
+
+**Three controls, because one digest over 46 captures is a claim.** 🟢 The
+`map_lines` gate is load-bearing: **24** further captures carry `map_level 0`
+with no map body (they are `n_writes` readings) and the gate excludes them —
+without it they would enter with an empty body, agree with each other
+trivially, and inflate the population to 70. 🟢 The pattern must match an
+offset containing an **uppercase** hex letter: 12 of the 32 offsets do, and all
+46 captures read 12. 🟢 Four `map_level 1` captures stay out of the population
+(negative control), and flipping one byte of one capture's body moves the
+digest to `162bbddeac409533` (detection control).
+
+🔴 **So the single `DIFFER` was never a before/after bracket.** It is a standing
+*device-versus-2026-08-16-dump* difference — the line's own fourth field is
+`dump` — and it is already present in the earliest qualifying capture,
+`bench/2026-09-08b`, two weeks before `P2`'s first vendor seating, where that
+date's `CORRECTIONS-block14.md` records the same `31 same, 1 DIFFER`. The
+differing unit is `000000`, that is `[0, 0x020000)`.
+
+🔴 **And at 4 KiB granularity it fails a second way.** 讀
+`notes/spi-mtd-driver.md`: group 0 is **30 same, 2 DIFFER**, and the two
+differing units are `009000` and `00D000` — **`0x00C000`, where `FW-196`
+writes, is SAME.**
+
+**The residual, which is not nothing.** `00D000` *is* inside COMPCS
+(`0x00C000` + `0x1D36` ends at `0x00DD36`, so COMPCS spans both units), so a
+vendor configuration write at some time before the dump baseline remains a live
+candidate for the dump divergence — it simply cannot be attributed to `P2` or
+to the 2026-10-04 episode. `009000` is unexplained and `FLS-26` holds it ⊘.
+
+**What this does not establish.** Not that the vendor never writes
+`AUTHG_IP_ADDR`: `FW-196` stands 讀. Not the digest's **sensitivity**: 46 equal
+digests over unchanged flash say nothing about whether a small write would be
+detected, and a sensitivity control needs a known change, which is a write.
+Nothing about two writes that cancel, or about any byte outside the units read.
+
+### 2.2  `P2` sent no HTTP at all, so the sentence saying it did not avoid gated paths is withdrawn
+
+🔄 **2026-10-04 correction.** § 2.1 used to read *`P2` was not avoiding gated
+paths; this seating was*. 量 by reading `P2`'s two seating directories
+(`bench/2026-09-23`, `bench/2026-09-25`): the only commands issued against the
+vendor were `ip neigh flush`, `ping`, and one
+`nmap -sT -p- -T4 -n --max-retries 1` per seating. A grep for `curl`, `wget`,
+`GET /`, `boafrm`, `goform`, `cgi-bin` and `.htm` over both directories returns
+**zero files** — **positive control, same grep, same day**: the identical
+pattern over `bench/2026-10-04` returns **six** files. **So `P2` sent no HTTP
+and therefore no URI at all**: `FW-196`'s branch is reached through a URI, so
+`P2` could not have reached it, and the sentence that distinguished this seating
+from it was wrong in the direction that flattered this seating. ⚠️ What is *not*
+re-derived here is `P2`'s timing axis — its vendor boots' residency against the
+600 s uptime threshold. Those captures carry no `started_wallclock`, so the
+bound would need the seating's `.timing` files read, and the path axis above
+settles the sentence on its own.
 
 ## 3  What the columns found
 
@@ -97,5 +158,11 @@ digests show reproducibility over unchanged flash, and a sensitivity control
 needs a known change, which is a write. It does not close `R9`: 68 of 89 `V-A`
 rows have no live probe and are exempted by reason, so the published table must
 say 21 and not 89. It says nothing about the 52 cases in tiers `V-B`, `V-C` and
-`V-D`, which `R9-4` owes. And a 302 to a login page is a reading about a
-surface, not a finding about authentication.
+`V-D` — 🔄 **2026-10-04: those 52 are not owed, they are carried.**
+`config/fix-cases.toml`, `R9-1`'s register, holds one row per upstream case:
+讀 141 rows, 89 `V-A` + 29 `V-B` + 10 `V-C` + 13 `V-D` = 141, and 141 of 141
+carry `mechanism_class` ①, `vendor_evidence` ②, `rlxfw_evidence` ③ and
+`opposite_check` with `opposite_check_reading` ④, with no empty cell among the
+five. What this file does not carry for them is a *live probe*, which is the
+sentence above. And a 302 to a login page is a reading about a surface, not a
+finding about authentication.

@@ -497,3 +497,327 @@ under its bare name in `ps`, and `brokerd` and `cfgstore` live in `/usr/sbin`,
 so directories remain unlisted. It does not establish that the other twelve
 `/bin` entries work, only that they resolve -- which is the distinction the
 command table's own header draws.
+
+## 🆕 2026-10-04 (`R9-4`) — which uid `bin/boa` runs as, and whether it chroots
+
+`SPEC.md` `FW-199` owns the row; this section owns the reading. Artefact: this
+unit's own firmware, `$FWRE_WORK/extracted/unit-2018/` — `rootfs.squashfs`
+(1,876,033 B) for anything about modes, and `squashfs-root` for file *contents*,
+which the extraction does preserve. Every command and every script is kept in
+`$FWRE_WORK/rebuild/s121-r9-4/`. No power action and no flash verb.
+
+`plan/REVIEW-2026-08-22.md` item 14's row reads `chroot + 降權 … ❌（boa 是 root）`
+with `ps` in its evidence column. That is an assertion carrying an instrument
+that cannot run: the vendor firmware has no shell (`docs/GATE-RESULTS.md`, `P2`'s
+⊘ Structural). Four sources below, then the verdict.
+
+### A — the launch path
+
+讀 `/etc/inittab` (361 B) holds exactly **one** non-comment line,
+`::sysinit:/etc/init.d/rcS`. Six further lines — an `askfirst` shell, a
+`respawn` shell, a `getty` on the console and three `tty2`–`tty4` shells — are
+commented out. busybox's inittab format has no user field, so no line in this
+file names a uid.
+
+讀 `/etc/init.d/rcS` (2,814 B, 111 lines) launches the web server at **line
+109**, bare: line 108 is the comment `# start web server`, line 109 is `boa`,
+line 110 is `#skt&`. No `su`, no wrapper, no option, not even a trailing
+ampersand.
+
+讀 **Ten uid-changing tokens read 0 files across the tree's text files.** The
+instrument is `grep -rIc` — `-I`, so binaries are skipped — counting files with
+at least one hit: `su ` 0, `su -` 0, `setuidgid` 0, `chpst` 0,
+`start-stop-daemon` 0, `runuser` 0, `setpriv` 0, `setuid` 0, `setgid` 0,
+`initgroups` 0. **Positive control, same flags, same run**: `User ` 1 file,
+`Group ` 1 file (both `etc/boa/boa.conf.bak`), `chroot` 1 file
+(`etc/vsftpd.conf`, six commented `chroot_*` lines). So the instrument finds
+tokens where tokens are and the ten zeros are readings.
+
+🔴 **The population is the text files, and saying so is load-bearing.** Drop
+`-I` and the same greps read `setuid` **8** files, `setgid` **6**, `chroot` **6**,
+`su ` **1**, `User ` **5** — all binaries. A sentence that said *nowhere in the
+image* would be false. What the ten zeros establish is that no **script** on any
+path changes a uid; what a binary links is source C's question.
+
+讀 busybox's applet list carries `killall` and carries neither
+`start-stop-daemon` nor `reinit`.
+
+### B — the configuration file boa actually reads
+
+讀 `/etc/boa/boa.conf` is a symlink to `/var/boa.conf`, and `/var` is a `ramfs`
+that `rcS` line 10 mounts with **no options at all** (`mount -t ramfs ramfs
+/var`). So the live config is not in the image. **Its generator is**: `bin/sysconf`
+and `bin/timelycheck` each carry the two literal shell lines
+`cp -a /etc/boa/boa.conf.bak /var/boa.conf` and
+`echo "Port 80" >> /var/boa.conf`, so the running config is `boa.conf.bak`
+verbatim plus one appended `Port 80`.
+
+讀 `boa.conf.bak` (9,504 B) has exactly **thirteen** uncommented directives:
+`User root`, `Group root`, `PidFile /var/run/webs.pid`, `DocumentRoot /web`,
+`UserDir public_html`, `DirectoryIndex index.html`, `DirectoryCache /tmp`,
+`KeepAliveMax 0`, `KeepAliveTimeout 10`, `MimeTypes /etc/boa/mime.types`,
+`DefaultType text/html`, `CGIPath /bin:/usr/bin:/usr/local/bin`,
+`SinglePostLimit 4096000`. There is **no `ServerRoot` directive and no chroot
+directive** — the only `ServerRoot` in the file is line 15's comment saying it is
+not in this configuration file, and Boa 0.94's config language has no chroot
+directive at all. `DocumentRoot /web` points at a symlink into the same ramfs,
+which `rcS` line 55 fills with `flash extr /web`.
+
+🔴 讀 **And the config's `User`/`Group` values would not have helped even if the
+binary applied them.** `/etc/passwd` is a symlink to `/var/passwd`; the image's
+`/etc/passwd.org` (213 B) carries five rows, and **three of them are uid 0 gid
+0** — `root`, a second credentialled account `onlime_r`, and **`nobody`,
+which in this image is uid 0 and gid 0**. The other two are `ftpshare` 501/501
+and `sambashare` 502/502; there is no uid 500 row. So the stock `#User nobody`
+line `boa.conf.bak` ships commented out at line 48 would also have resolved to
+uid 0. Verified field by field with `awk -F:` printing fields 1, 3 and 4 only;
+no hash from that file is quoted here or anywhere in this repository.
+
+### C — the binary's import list
+
+讀 `bin/boa` is 485,012 B, ELF32 MSB, `EXEC`, MIPS R3000, `e_shoff` **0**,
+`e_shnum` 0, flags `0x1007` (noreorder pic cpic o32 mips1), 8 program headers,
+`PT_INTERP` `/lib/ld-uClibc.so.0`, `DT_NEEDED` `libapmib.so`, `libc.so.0`,
+`libgcc_s.so.1`.
+
+讀 `readelf --dyn-syms` prints **0 bytes** on this file, and so does
+`readelf -D --dyn-syms` — which reproduces `FW-20`'s instrument warning exactly:
+with no section headers that route cannot tell clean from unread. The import
+list therefore comes from a `PT_DYNAMIC` → `DT_SYMTAB` walk (`DT_HASH`
+`0x00400248`, `DT_STRTAB` `0x0040278c`, `DT_SYMTAB` `0x00400d0c`, `DT_SYMENT`
+16, `DT_MIPS_SYMTABNO` **424**, `DT_PLTGOT` `0x00485ff0`,
+`DT_MIPS_LOCAL_GOTNO` 13, `DT_MIPS_GOTSYM` 13), cross-checked by an independent
+`DT_HASH` bucket/chain lookup per name. 424 entries = 1 unnamed + **163** named
+`SHN_UNDEF` imports + **260** named and defined.
+
+| name | linear walk | `DT_HASH` walk |
+|---|---|---|
+| `setuid` `setgid` `seteuid` `setegid` `setreuid` `setregid` `setresuid` `setresgid` `setgroups` `initgroups` | **absent, all ten** | absent, all ten |
+| `geteuid` `getegid` `prctl` `capset` `setrlimit` `daemon` | absent | absent |
+| `chroot` | PRESENT, idx 417, `SHN_UNDEF` | PRESENT |
+| `chdir` `getpwnam` `getgrnam` `getuid` `getgid` `umask` | PRESENT | PRESENT |
+| `system` `popen` `malloc` `socket` `fork` | PRESENT (positive controls, already read by `FW-20`) | PRESENT |
+| `rlxfw_absent_symbol_control` | absent (negative control) | absent |
+
+Eleven positive controls present, one negative control absent, and the two paths
+agree on all twenty-eight names queried. **`bin/boa` links no
+privilege-dropping entry point at all**, so the live config's `User root` is a
+dead word rather than an operative setting: it cannot change its own
+credentials whatever a config file says.
+
+### D — does the text reference those imports, and under what guard
+
+An import says the linker recorded a name; it does not say the text calls it. On
+o32 MIPS PIC every external call loads the callee from the GOT, so counting
+`lw $t9, X($gp)` words whose `X` maps to a symbol's GOT slot is a reference count
+taken from the instruction stream. 讀 `$gp` = `0x0048dfe0`, read out of
+`PT_MIPS_REGINFO`'s `ri_gp_value` at offset +20 of that segment rather than
+assumed — ⚠️ reading it at +24 instead falls off the end of a 24-byte segment and
+returns `0x00000001`, a plausible-looking number rather than an error. 讀
+**9,450** such words over **305** distinct `X` in the executable LOADs.
+
+讀 `chroot` **1** site (`0x405504`); `chdir` 9 (first `0x4054c0`); `getuid` 3;
+`getpwnam` 2; `getgrnam` 1; `getgid` 1; `umask` 1. Positive controls in the same
+run: `system` **187**, `malloc` 28, `fork` 18, `socket` 15, `popen` 1. Negative
+control — a gp offset 64 words past the end of the GOT — **0** sites.
+
+讀 The one `chroot` site is a `switch` case, not straight-line code. The loop is
+`while ((c = getopt(argc, argv, "c:dl:f:r:")) != -1)`, option string at
+`0x462448`; the body starts `addiu v0,v0,-99` (`'c'`), `sltiu v1,v0,16`, `beqz`
+to the default, then an indexed `jr` through a 16-word table at `0x4624c0`. The
+table's last word, at `0x4624fc`, is `0x004054c0` — index 15, letter 99+15 = 114
+= **`'r'`**. The table holds exactly five non-default targets (`0x00405454`,
+`0x004054a8`, `0x004054b0`, `0x00405554`, `0x004054c0`) against exactly five
+option letters in `c:dl:f:r:`, the other eleven slots all being the default
+`0x00405570`, so the mapping is closed rather than guessed.
+
+讀 The `'r'` case body is three calls in sequence, each guarded only by its own
+error test (`bne v0,s1` with `li s1,-1` at `0x4053c0`), the fall-through being
+`perror(...)` then `exit(1)`:
+
+    0x4054c0  chdir(optarg)      ; on -1 -> perror @0x4623c0 "chdir (to chroot)"
+    0x405504  chroot(optarg)     ; on -1 -> perror @0x4623d4 "chroot"
+    0x40552c  chdir("/")         ; on -1 -> perror @0x4623dc "chdir (after chroot)"
+
+The three strings at `0x4623c0`, `0x4623d4` and `0x4623dc` read back byte for
+byte as above, and `0x46c6e8` — the third call's argument — is the one-byte
+string `/`. 讀 With no `-c`, boa instead does `server_root = strdup("/etc/boa")`
+(string at `0x462454`, failure message `strdup (SERVER_ROOT)` at `0x462460`) and
+`chdir(server_root)` at `0x40561c`. A `chdir`, not a `chroot`.
+
+**Refutation condition, written before the search**: if any launcher in the
+image hands `boa` a `-r`, the chroot verdict flips. 讀 a byte grep for `boa`
+followed by whitespace, a dash and a letter, over every file of the tree,
+returns **one** hit — `boa -c`, inside the comment `# boa -c /usr/local/boa` at
+`boa.conf.bak` line 19. **Control, same grep shape, same run**: the pattern
+`boa.conf` returns hits in four files, so the search is not silently empty. 讀
+The only `/bin/boa` string in the whole image lives inside `bin/boa` itself, at
+file offset `0x6892c`, in a (label, pidfile, binary) restart table — `kill boa `,
+`/var/run/webs.pid`, `/bin/boa`, then `kill wscd ` — and the byte after
+`/bin/boa` is NUL. Six other binaries (`ddns_inet`, `fwd`, `ntp_inet`,
+`ppp_inet`, `sysconf`, `timelycheck`) carry `killall -9 boa` or `reinit boa `;
+none carries a `boa` command line with an option.
+
+### Verdict ①
+
+讀 **On the shipped image there is no privilege change and no chroot on the path
+that starts the vendor's web server.** The launch is `boa` with no argument from
+`rcS`, which `/etc/inittab` runs as PID 1's `sysinit`; the binary links no
+uid-setting function at all; and its single `chroot` call site is reachable only
+through the `-r` command-line case, which no launcher in the image uses.
+
+推 **Therefore `bin/boa` runs with the uid PID 1 holds — 0 — and with `/` as its
+root directory.** This half is 推 and not 量: no reading here was taken from a
+running vendor system. The four sources do not disagree; they agree, they are of
+four different kinds (init script, config generator, import table, instruction
+stream), and the interesting part is *how* they agree — the config's `User root`
+is inert in this build rather than operative, so a vendor who had written
+`User nobody` would have got exactly the same uid, twice over, because `nobody`
+is uid 0 here.
+
+**What this does not establish.**
+
+* Not the runtime uid or root directory. The 量 for those is `/proc/<pid>/status`
+  and `/proc/<pid>/root`, which need a shell the vendor firmware does not have —
+  ⊘ Structural, the same disposition `P2` already carries.
+* Not that a script generated into `/var` at runtime cannot relaunch `boa` with
+  `-r`. The image cannot answer that; only a running vendor system could, and
+  that route is the ⊘ above. Note the direction: that residue could only make
+  the vendor's posture *better* than stated, never worse.
+* Not anything about exploitability. The 187 `system` GOT loads are a count of
+  linked references, and `plan/` § 8.1's `CVE-2014-8361` entry is the standing
+  precedent for why code shape is not effect. Which of them a request reaches is
+  `FW-20`'s question and is not answered here.
+* Not that `getpwnam`/`getgrnam`/`getuid`/`getgid` are unused — they are
+  referenced, 2 + 1 + 3 + 1 sites. What is established is that nothing in the
+  binary can *apply* their results to the process credentials.
+* Not a claim about any other firmware version. Everything above is `unit-2018`.
+
+## 🆕 2026-10-04 (`R9-4`) — the vendor setuid / setgid / exec-bit census, off the image
+
+`SPEC.md` `FW-200` owns the row. Read off the **image**, never off the
+extraction. `unsquashfs` version **4.6.1 (2023/03/25)**, run as **uid 1000, not
+root** (`id` printed in the same script). `unsquashfs -ll` on `rootfs.squashfs`
+(1,876,033 B) → rc 0, **567** lines on stdout, **0** bytes on stderr. `-ll` lists
+modes out of the superblock and creates nothing, so running it unprivileged
+costs nothing.
+
+讀 567 inodes — and 567 is `FW-08`'s inode count, so the listing is the whole
+filesystem: **260** block, **38** char, **20** directories, **161** regular,
+**88** symlinks. 260 + 38 + 20 + 161 + 88 = 567.
+
+| | count | detail |
+|---|---|---|
+| **setuid files** | **0** | no path, no mode — the list is empty |
+| **setgid files** | **0** | likewise |
+| sticky entries | 0 | |
+| regular files | 161 | |
+| … with any exec bit | **160** | `-rwxr-xr-x` x114, `-rwxrwxr-x` x46 |
+| … with no exec bit | **1** | `etc/version`, `-rw-rw-r--`, 41 B |
+| … world-writable | 0 | |
+| FIFOs, sockets | 0, 0 | |
+
+114 + 46 + 1 = 161. 讀 Ownership: all 269 regular files, symlinks and
+directories are `500/501`; 297 of the 298 device nodes are `root/root` and the
+one exception is `/dev/ptmx` at `root/tty`.
+
+**Positive control, in the same run** — the listing must show a device node, and
+`FW-68` already read device nodes off this image, so the control is that this run
+reproduces them. 讀 **298** device nodes (260 block + 38 char), including
+`FW-68`'s exact readings: `/dev/mtd0`–`mtd4` at `crw-rw-rw-` 90,0–90,4 and
+`/dev/mtdblock0`–`3` at `brw-rw-rw-` 31,0–31,3. **The named node:
+`/dev/mtdblock0`, type `b`, mode `brw-rw-rw-` (0666), major 31 minor 0** —
+`FW-68`'s row verbatim, and the reason that row matters is that mtd0 covers the
+loader and `H601`.
+
+**Negative control, in the same run** — the identical census over
+`squashfs-root`, via `find`/`stat` instead of `-ll`: block **0**, char **0**,
+fifo 0, socket 0, setuid **0**, setgid **0**, sticky 0. That is the false zero
+the rule exists to name: 298 device nodes become 0. `extract.log`'s own tail says
+it in the tool's words — `created 161 files`, `created 20 directories`,
+`created 88 symlinks`, **`created 0 devices`**, `created 0 fifos`,
+`created 0 sockets`, `created 0 hardlinks` — with **298** lines reading
+`because you're not superuser!`, exactly one per dropped node.
+
+🔴 **And the negative control is sharper than the rule.** The extraction's
+*regular-file* modes are wrong too: image `-rwxr-xr-x` x114 + `-rwxrwxr-x` x46 +
+`-rw-rw-r--` x1 against extraction `-rwxr-xr-x` x160 + `-rw-r--r--` x1. **47 of
+161 regular files read a different mode in the extraction**, all 47 by the
+group-write bit (umask 022). So a group-writable or world-writable census over
+the extraction returns a false zero as well, not only a device-node census.
+
+🔴 **Positive control for the setuid detector itself, because 0 is a claim.** A
+census reporting 0 setuid and a census blind to setuid bits print the same
+number. So: `mksquashfs` 4.6.1 built `probe.squashfs` from one 4755 file, one
+2755 file, one 0644 file and a pseudo-definition `b 666 0 0 31 0`, `-all-root`.
+讀 `unsquashfs -ll` on that image prints `-rwsr-xr-x`, `-rwxr-sr-x` and
+`brw-rw-rw- 31, 0`, and the same parser reads **setuid 1, setgid 1, device nodes
+1**. So the 0/0 on the vendor image is a reading.
+
+🔴 **And extracting that same probe as non-root reads setuid 0, setgid 0, device
+nodes 0** — both files come out `-rwxr-xr-x`. **The extraction's zero for setuid
+and setgid is a demonstrated false zero, not a suspected one.** The rule written
+above for device nodes holds for the setuid bit, the setgid bit and the
+group-write bit as well, and that is now shown rather than argued. This is the
+most load-bearing line in the reading: before it, a mode census over the
+extraction was *suspected* of lying about setuid; now it is known to.
+
+讀 **Second parser, no shared code**: an `awk` field-offset count agrees on
+unit-2018 — 161 regular, 160 with an exec bit, 0 setuid, 0 setgid, 298 device
+nodes — and reads 1 / 1 / 1 on the probe image. A third parser, written
+afterwards without reading either, reproduces all of it plus the mode
+multiset 114 / 46 / 1 and the 269 / 297 / 1 ownership split.
+
+讀 **Different population** (other devices, not this unit's firmware), same
+instrument, for context only: `n200re-3.2.0` 168 regular / 166 exec,
+`n300rt-2.1.6` 164 / 163, `n300rt-3.4.0` 371 / 342, `v2.1.2` 165 / 164,
+`v3.4.0` 364 / 363 — **0 setuid and 0 setgid in all five**, 298 device nodes in
+three of them and 327 in two.
+
+### Verdict ②
+
+讀 **The shipped vendor image carries zero setuid files and zero setgid files.
+160 of its 161 regular files are executable; the one that is not is
+`etc/version`.** `plan/REVIEW-2026-08-22.md` item 14's vendor `無 setuid binary`
+cell turns out to be right, and now has a reading under it instead of the word
+`CI`.
+
+**What this does not establish.**
+
+* Nothing about runtime. 讀 `rcS` line 10 mounts `ramfs` on `/var` with **no
+  options** — no `nosuid` — and `/tmp`, `/web`, `/etc/passwd`,
+  `/etc/boa/boa.conf`, `/etc/hosts` and `/etc/resolv.conf` are all symlinks into
+  it. A root process can create a setuid file there at runtime and an image
+  census cannot see it. "No setuid binary in the image" is not "no setuid binary
+  on the box".
+* Not that 0 setuid is what bounds the vendor here. Every shipped regular file is
+  owned by uid **500**, which has no row in `/etc/passwd.org`, so a setuid bit on
+  one of them would have conferred uid 500 rather than 0. What puts the vendor's
+  userspace at uid 0 is the reading above — the web server itself — not a setuid
+  bit.
+* Not a hardlink census. `-ll` prints no link count, and `extract.log`'s
+  `created 0 hardlinks` is a line from the extraction, which this reading does
+  not trust for anything.
+* Not the per-file exec-bit *appropriateness*. 160 of 161 executable is a count,
+  not a judgement, and 106 of those files are not ELFs at all (`FW-20` reads 55
+  ELFs out of the same 161).
+* Not a reading of a different firmware version for this device. The five other
+  images above are other products.
+
+### Both readings, jointly
+
+Both are tier `V-B` — static, from this unit's own dump-derived image — and
+`V-B` carries no executable refutation, because the vendor firmware has no
+shell. So they say what the shipped bytes are and what shape the code has. They
+do not say that any defect is absent, and they do not say that any of this is
+reachable. Where each instrument could be lying: `unsquashfs -ll` could fail to
+print modes it cannot see (settled by the probe image); the `-ll` parser could
+index the wrong mode column (settled by two further parsers with no shared
+code); the extraction drops device nodes, setuid, setgid and group-write (shown
+directly on the probe and in `extract.log`'s own words); `readelf --dyn-syms`
+reports nothing and nothing looks clean (not used, and `FW-20` already named
+it); the `PT_DYNAMIC` walk could mis-size entries (settled by the `DT_HASH`
+lookup agreeing on all 28 names); the GOT count counts loads rather than
+executed calls (the one `chroot` load at `0x405504` is followed by `jalr t9`,
+and a gp offset past the GOT reads 0); the `boa` option grep could be silently
+empty (the `boa.conf` control hits four files).
