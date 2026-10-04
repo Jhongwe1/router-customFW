@@ -389,6 +389,16 @@ _R78 = ("; the lease is SYNTHETIC: 10.9.9.9, 10.9.9.1 and 10.9.9.53 were typed "
         "into ifupd at the console for R78-iu1..4, no DHCP server issued them, "
         "and R78-fix put rlx0 back on 10.1.1.1 (notes/userspace-integration.md "
         "7.6, SPEC.md FW-181)")
+#: 🆕 2026-10-04 (s121): `serial-ish` fires on the WORDS `serial number` in
+#: `R9-6`/`R9-7`'s probe register, where cell C23's `expect` states why that
+#: probe records no body.  Prose about a leak surface, not this unit's serial.
+_C23 = (
+    "cell C23's `expect` says WHY the probe records no body -- a UPnP "
+    "description document carries a UDN uuid and often a serial number -- "
+    "so the match is prose about the leak surface, not this unit's serial. "
+    "The capture is a frozen record and is never edited (CLAUDE.md); the "
+    "exemption is by name, and control A4 turns it red the day the line "
+    "stops producing the hit")
 FILE_EXEMPT = [
     ("bench/2026-09-30/R78-iu1.log", "private IPv4", "10.9.9",
      "ip=10.9.9.9 subnet=255.255.255.0 router=10.9.9.1 dns=10.9.9.53 "
@@ -415,6 +425,24 @@ FILE_EXEMPT = [
      '"sent": "ip=10.9.9.9 subnet=255.255.255.0 interface= /sbin/ifupd '
      'bound; echo rc=$?",',
      "console-capture's record of what it sent" + _R78),
+    ("bench/2026-10-04/R-DIFF.meta.json", "serial-ish", "serial number",
+     "\"expect\": \"vendor 200 or 404; rlxfw no-connect/refused. \\ud83d\\udd34"
+     " body = none: a description document carries a UDN uuid and often a "
+     "serial number. The row's SSDP half is UDP and outside this instrumen"
+     "t.\",",
+     _C23),
+    ("bench/2026-10-04/V-DIFF.meta.json", "serial-ish", "serial number",
+     "\"expect\": \"vendor 200 or 404; rlxfw no-connect/refused. \\ud83d\\udd34"
+     " body = none: a description document carries a UDN uuid and often a "
+     "serial number. The row's SSDP half is UDP and outside this instrumen"
+     "t.\",",
+     _C23),
+    ("bench/2026-10-04/V-DIFF2.meta.json", "serial-ish", "serial number",
+     "\"expect\": \"vendor 200 or 404; rlxfw no-connect/refused. \\ud83d\\udd34"
+     " body = none: a description document carries a UDN uuid and often a "
+     "serial number. The row's SSDP half is UDP and outside this instrumen"
+     "t.\",",
+     _C23),
 ]
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
