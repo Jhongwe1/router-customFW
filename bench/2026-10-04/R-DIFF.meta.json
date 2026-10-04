@@ -1,0 +1,462 @@
+{
+  "bounds": {
+    "max_excerpt": 512,
+    "max_header_value": 256,
+    "max_headers": 64
+  },
+  "case_prose": {
+    "C01": {
+      "body": "none",
+      "expect": "vendor connect-ok (\u91cf V1-NMAP 80/tcp open); rlxfw connect-ok (\u91cf FW-175, httpd on 80). The UDP half of this row is outside this instrument.",
+      "register_id": "FC-016",
+      "why": "Discriminates whether the two firmwares open the SAME TCP ports. 80 is the one port both are expected to open, so it is the census's positive control on BOTH columns at once: a refusal here means the reading is about the cable, not the board. Cannot write: no byte is sent."
+    },
+    "C02": {
+      "body": "none",
+      "expect": "vendor connect-ok (\u91cf V1-NMAP); rlxfw no-connect/refused. Says nothing about which daemon owns the port (\u91cf NET-118 has it \u63a8 only) and nothing about any command path.",
+      "register_id": "FC-076",
+      "why": "Discriminates whether the host port of the daemon this row's class-level claim is about exists at all. rlxfw ships no such daemon, so the claim is an absence; the vendor half is what keeps that absence from being an instrument zero. Cannot write: no byte is sent, so no value reaches any command path."
+    },
+    "C03": {
+      "body": "none",
+      "expect": "vendor connect-ok (\u91cf V1-NMAP); rlxfw no-connect/refused. Establishes LAN reachability only; the WAN half stays \u672a\u5b9a on both columns.",
+      "register_id": "FC-120",
+      "why": "Discriminates whether a second non-web daemon's port is reachable from the LAN at all. The row's residual limits it to the surface question -- WAN reachability is unmeasured on both firmwares -- and a connect() from the LAN is exactly that much. Cannot write: no byte is sent."
+    },
+    "C04": {
+      "body": "none",
+      "expect": "both columns no-connect/refused. \u91cf V1-NMAP lists 23 among the 65,381 closed.",
+      "register_id": "FC-078",
+      "why": "Discriminates whether either firmware offers a remote shell port. \u91cf P2: the vendor has no getty and TELNET_ENABLED 0, so a closed 23 on the vendor is the predicted reading and its agreement is what makes the open ports above a measurement rather than a scan artefact. Cannot write: no byte is sent."
+    },
+    "C05": {
+      "body": "none",
+      "expect": "both columns no-connect/refused.",
+      "register_id": "FC-078",
+      "why": "The second half of the same row, which predicts BOTH ports closed; one of the two read alone would leave the prediction half-tested. Discriminates an ssh surface on either firmware. Cannot write: no byte is sent."
+    },
+    "C06": {
+      "body": "none",
+      "expect": "both columns no-connect/refused; \u91cf V1-NMAP found only 80/52869/52881.",
+      "register_id": "FC-084",
+      "why": "Discriminates whether the named Realtek-SDK backdoor port is open on this build. A closed port on the vendor column refutes the row's own premise for this unit, which is a result and not a non-result. Cannot write: no byte is sent."
+    },
+    "C07": {
+      "body": "none",
+      "expect": "both columns no-connect/refused.",
+      "register_id": "FC-085",
+      "why": "Discriminates whether a remote-management surface is listening. The row also asks for an ACS URL, which only a reply could carry; a closed port answers the surface half and leaves the configuration half \u672a\u5b9a. Cannot write: no byte is sent."
+    },
+    "C08": {
+      "body": "none",
+      "expect": "both columns no-connect/refused.",
+      "register_id": "FC-079",
+      "why": "Discriminates whether a Realtek diagnostic port is listening on this build. Cannot write: no byte is sent."
+    },
+    "C09": {
+      "body": "none",
+      "expect": "both columns no-connect/refused.",
+      "register_id": "FC-079",
+      "why": "The second diagnostic port the same row names; the row is about a SET of ports and one of them is not the set. Cannot write: no byte is sent."
+    },
+    "C10": {
+      "body": "digest",
+      "expect": "vendor 200 with a Server header naming boa; rlxfw 200 index.html with the three security headers and no Server. A digest, not an excerpt.",
+      "register_id": "FC-017",
+      "why": "Discriminates the serving program itself. \u8b80 notes/httpd.md \u00a7 2.3: rlxfw emits X-Frame-Options, Content-Security-Policy, X-Content-Type-Options and no Server header at all, while boa announces its version in one. `hdr_names` and `hdr_sha256` carry that difference without carrying a byte of either body. Cannot write: GET of the root, no handler, and `/` holds no `htm` so the gate does not run."
+    },
+    "C11": {
+      "body": "none",
+      "expect": "vendor 200 and a non-zero length; rlxfw 404 and 30 bytes of fixed JSON. \ud83d\udd34 body = none: this document is this unit's configuration, so neither its bytes nor a digest of them is recorded. The length is the comparable field.",
+      "register_id": "FC-024",
+      "why": "Discriminates the whole class this row is about: whether an unauthenticated GET can retrieve the serialised configuration store. \u8b80 auth-flow.md: this path holds no `htm`, so the authorisation gate never runs on it. rlxfw's equivalent is GET /api/config, which \u8b80 notes/httpd.md \u00a7 2 requires a session, so an unauthenticated read there is 401 and an unknown path is 404. Status and length alone separate 200-with-a-blob from 404-with-a-fixed-document. Cannot write: a GET of a served file; translate_uri reaches init_get, not handleForm."
+    },
+    "C12": {
+      "body": "none",
+      "expect": "vendor 200 with a non-zero length and no credential sent; rlxfw 404. \ud83d\udd34 body = none: this page renders the unit's hardware and WAN addresses. Does NOT establish that the gate ever fires -- that reading needs a gated path, which R1 refuses.",
+      "register_id": "FC-034",
+      "why": "Discriminates the gate's reach on its own exempt side. \u8b80 auth-flow.md: this is one of seven names the authorisation block tests with `!strstr`, so a match skips the block ENTIRELY -- including the 601-second branch -- and the page is served to a client with no credential. Paired with C14 it reads the gate's boundary from both sides without ever entering the gated branch. Cannot write: the exemption makes the block unreachable, so the `flash set` inside it cannot run; and the path is not under /boafrm/."
+    },
+    "C13": {
+      "body": "none",
+      "expect": "vendor 200 or 404 -- either is a reading; rlxfw 404. \ud83d\udd34 body = none: a certificate may be per-unit.",
+      "register_id": "FC-026",
+      "why": "Discriminates a SECOND unauthenticated non-htm document, which is what turns C11 from one file into a class. \u8b80 auth-flow.md names this path beside /config.dat as outside the gate for the same reason. The row asks for a dictionary of 20+ names; one hit on a second name settles the class and the rest are the same request shape, so the episode's budget goes elsewhere. Cannot write: a GET of a served file."
+    },
+    "C14": {
+      "body": "digest",
+      "expect": "vendor 404, boa's own HTML; rlxfw 404 and exactly the fixed document {\"ok\":false,\"error\":\"notfound\"}. Neither reply should contain the request path.",
+      "register_id": "FC-034",
+      "why": "The ungated side of the same boundary C12 reads from the exempt side: a path holding no `htm`, so \u8b80 auth-flow.md the authorisation block is skipped on the `beq` and the client reaches translate_uri with no credential. Discriminates what an unauthenticated miss looks like on each firmware. Also the control for rlxfw's own no-reflection property (\u8b80 notes/httpd.md \u00a7 2.1 tests exactly this with a marker path): the digest changing between columns while the status matches is the finding. Cannot write: nothing exists at this path on either firmware."
+    },
+    "C15": {
+      "body": "digest",
+      "expect": "vendor 404; rlxfw 404 with its fixed document. Does NOT establish the dispatcher's branch: send_r_not_found is the same function a missing file uses, so this reading is the prefix's PRESENCE and nothing about any handler.",
+      "register_id": "FC-022",
+      "why": "Discriminates whether the serving program carries a form-dispatch prefix at all -- this row's own subject. \ud83d\udd34 Cannot write, and this is the one case that needs the argument spelled out: \u8b80 upstream/notes/dispatch-table.md, handleForm compares `strlen(uri+8) == strlen(name)` and then memcmp against a 59-entry table, so matching is EXACT and not prefix; a name the table cannot hold falls through to send_r_not_found(req) without reaching any handler. The name here is not a `form*` name. No handler runs, so neither the flash write of P10-10 nor D-11's loss of the server is reachable."
+    },
+    "C16": {
+      "body": "digest",
+      "expect": "vendor 404; rlxfw 404. A 404 here refutes the row's precondition for this build, which is the result.",
+      "register_id": "FC-023",
+      "why": "Settles this row's own stated precondition -- it applies only if a /goform/ prefix answers -- and the other half of C15's prefix comparison. Cannot write: /goform/ is not this build's dispatch prefix (\u8b80 dispatch-table.md: handleForm greps for /boafrm/), so the request is a plain file lookup, and the name does not exist."
+    },
+    "C17": {
+      "body": "digest",
+      "expect": "vendor 404 (or 500 if a ScriptAlias exists and the exec fails -- also a reading); rlxfw 404. Does NOT establish whether the named script exists; that needs a request this gate refuses.",
+      "register_id": "FC-047",
+      "why": "Discriminates whether a CGI prefix is served, which is the surface this row's named script would need. The script itself is NOT requested: a request that reached init_cgi would execute vendor code with side effects this gate cannot bound. A name that cannot exist reaches no interpreter whether the prefix is configured or not, so the reading is the prefix and the risk is none."
+    },
+    "C18": {
+      "body": "digest",
+      "expect": "both columns 404. A 200 on the vendor column is the finding this case exists for; the row stays \u672a\u5b9a if both are 404, because one name is not an enumeration.",
+      "register_id": "FC-021",
+      "why": "Discriminates whether an undeclared endpoint answers outside the documented UI -- the row's subject. One name, chosen to hold no `htm` and to sit under no dispatch or script prefix, so a 200 would be a finding and a 404 is the expected reading on both columns. Cannot write: a GET of a name that exists on neither firmware."
+    },
+    "C19": {
+      "body": "none",
+      "expect": "vendor 200 or 404; rlxfw 400. \ud83d\udd34 body = none: the target is this unit's configuration. The row names ~30 variants; this and C20 take the two rlxfw refuses by independent rules.",
+      "register_id": "FC-038",
+      "why": "Discriminates the two parsers' normalisation. \u8b80 notes/httpd.md \u00a7 3.1: rlxfw refuses an empty segment before the byte is stored and then reads the whole decoded string again for `//`, so this is 400 by construction; the vendor runs stock boa alias.c. The target is a document C11 already reads, so the variant is the only variable and a 200 here means the normaliser accepted it. Cannot write: a GET, and the path reaches no handler and holds no `htm`."
+    },
+    "C20": {
+      "body": "none",
+      "expect": "vendor 200 or 404; rlxfw 400. \ud83d\udd34 body = none.",
+      "register_id": "FC-038",
+      "why": "The second variant, refused by rlxfw's OTHER rule: \u8b80 notes/httpd.md \u00a7 3.1 every `.` and `..` segment is refused, separately from the empty-segment test. A traversal that ESCAPED the document root was deliberately not written -- it would pull a file this gate has no business recording. Cannot write: a GET, no handler, no `htm`."
+    },
+    "C21": {
+      "body": "digest",
+      "expect": "vendor 501 or 200 from stock boa; rlxfw 405 with Allow: GET, POST. PUT and DELETE are spellable by the instrument and are refused by R3.",
+      "register_id": "FC-039",
+      "why": "Discriminates the method-handling layer, which is the only one of this row's four bypass axes a read can reach. \u8b80 notes/httpd.md \u00a7 2: rlxfw answers a known path with the wrong method 405 and names the methods in Allow. A header-based bypass was NOT written: Referer and X-Forwarded-For are ignored by both on an ungated path, so that probe would read the same on both columns for a reason unrelated to the row, and a crafted Host belongs to the held D-14 rows. Cannot write: OPTIONS reaches no handler and the root holds no `htm`."
+    },
+    "C22": {
+      "body": "none",
+      "expect": "vendor 200 with a Content-Length matching C11's body_bytes; rlxfw 404 or 405. \ud83d\udd34 body = none, and HEAD carries none regardless.",
+      "register_id": "FC-039",
+      "why": "The same axis on a path that exists on one column only: whether a method change alters what the serving program will hand over. HEAD also reads C11's status and length with no body transferred at all, which is a second, independent reading of the same document under a different code path. Cannot write: HEAD, no handler, no `htm`."
+    },
+    "C23": {
+      "body": "none",
+      "expect": "vendor 200 or 404; rlxfw no-connect/refused. \ud83d\udd34 body = none: a description document carries a UDN uuid and often a serial number. The row's SSDP half is UDP and outside this instrument.",
+      "register_id": "FC-013",
+      "why": "Discriminates whether the daemon on this port serves a description document to an unauthenticated client -- the information-leak surface this row is about, as distinct from C02's bare reachability. Cannot write: a GET of the root. \ud83d\udd34 It is NOT the control path: \u8b80 upstream/docs/disclosure.md D-16/D-19, the request that terminated this daemon was a SOAP POST carrying a value to a named control endpoint, and neither that endpoint nor any SOAP body appears in this file."
+    },
+    "C24": {
+      "body": "none",
+      "expect": "vendor malformed or a status line -- either is a reading; rlxfw no-connect/refused. \ud83d\udd34 body = none: the daemon is unidentified, so the reply's content is unknown rather than known-safe.",
+      "register_id": "FC-081",
+      "why": "Discriminates whether this port speaks HTTP at all, which is the precondition for the HTTP-method surface this row names; the method itself is not one tools/diffprobe.py can spell, so the surface question is what a read can settle. Cannot write: a GET of the root, no form handler, no parameter. Ordered after C03 so the reachability reading is already banked if this request costs the daemon."
+    },
+    "C25": {
+      "body": "digest",
+      "expect": "vendor 200 (header ignored); rlxfw 501.",
+      "register_id": "FC-041",
+      "why": "Discriminates the two parsers' strictness at the protocol layer. \u8b80 notes/httpd.md \u00a7 3: rlxfw answers 501 to Transfer-Encoding with ANY value, deliberately, because a tolerant parser in front of anything is a request-smuggling primitive; stock boa ignores the header. Cannot write: a GET with no body, so there is nothing chunked to decode. The row's HTTP/0.9 and version-number axes are outside the instrument, which hard-codes HTTP/1.1."
+    },
+    "C26": {
+      "body": "digest",
+      "expect": "vendor 200 or 400 from stock boa's own limit; rlxfw 431. Does NOT establish any bound on the vendor -- only what it did with 1,100 bytes.",
+      "register_id": "FC-067",
+      "why": "Discriminates the header-length bound, with the bound's NUMBER as the claim. \u8b80 notes/httpd.md \u00a7 3: rlxfw answers 431 past 1,024 bytes on one header line, and the value here is 1100 bytes, making the header line 1111 bytes with its name, so the line crosses that bound and nothing else. Deliberately NOT an overflow attempt: the row's parameter-count half is a request body, which R3 refuses, and a value chosen to reach a buffer rather than a declared bound would risk the server this episode needs. Cannot write: a GET with no body."
+    },
+    "C27": {
+      "body": "digest",
+      "expect": "vendor 206 with a Content-Range; rlxfw 200 with the full index.html. The status pair is the reading.",
+      "register_id": "FC-067",
+      "why": "The Range axis the same row names, which is a read and carries no length risk at all. Discriminates whether each serving program implements partial content: stock boa does, and \u8b80 notes/httpd.md \u00a7 2 rlxfw's route table has no Range handling, so it answers the whole document. Cannot write: a GET of the root."
+    }
+  },
+  "cases": 27,
+  "cases_path": "config/r9-probes.toml",
+  "clock": "CLOCK_MONOTONIC_RAW",
+  "column": "rlxfw",
+  "compare_fields": [
+    "reply",
+    "result",
+    "why",
+    "status",
+    "reason",
+    "hdr_n",
+    "hdr_names",
+    "hdr_sha256",
+    "body_state",
+    "body_bytes",
+    "body_truncated",
+    "body_sha256",
+    "addr_labelled",
+    "excerpt"
+  ],
+  "connected": 17,
+  "end_raw": 31720.95262104,
+  "labels": {},
+  "provenance": {
+    "body_max": 4096,
+    "cases_sha256": "9143be00243121eef8a10ac41eae2d77a04aaece7b41d9f6b7ba7ae3b8c4e092",
+    "cases_version": 1,
+    "connect_timeout_s": 2.0,
+    "drain_max": 1048576,
+    "header_max": 8192,
+    "host": "K",
+    "iface": "enxfc19286184c9",
+    "kernel": "Linux 6.6.87.2-microsoft-standard-WSL2",
+    "python": "3.12.3",
+    "read_timeout_s": 3.0,
+    "src": "10.1.1.2",
+    "target": "10.1.1.1",
+    "tool": "diffprobe",
+    "tool_version": "1.0"
+  },
+  "register": {
+    "allowed_uncovered": [
+      "FC-006",
+      "FC-007",
+      "FC-012",
+      "FC-014",
+      "FC-015",
+      "FC-018",
+      "FC-027",
+      "FC-028",
+      "FC-035",
+      "FC-036",
+      "FC-037",
+      "FC-040",
+      "FC-042",
+      "FC-043",
+      "FC-044",
+      "FC-045",
+      "FC-046",
+      "FC-048",
+      "FC-049",
+      "FC-050",
+      "FC-052",
+      "FC-053",
+      "FC-054",
+      "FC-055",
+      "FC-056",
+      "FC-057",
+      "FC-058",
+      "FC-059",
+      "FC-060",
+      "FC-061",
+      "FC-062",
+      "FC-063",
+      "FC-066",
+      "FC-068",
+      "FC-070",
+      "FC-077",
+      "FC-080",
+      "FC-082",
+      "FC-083",
+      "FC-086",
+      "FC-087",
+      "FC-088",
+      "FC-089",
+      "FC-090",
+      "FC-091",
+      "FC-092",
+      "FC-093",
+      "FC-094",
+      "FC-095",
+      "FC-097",
+      "FC-098",
+      "FC-099",
+      "FC-100",
+      "FC-101",
+      "FC-103",
+      "FC-104",
+      "FC-106",
+      "FC-107",
+      "FC-108",
+      "FC-109",
+      "FC-110",
+      "FC-116",
+      "FC-117",
+      "FC-118",
+      "FC-119",
+      "FC-126",
+      "FC-135",
+      "FC-136"
+    ],
+    "by_row": {
+      "FC-013": [
+        "C23"
+      ],
+      "FC-016": [
+        "C01"
+      ],
+      "FC-017": [
+        "C10"
+      ],
+      "FC-021": [
+        "C18"
+      ],
+      "FC-022": [
+        "C15"
+      ],
+      "FC-023": [
+        "C16"
+      ],
+      "FC-024": [
+        "C11"
+      ],
+      "FC-026": [
+        "C13"
+      ],
+      "FC-034": [
+        "C12",
+        "C14"
+      ],
+      "FC-038": [
+        "C19",
+        "C20"
+      ],
+      "FC-039": [
+        "C21",
+        "C22"
+      ],
+      "FC-041": [
+        "C25"
+      ],
+      "FC-047": [
+        "C17"
+      ],
+      "FC-067": [
+        "C26",
+        "C27"
+      ],
+      "FC-076": [
+        "C02"
+      ],
+      "FC-078": [
+        "C04",
+        "C05"
+      ],
+      "FC-079": [
+        "C08",
+        "C09"
+      ],
+      "FC-081": [
+        "C24"
+      ],
+      "FC-084": [
+        "C06"
+      ],
+      "FC-085": [
+        "C07"
+      ],
+      "FC-120": [
+        "C03"
+      ]
+    },
+    "covered": 21,
+    "live_rows": 89,
+    "live_tier": "V-A",
+    "path": "config/fix-cases.toml",
+    "schema_version": "1",
+    "sha256": "01ee62ba74a8e2e38e47918cef809bb1fce3220242abf65cd8b928bf3604bfd5",
+    "uncovered": [
+      "FC-006",
+      "FC-007",
+      "FC-012",
+      "FC-014",
+      "FC-015",
+      "FC-018",
+      "FC-027",
+      "FC-028",
+      "FC-035",
+      "FC-036",
+      "FC-037",
+      "FC-040",
+      "FC-042",
+      "FC-043",
+      "FC-044",
+      "FC-045",
+      "FC-046",
+      "FC-048",
+      "FC-049",
+      "FC-050",
+      "FC-052",
+      "FC-053",
+      "FC-054",
+      "FC-055",
+      "FC-056",
+      "FC-057",
+      "FC-058",
+      "FC-059",
+      "FC-060",
+      "FC-061",
+      "FC-062",
+      "FC-063",
+      "FC-066",
+      "FC-068",
+      "FC-070",
+      "FC-077",
+      "FC-080",
+      "FC-082",
+      "FC-083",
+      "FC-086",
+      "FC-087",
+      "FC-088",
+      "FC-089",
+      "FC-090",
+      "FC-091",
+      "FC-092",
+      "FC-093",
+      "FC-094",
+      "FC-095",
+      "FC-097",
+      "FC-098",
+      "FC-099",
+      "FC-100",
+      "FC-101",
+      "FC-103",
+      "FC-104",
+      "FC-106",
+      "FC-107",
+      "FC-108",
+      "FC-109",
+      "FC-110",
+      "FC-116",
+      "FC-117",
+      "FC-118",
+      "FC-119",
+      "FC-126",
+      "FC-135",
+      "FC-136"
+    ]
+  },
+  "row_fields": [
+    "id",
+    "kind",
+    "port",
+    "method",
+    "path",
+    "t_raw",
+    "dur_ms",
+    "reply",
+    "result",
+    "why",
+    "status",
+    "reason",
+    "hdr_n",
+    "hdr_names",
+    "hdr_sha256",
+    "body_state",
+    "body_bytes",
+    "body_truncated",
+    "dropped",
+    "body_sha256",
+    "addr_labelled",
+    "excerpt"
+  ],
+  "start_raw": 31720.81333572,
+  "start_real": 1791089458.4646158,
+  "started_wallclock": "2026-10-04T12:50:58+0800",
+  "tool": "diffprobe",
+  "tool_version": "1.0",
+  "volatile_headers": [
+    "date"
+  ]
+}

@@ -1,0 +1,131 @@
+J 80500000
+---Jump to address=80500000
+decompressing kernel:
+Uncompressing Linux... done, booting the kernel.
+done decompressing kernel.
+start address: 0x80003600
+RLXFW-B00
+RLXFW-ID0=0E45C61D
+RLXFW-B01
+RLXFW-B02=0000CD01
+RLXFW-B03
+RLXFW-B04
+RLXFW-B05
+RLXFW-B06
+RLXFW-SM0=C4000000
+RLXFW-SM1=04000000
+RLXFW-B07=00000000
+RLXFW-B08
+RLXFW-B09
+RLXFW-PD0
+RLXFW-PD1=00000000
+RLXFW-TA0=FFFF8AE6
+RLXFW-TA1=00000000
+RLXFW-TA2=00000001
+RLXFW-TA3=00000000
+RLXFW-TA4=00000000
+RLXFW-G0
+RLXFW-G1=FFFFFFDF
+RLXFW-G2=FF000000
+RLXFW-G3=0000003C
+RLXFW-G4=00000000
+RLXFW-G5=00000001
+RLXFW-G6
+RLXFW-SW0
+RLXFW-SW1=81964000
+RLXFW-SW7=00000000
+RLXFW-SW2=00000001
+RLXFW-SW3=00000200
+RLXFW-SW4=000001FF
+RLXFW-SW5=00080008
+RLXFW-SW6
+Realtek WLAN driver driver version 1.6 (2012-12-04)
+RLXFW-K0
+RLXFW-K1
+RLXFW-K2=00000000
+RLXFW-K3=00000001
+RLXFW-K4=FFFFFFFA
+RLXFW-K5=00000000
+RLXFW-K6=00000000
+RLXFW-K7=00000000
+RLXFW-K8
+RLXFW-G7=0000007C
+RLXFW-G8=0000007C
+Realtek FastPath:v1.03
+RLXFW-N0
+RLXFW-N1=04000000
+RLXFW-N2=00000000
+RLXFW-N3=00000000
+RLXFW-N4=A040FCD0
+RLXFW-N5
+RLXFW-N6=00000010
+RLXFW-N7=00000011
+RLXFW-S0
+RLXFW-S1=FFC00000
+RLXFW-S2=0BA08000
+RLXFW-S3=C8000000
+RLXFW-S4=00000000
+RLXFW-S5=00000000
+RLXFW-S6=00000002
+RLXFW-S7
+RLXFW-S8
+RLXFW-W0
+RLXFW-W1=A5000000
+RLXFW-W2=00000000
+RLXFW-W3=00000000
+RLXFW-W4=00240000
+RLXFW-W5
+RLXFW-TA5=FFFF8CFA
+RLXFW-TA6=00000003
+RLXFW-TA7=00000000
+RLXFW-TA8=00000000
+RLXFW-TA9=00000003
+RLXFW-B10
+^[^[rlxfw: init running,R LRXLFXFW-WR-3-RUSNWG1--UONKLO
+CrKlxf
+wR:L XiniFtW:- ScoWm-pIiNlIeTd= 0PID0 01 0(1RF7)1.F  N
+o RshLeXlFlW -isS We-xSeTc'Ad eRxTcep
+tR LtXhFe Wb-eNnc-hU NsLhOeClKl 
+below.R
+LrXlFxfWw:- inNit-: NmDoRuEntGed 
+/proc
+RrlLxXfFwW: -iNn-iAtL:L OmCo=unAte1d5 C/8s0y0s0
+
+rRlLxfXwF: Wi-nNit-:A RmMou=nAt1e5dC 8/0v0a0r
+
+rlRxLfXw:F Wi-nNi-tA:R mMoRu=nte0d0 0/r0u0n0
+r0l0xf
+w: RiLnXiFtW:- Nm-ounEteNd G/OtNm=pC
+rl4x0f0w0:0 i0ni0t: mou
+ntReLdX F/sWrv/-wwwN/r-uNn
+DrOlPxfEw:N in
+it: config store slot 0 seq 0
+rlxfw: init: hostname rlxfw
+rlxfw: init: lan bring-up
+^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[rlxfw: lan up, rlx0 10.1.1.1/24
+rlxfw: init: wrote /var/udhcpd.conf
+rlxfw: init: *** BENCH PROFILE: A ROOT SHELL IS ENABLED ON /dev/console ***
+rlxfw: init: *** build with BENCH_SHELL=0, or boot with 'rlxfw.noshell', to remove it ***
+rlxfw: init: udhcpc: not started (wan.mode is not dhcp)
+brokerd: entropy_avail=0 auth_ready=0
+brokerd: LOGIN and PWSET will answer NOENTROPY until entropy_avail reaches 128 at least once
+brokerd: listening on /srv/www/run/broker.sock mode 0666
+rlxfw: init: brokerd started pid=12
+^[^[^[^[httpd: uid=100 gid=100 root=/srv/www sock=/run/broker.sock port=80 conn=8
+rlxfw: init: httpd started pid=13
+dnsfwd: lan 10.1.1.1 mask FFFFFF00 upstream 10.^[^[^[^[^[1.1.2
+dnsfwd: running as uid 101 gid 101; setuid(0) refused (Operation not permitted)
+dnsfwd: forwarding; inflight cap 64, upstream timeout 4000 ms, rate 20 q/s burst 40
+rlxfw: init: dnsfwd started pid=14
+udhcpd (v1.13.4) started
+udhcpd: can't open '/var/udhcpd.leases': No such file or directory
+^[^[^[^[rlxfw: init: udhcpd started pid=15
+
+
+BusyBox v1.13.4 (2026-09-01 00:00:00 UTC) built-in shell (ash)
+Enter 'help' for a list of built-in commands.
+
+# rlxfw: init: shell started pid=16
+^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[^[
+sh: : not found
+# 
