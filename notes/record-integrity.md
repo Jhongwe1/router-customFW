@@ -319,7 +319,7 @@ finding's *data*, not pointers into today's file — and `5b01d73` re-pointed
 `751` → `1003`, because `751` happened to be spelled with a full path and was
 therefore the one number `CITE_RX` could see. `:758`, `:768`, `:1232`, `:1239`
 stayed. The row's prose still read `751`. Put back, and marked
-**這一處不准改號碼** the way `SPEC.md:830` already is.
+**這一處不准改號碼** the way § 19's preamble paragraph does — the one that opens 量 2026-09-15,搬回來之前 and lists `CORRECTIONS-block20.md`'s four re-pointed citations. 🔄 **2026-10-04 (`P3`): this sentence used to name that paragraph by its line number, and a line citation here made that line a no-renumber site** — which is what § 5.3 (`FW-110`) exists to compensate for, and by `R9`'s closing commit the compensation between § 18 and it was spent, so the next § 17 row had nowhere to go. 讀 `CLAUDE.md`: cite a row by its id, not by a line number. 量 the blast radius was exactly one line — this one — unfenced and not on `tools/citecheck-baseline.tsv`. ⚠️ This is **not** § 5.1b's laundering: that hides a rotted or declared citation by editing the citing line, while this removes a line citation outright, so nothing is left to read as `STABLE` and `citecheck`'s population falls by one. 🔴 **And it took three tries**: the first retraction still spelled the old number, and the content reference written to replace it spelled two more — a sentence that says *this used to cite X:NNN* **is** a citation to X:NNN, and `citecheck`'s `M3` is what said so, twice.
 
 ### 5.1b Declaring a quotation launders it, and the baseline is a floor rather than a census — 量 2026-09-22
 
