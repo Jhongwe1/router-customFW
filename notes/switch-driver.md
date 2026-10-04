@@ -2166,8 +2166,8 @@ reads 144 objects different between `r6b8by` and `r6b8bn`. `storeseq r6b8cr → 
 
 讀 `include/linux/skbuff.h:331-473`: `srcPort` and `srcVlanId` are under
 `CONFIG_RTL_HARDWARE_MULTICAST` (`:415`), `tag` under `CONFIG_RTK_VLAN_SUPPORT` (`:429`)
-and `src_info` under `CONFIG_RTK_VLAN_NEW_FEATURE` (`:431`) — three of the forty symbols
-`SWCORE=n` takes away. So **the layout changes**, measured by compiling a probe of
+and `src_info` under `CONFIG_RTK_VLAN_NEW_FEATURE` (`:431`) — three of the symbols
+`SWCORE=n` takes away (🔄 **2026-10-04: this said *the forty symbols*; see § 19.4**). So **the layout changes**, measured by compiling a probe of
 `offsetof()` and `sizeof()` to assembly with `rtl819x-nic.o`'s own command line from
 each tree, through `tools/vendor-tripwire.sh` (CLEAN both times): `sizeof(struct
 sk_buff)` 200 → 192; `srcPhyPort` and `dstPhyPort` 132/133 → 128/129 (−4); every field
@@ -2232,9 +2232,11 @@ refused) and refuses a copy with a planted `EW` and `FLR`.
 * Anything on the silicon: `r6b8bn` has not booted. That the seam's marks print, that
   `N1` reads `04000000`, that `rlx0` comes up without the vendor's probe, and what the
   loader's switch state carries, are arm II's.
-* That the kernel's behaviour outside the Ethernet path is unchanged: the forty symbols
-  also recompile the bridge, the IPv4 stack, netfilter and the WLAN driver (§ 13.7), and
-  none of that was exercised.
+* That the kernel's behaviour outside the Ethernet path is unchanged: the symbols the flip
+  takes away also recompile the bridge, the IPv4 stack, netfilter and the WLAN driver
+  (§ 13.7), and none of that was exercised. 🔄 **2026-10-04: this said *the forty symbols*,
+  and the 40 is retracted at § 19.4 — the measured loss is 11 entries and 6 references.
+  The clause does not depend on the count.**
 * That the ten stand-ins are right for every caller: the census shows who references
   them, not what a WLAN station, an L2TP netif or a bridge would do with the answers; no
   rlxfw image configures any of the three (推).
