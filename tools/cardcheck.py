@@ -464,7 +464,7 @@ def classify_command(cmd, names, paths, allow_flr=False, flash_ok=frozenset()):
             continue
         if t not in paths:
             issues.append(f"{t}: redirection target is not declared")
-    return "SHELL", issues + memnode(cmd, flash_ok)
+    return "SHELL", issues + memnode(cmd, flash_ok) + devflash(cmd, flash_ok)
 
 
 ABSENT_RE = re.compile(r"```cardabsent\n(.*?)\n```", re.S)
@@ -727,6 +727,89 @@ def flash_write(cmd):
             f"(FW-113)")
 
 
+# --------------------------------------------------------------------------
+# flash writes through the DRIVER -- `FW-113` extended, R8b D8, 2026-10-05
+#
+# R8b's install path (rtl819x-spi.c's Gap A, CONFIG_MTD_RTL819X_WRITE images
+# only) puts three verbs on /proc/rtl819x-spi that ERASE OR PROGRAM FLASH:
+# `install <region> sha=<64 hex>`, `erase barrier` and `eraseprobe`.  A
+# `--send` that writes one of them is a flash write exactly as `EW` is, and
+# passes only by the owner's dated yes for that EXACT payload -- so the yes
+# names the region, and for `install` the sha256, because both are inside the
+# string it must equal (owner_yes(), unchanged in kind).
+#
+# What counts, per simple command:
+#   * it writes /proc/rtl819x-spi: a `>`/`>>` redirection, or a `tee`
+#     argument, naming that path.  `-img` (the staging sink, which writes RAM)
+#     and `-map` (read-only) are other files and are not it; anything else
+#     that merely STARTS with the path is treated as it, and
+#   * its content begins `install` or `erase` in ANY case -- the driver's
+#     dispatcher hands every line with either prefix to the install parser,
+#     `eraseprobe` included -- OR its content cannot be read here: a writer
+#     other than `echo`, an echo flag other than -n, or any of $ ` \ * ? [ in
+#     the words.  A line this tool cannot read is a line that could carry the
+#     verb, and refusing it costs a retyped line (flash_write()'s reasoning).
+#
+# 量 2026-10-05, before this rule existed: the corpus (95 cards, 2,265 --send
+# payloads) holds 44 simple commands writing /proc/rtl819x-spi, every one an
+# `echo` of literal words -- map 32, verify 5, corrupt 4, probe, trywrite and
+# wedge 1 each -- so the rule changes no committed card's verdict; B16 sweeps
+# that population every run.
+#
+# ⚠️ WHAT THIS CANNOT SEE: everything the FW-113 note above lists -- a write
+# made outside a single-quoted --send, and a script ON THE DEVICE that writes
+# the verb.  And `arm` is not refused: it writes nothing to flash, and the
+# yes belongs to the verb that does.
+SPI_NODE = "/proc/rtl819x-spi"
+SPI_OTHER = (SPI_NODE + "-img", SPI_NODE + "-map")
+_SPI_SPLIT_RE = re.compile(r"\s*(?:&&|\|\||;|\|)\s*")
+_SPI_TARGET_RE = re.compile(r"(?:\d*>{1,2}\s*|\btee\s+(?:-a\s+)?)(\S+)")
+_SPI_UNREADABLE = frozenset("$`\\*?[")
+
+
+def devflash(cmd, flash_ok=frozenset()):
+    """-> [the refusal] when this --send writes a flash verb to the driver's
+    /proc/rtl819x-spi, else [] -- [] too when the card's owner-yes names this
+    exact payload.  One issue per --send, ending `(FW-113)`, which
+    unsuppressed() never filters."""
+    c = cmd.strip()
+    if c in flash_ok:
+        return []
+    for simple in _SPI_SPLIT_RE.split(c):
+        tgts = [t.rstrip("\"')") for t in _SPI_TARGET_RE.findall(simple)]
+        if not any(t.startswith(SPI_NODE) and t not in SPI_OTHER for t in tgts):
+            continue
+        words = re.sub(r"\d*>{1,2}\s*\S+", " ", simple).split()
+        why = None
+        if not words or words[0] != "echo":
+            why = f"its writer is `{words[0] if words else '?'}`, not echo"
+        else:
+            body = words[1:]
+            while body and body[0].startswith("-"):
+                if body[0] != "-n":
+                    why = f"echo {body[0]} rewrites what it prints"
+                    break
+                body = body[1:]
+            if why is None and any(ch in _SPI_UNREADABLE for w in body
+                                   for ch in w):
+                why = "its words carry a character the shell expands"
+            if why is None:
+                verb = body[0].strip('"').lower() if body else ""
+                if not verb.startswith(("install", "erase")):
+                    continue
+                return [f"{SPI_NODE}: FLASH WRITE -- `{body[0].strip(chr(34))}`"
+                        f" erases or programs flash through the driver's "
+                        f"install path (R8b). It needs the owner's own dated "
+                        f"yes on this card, as a ```owner-yes row "
+                        f"`YYYY-MM-DD<TAB>{c}`; nothing else silences it "
+                        f"(FW-113)"]
+        return [f"{SPI_NODE}: a write this tool cannot read ({why}) could "
+                f"carry `install` or `erase`, which write flash. It needs the "
+                f"owner's own dated yes on this card, as a ```owner-yes row "
+                f"`YYYY-MM-DD<TAB>{c}`; nothing else silences it (FW-113)"]
+    return []
+
+
 def unsuppressed(kind, issues, absent):
     """-> the issues an absence declaration does not excuse.
 
@@ -740,6 +823,8 @@ def unsuppressed(kind, issues, absent):
     whole, whatever is declared (`A35`).
     """
     if any(i.endswith("(HW-1)") for i in issues):   # the memory node: A55
+        return list(issues)
+    if any(i.startswith(SPI_NODE + ":") for i in issues):   # R8b D8: A61
         return list(issues)
     if kind == "LOADER":
         return list(issues)
@@ -831,7 +916,8 @@ def owner_yes(text, card_rel, pairs, report=print):
     used = set()
     for cid, cmd in pairs:
         c = cmd.strip()
-        if not flash_write(c) or (c not in yes and c not in legacy):
+        if not (flash_write(c) or devflash(c)) or (c not in yes and
+                                                   c not in legacy):
             continue
         used.add(c)
         report(f"  note  {cid}: {cmd}")
@@ -2091,7 +2177,8 @@ def run_controls():
         except OSError:
             continue
         prs = sends_with_cells(t)
-        mine = {cmd.strip() for _cid, cmd in prs if flash_write(cmd.strip())}
+        mine = {cmd.strip() for _cid, cmd in prs
+                if flash_write(cmd.strip()) or devflash(cmd)}
         if mine:
             fw_sent[c] = mine
             fw_ok, _n = owner_yes(t, c, prs, silent)
@@ -2112,6 +2199,11 @@ def run_controls():
     # ------------------------------------------------------- A50-A55, B15
     # HW-1, the vendor's memory node: memnode_controls() below.
     memnode_controls(row, cards, card_at, silent, names, paths)
+
+    # ------------------------------------------------------- A56-A62, B16
+    # R8b D8, the driver's flash verbs: devflash_controls() below.
+    devflash_controls(row, cards, card_at, silent, cells, yes_fence, names,
+                      paths)
 
     print()
     return 0 if ok else 1
@@ -2406,6 +2498,153 @@ def host_controls(row, cards, card_at, silent):
                     f"over {len(tools)} tool(s); host-cells cardnum agrees on "
                     f"{checked - len(mism)} of {checked}" + (f": {mism}" if mism else ""))
     case("B14", "the HOST population, and its count against each cardnum", b14)
+
+
+def devflash_controls(row, cards, card_at, silent, cells, yes_fence, names,
+                      paths):
+    """R8b D8's cases: the driver's three flash verbs on /proc/rtl819x-spi are
+    refused without the owner's yes, permitted by it, exact in region and in
+    sha256, never hidden by an absence declaration, and no blanket over the
+    driver's other verbs.  B16 is the corpus."""
+    import tempfile
+    node = " > " + SPI_NODE
+    sha_x = "ab" * 32
+    sha_y = "ab" * 31 + "ac"
+    inst_x = "echo install slotA sha=" + sha_x + node
+    three = (inst_x, "echo erase barrier" + node, "echo eraseprobe" + node)
+
+    def dev(cmd):
+        return [i for i in classify_command(cmd, names, paths)[1]
+                if i.startswith(SPI_NODE + ":")]
+
+    def case(tag, name, fn):
+        try:
+            good, detail = fn()
+        except Exception as e:                              # noqa: BLE001
+            good, detail = False, f"{type(e).__name__}: {str(e)[:60]}"
+        row(tag, name, good, detail)
+
+    def run(name, sent, said, absent=None, extra=()):
+        with tempfile.TemporaryDirectory() as d:
+            lines = []
+            # no fence at all when there is no yes: an EMPTY owner-yes fence
+            # followed by another fence is read by OWNER_YES_RE as one fence
+            # whose row is the closing ``` -- a defect of the fixture's own
+            body = cells(sent, "D") + (yes_fence(f"2026-10-05\t{c}"
+                                                 for c in said) if said else "")
+            if absent:
+                body += "\n```cardabsent\n" + "\n".join(absent) + "\n```\n"
+            n = cards_commands(card_at(d, name, body), report=lines.append,
+                               extra_absent=extra)
+        return n, lines
+
+    # A56 -- the three verbs, each one issue, each named a flash write
+    def a56():
+        miss = [c for c in three
+                if len(dev(c)) != 1 or "FLASH WRITE" not in dev(c)[0]]
+        return (not miss, f"{3 - len(miss)} of 3 refused as FLASH WRITE"
+                + (f"; passed: {miss}" if miss else ""))
+    case("A56", "install, erase, eraseprobe to the driver are REFUSED", a56)
+
+    # A57 -- every other spelling of the same write, and a line whose content
+    # this tool cannot read, which could carry any of them
+    def a57():
+        spell = ["echo install slotA sha=" + sha_x + " >> " + SPI_NODE,
+                 "echo install slotA sha=" + sha_x + " >" + SPI_NODE,
+                 "echo INSTALL slotA sha=" + sha_x + node,
+                 "echo Erase barrier" + node,
+                 "echo -n eraseprobe" + node,
+                 "echo installx" + node,
+                 "echo verify;echo eraseprobe" + node,
+                 'printf "install slotA\\n"' + node,
+                 "echo $V" + node,
+                 "echo -e eraseprobe" + node,
+                 "echo eraseprobe | tee " + SPI_NODE,
+                 'sh -c "echo eraseprobe' + node + '"']
+        miss = [c for c in spell if len(dev(c)) != 1]
+        return (not miss, f"{len(spell) - len(miss)} of {len(spell)} refused"
+                + (f"; passed: {miss}" if miss else ""))
+    case("A57", "and so is every other spelling, or a line it cannot read",
+         a57)
+
+    # A58 -- 🔴 THE ONE WAY THROUGH: the owner's dated yes, naming each
+    # exact payload; each permitted cell is noted with the yes's date
+    def a58():
+        n, lines = run("dev-yes.md", three, three)
+        dated = sum("the owner's yes of 2026-10-05" in x for x in lines)
+        return (n == 0 and dated == 3,
+                f"{n} bad; {dated} of 3 cells noted with the yes")
+    case("A58", "each is PERMITTED by the owner's dated yes for it", a58)
+
+    # A59, A60 -- the yes binds the sha256 and the region: a yes for sha X
+    # does not let a cell send sha Y, nor slotB ride on slotA's yes.  Each is
+    # two defects -- the cell refused, and the yes permitting nothing.
+    def a59():
+        n, lines = run("dev-sha.md", ("echo install slotA sha=" + sha_y + node,),
+                       (inst_x,))
+        stale = sum("permits nothing on this card" in x for x in lines)
+        return (n == 2 and stale == 1, f"{n} bad (want 2); stale yes {stale}")
+    case("A59", "a yes for one sha256 does not permit another", a59)
+
+    def a60():
+        n, lines = run("dev-reg.md", ("echo install slotB sha=" + sha_x + node,),
+                       (inst_x,))
+        stale = sum("permits nothing on this card" in x for x in lines)
+        return (n == 2 and stale == 1, f"{n} bad (want 2); stale yes {stale}")
+    case("A60", "a yes for one region does not permit another", a60)
+
+    # A61 -- nothing but the owner's yes silences it: neither a ```cardabsent
+    # fence nor --expect-absent naming the writer, the node or the verb
+    def a61():
+        hide = ("echo", SPI_NODE, "install", "erase", "eraseprobe")
+        n_fence, _l = run("dev-hide.md", three, (), absent=hide)
+        n_flag, _l = run("dev-flag.md", three, (), extra=hide)
+        return (n_fence == 3 and n_flag == 3,
+                f"cardabsent: {n_fence} of 3 still bad; --expect-absent: "
+                f"{n_flag} of 3")
+    case("A61", "no absence declaration hides a driver flash verb", a61)
+
+    # A62 -- 🔴 THE CONTROL THAT SAYS IT IS A GUARD AND NOT A BLANKET: the
+    # driver's other verbs, the staging sink, reads of both files, and the
+    # verb's word written somewhere else are all left alone
+    def a62():
+        quiet = ["echo verify" + node, "echo map 1 3" + node,
+                 "echo arm 0x70000 0x190000 0x120000" + node,
+                 "echo disarm" + node, "echo img reset" + node,
+                 "echo trywrite" + node, "echo corrupt off" + node,
+                 "cat /fw/P.rlxu > " + SPI_NODE + "-img", "cat " + SPI_NODE,
+                 "cat " + SPI_NODE + "-map", "echo eraseprobe > /tmp/x"]
+        noisy = [c for c in quiet if dev(c)]
+        return (not noisy, f"{len(noisy)} of {len(quiet)} flagged"
+                + (f": {noisy}" if noisy else ""))
+    case("A62", "and the driver's other verbs are not touched by it", a62)
+
+    # B16 -- the corpus, with a population floor so a sweep that read nothing
+    # cannot pass: every write to the node is counted, and every flash verb
+    # among them must be under its card's own yes
+    def b16():
+        writes, flagged, off = 0, 0, []
+        for c in cards:
+            try:
+                t = _read(c).decode("utf-8", "replace")
+            except OSError:
+                continue
+            prs = sends_with_cells(t)
+            ok_set, _n = owner_yes(t, c, prs, silent)
+            for _cid, cmd in prs:
+                for simple in _SPI_SPLIT_RE.split(cmd.strip()):
+                    if SPI_NODE in [x.rstrip("\"')") for x in
+                                    _SPI_TARGET_RE.findall(simple)]:
+                        writes += 1
+                if devflash(cmd):
+                    flagged += 1
+                    if cmd.strip() not in ok_set:
+                        off.append(f"{c}: {cmd}")
+        return (writes >= 40 and not off,
+                f"{len(cards)} cards, {writes} writes to {SPI_NODE}, "
+                f"{flagged} flash verb(s)"
+                + (f", NEW offender(s): {off}" if off else ", none unyessed"))
+    case("B16", "every corpus driver flash verb has a yes", b16)
 
 
 def memnode_controls(row, cards, card_at, silent, names, paths):

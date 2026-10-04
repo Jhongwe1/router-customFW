@@ -573,9 +573,8 @@ static unsigned long rtl819x_spi_n_mtd_write_calls;
 static unsigned long rtl819x_spi_n_mtd_erase_calls;
 
 #ifdef CONFIG_MTD_RTL819X_WRITE
-/* The write TU.  Declared here rather than in a shared header: there are
- * exactly two callers, both below, and both are compiled under this same
- * CONFIG_ as the definitions are. */
+/* The write TU, then the install path's /proc block, defined at the end of
+ * this file under the same CONFIG_ (R8b Gap A -- below every cited line). */
 extern int rtl819x_spi_write_page(struct mtd_info *mtd, loff_t to, size_t len,
 				  size_t *retlen, const u_char *buf);
 extern int rtl819x_spi_erase_sector(struct mtd_info *mtd,
@@ -584,6 +583,7 @@ extern int rtl819x_spi_wr_do_arm(u32 lo, u32 hi, u32 budget);
 extern void rtl819x_spi_wr_do_disarm(void);
 extern int rtl819x_spi_wr_proc(char *p);
 extern int rtl819x_spi_wr_proc_max(void);
+static int rtl819x_spi_inst_proc(char *page, int used);
 
 /* What an UNARMED write answers in this build.  -EACCES, from the write TU's
  * errno table.  It is printed as `unarmed_rc` so a card compares against the
@@ -915,7 +915,7 @@ static void rtl819x_spi_read_mmio(u32 addr, u32 len, u8 *buf)
  * n_wip_timeout is what says it was reached. */
 #define RTL819X_SPI_WIP_SPINS	200000u
 
-static unsigned long rtl819x_spi_n_wip_timeout;
+static unsigned long rtl819x_spi_n_wip_timeout, rtl819x_spi_wip_polls;
 
 /* One opcode byte, CS down and up around it.  The vendor's SeqCmd_Order. */
 static int rtl819x_spi_cmd1(u32 cmd)
@@ -937,7 +937,7 @@ static int rtl819x_spi_wait_wip(void)
 	unsigned int i;
 
 	for (i = 0; i < RTL819X_SPI_WIP_SPINS; i++) {
-		u32 v;
+		u32 v = (u32)(rtl819x_spi_wip_polls = i + 1u);	/* D19 count */
 		int rc = rtl819x_spi_cs_low(0);
 
 		if (rc)
@@ -967,7 +967,7 @@ static int rtl819x_spi_wait_wip(void)
  * installs mtd_spi_write / mtd_spi_erase on the vendor's partitions
  * unconditionally and nothing here counts those.  The breakdown into programs
  * and erases is the write TU's wr_n_prog / wr_n_erase. */
-void rtl819x_spi_note_write(void)
+void rtl819x_spi_note_write(int erase)
 {
 	rtl819x_spi_n_writes++;
 }
@@ -1867,10 +1867,9 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 	/* The write TU's own fields, behind a SECOND budget check with the TU's
 	 * own declared maximum.  A separate `if` and not folded into the one
 	 * above on purpose: that block is 量 to fit and this one is in no image
-	 * yet, so a reader can see which of the two ran out of room.
-	 * wr_truncated is printed either way, for the reason the map's own guard
-	 * gives -- a short answer must never be ambiguous between "no room" and
-	 * "nothing to say". */
+	 * yet, so a reader can see which of the two ran out of room.  Its
+	 * wr_truncated, like the install block's inst_truncated, prints either
+	 * way: a short answer must never be ambiguous ("no room"/"nothing"). */
 	if (len + rtl819x_spi_wr_proc_max() <= RTL819X_SPI_PROC_BUDGET) {
 		len += rtl819x_spi_wr_proc(page + len);
 		len += sprintf(page + len, "wr_truncated 0\n");
@@ -1879,6 +1878,7 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 	}
 	len += sprintf(page + len, "n_wip_timeout %lu\n",
 		       rtl819x_spi_n_wip_timeout);
+	len += rtl819x_spi_inst_proc(page + len, len);	/* R8b Gap A */
 #endif
 	/* Self-measuring, so the headroom is a reading a card can assert on
 	 * rather than an arithmetic nobody re-runs.  It reports the length
@@ -2370,10 +2370,12 @@ static int rtl819x_spi_verb_trywrite(void)
 	 * rtl819x_spi_lock themselves -- they must, because in a write image
 	 * they issue a transaction -- and this mutex is not recursive, so the
 	 * old shape would have deadlocked here on the first boot of the first
-	 * write image.  Nothing else can issue a verb concurrently: there is ONE
-	 * writable /proc entry and the shell that writes it is serial, so
-	 * reading the counters outside the lock is not a race on this board.
-	 * Said rather than left implicit, because it IS an assumption. */
+	 * write image.  Nothing else can issue a verb concurrently: ONE
+	 * writable /proc entry takes verbs (an armed build's second one,
+	 * rtl819x-spi-img, only appends to RAM under rtl819x_spi_lock) and the
+	 * shell that writes it is serial, so reading the counters outside the
+	 * lock is not a race on this board.  Said rather than left implicit,
+	 * because it IS an assumption. */
 	r0 = rtl819x_spi_n_write_refused;
 	w0 = rtl819x_spi_n_writes;
 
@@ -2449,6 +2451,710 @@ static int rtl819x_spi_verb_arm(const char *arg)
 		return -EINVAL;
 	return rtl819x_spi_wr_do_arm((u32)v[0], (u32)v[1], (u32)v[2]);
 }
+
+/* ========================================================================
+ * R8b GAP A -- THE INSTALL PATH.  2026-10-05, 124th segment.
+ * ========================================================================
+ *
+ * A payload is staged in RAM through /proc/rtl819x-spi-img (D12), then ONE
+ * verb writes it to ONE region of a compiled-in table, commit-by-header:
+ *
+ *   cat <payload> > /proc/rtl819x-spi-img
+ *   echo 'arm 0x70000 0x190000 0x120000' > /proc/rtl819x-spi
+ *   echo 'install slotA sha=<64 hex>' > /proc/rtl819x-spi
+ *
+ * Every decision is in rtl819x-spi-install.h, which has no #include and is
+ * compiled unchanged by tools/test-spi-install.c on the host; what is here
+ * executes those decisions against the registers.  THE #includes BELOW ARE
+ * MID-FILE ON PURPOSE: tracked documents cite this file by line (430, 1120,
+ * 1216, 1919 and 2298 when this was written), and FW-110's rule is that an
+ * insertion above a cited line moves it.  So the whole path sits below the
+ * last cited line, and its two touch points above it -- one prototype, one
+ * call in read_proc -- were made line-neutral.
+ *
+ * HOW A WRITE IS AUTHORISED (D6, D7) -- AND THE ARM IS SINGLE-USE.
+ *  - The region comes from the table; no verb takes an address.
+ *  - The arm in force -- a copy from the write TU's getter, taken under
+ *    rtl819x_spi_lock (D20) -- must be exactly that region, with a budget
+ *    of at least its size.  The copy is zeroed first, so a failed read is
+ *    both an error (ARM_READ) and an unarmed copy.
+ *  - The sha256 of the staged bytes, computed by the same
+ *    crypto/sha256_generic.c that verify() uses and gated on the same boot
+ *    KAT, must equal the typed digest.  The staged digest is never printed,
+ *    so the device cannot be where a card copies the digest from.
+ *  - The payload's own declaration must name this region: a container's
+ *    signed flash_at and flash_form (WHOL); a cr6c's burnAddr, plus
+ *    check_image()'s zero 16-bit sum.
+ *  - 🔴 EVERY install/erase verb, whatever its outcome, a refusal included,
+ *    ends DISARMED.  One arm, one attempt: a retry re-types both statements.
+ *
+ * WHY THE WRITES DO NOT GO THROUGH rtl819x_spi_write_page/_erase_sector.
+ * Their budget is debited per operation and the arm verb caps it at hi-lo,
+ * so an install -- erase S bytes, then program up to S more -- would spend
+ * the whole budget in its erase phase.  Changing that is the write TU's
+ * decision, not this path's.  So each operation here is checked by the SAME
+ * policy functions (rtl819x-spi-wrpolicy.h: the forbidden window first, then
+ * range, geometry and window) against a per-phase arm that is exactly the
+ * region with a budget of its size, and is executed by the same two register
+ * primitives above.  The forbidden-window rule thus runs on every operation,
+ * beneath a region table that already keeps every address >= 0x010000.
+ *
+ * D11, FROM THE CODE.  Every erase is rtl819x_spi_se_block(): WREN, SE opcode
+ * 0x20 (RTL819X_SPI_CMD_SE) with a 3-byte address, then the bounded WIP poll.
+ * The step is RLXFW_SPI_WR_ERASE_GRAIN, 0x1000, which the policy's GEOM
+ * conjunct refuses unless it equals rtl819x_spi_mtd.erasesize.  At either
+ * candidate size the cleared range is exactly the region (argued at
+ * rlxfw_spi_inst_op(), computed by the host test); at 65,536 each block is
+ * erased sixteen times, which costs time and not correctness.
+ *
+ * D19, THE READING OF IT.  `eraseprobe`, under an arm equal to the probe
+ * block (0x3E0000, 64 KiB), refuses unless the block reads erased, writes
+ * three marker pages, issues ONE SE at the block base, and reads which
+ * markers it cleared -- the verdict table is at rlxfw_spi_inst_probe_size().
+ * It records that SE's and one page program's RDSR poll counts and ticks,
+ * and the polls one tick holds when the part is idle (a read-only calibration
+ * inside the usual claim/release), because the only clocksource here is
+ * jiffies and a poll count is the finest reading this path can take.  It then
+ * re-erases the block with the step its own verdict proves, and verifies.
+ *
+ * WHAT THIS DOES NOT ESTABLISH.  That any of it works on this die: no line
+ * below has run anywhere.  That RTL819X_SPI_WIP_SPINS (推) outlasts an erase
+ * of this part: if it does not, the install stops with ENGINE, n_wip_timeout
+ * moves, and the region is left erased and invalid -- the safe failure, but
+ * a failure.  That a container's signature is valid: D7's optional in-kernel
+ * Ed25519 is NOT done, because src/rlxboot's verifier reaches this tree only
+ * through a build-time staging step this path does not own.  rlxboot checks
+ * the signature at boot, and that is the security boundary.
+ */
+#include <linux/vmalloc.h>
+#include <linux/delay.h>
+#include "rtl819x-spi-wrpolicy.h"
+#include "rtl819x-spi-install.h"
+
+/* D20.  The write TU's arm, copied out under rtl819x_spi_lock. */
+extern int rtl819x_spi_wr_get_arm(struct rlxfw_spi_wr_arm *out);
+
+#define RTL819X_SPI_IMG_PROC_NAME	"rtl819x-spi-img"
+
+static u8 *rtl819x_spi_img;			/* vmalloc'd on the first append */
+static struct rlxfw_spi_inst_img rtl819x_spi_img_st;
+static struct rlxfw_spi_inst_st rtl819x_spi_inst_st;
+static struct rlxfw_spi_inst_probe rtl819x_spi_probe_st;
+
+/* Reason -> errno.  ENGINE is overridden by the primitive's own errno. */
+static const int rtl819x_spi_inst_errno[RLXFW_SPI_INST_R_COUNT] = {
+	0,		/* OK */
+	-EINVAL,	/* SYNTAX */
+	-EINVAL,	/* REGION */
+	-EINVAL,	/* ERASE_ONLY */
+	-EINVAL,	/* NOT_ERASABLE */
+	-EPROTO,	/* ARM_READ */
+	-EACCES,	/* UNARMED -- the write TU's own unarmed errno */
+	-EPERM,		/* ARM_WINDOW */
+	-ENOSPC,	/* ARM_BUDGET */
+	-EIO,		/* IMG_BAD */
+	-ENODATA,	/* IMG_EMPTY */
+	-EFBIG,		/* IMG_SIZE */
+	-EPERM,		/* KAT */
+	-EIO,		/* HASH */
+	-EBADMSG,	/* SHA */
+	-ENOEXEC,	/* HDR_MAGIC */
+	-ENOEXEC,	/* HDR_FORMAT */
+	-ENOEXEC,	/* HDR_FLASH_AT */
+	-ENOEXEC,	/* HDR_FORM */
+	-ENOEXEC,	/* HDR_LEN */
+	-ENOEXEC,	/* HDR_SUM */
+	-EPERM,		/* POLICY */
+	-ENOMEM,	/* NOMEM */
+	-EIO,		/* ENGINE */
+	-EIO,		/* CMP */
+	-EINVAL,	/* PROBE_ONLY */
+	-ENOTEMPTY,	/* PROBE_DIRTY -- refused, nothing written */
+	-EIO,		/* PROBE_MARK */
+	-EIO,		/* PROBE_ANOMALY -- measured, inconclusive */
+	-EIO,		/* PROBE_UNCLEAN */
+};
+
+static int rtl819x_spi_inst_err(int reason)
+{
+	int e;
+
+	if (reason == RLXFW_SPI_INST_OK)
+		return 0;
+	if (reason < 0 || reason >= RLXFW_SPI_INST_R_COUNT)
+		return -EPROTO;
+	e = rtl819x_spi_inst_errno[reason];
+	return e ? e : -EPROTO;	/* a reason with no row never reads as 0 */
+}
+
+static void rtl819x_spi_inst_say_step(int ph, u32 blk, unsigned long t0)
+{
+	char b[RLXFW_SPI_INST_SAY_MAX];
+
+	rlxfw_spi_inst_fmt_step(b, ph, blk, jiffies_to_msecs(jiffies - t0),
+				rtl819x_spi_inst_st.r.pace_ms);
+	rlxfw_puts(b);
+}
+
+/* ------------------------------------------------------------------------
+ * D19: the erase-size probe.  Called with rtl819x_spi_lock held.
+ * ------------------------------------------------------------------------ */
+
+/* Read [base, base+size) and say whether every byte is 0xFF. */
+static int rtl819x_spi_probe_read_ff(u32 base, u32 size, u8 *buf, int *all_ff)
+{
+	u32 off;
+	int rc;
+
+	*all_ff = 1;
+	for (off = 0; off < size; off += RTL819X_SPI_CHUNK) {
+		rc = rtl819x_spi_read_pio(base + off, RTL819X_SPI_CHUNK, buf);
+		if (rc)
+			return rc;
+		if (rlxfw_spi_inst_probe_chk_erased(buf, RTL819X_SPI_CHUNK))
+			*all_ff = 0;
+		cond_resched();
+	}
+	return 0;
+}
+
+/* The idle RDSR polls that fit in RLXFW_SPI_INST_PROBE_CAL_TICKS ticks, from
+ * a tick edge, inside the driver's own claim/release bracket.  READ-ONLY:
+ * RDSR changes nothing on the part.  Both loops are bounded by
+ * RTL819X_SPI_WIP_SPINS, so a stopped tick ends them with cal_ticks short of
+ * its target instead of hanging -- the reading then says so itself. */
+static int rtl819x_spi_probe_cal(struct rlxfw_spi_inst_probe *p)
+{
+	struct rtl819x_spi_state s;
+	unsigned long j0;
+	u32 n;
+	int rc = 0, rc2;
+
+	rc2 = rtl819x_spi_claim(&s);
+	if (rc2)
+		return rc2;
+	j0 = jiffies;
+	for (n = 0; jiffies == j0 && n < RTL819X_SPI_WIP_SPINS; n++) {
+		rc = rtl819x_spi_wait_wip();
+		if (rc)
+			goto out;
+	}
+	j0 = jiffies;
+	for (n = 0; jiffies - j0 < RLXFW_SPI_INST_PROBE_CAL_TICKS &&
+		    n < RTL819X_SPI_WIP_SPINS; n++) {
+		rc = rtl819x_spi_wait_wip();
+		if (rc)
+			goto out;
+		cond_resched();
+	}
+	p->cal_polls = n;
+	p->cal_ticks = (u32)(jiffies - j0);
+out:
+	rc2 = rtl819x_spi_release(&s);
+	return rc ? rc : rc2;
+}
+
+/*
+ * `eraseprobe`, steps (a)-(f) of D19.  Returns a reason; *wrote says whether
+ * any program or erase was sent (a refusal sends none), *err the primitive's
+ * errno when the reason is ENGINE.  Every write is checked by the same
+ * policy functions the install path uses, against an arm equal to the block.
+ */
+static int rtl819x_spi_probe(const struct rlxfw_spi_inst_region *rg,
+			     unsigned long t0, int *wrote, int *err)
+{
+	struct rlxfw_spi_inst_probe *p = &rtl819x_spi_probe_st;
+	struct rlxfw_spi_inst_res *r = &rtl819x_spi_inst_st.r;
+	struct rlxfw_spi_wr_arm arm_p, arm_e, arm_c;
+	char say[RLXFW_SPI_INST_SAY_MAX];
+	u8 mark[RLXFW_SPI_WR_PAGE];
+	u8 *buf;
+	unsigned long j0;
+	u32 a, off;
+	int k, ff, rc = 0, verified = 0, why = RLXFW_SPI_INST_OK;
+
+	*wrote = 0;
+	buf = kmalloc(RTL819X_SPI_CHUNK, GFP_KERNEL);
+	if (!buf)
+		return RLXFW_SPI_INST_R_NOMEM;
+
+	/* (a) the block reads erased, or nothing is written at all */
+	r->phase = 'R';
+	rc = rtl819x_spi_probe_read_ff(rg->base, rg->size, buf, &ff);
+	if (rc) {
+		why = RLXFW_SPI_INST_R_ENGINE;
+		goto out;
+	}
+	p->clean_known = 1;
+	p->clean = ff;
+	verified = 1;
+	if (!ff) {
+		why = RLXFW_SPI_INST_R_PROBE_DIRTY;
+		goto out;
+	}
+	rc = rtl819x_spi_probe_cal(p);
+	if (rc) {
+		why = RLXFW_SPI_INST_R_ENGINE;
+		goto out;
+	}
+	arm_p.armed = 1;
+	arm_p.lo = rg->base;
+	arm_p.hi = rg->base + rg->size;
+	arm_p.budget = rg->size;
+	arm_e = arm_p;
+	arm_c = arm_p;
+	rlxfw_spi_inst_fmt_go(say, r);
+	rlxfw_puts(say);
+
+	/* (b) a marker page at +0x0000, +0x1000, +0x8000, each read back */
+	r->phase = 'M';
+	verified = 0;
+	rlxfw_spi_inst_probe_mark(mark);
+	for (k = 0; k < RLXFW_SPI_INST_PROBE_NMARK; k++) {
+		a = rg->base + rlxfw_spi_inst_probe_off[k];
+		r->policy = rlxfw_spi_wr_chk_prog(&arm_p, a, RLXFW_SPI_WR_PAGE);
+		if (r->policy) {
+			why = RLXFW_SPI_INST_R_POLICY;
+			goto out;
+		}
+		j0 = jiffies;
+		rc = rtl819x_spi_pp_page(a, RLXFW_SPI_WR_PAGE, mark);
+		if (k == 0) {
+			p->pp_polls = (u32)rtl819x_spi_wip_polls;
+			p->pp_jiffies = (u32)(jiffies - j0);
+		}
+		*wrote = 1;
+		if (rc) {
+			why = RLXFW_SPI_INST_R_ENGINE;
+			goto out;
+		}
+		rtl819x_spi_note_write(0);
+		arm_p.budget -= RLXFW_SPI_WR_PAGE;
+		r->n_pp++;
+		r->programmed += RLXFW_SPI_WR_PAGE;
+		rc = rtl819x_spi_read_pio(a, RLXFW_SPI_WR_PAGE, buf);
+		if (rc) {
+			why = RLXFW_SPI_INST_R_ENGINE;
+			goto out;
+		}
+		why = rlxfw_spi_inst_probe_chk_mark(buf);
+		if (why)
+			goto out;
+	}
+
+	/* (c) exactly ONE SE, at the block base, timed in polls and ticks */
+	r->phase = 'E';
+	r->policy = rlxfw_spi_wr_chk_erase(&arm_e, rg->base,
+					   RLXFW_SPI_WR_ERASE_GRAIN,
+					   RLXFW_SPI_WR_ERASE_GRAIN,
+					   (u32)rtl819x_spi_mtd.erasesize);
+	if (r->policy) {
+		why = RLXFW_SPI_INST_R_POLICY;
+		goto out;
+	}
+	j0 = jiffies;
+	rc = rtl819x_spi_se_block(rg->base);
+	p->se_polls = (u32)rtl819x_spi_wip_polls;
+	p->se_jiffies = (u32)(jiffies - j0);
+	p->se_issued = 1;
+	if (rc) {
+		why = RLXFW_SPI_INST_R_ENGINE;
+		goto out;
+	}
+	rtl819x_spi_note_write(1);
+	r->n_se++;
+
+	/* (d) which of the three that one erase cleared */
+	for (k = 0; k < RLXFW_SPI_INST_PROBE_NMARK; k++) {
+		rc = rtl819x_spi_read_pio(rg->base + rlxfw_spi_inst_probe_off[k],
+					  RLXFW_SPI_WR_PAGE, buf);
+		if (rc) {
+			why = RLXFW_SPI_INST_R_ENGINE;
+			goto out;
+		}
+		p->m[k] = rlxfw_spi_inst_probe_state(buf);
+	}
+	p->se_bytes = rlxfw_spi_inst_probe_size(p->m[0], p->m[1], p->m[2]);
+	p->classified = 1;
+	rlxfw_spi_inst_fmt_probe(say, p);
+	rlxfw_puts(say);
+
+	/* (e) re-erase with the step the verdict proves, then verify */
+	r->phase = 'C';
+	p->clean_step = rlxfw_spi_inst_probe_clean_step(p->se_bytes);
+	for (off = 0; p->clean_step && off < rg->size; off += p->clean_step) {
+		r->policy = rlxfw_spi_wr_chk_erase(&arm_c, rg->base + off,
+						   RLXFW_SPI_WR_ERASE_GRAIN,
+						   RLXFW_SPI_WR_ERASE_GRAIN,
+					(u32)rtl819x_spi_mtd.erasesize);
+		if (r->policy) {
+			why = RLXFW_SPI_INST_R_POLICY;
+			goto out;
+		}
+		rc = rtl819x_spi_se_block(rg->base + off);
+		if (rc) {
+			why = RLXFW_SPI_INST_R_ENGINE;
+			goto out;
+		}
+		rtl819x_spi_note_write(1);
+		arm_c.budget -= RLXFW_SPI_WR_ERASE_GRAIN;
+		p->clean_ops++;
+		r->n_se++;
+		cond_resched();
+	}
+	rtl819x_spi_inst_say_step('E', 0u, t0);
+	r->phase = 'V';
+	rc = rtl819x_spi_probe_read_ff(rg->base, rg->size, buf, &ff);
+	if (rc) {
+		why = RLXFW_SPI_INST_R_ENGINE;
+		goto out;
+	}
+	p->clean = ff;
+	verified = 1;
+	rtl819x_spi_inst_say_step('V', 0u, t0);
+
+	/* (f) the verdict: unclean outranks an inconclusive size */
+	why = rlxfw_spi_inst_probe_verdict(p->se_bytes, p->clean);
+	if (!why)
+		r->phase = 'D';
+out:
+	/* A stop after a write and before the final read leaves the block in a
+	 * state nobody read: clean is then unknown, never a stale 1. */
+	if (!verified)
+		p->clean_known = 0;
+	kfree(buf);
+	*err = rc;
+	return why;
+}
+
+/* sha256 over the staged bytes, chunked so the scheduler runs between. */
+static int rtl819x_spi_inst_sha(const u8 *p, u32 n, u8 *out)
+{
+	struct crypto_shash *tfm;
+	struct shash_desc *d;
+	u32 off, c;
+	int rc = 0;
+
+	tfm = crypto_alloc_shash("sha256", 0, 0);
+	if (IS_ERR(tfm))
+		return PTR_ERR(tfm);
+	d = rtl819x_spi_desc(tfm);
+	if (!d) {
+		crypto_free_shash(tfm);
+		return -ENOMEM;
+	}
+	for (off = 0; off < n && !rc; off += c) {
+		c = n - off;
+		if (c > RTL819X_SPI_CHUNK)
+			c = RTL819X_SPI_CHUNK;
+		rc = crypto_shash_update(d, p + off, c);
+		cond_resched();
+	}
+	if (!rc)
+		rc = crypto_shash_final(d, out);
+	kfree(d);
+	crypto_free_shash(tfm);
+	return rc;
+}
+
+/*
+ * One attempt.  Called with rtl819x_spi_lock held.  Everything before the
+ * RLXFW-SI-GO line is a REFUSAL -- nothing has been sent to the chip --
+ * and everything after it is a FAILURE, because a write may have happened.
+ */
+static int rtl819x_spi_inst_run(const char *line)
+{
+	struct rlxfw_spi_inst_st *s = &rtl819x_spi_inst_st;
+	struct rlxfw_spi_inst_res *r = &s->r;
+	const struct rlxfw_spi_inst_region *rg;
+	struct rlxfw_spi_inst_req rq;
+	struct rlxfw_spi_wr_arm arm, arm_e, arm_p;
+	struct rlxfw_spi_inst_plan pl;
+	struct rlxfw_spi_inst_opd op;
+	char say[RLXFW_SPI_INST_SAY_MAX];
+	unsigned long t0 = jiffies;
+	u8 got[32];
+	u8 *chunk = NULL;
+	u32 i, nops, off;
+	int why, rc = 0, wrote = 0;
+
+	rlxfw_spi_inst_begin(s);
+	why = rlxfw_spi_inst_parse(line, &rq);
+	r->verb = rq.verb;
+	r->region1 = rq.region + 1;
+	r->pace_ms = rq.pace_ms;
+	if (rq.verb == RLXFW_SPI_INST_V_PROBE)
+		rlxfw_spi_inst_probe_begin(&rtl819x_spi_probe_st);
+	if (why)
+		goto refuse;
+	rg = &rlxfw_spi_inst_regions[rq.region];
+	r->base = rg->base;
+	r->size = rg->size;
+
+	/* D6: the two typed statements agree, or nothing happens.  D20: the
+	 * copy is zeroed first, so even a getter that failed without saying
+	 * so would hand back an UNARMED arm. */
+	arm.armed = 0;
+	arm.lo = arm.hi = arm.budget = 0u;
+	if (rtl819x_spi_wr_get_arm(&arm))
+		why = RLXFW_SPI_INST_R_ARM_READ;
+	else
+		why = rlxfw_spi_inst_chk_arm(&arm, rg);
+	if (why)
+		goto refuse;
+	r->arm_ok = 1;
+
+	if (rq.verb == RLXFW_SPI_INST_V_PROBE) {
+		why = rtl819x_spi_probe(rg, t0, &wrote, &rc);
+		if (why == RLXFW_SPI_INST_OK) {
+			s->done++;
+			goto out;
+		}
+		if (wrote)
+			goto fail;
+		goto refuse;
+	}
+
+	if (rq.verb == RLXFW_SPI_INST_V_INSTALL) {
+		why = rlxfw_spi_inst_chk_img(&rtl819x_spi_img_st, rg);
+		if (!why && !rtl819x_spi_img)
+			why = RLXFW_SPI_INST_R_IMG_EMPTY;
+		if (why)
+			goto refuse;
+		r->len = rtl819x_spi_img_st.len;
+		/* D7: the owner's yes is for THESE bytes. */
+		if (rtl819x_spi_kat_rc) {
+			why = RLXFW_SPI_INST_R_KAT;
+			goto refuse;
+		}
+		rc = rtl819x_spi_inst_sha(rtl819x_spi_img, r->len, got);
+		if (rc) {
+			why = RLXFW_SPI_INST_R_HASH;
+			goto refuse;
+		}
+		r->sha_checked = 1;
+		r->sha_ok = rlxfw_spi_inst_digest_eq(got, rq.sha);
+		if (!r->sha_ok) {
+			why = RLXFW_SPI_INST_R_SHA;
+			goto refuse;
+		}
+		why = rlxfw_spi_inst_chk_payload(rtl819x_spi_img, r->len, rg);
+		r->hdr_checked = 1;
+		r->hdr_ok = !why;
+		if (why)
+			goto refuse;
+	}
+
+	why = rlxfw_spi_inst_plan_init(&pl, rg, r->len,
+				       RLXFW_SPI_WR_ERASE_GRAIN);
+	if (why)
+		goto refuse;
+	nops = rlxfw_spi_inst_nops(&pl);
+	r->ops_planned = nops;
+	chunk = kmalloc(RTL819X_SPI_CHUNK, GFP_KERNEL);
+	if (!chunk) {
+		why = RLXFW_SPI_INST_R_NOMEM;
+		goto refuse;
+	}
+	arm_e.armed = 1;
+	arm_e.lo = rg->base;
+	arm_e.hi = rg->base + rg->size;
+	arm_e.budget = rg->size;
+	arm_p = arm_e;
+
+	rlxfw_spi_inst_fmt_go(say, r);
+	rlxfw_puts(say);
+	/* D5: erase all (first block first), program pages 1.., page 0 last. */
+	for (i = 0; i < nops; i++) {
+		if (rlxfw_spi_inst_op(&pl, i, &op) == RLXFW_SPI_INST_OP_ERASE) {
+			r->phase = 'E';
+			r->policy = rlxfw_spi_wr_chk_erase(&arm_e, op.addr,
+					op.len, RLXFW_SPI_WR_ERASE_GRAIN,
+					(u32)rtl819x_spi_mtd.erasesize);
+			if (r->policy) {
+				why = RLXFW_SPI_INST_R_POLICY;
+				goto fail;
+			}
+			rc = rtl819x_spi_se_block(op.addr);
+			if (rc) {
+				why = RLXFW_SPI_INST_R_ENGINE;
+				goto fail;
+			}
+			rtl819x_spi_note_write(1);
+			arm_e.budget -= op.len;
+			r->n_se++;
+			r->erased += op.len;
+		} else if (op.kind == RLXFW_SPI_INST_OP_PROG) {
+			r->phase = op.commit ? 'H' : 'P';
+			r->policy = rlxfw_spi_wr_chk_prog(&arm_p, op.addr,
+							  op.len);
+			if (r->policy) {
+				why = RLXFW_SPI_INST_R_POLICY;
+				goto fail;
+			}
+			rc = rtl819x_spi_pp_page(op.addr, op.len,
+						 rtl819x_spi_img + op.off);
+			if (rc) {
+				why = RLXFW_SPI_INST_R_ENGINE;
+				goto fail;
+			}
+			rtl819x_spi_note_write(0);
+			arm_p.budget -= op.len;
+			r->n_pp++;
+			r->programmed += op.len;
+			r->committed = op.commit;
+		} else {
+			why = RLXFW_SPI_INST_R_POLICY;	/* plan ended early */
+			goto fail;
+		}
+		r->ops_done++;
+		if (op.blk_end) {
+			rtl819x_spi_inst_say_step(r->phase, op.blk, t0);
+			/* D10: the pause a human pull lands in */
+			if (r->pace_ms && !op.commit)
+				msleep(r->pace_ms);
+		}
+		cond_resched();
+	}
+
+	/* D5's read-back over the WHOLE region: staged bytes, then 0xFF. */
+	r->phase = 'V';
+	r->cmp_ran = 1;
+	for (off = 0; off < rg->size; off += RTL819X_SPI_CHUNK) {
+		rc = rtl819x_spi_read_pio(rg->base + off, RTL819X_SPI_CHUNK,
+					  chunk);
+		if (rc) {
+			why = RLXFW_SPI_INST_R_ENGINE;
+			goto fail;
+		}
+		rlxfw_spi_inst_cmp(chunk, off, RTL819X_SPI_CHUNK,
+				   rtl819x_spi_img, r->len, &r->cmp_diff,
+				   &r->cmp_first);
+		r->cmp_bytes += RTL819X_SPI_CHUNK;
+		if ((off + RTL819X_SPI_CHUNK) % RLXFW_SPI_INST_BLOCK == 0u)
+			rtl819x_spi_inst_say_step('V',
+					off / RLXFW_SPI_INST_BLOCK, t0);
+		cond_resched();
+	}
+	if (r->cmp_diff) {
+		why = RLXFW_SPI_INST_R_CMP;
+		goto fail;
+	}
+	r->cmp_ok = 1;
+	r->phase = 'D';
+	s->done++;
+	why = RLXFW_SPI_INST_OK;
+	goto out;
+refuse:
+	s->refused++;
+	goto out;
+fail:
+	s->failed++;
+out:
+	kfree(chunk);
+	r->reason = why;
+	r->rc = (why == RLXFW_SPI_INST_R_ENGINE && rc) ? rc :
+		rtl819x_spi_inst_err(why);
+	r->ms = jiffies_to_msecs(jiffies - t0);
+	rlxfw_spi_inst_fmt_end(say, r);
+	rlxfw_puts(say);
+	return r->rc;
+}
+
+/* `install ...` and `erase ...`.  The whole line goes to the parser, so a
+ * malformed one is still an attempt -- and still disarms. */
+static int rtl819x_spi_verb_inst(const char *line)
+{
+	int rc;
+
+	mutex_lock(&rtl819x_spi_lock);
+	rc = rtl819x_spi_inst_run(line);
+	/* ONE ARM, ONE ATTEMPT: refused, failed or done, the write path
+	 * leaves this verb disarmed. */
+	rtl819x_spi_wr_do_disarm();
+	mutex_unlock(&rtl819x_spi_lock);
+	rlxfw_markx("SI-RC", (unsigned)rc);
+	return rc;
+}
+
+/* `img reset`: forget the staged bytes and any latched error. */
+static int rtl819x_spi_verb_img_reset(void)
+{
+	mutex_lock(&rtl819x_spi_lock);
+	vfree(rtl819x_spi_img);			/* NULL is a no-op */
+	rtl819x_spi_img = NULL;
+	rlxfw_spi_inst_img_reset(&rtl819x_spi_img_st);
+	mutex_unlock(&rtl819x_spi_lock);
+	rlxfw_mark("SI-IMGRESET");
+	return 0;
+}
+
+/* /proc/rtl819x-spi-img.  Appends; refuses an overflow WHOLE with EFBIG and
+ * poisons the buffer (EIO on every later append) until `img reset`.  Under
+ * rtl819x_spi_lock, so an append cannot land in the middle of an install. */
+static int rtl819x_spi_img_write_proc(struct file *file,
+				      const char __user *buffer,
+				      unsigned long count, void *data)
+{
+	struct rlxfw_spi_inst_img *im = &rtl819x_spi_img_st;
+	int rc;
+
+	mutex_lock(&rtl819x_spi_lock);
+	switch (rlxfw_spi_inst_img_admit(im, count)) {
+	case RLXFW_SPI_INST_IMG_OK:
+		break;
+	case RLXFW_SPI_INST_IMG_OVERFLOW:
+		rc = -EFBIG;
+		goto out;
+	default:
+		rc = -EIO;
+		goto out;
+	}
+	if (!count) {
+		rc = 0;
+		goto out;
+	}
+	if (!rtl819x_spi_img) {
+		rtl819x_spi_img = vmalloc(RLXFW_SPI_INST_IMG_CAP);
+		if (!rtl819x_spi_img) {
+			im->err = RLXFW_SPI_INST_IMG_NOMEM;
+			rc = -ENOMEM;
+			goto out;
+		}
+	}
+	if (copy_from_user(rtl819x_spi_img + im->len, buffer, count)) {
+		im->err = RLXFW_SPI_INST_IMG_FAULT;
+		rc = -EFAULT;
+		goto out;
+	}
+	im->len += (u32)count;
+	im->writes++;
+	rc = (int)count;
+out:
+	mutex_unlock(&rtl819x_spi_lock);
+	return rc;
+}
+
+/* The /proc block, behind its own budget check like the write TU's. */
+static int rtl819x_spi_inst_proc(char *page, int used)
+{
+	int len = 0;
+
+	if (used + RLXFW_SPI_INST_PROC_MAX <= RTL819X_SPI_PROC_BUDGET) {
+		len += rlxfw_spi_inst_emit(page, &rtl819x_spi_inst_st,
+					   &rtl819x_spi_img_st,
+					   &rtl819x_spi_probe_st,
+					   RTL819X_SPI_CMD_SE,
+					   RLXFW_SPI_WR_ERASE_GRAIN,
+					   jiffies_to_usecs(1));
+		len += sprintf(page + len, "inst_truncated 0\n");
+	} else {
+		len += sprintf(page + len, "inst_truncated 1\n");
+	}
+	return len;
+}
+/* END OF R8b GAP A.  tools/test-spi-install.sh compiles the lines from the
+ * banner above to this one on the host, against a simulated chip. */
 #endif
 
 /* `<n>` or `<n> <off>`.  Two numbers, parsed with an END POINTER rather than
@@ -2525,10 +3231,21 @@ static int rtl819x_spi_verb_corrupt(const char *arg)
 static int rtl819x_spi_write_proc(struct file *file, const char __user *buffer,
 				  unsigned long count, void *data)
 {
+#ifdef CONFIG_MTD_RTL819X_WRITE
+	/* R8b Gap A: `install` carries 64 hex digits, so a line outgrows 31
+	 * bytes -- and an over-long line is REFUSED rather than cut, because a
+	 * cut install line must never parse as a shorter, different one. */
+	char buf[RLXFW_SPI_INST_LINE_MAX];
+#else
 	char buf[32];
+#endif
 	unsigned long n = count;
 	int ret;
 
+#ifdef CONFIG_MTD_RTL819X_WRITE
+	if (n >= sizeof(buf))
+		return -EINVAL;
+#endif
 	if (n >= sizeof(buf))
 		n = sizeof(buf) - 1;
 	if (copy_from_user(buf, buffer, n))
@@ -2551,12 +3268,21 @@ static int rtl819x_spi_write_proc(struct file *file, const char __user *buffer,
 	} else if (!strcmp(buf, "trywrite"))
 		ret = rtl819x_spi_verb_trywrite();
 #ifdef CONFIG_MTD_RTL819X_WRITE
-	else if (!strncmp(buf, "arm ", 4))
+	/* arm and disarm take the lock since Gap A, so neither can land inside
+	 * an install, which holds it from its arm check to its disarm. */
+	else if (!strncmp(buf, "arm ", 4)) {
+		mutex_lock(&rtl819x_spi_lock);
 		ret = rtl819x_spi_verb_arm(buf + 4);
-	else if (!strcmp(buf, "disarm")) {
+		mutex_unlock(&rtl819x_spi_lock);
+	} else if (!strcmp(buf, "disarm")) {
+		mutex_lock(&rtl819x_spi_lock);
 		rtl819x_spi_wr_do_disarm();
+		mutex_unlock(&rtl819x_spi_lock);
 		ret = 0;
-	}
+	} else if (!strncmp(buf, "install", 7) || !strncmp(buf, "erase", 5))
+		ret = rtl819x_spi_verb_inst(buf);
+	else if (!strcmp(buf, "img reset"))
+		ret = rtl819x_spi_verb_img_reset();
 #endif
 	else if (!strcmp(buf, "verify"))
 		ret = rtl819x_spi_verb_verify("");
@@ -2649,6 +3375,21 @@ static int __init rtl819x_spi_init(void)
 	pde->read_proc = rtl819x_spi_map_read_proc;
 	rlxfw_mark("S8");
 
+#ifdef CONFIG_MTD_RTL819X_WRITE
+	/* R8b Gap A, D12.  A SECOND WRITABLE ENTRY, which the 0444 paragraph
+	 * above argues against -- and its argument does not reach this one:
+	 * it issues no transaction.  It appends bytes to a RAM buffer under
+	 * rtl819x_spi_lock and does nothing else; every flash operation is
+	 * still one verb on the first file.  0200 and no read_proc, so a read
+	 * returns end-of-file. */
+	pde = create_proc_entry(RTL819X_SPI_IMG_PROC_NAME, 0200, NULL);
+	if (!pde) {
+		rlxfw_mark("S9-NOIMG");
+		return 0;
+	}
+	pde->write_proc = rtl819x_spi_img_write_proc;
+	rlxfw_mark("S9");
+#endif
 	return 0;
 }
 

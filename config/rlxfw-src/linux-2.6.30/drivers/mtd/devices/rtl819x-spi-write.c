@@ -384,6 +384,28 @@ void rtl819x_spi_wr_do_disarm(void)
 }
 EXPORT_SYMBOL(rtl819x_spi_wr_do_disarm);
 
+/*
+ * The arm in force, for rtl819x-spi.c's install path (R8b Gap A, D20).
+ *
+ * A COPY, never a pointer: the caller can compare against this state and
+ * cannot change it, so this file stays the one owner of the arm.  It is read
+ * UNDER rtl819x_spi_lock, which lives in rtl819x-spi.c: the install path holds
+ * it across this call and its disarm, and every writer of this state holds it
+ * too -- the arm and disarm verbs since Gap A, mtd->write and mtd->erase since
+ * item 4 -- so the four fields are read as one state, never half an arm.
+ *
+ * -EINVAL on a NULL destination, and the caller zeroes its copy before the
+ * call, so a failed read is an UNARMED copy plus an error: both halves refuse.
+ */
+int rtl819x_spi_wr_get_arm(struct rlxfw_spi_wr_arm *out)
+{
+	if (!out)
+		return -EINVAL;
+	*out = rtl819x_spi_wr_arm;
+	return 0;
+}
+EXPORT_SYMBOL(rtl819x_spi_wr_get_arm);
+
 /* ------------------------------------------------------------------------
  * What /proc prints.  The caller owns the page budget, so this returns the
  * length it wrote and writes nothing without being asked.

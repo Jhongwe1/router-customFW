@@ -456,6 +456,39 @@ MUT = [
     ("M70 a memwrite row that permits nothing unreported     (kills A53)",
      '        if ln not in sent:',
      '        if False:'),
+
+    # ------------------------------------------ R8b D8, 2026-10-05
+    # The driver's flash verbs (devflash()).  One mutant per property the
+    # rule claims: it is wired in, it is case-blind, it refuses a line it
+    # cannot read, the owner's yes is what passes it, no absence declaration
+    # hides it, and it is no blanket over the driver's other verbs.
+    ("M71 the driver flash-verb refusal unwired              (kills A56)",
+     '    return "SHELL", issues + memnode(cmd, flash_ok) + devflash(cmd, '
+     'flash_ok)',
+     '    return "SHELL", issues + memnode(cmd, flash_ok)'),
+
+    ("M72 the driver verb matched case-SENSITIVELY           (kills A57)",
+     "                verb = body[0].strip('\"').lower() if body else \"\"",
+     "                verb = body[0].strip('\"') if body else \"\""),
+
+    ("M73 a line it cannot read is read as harmless          (kills A57)",
+     '            if why is None and any(ch in _SPI_UNREADABLE for w in body',
+     '            if False and any(ch in _SPI_UNREADABLE for w in body'),
+
+    ("M74 the yes does not count for a driver verb           (kills A58)",
+     '        if not (flash_write(c) or devflash(c)) or (c not in yes and',
+     '        if not flash_write(c) or (c not in yes and'),
+
+    ("M75 an absence declaration hides a driver verb         (kills A61)",
+     '    if any(i.startswith(SPI_NODE + ":") for i in issues):   # R8b D8: '
+     'A61',
+     '    if False:'),
+
+    ("M76 every write to the driver's node refused           (kills A62, B16)",
+     '                if not verb.startswith(("install", "erase")):\n'
+     '                    continue',
+     '                if False:\n'
+     '                    continue'),
 ]
 
 
