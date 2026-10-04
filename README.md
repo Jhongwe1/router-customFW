@@ -434,9 +434,9 @@ Every instrument here is expected to be able to fail, and ships with the
 controls that show it can:
 
 ⚠️ **This is a selection, not a census, and the numbers are derived rather than counted by
-eye.** 🔄 **量 2026-09-17 (eighty-sixth segment), re-derived and not incremented**, over `git ls-files tools/` (**144** files), taking those whose
-first two bytes are `#!` and excluding `tools/test-*`: **67** programs, of which **21 are
-described below and 42 are not** — **`appletcensus`**, `audit-bench-log`, `binsim`, `capdate`, `capfield`,
+eye.** 🔄 **量 2026-10-04 (120th segment, `R9-8`), re-derived and not incremented**, over `git ls-files tools/` (**181** files), taking those whose
+first two bytes are `#!` and excluding `tools/test-*`: **93** programs, of which **21 are
+described below and 72 are not** — 🔄 **the row this replaces read 144 / 67 and had been stale since 2026-09-17, and it also did not close: 21 + 42 = 63 against its own 67, because that re-derivation moved the total and left the breakdown alone. The names that follow are the 42 measured on 2026-09-16, so they are 42 of the 72 rather than a census of them; whether this list should be a census at all is the open half of `CI-4`, reassigned to `P4b`, and quietly adding thirty names would answer the owner's question by stealth. 🔴 There is still nothing that compares these numbers — `ci-census` has no README action — which is `CI-4`'s other half, and it is why this row goes stale every time rather than once.** The 42: **`appletcensus`**, `audit-bench-log`, `binsim`, `capdate`, `capfield`,
 **`cfcensus`**, `ci-census`, **`citecheck`**, `citime`, `derivcheck`, `desk-sweep`, `dtcheck`,
 **`elfops`**, **`emueq`**, **`emupredict`**, `fetch-sources`, `flashmap`, `fsmanifest`,
 **`hazdecl`**, **`hazpay`**, `isa-probe`, `isacensus`, **`isapay`**, `leakscan`, `marchcmp`,

@@ -3950,9 +3950,11 @@ image whose only Ethernet driver is `rtl819x-nic`. The new entry in `docs/KNOWN-
 and that `R9` must build from `quiet-swcore`, the variant that still carries the vendor's driver.
 Its first wording also said that an `R9` card must bring up the vendor's `eth*` rather than `rlx0`;
 that is more than D16 says, and it was cut back to D16's words. The WLAN driver, the plan's other
-identical driver, is the same source at `SWCORE=n` and not the same object: the forty symbols
-recompile it against a `struct sk_buff` four fields shorter (§ 13.7), and five of the ten names
-the seam defines are its references (§ 13.3).
+identical driver, is the same source at `SWCORE=n` and not the same object: 🔄 **量 2026-10-04 its
+`built-in.o` loses 11 symbol-table entries and 6 references, not the forty this sentence said —
+§ 19.4 is the retraction** — and it is recompiled against a `struct sk_buff` 8 bytes shorter
+(§ 19.5; the four declared fields are § 13.7), and five of the ten names the seam defines are its
+references (§ 13.3).
 
 ## 18.7 The rows re-pointed, and the other files
 
@@ -3995,3 +3997,263 @@ the seam defines are its references (§ 13.3).
   makes `R9`'s NIC column equal to the vendor firmware's, whose kernel configuration, toolchain and
   userspace still differ.
 * Whether a list naming every variant should be refused (§ 18.2).
+
+# 19. 2026-10-04 (`R9-5`) — `quiet-swcore` built, and the controlled variable read off the artefact
+
+**量 unless marked otherwise**, and the measurement is of two ELFs, not of a board: no image ran,
+neither arm went through `rtkimage`, no power action was taken, no flash verb and no `FLR` was
+issued. The reports, TSVs and asm dumps are `$FWRE_WORK/rebuild/s121/r9-5/` (not in this
+repository) with `scripts/` beside them; the three manifests, `vmlinux` ELFs, `System.map`s,
+`.config-installed`, `.config-built` and both gate logs per cell are
+`$FWRE_WORK/rebuild/r3-4/out/r95{q,y,q2}.*`. `SPEC.md` `FW-202`, `FW-203`, `FW-204`.
+
+## 19.1 The two builds, and the control that makes the comparison mean anything
+
+讀: `quiet-swcore` had never been built. No `quiet-swcore` manifest exists anywhere under
+`$FWRE_WORK/rebuild/r3-4/out/`; the three `quiet-noswcore` manifests are 8b's retired name, and
+every `--variant quiet` manifest older than 8g names the opposite configuration (§ 18, `FW-157`).
+So both arms had to be built. The `quiet` builds already on record carry a different `RECIPE_ID`,
+and `RECIPE_ID` is compiled into every object as `-DRLXFW_SRC_ID` (讀 `tools/rlxfw-kbuild.sh`), so
+comparing against a stored artefact would have put a changed constant in all 600 objects and made
+every one of them differ for a reason that is not `SWCORE`.
+
+Three builds, one at a time, `-j4`, from HEAD's `config/`, which was not touched:
+
+```
+bash tools/rlxfw-kbuild.sh r95y  --variant quiet-swcore --marks --jobs 4 \
+     --initramfs $FWRE_WORK/rebuild/r3-4/out/r6b8i.initramfs.spec
+bash tools/rlxfw-kbuild.sh r95q  --variant quiet        --marks --jobs 4 \
+     --initramfs $FWRE_WORK/rebuild/r3-4/out/r6b8i.initramfs.spec
+bash tools/rlxfw-kbuild.sh r95q2 --variant quiet        --marks --jobs 4 \
+     --initramfs $FWRE_WORK/rebuild/r3-4/out/r6b8i.initramfs.spec
+```
+
+| | `r95q` (`quiet`, `SWCORE=n`) | `r95y` (`quiet-swcore`, `SWCORE=y`) |
+|---|---|---|
+| `recipe_id` / `RLXFW_SRC_ID` | `575da809` | `575da809`, equal |
+| `config_sha256` installed | `8c40643b5b1c1160…` | `5220ac6ada98d25f…` |
+| `vmlinux` bytes | 4,257,403 | 4,567,218, +309,815 |
+| `vmlinux` sha256 | `0d9f837901866a4d…` | `f1eed782cb2c995c…` |
+| `cflags_kernel` / `stamp_epoch` | `-fno-if-conversion` / 1788220800 | same / same |
+| `host_compat_patches` / `marks` | 9 / 28 | 9 / 28 |
+| `(NEW)` lines from `oldconfig` | 0 | 0 |
+| `build_rc` / verdict | 0 / green | 0 / green |
+| `CC` / `LD` lines in the build log | 600 / 119 | 620 / 126 |
+
+The equal `recipe_id` is the control the whole comparison rests on, and it is checked rather than
+assumed: the comparator refuses to report anything when the two differ. The initramfs spec is the
+same file in all three builds — `r6b8i`'s, the one arm I used — so it is held, and all three
+manifests agree on `initramfs_sha256` and `initramfs_manifest_sha256`. `--variant quiet-noswcore`
+was refused with rc 3 before any 480 MB stage was paid for, and `--dry-run` ran for both live names
+first.
+
+## 19.2 The `SWCORE` set `S` — two readings, and they are not the same reading
+
+* The `.config` that `kconfig-delta apply` **installs**: the two differ on exactly **1** symbol,
+  `CONFIG_RTL_819X_SWCORE`, `# … is not set` against `=y`.
+* The `.config` each build **used** (`.config-built`, after `oldconfig` — the file that matters):
+  **800** symbols in `r95q` against **840** in `r95y`, differing on exactly **41**. One is
+  `CONFIG_RTL_819X_SWCORE`; the other 40 are absent at `SWCORE=n` and present at `SWCORE=y`, which
+  is the `dep-unmet` mechanism the delta declares.
+
+`S` is that set of 41. Second source: the delta's `@quiet,loud`-tagged rows number **41** too, and
+the two sets are equal in both directions — 0 declared-but-not-realised, 0 realised-but-not-declared.
+
+🔴 **So the 40 in `R9-5`'s own definition of done is a kconfig-symbol count** (量, 840 − 800 = 40),
+and § 19.4 is what the ELF level actually loses.
+
+## 19.3 The artefact comparison
+
+Sections, `mips-linux-gnu-readelf -W -S` from the host's `binutils-mips-linux-gnu` and never the
+vendor toolchain: **23** sections in each file, **0 added and 0 removed**, 10 identical in size, 13
+different. `.bss` 1,371,392 → 2,727,936; `.text` 2,401,772 → 2,605,296; `.strtab` 225,363 →
+248,218; `.symtab` 218,608 → 234,704; `.rodata` 120,688 → 130,944; `.iram` 22,084 → 27,852;
+`__param` 2,148 → 4,180. `.init.ramfs` is **934,912** bytes in both — the held variable showing as
+held. 推: the +1.33 MiB of `.bss` is the vendor switch core's static tables, which is RAM and not
+image bytes. These figures are not comparable with the delta header's recorded cost for
+`SWCORE=y`: that is the flat image after `rtkimage`/LZMA, and no flat image was built here.
+
+Objects, over the two staged trees: **735** `.o` files against **764**; present only in one tree
+**0** against **29**; present in both and byte-identical **591**; present in both and differing
+**144**. **173** differences in all, and every one is classified by a rule that names the evidence
+it read:
+
+| rule | what it reads | count |
+|---|---|---|
+| `R1` presence | the `obj-$(CONFIG_X)` / `subdir-$(CONFIG_X)` line on an ancestor of the path | 29 |
+| `R2` link product | `cmd_<path> := … ld … -r -o …`, recursed into the inputs | 32 |
+| `R3` content | the `include/config/<p>.h` stamps in the object's own `deps_` line, kbuild's own record of what the preprocessor touched | 112 |
+| **outside `S`** | | **0** |
+
+Of the 29 presence differences, **28** are under `drivers/net/rtl819x/`, gated by
+`obj-$(CONFIG_RTL_819X_SWCORE) += rtl819x/built-in.o` and
+`subdir-$(CONFIG_RTL_819X_SWCORE) += rtl819x` in `drivers/net/Makefile` (讀, both lines), and **1**
+is `drivers/net/rtk_vlan.o`, gated by `obj-$(CONFIG_RTK_VLAN_SUPPORT) += rtk_vlan.o` in the same
+file. Both gate symbols are in `S`.
+
+Symbols, `readelf -W -s` with `nm -f sysv` as a second reader that disagreed on **0** of the
+defined names in either file: **13,402** names against **14,387** (`nm --defined-only`: 12,799
+against 13,760); only in `quiet-swcore` **985**; only in mainline **0**; different `st_size` 57;
+different address 12,629. The 12,629 are link layout — `.text` growing 203,524 bytes relocates
+almost everything below it — and they are counted and set aside, not reported as content. All
+**1,042** symbol-level differences (985 + 0 + 57) were traced to a defining object and checked
+against that object's verdict: **0 of 1,042** has an owner outside the inside-`S` bucket. That is a
+second route to the same answer, and the two had to agree or one of them was wrong.
+
+## 19.4 Same source is not the same object, measured in three places
+
+**The WLAN driver.** `drivers/net/wireless/rtl8192cd/built-in.o`, the same bytes as
+`rtl8192cd.o`: **816,475** bytes at `SWCORE=n` against **820,910** at `SWCORE=y`, **+4,435**;
+defined symbols 2,355 → 2,366, so `SWCORE=n` is missing **11** symbol-table entries and gains 0;
+undefined references 59 → 65, so it is missing **6**; **11** symbols present in both have a
+different `st_size`; and of the 44 leaf objects in that directory **15** differ while 29 are
+byte-identical. The 11 are **four functions** and their section and relocation symbols —
+`rtl8192cd_isIgmpV1V2Report`, `rtl8192cd_isMldV1Report`, `rtl8192cd_proc_vlan_read`,
+`rtl8192cd_proc_vlan_write`, plus `.text.<each>` and `.rel.text.` for three of them. The six
+references are `eth_skb_free_num`, `priv_skb_copy`, `rtk_vlan_support_enable`,
+`rtl_add_vlan_info`, `rx_vlan_process` and `tx_vlan_process`.
+
+🔴 **§ 18.6's "forty symbols" is not reproduced and is retracted here.** The measured loss is 11
+symbol-table entries and 6 references. 推 that the 40 was § 19.2's kconfig count read as an
+ELF-symbol count; the sentence it supported — the WLAN driver is the same source and not the same
+object — stands and is now a number instead of an estimate.
+
+**rlxfw's own drivers.** For each of the 13 `.c` files under `config/rlxfw-src/linux-2.6.30/`:
+`drivers/net/rtl819x-nic.o` and `drivers/net/rlxfw-seam.o` **differ** across the flip;
+`drivers/mtd/devices/rtl819x-spi-write.o` is absent from both trees; and the other **10** —
+`rlxfw-devices`, `rlxfw_mark`, `rlxfw-entropy`, `rtl819x-timer`, `rtl819x-gpio`, `rtl819x-keys`,
+`rtl819x-spi`, `rtl819x-switch`, `rtl819x-view`, `rtl819x-wdt` — are byte-identical. Both
+differences are inside `S`: the NIC driver is compiled against the shorter `sk_buff` in one arm and
+the longer one in the other (§ 19.5), and `rlxfw-seam.o` is the file that supplies the ten names
+`SWCORE=n` takes away (§ 13.3).
+
+## 19.5 `sk_buff` is 8 bytes shorter, read out of the instruction stream
+
+2.6.30's `skb_init()` calls `kmem_cache_create("skbuff_head_cache", sizeof(struct sk_buff), …)` and
+then `kmem_cache_create("skbuff_fclone_cache", (2*sizeof(struct sk_buff)) + sizeof(atomic_t), …)`.
+`objdump -d` at `skb_init`'s address in each image's own `System.map`:
+
+```
+r95q (SWCORE=n)  802a4c80:  li  a1,192      802a4ca4:  li  a1,388
+r95y (SWCORE=y)  802e667c:  li  a1,200      802e66a0:  li  a1,404
+```
+
+So `sizeof(struct sk_buff)` is **192** at `SWCORE=n` against **200** at `SWCORE=y`: 8 bytes
+shorter, read off the artefact and not out of a header. The second immediate is an internal
+cross-check and it closes — 2 × 192 + 4 = 388 and 2 × 200 + 4 = 404.
+
+讀, the mechanism: the three gating symbols are all in `S` — `CONFIG_RTL_HARDWARE_MULTICAST`,
+`CONFIG_RTK_VLAN_SUPPORT` and `CONFIG_RTK_VLAN_NEW_FEATURE` are `1` in `r95y`'s `autoconf.h` and
+**not defined** in `r95q`'s. That had to be read with a parser for `#define CONFIG_X 1`; the
+`.config` parser silently returned `-` for all of them on the first pass, which is an empty reading
+and not a negative one. The fields are `srcPort` (`__u16`), `srcVlanId:12`,
+`struct vlan_tag tag` (讀 `include/net/rtl/rtk_vlan.h`: a union of `unsigned long` with two
+`unsigned short`, so 4 bytes) and `struct vlan_info *src_info` (4 bytes) — 讀 12 bytes of declared
+field. **未定**: the 4 bytes between the 12 declared and the 8 measured are 推 alignment padding
+reclaimed. Nothing here measures the padding, and the 8 does not depend on it. § 18.6's "four
+fields shorter" counts the same declared fields and is left standing; what is corrected there is
+the 40.
+
+## 19.6 What the controlled-variable claim becomes
+
+`R9-5`'s definition of done says any difference beyond the `SWCORE` set withdraws
+「相同的只有 NIC 與 WiFi 驅動」, and that the WLAN driver counts as a difference regardless. The
+measurement gives both halves at once:
+
+* **Nothing outside `S` was found** — 0 of 173 objects and 0 of 1,042 symbols — so the claim is not
+  withdrawn on that clause.
+* **Both of the two drivers the claim calls *the same* are not the same object.** The WLAN driver
+  is § 19.4's 11 entries and 6 references; rlxfw's `rtl819x-nic.o` is a differing object in its own
+  right. So the claim survives only in the narrower form the artefact supports: *the vendor's
+  switch-core driver and its dependents are the whole of the difference, and the two drivers the
+  claim named are inside that difference rather than outside it.* Ten of rlxfw's twelve built
+  drivers are byte-identical across the flip, and that is the part of the claim that survives at
+  object level.
+
+§ 18.6's sentence is corrected in place to the measured counts, and the three other files that
+repeated the 40 — `docs/KNOWN-ISSUES.md`, `docs/threat-model.md` and `docs/hardening-matrix.md` —
+with it. Two statements of it are **not** corrected in this commit and are owed: `PROGRESS.md`'s
+`R9-5` row, which is where the 40 entered as a definition of done, and the `residual` of
+`config/fix-cases.toml`'s `FC-014` / `P1-11`, which is read at render time but not published, so
+`docs/differential.md` does not carry it. Both are outside this commit's reach by instruction, and
+the dated `LOG.md` entry the retraction needs is owed with them. `config/rlxfw-kernel.delta`'s
+comment calls the same 40 *the forty symbols this one decision takes away*, which is § 19.2's
+kconfig count and is right as it stands.
+
+## 19.7 The controls, and two readings about the instruments
+
+Every 0 above has a control that can make it non-zero.
+
+| id | what it tests | reading |
+|---|---|---|
+| `D` | reproducibility: is "144 differing objects" a reading or build noise? `r95q2`, same argv | 🟢 `vmlinux` byte-identical to `r95q` (`0d9f837901866a4d…` both) and **735 of 735** objects identical, 0 differing |
+| `C3` | first classifier: with `S` = every symbol, does a difference classify inside? | 🔴 **FAIL, and that is how the first classifier's defect was found** — it read only the cpp dependency record, and an `ld -r` link product has none, so 41 differences sat outside `S` spuriously. The three rules of § 19.3 are the repair |
+| `K1`/`K2` | with `S` emptied, does a leaf classify outside? with `S` = everything, inside? | 🟢 `net/core/dev.o` outside, then inside: both buckets are reachable, so "0 outside `S`" is a reading |
+| `K4` | the Makefile gate finder, both ways | 🟢 `rtl819x/built-in.o` gated by `CONFIG_RTL_819X_SWCORE`; `net/core/dev.o` by `CONFIG_NET`, which is **not** in `S` |
+| `K5`/`K6` | does the link rule recurse, and is the stamp map right? | 🟢 `net/core/built-in.o` has 24 `ld -r` inputs with `skbuff.o` among them; `net/core/.skbuff.o.cmd` carries `include/config/rtl/hardware/multicast.h` and not an invented path |
+| `K7`/`C7` | is either side of a comparison empty, or `S` degenerate? | 🟢 591 identical **and** 144 differing; `S` = 41, strictly between 0 and 800 |
+| `K8`/`G7` | can "0 lost symbols" and "0 of 1,042 unowned" go non-zero? | 🟢 removing one name from a copy of `r95q`'s own set reads as 1 lost; one planted unowned symbol reads as residue 1 |
+| `C1`/`C4`/`C5`/`C6` | one flipped bit, one dropped section, an empty symbol read, two readers disagreeing | 🟢 digest moves; 1 only-in-`q`; 13,402 and 14,387 names rather than 0; 0 disagreements between `nm` and `readelf` |
+| `G2`/`G3` | can `kconfig-delta check` go red on these two files? | 🟢 `r95y` read as `quiet` refuses with **41 not applied**; `r95q` read as `quiet-swcore` refuses with **41 undeclared**. The two refusals are the same 41 seen from the two sides, so the variant column is doing work |
+| `H4` | can `rlxfw-marks verify` go red? | 🟢 rc 1, "12 mark(s) and 11 witness(es) not a discriminator", on a vendor kernel offered as the image |
+| `A7` | does the driver refuse a retired variant? | 🟢 `--variant quiet-noswcore` gives rc 3 before any stage |
+
+`kconfig-delta check` is green on both arms against the `.config` each build used: 30 derived by
+kconfig and 74 set by rlxfw for `r95y`, 70 and 75 for `r95q`. `rlxfw-marks verify`, reading each
+artefact with both `--absent` vendor kernels, is rc 0 on both with the identical RESULT line — 12
+marks present once, 12 witnesses present, 1 witness confirmed absent, absent from 2 vendor
+artefacts.
+
+🔴 **A defect in an instrument, found while building its negative control.**
+`tools/rlxfw-marks.py verify` returns **rc 0 when handed the wrong `System.map`** — `r95y`'s image
+with `r95q`'s map produced the same RESULT line as the correct pairing. So for this declaration its
+green certifies the image's bytes and says nothing about the image/map pairing, and a card that
+treats a green `verify` as proof that a map belongs to an image is reading more than the tool
+measured. Nothing was changed in the tool here. A second reading in the same family, and this one
+is the tool being right: run without its two `--absent` inputs, `verify` refuses with rc 1 and
+"0 mark(s) and 0 witness(es) not a discriminator", exactly as `tools/rlxfw-marks-absent.tsv`'s own
+header says it should; the first standalone invocation of this step made that mistake and the tool
+caught it.
+
+A third instrument reading, and it belongs to `SPEC.md` `FW-173` rather than to this gate. Landing
+§ 19's rows hit that row's known blind spot again: `spec-check`'s `C3` decides a row is open by a
+bare substring, and the open mark's two characters are the first two of the Chinese for
+*undefined*, so `未定義引用` — the `UND` entries § 19.4 counts — read as an open value and `C3`
+asked § 17 what fills it. The row says `未解析` instead, which is the precedent `FW-173` set and is
+no less precise. What is new is the cost of the repair, 量 2026-10-04 by running both regexes over
+every `SPEC.md` row the tool itself parses: tightening the mark to reject the `義` that may follow
+it moves the open-row count from **67** to **66**, and the single row whose verdict changes is this
+commit's own. On the population as it stood before this commit the two regexes agree on every row,
+so the repair is verdict-preserving there — which is what an instrument change has to show before
+it is accepted. It was not made here: the decision to reword rather than retune is `FW-173`'s and
+the owner's, and this is the measurement it did not have.
+
+## 19.8 What `R9-5` does not establish
+
+* **It has not booted.** Neither arm has run on the silicon, neither went through `rtkimage`, and
+  no `nfjrom` was built. § 18.8 already said the post-8g default had not booted; `quiet-swcore` has
+  not either. Everything above is a desk reading of an ELF.
+* **"0 differences outside `S`" is an attribution, not a cause.** Rule `R3` says the object's
+  preprocessing *touched* a symbol in `S`, so the flip *can* explain the difference; it does not
+  prove the flip *is* the difference. A per-object diff of preprocessed output would be the sharper
+  instrument and was not run.
+* **The dependency record is kbuild's, so it inherits kbuild's blind spots.** A difference produced
+  by something the preprocessor cannot see would be caught only by `R3`'s second leg, the dep-file
+  byte comparison, which found nothing — so that leg was never exercised on a real case and is an
+  untested path.
+* **The 12,629 address differences were set aside, not explained.** If one of them is a content
+  difference wearing a relocation's clothes, this comparison did not look.
+* **Nothing about code generation.** `hazlint` was not run, and a green `kconfig-delta` and `marks`
+  pair passes a `--no-cflags` image with seven load-use violations.
+* **`.bss` +1.33 MiB is a file-level reading.** No measurement here says whether a board with that
+  configuration boots, or what it does to free memory.
+* **Nothing about the vendor firmware.** This compares two rlxfw builds. Whether `quiet-swcore`
+  makes `R9`'s NIC column equal to the vendor firmware's is § 18.8's open item still.
+* **殘留, and it is not reconciled here**: `R6-4` counted **five** names still undefined after the
+  whole `vmlinux` link that come from `drivers/net/wireless/rtl8192cd/`, while § 19.4 counts
+  **six** references present only at `SWCORE=y` in that driver's own object. The two populations
+  are taken at different stages of the link and are not obviously the same one. Settled by reading
+  both sets by name out of the same two trees, which this step did not do.
+* **The `rlxfw-marks verify` reading of § 19.7 bounds one declaration**, this one, with 12 marks
+  and one absent witness. It does not establish that the map is never a discriminator for some
+  other declaration.

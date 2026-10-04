@@ -302,8 +302,10 @@ driver that **builds** is `rtl8192cd/`, **not** `rtl8192e/`: 量 `FW-51`,
 `built-in.o` **820,910 bytes**; 讀 `FW-103`, `rtl8192e/` carries the same two
 print lines and that directory never enters the image. And at `SWCORE=n` — the
 mainline since `R6b-8` 8g — it is the **same source and not the same object**
-(讀, `docs/KNOWN-ISSUES.md`): the forty symbols the flip removes recompile it
-against a `struct sk_buff` four fields shorter, and five of the ten names the
+(讀, `docs/KNOWN-ISSUES.md`), and 🔄 **量 2026-10-04 both halves are counted:
+`built-in.o` loses 11 symbol-table entries and 6 references, not the forty this
+paragraph said, and `struct sk_buff` is 192 bytes against 200**
+(`notes/switch-driver.md` § 19.4). Five of the ten names the
 seam defines are its references. `R9` therefore builds `quiet-swcore`, where it
 and the NIC driver are the vendor's objects as built at `SWCORE=y` — and even
 there, the WLAN driver is listed as a **difference** between the two columns

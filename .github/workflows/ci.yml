@@ -1052,19 +1052,16 @@ jobs:
       # fixcases is R9-1's: it checks and freezes config/fix-cases.toml, the
       # per-case register.  `check` is the step that goes red when the committed
       # register drifts from its own rules; `--self-test` is its mutation run,
-      # one planted row per rule plus three positive controls.
+      # one planted row per rule plus four positive controls.
       #
-      # 🔴 NEITHER has a row in tools/ci-expected.tsv, and that is deliberate
-      # rather than an omission.  量 2026-10-04 with ci-census's OWN parser over
-      # this suite's real output: 0 ok, 0 FAIL, 0 skip, 0 unparsable, 1 line
-      # case-shaped at the wrong indentation.  Its case lines are at THREE spaces
-      # and their first token is `M1`/`P1`, not `ok`/`FAIL`, so OK_RE and FAIL_RE
-      # match nothing and any total would read CENSUS-MISMATCH.  A table row
-      # becomes possible only when those prints carry `ok`/`FAIL` at exactly two
-      # spaces -- see the note at the end of tools/ci-expected.tsv.  Until then
-      # these two steps gate CI on their EXIT CODES, which is a real gate and not
-      # a case census, and ci-census iterates the table rather than the capture
-      # directory, so the captures they leave are ignored and nothing goes red.
+      # 🔄 The paragraph that stood here said NEITHER step had a row in
+      # tools/ci-expected.tsv, because the case lines were at three spaces with
+      # `M1`/`P1` as their first token and any total would have read
+      # CENSUS-MISMATCH.  Both halves were repaired later the same day and the
+      # row is there now -- 24 cases, no skip.  The diagnosis is kept where it
+      # was measured, at the end of tools/ci-expected.tsv, rather than restated
+      # here.  The exit codes still gate: a census counts cases and says nothing
+      # about whether the suite passed.
       - name: fixcases check
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/fixcases.py check 2>&1 | tee ci-out/fixcases-check.out; exit "${PIPESTATUS[0]}"
@@ -1072,6 +1069,26 @@ jobs:
       - name: fixcases self-test
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/fixcases.py --self-test 2>&1 | tee ci-out/fixcases.out; exit "${PIPESTATUS[0]}"
+
+      # diffrender is R9-8's: it renders docs/differential.md from the register
+      # and the probe list, with five guards that refuse to write the file.
+      #
+      # 🔴 `render` is NOT run here, and that is the point of running `check`.
+      # `render` writes a tracked file; a CI job that rendered would make the
+      # committed table agree with the tool by construction, which is the
+      # opposite of a check.  `check` runs the same five guards and the same
+      # coverage arithmetic over the same inputs and writes nothing, so a
+      # committed table that has drifted from its inputs shows up as a red
+      # `check` -- and re-rendering at the desk is what repairs it.
+      # `--self-test` is the mutation run: 13 mutations each required to make a
+      # NAMED guard fire, plus 5 positive controls showing a guard permitting.
+      - name: diffrender check
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/diffrender.py check 2>&1 | tee ci-out/diffrender-check.out; exit "${PIPESTATUS[0]}"
+
+      - name: diffrender self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/diffrender.py --self-test 2>&1 | tee ci-out/diffrender.out; exit "${PIPESTATUS[0]}"
 
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"

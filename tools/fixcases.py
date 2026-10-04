@@ -78,7 +78,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT = ROOT / "config/fix-cases.toml"
 
-CLASSES = {"架構性", "有界化", "服務不存在", "不適用"}
+#  `平台限制` is the fifth member, added to the gate's closed set on 2026-10-04
+#  (`PROGRESS.md`, `R9`) because `不適用` was the least wrong cell for a row
+#  rlxfw does NOT fix and not a right one.  This checker still held four, so a
+#  `平台限制` row passed `tools/diffrender.py`'s `D1` and failed `C1` here --
+#  two tools disagreeing about the primary key.  `P4` is its control.
+CLASSES = {"架構性", "有界化", "服務不存在", "不適用", "平台限制"}
 TIERS = {"V-A", "V-B", "V-C", "V-D"}
 PUBLISH = {"win", "surface-absent", "not comparable", "未定"}
 # `same_instrument_pair` is TRI-state and the third value is not a hedge.
@@ -407,6 +412,13 @@ POSITIVES = [
     ("P3", "a resolving evidence link passes C8",
      lambda d: _resync(d["row"][0].update(
          {"vendor_evidence": "讀 `notes/rootfs-census.md` and `config/rlxfw-cflags`"}) or d)),
+    # on a row whose pair is `complete`, because C13 refuses a class claim on a
+    # row whose pair is `none needed` -- 量, the first draft of this control
+    # planted it on row 0 and C13 fired, which is C13 working and not C1 failing
+    ("P4", "a 平台限制 row -- the fifth class -- passes C1",
+     lambda d: _resync(next(r for r in d["row"]
+                            if r.get("same_instrument_pair") == "complete")
+                       .update({"mechanism_class": "平台限制"}) or d)),
 ]
 
 
