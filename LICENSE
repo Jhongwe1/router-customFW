@@ -19,10 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This file covers rlxfw's own userspace programs, tools and documents. It does
-NOT cover rlxfw's own kernel files, which are GPL-2.0-only, nor any third
-party's code in this repository or in the image rlxfw builds. `NOTICE` names
-every clause and the files it covers; `docs/sbom.md` is the component list.

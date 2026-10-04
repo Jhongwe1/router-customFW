@@ -23,6 +23,18 @@ that one disagree, `docs/sbom.md` owns the component and this file is wrong.
 | rlxfw's own **kernel** files | `GPL-2.0-only` | forced by provenance: they are compiled into, and linked with, a kernel whose own `COPYING` says version 2 and not "or later" (§ 2) |
 | rlxfw's own **userspace** programs, **tools**, scripts, declarations, web assets and documents | `MIT` | chosen. MIT is compatible in both directions with the two licences the image combines it with — statically linked LGPL-2.1 uClibc and GPL-2.0 kernel headers — so the image carries no compatibility question (§ 4) |
 
+**What `LICENSE` holds.** `LICENSE` is the MIT text and nothing else, so that a
+tool matching licence texts can read it as MIT. 量 2026-10-05 (`gh api`, before
+this change) GitHub's licence detection read it as `NOASSERTION`; 推 the
+paragraph it then ended with is why, and the first read after a push settles
+it. That paragraph moved here verbatim on 2026-10-05; in it, *this file* means
+`LICENSE`:
+
+> This file covers rlxfw's own userspace programs, tools and documents. It does
+> NOT cover rlxfw's own kernel files, which are GPL-2.0-only, nor any third
+> party's code in this repository or in the image rlxfw builds. `NOTICE` names
+> every clause and the files it covers; `docs/sbom.md` is the component list.
+
 **Why not one licence for both halves.** 讀 GPL-2.0 § 2(b): a work derived from
 a GPL-2.0 program, distributed as a whole, is licensed under that licence.
 rlxfw's kernel files are not a separate work that happens to sit beside the
@@ -47,9 +59,11 @@ is not this file's to settle; MIT was chosen so that nothing turns on it.
 
 ## 2. rlxfw's own kernel files — `GPL-2.0-only`, and the choice is forced
 
-**Covered:** every file under `config/rlxfw-src/`. 量 there are 16 of them —
-12 compiled sources, one declared-and-not-built (`rtl819x-spi-write.c`, behind
-`CONFIG_MTD_RTL819X_WRITE`, which is not set) and 3 headers.
+**Covered:** every file under `config/rlxfw-src/`: the compiled sources, the
+ones declared and not built (`rtl819x-spi-write.c`, behind
+`CONFIG_MTD_RTL819X_WRITE`, which the mainline configuration does not set) and
+the headers. The directory is the unit, and no count of it is kept here: one
+went stale the day a header was added.
 
 The 12 compiled sources are `rlxfw-devices`, `rlxfw_mark`, `rlxfw-entropy`,
 `rtl819x-timer`, `rtl819x-gpio`, `rtl819x-keys`, `rtl819x-spi`, `rtl819x-wdt`,
@@ -58,9 +72,10 @@ The 12 compiled sources are `rlxfw-devices`, `rlxfw_mark`, `rlxfw-entropy`,
 
 **Why GPL-2.0-*only* and not "or later".**
 
-1. 量 all 16 are paths the vendor drop does not have: they are additions to the
-   staged tree, not edits of vendor files. So nothing about them is inherited
-   file-by-file; the question is what the link decides.
+1. 量 at `01cff02b`, all 16 files then present are paths the vendor drop does
+   not have: they are additions to the staged tree, not edits of vendor files.
+   So nothing about them is inherited file-by-file; the question is what the
+   link decides.
 2. 讀 the drop's `linux-2.6.30/COPYING` is the GPL version 2 text with the
    kernel's own preamble note, and the kernel is distributed under version 2
    with no "or later" option. A file linked into that kernel and distributed as
@@ -89,7 +104,7 @@ so both checkers would go red. The rest of the 213 are in `LOG.md` and in frozen
 (讀 `CLAUDE.md`).
 
 So the per-file statement is made where it moves no line: a licence comment at
-the **end** of each file, or one `config/rlxfw-src/LICENSE` naming the 16 paths.
+the **end** of each file, or one `config/rlxfw-src/LICENSE` naming the directory.
 `SPDX-License-Identifier` wants line 1 by convention, and that convention
 postdates this 2.6.30 tree by eight years and is not enforced anywhere in this
 build — so the convention is what gives way, and this paragraph is why.
@@ -116,8 +131,8 @@ carries weight is *it is not `0e45c61d`*, not the exact eight hex digits.)
 `config/rlxfw-kernel.delta`.
 
 These four files are not copies of vendor source; they are declarations of how
-to change it. 量 they describe changes to **23 distinct vendor files**: 11
-through 28 rows of `config/rlxfw-marks.tsv`, 9 through the 9 patches in
+to change it. 量 they describe changes to **24 distinct vendor files**: 11
+through 28 rows of `config/rlxfw-marks.tsv`, 10 through the 10 patches in
 `config/host-compat/`, 2 through the busybox patch, and 1 — the board
 configuration template `boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW` —
 through `config/rlxfw-kernel.delta`. `tools/modrecord.py` generates the per-file
@@ -126,13 +141,13 @@ record, and that record, not this paragraph, is the thing to check.
 **The licence of the result** 推: where a hunk or a row changes a GPL-2.0 file,
 the changed file stays that file's licence, which is GPL-2.0 as the vendor
 directory's `COPYING` states it. Where a declaration is rlxfw's own prose — the
-reason column of every marks row, the reason column of all 147 delta rows, the
+reason column of every marks row, the reason column of all 148 delta rows, the
 explanatory header of each patch — it is rlxfw's text under MIT (§ 4). The two
 are in the same file on purpose, and that is a mixed file rather than a
 contradiction: a patch's `+`/`-` lines are a derivative of what they change,
 and its header is a document about them.
 
-**What is NOT established here.** 量 none of the four files, none of the 10
+**What is NOT established here.** 量 none of the four files, none of the 11
 patches and none of the scripts states a licence (`docs/sbom.md` row `K7`), and
 this file does not fix that by assertion: the per-file statement is a change to
 those files, not a sentence here.
@@ -180,9 +195,10 @@ links these programs with two other people's licences and nothing else:
 
 **What MIT does not do.** It does not make the image rlxfw's to publish: §§ 5–8
 are other people's code, and 量 none of the 17 `file` rows of
-`config/rlxfw-initramfs.tsv` is a licence text or a source offer, so an image
-distributed as built today carries no notices at all. `offer.md` is the
-companion to this file and says what the first release carrying a binary owes.
+`config/rlxfw-initramfs.tsv` is a licence text or a source offer, so the image
+carries no notices at all, by decision: they travel beside it, as assets of the
+release that carries it and inside its corresponding-source archive. `offer.md`
+is the companion to this file and says what that release carries.
 
 ---
 
@@ -220,8 +236,8 @@ relink to produce a modified executable.
 推 what that means here: a static link makes the *relink path* the obligation,
 not just the library source. rlxfw's side of it is already in this repository —
 each program's sources and its Makefile — and the library's side is in the
-pinned drop (§ 8 names why a pin is not yet an offer). `offer.md` states this as
-one of the things the first binary release must actually ship.
+pinned drop; the corresponding-source archive a release carries holds both
+(`offer.md` § 2, row 5).
 
 **殘留 `SBOM-R1`** 量: object equality shows the in-drop tree built the archive.
 It does not show the tree's `.c` files are unmodified since. Recompiling a
@@ -280,13 +296,16 @@ Gamble), `net` (MIT, Russ Cox, with a Lucent permission notice), `queue.h`
 `portable_endian.h` (public domain). 量 over the 16 compiled sources: 13 carry
 the LBNL header, 1 the cJSON text, 2 the Illinois text.
 
-🔴 量 iperf3's source tree is **not in this repository and not in
-`SOURCES.json`** (`SBOM-3`): the repository holds the recipe only,
-`config/rlxfw-user/iperf3/` (`Makefile`, `build.sh`, `probe.sh`,
-`iperf_config.h`), and that Makefile says a clean clone cannot build the target.
-The tree used is `$FWRE_WORK/iperf3-port/src313/`, outside any clone. The
-`SOURCES.json` entry that closes the gap is drafted in `sources-patch.md`; until
-it lands, iperf3's notices are not in anything this project distributes.
+🔴 量 iperf3's source tree is **not in this repository** (`SBOM-3`): the
+repository holds the recipe only, `config/rlxfw-user/iperf3/` (`Makefile`,
+`build.sh`, `probe.sh`, `iperf_config.h`), and that Makefile says a clean clone
+cannot build the target. The tree used is `$FWRE_WORK/iperf3-port/src313/`,
+outside any clone. 讀 `SOURCES.json` has pinned the upstream tarball since
+`01cff02b` (entry `iperf3`: URL, bytes, sha256 and two more origins), and 量
+2026-10-05 `tools/fetch-sources.sh --list` plans it; `sources-patch.md`, which
+this paragraph used to name, is not in the repository. A release carrying
+`/bin/iperf3` carries that tarball, `LICENSE` and all, in its
+corresponding-source archive (`tools/srcarchive.py`).
 
 **Realtek's kernel, loader stub and WLAN driver — GPL-2.0.** `docs/sbom.md` rows
 `W1` and `K1`–`K5`. The LZMA decoder in the loader stub (`W2`) is LGPL or CPL
@@ -303,7 +322,7 @@ only a compiler tree has (`libgcc2.c`, `reload1.c`, `ldlang.c`, `tc-mips.c`) are
 found in **0 of the 3 drops**, with the control (`fork.c` in each kernel tree)
 found in all three. 量 members of the default `libgcc.a` variant are found byte
 for byte in 7 of the 11 ELFs, so it is in the image. `offer.md` names this as
-the second thing the offer cannot supply.
+its second gap: the archive cannot supply it.
 
 ---
 
@@ -318,8 +337,9 @@ the second thing the offer cannot supply.
 - **It does not make the image distributable.** 量 0 of the 17 `file` rows in
   `config/rlxfw-initramfs.tsv` is a notice, and 量 0 of 5 releases has an asset,
   so nothing has been distributed and nothing has discharged an obligation.
-  `offer.md` states what the first release carrying a binary owes, and the two
-  gaps (`SBOM-3`, `SBOM-4`) that are open on the day it would bind.
+  `offer.md` states what a release carrying a binary carries beside it, and the
+  two gaps (`SBOM-3`, `SBOM-4`) still open; `docs/release-process.md` is the
+  order in which such a release is made.
 - **It does not close `SBOM-2`.** 35 Realtek-directory sources plus 3 in the
   loader stub carry no licence text; their licence is read from a `COPYING` file
   and that reading is not this project's to make authoritative.

@@ -944,9 +944,9 @@ nodes and 294 setuid bits in the tree it protects.
 
 None of the vendor material is committed here. `SOURCES.json` records every
 external input with its URL and sha256, and `tools/fetch-sources.sh` obtains and
-verifies the seven entries it plans — two datasheets, four git trees and
-`upstream/`; 量 2026-10-05 it does not plan the two imported sources, `iperf3`
-and `tweetnacl`, whose `fetch` field is a command line. Two Realtek datasheets
+verifies the nine entries it plans (量 2026-10-05, `--list`) — two datasheets,
+the two imported sources `iperf3` and `tweetnacl`, four git trees and
+`upstream/`, re-checking each file's sha256 on every run. Two Realtek datasheets
 are read and cited but not redistributed —
 `refs/README.md` says why, and records the three limits that travel with every
 citation from them.
@@ -958,9 +958,9 @@ radio calibration; it identifies one physical device rather than a model.
 userspace, tools and documents; [`config/rlxfw-src/LICENSE`](config/rlxfw-src/LICENSE)
 covers rlxfw's own kernel files, which are `GPL-2.0-only` because provenance
 forces it. [`NOTICE`](NOTICE) says what is under which licence and why, by
-provenance, and [`docs/offer.md`](docs/offer.md) is the written offer for
-corresponding source — it does not bind yet, and says so: 量 2026-10-04 there
-are five releases and none carries a binary asset.
+provenance, and [`docs/offer.md`](docs/offer.md) says how corresponding source
+travels: as an asset of the same release as the binary. Nothing is owed yet:
+量 2026-10-04 there are five releases and none carries a binary asset.
 [`docs/vendor-modifications.md`](docs/vendor-modifications.md) is the per-file
 record of rlxfw's changes to vendor source, generated rather than kept by hand.
 

@@ -325,7 +325,8 @@
       "needed_by": [
         "R8a"
       ],
-      "fetch": "curl -fsSL https://tweetnacl.cr.yp.to/20140427/tweetnacl.c -o refs/tweetnacl-20140427.c  # then: src/rlxboot/test/check-import.sh, which regenerates both files and fails on a one-byte difference"
+      "then": "src/rlxboot/test/check-import.sh, which regenerates src/lib/ed25519.c and src/lib/sha512.c from this file and fails on a one-byte difference. Until 2026-10-05 this and the curl line tools/fetch-sources.sh runs anyway were the value of `fetch`, which that script does not plan, so nothing re-checked the sha256 above.",
+      "fetch": "now"
     },
     {
       "id": "iperf3",
@@ -362,8 +363,8 @@
         "P2",
         "P4b"
       ],
-      "fetch": "curl -fsSL https://github.com/esnet/iperf/archive/3.1.3.tar.gz -o refs/iperf-3.1.3.tar.gz",
-      "fetch_gap": "未定. 量 2026-10-04: config/rlxfw-user/iperf3/build.sh neither fetches nor hashes -- it sets SRC=$W/src313/src, and the Makefile states that a clean clone cannot build this target (SRC ?= $(FWRE_WORK)/iperf3-port/src313/src). tools/fetch-sources.sh DOES plan entries whose dest is inside the repository, so the sha256 above starts being re-checked the moment this entry exists. What is still unwritten is the step that unpacks refs/iperf-3.1.3.tar.gz into a tree build.sh can point SRC at. Until that is written, this entry pins the bytes and does not make the target buildable from a clean clone, and SBOM-3 stays 未定 for that reason and not for want of an entry."
+      "fetch": "now",
+      "fetch_gap": "未定. 量 2026-10-04: config/rlxfw-user/iperf3/build.sh neither fetches nor hashes -- it sets SRC=$W/src313/src, and the Makefile states that a clean clone cannot build this target (SRC ?= $(FWRE_WORK)/iperf3-port/src313/src). 🔄 2026-10-05: `fetch` is `now`, so tools/fetch-sources.sh plans this entry and re-checks the sha256 above on every run (量: `--list` names it), and tools/srcarchive.py packs these bytes into a release's corresponding-source archive. Until then `fetch` held the curl command line, which the planner does not plan: the sentence that stood here said it plans every entry whose dest is inside the repository, and 讀 its plan block selects on the `fetch` value alone. What is still unwritten is the step that unpacks refs/iperf-3.1.3.tar.gz into a tree build.sh can point SRC at. Until that is written, this entry pins the bytes and does not make the target buildable from a clean clone, and SBOM-3 stays 未定 for that reason and not for want of an entry."
     }
   ],
   "reference_only": {
@@ -451,5 +452,58 @@
         "about": "A PUBLIC, redistributable RTL8196E-CG datasheet mirrored by a distributor -- not the leaked -VEx draft in refs/. Names the core RLX4181. Its value is that it can be linked from a public README where the leaked draft cannot, and that it is a second document (not the same one) on the naming question. It does not settle CPU-04: the device still says neither, and only PRId does."
       }
     ]
+  },
+  "corresponding_source": {
+    "_comment": [
+      "What tools/srcarchive.py packs as the corresponding source of an image built from this",
+      "repository, and the only place that says so. srcarchive refuses when anything named here,",
+      "or anything it implies, is missing; docs/offer.md says why the archive ships with the binary.",
+      "",
+      "repository  every file tracked at the release commit, read from git objects, minus `exclude`.",
+      "            An exclusion may not cover config/ (RECIPE_ID digests all of it) nor any $REPO",
+      "            source config/rlxfw-initramfs.tsv puts in the image; srcarchive checks both.",
+      "trees       per source tree above, the paths that enter the build, read at that tree's `pin`",
+      "            and placed at its `dest`. A blob git calls binary (a NUL byte in its first 8,000",
+      "            bytes) is left out and listed, with its sha256, in the archive's manifest: the",
+      "            drop's prebuilt objects, host programs and images. Every vendor file a declaration",
+      "            changes (tools/modrecord.py) must lie under one of these paths.",
+      "imported    every entry above whose `role` is `imported-source`, checked against its sha256.",
+      "",
+      "Not in the archive, by the owner's boundary of 2026-10-05: the toolchain -- compilers,",
+      "binutils, and its prebuilt libc.a and libgcc.a -- and prebuilt vendor binaries. A rebuild",
+      "takes them from the tree at its pin."
+    ],
+    "repository": {
+      "exclude": [
+        {
+          "path": "bench",
+          "why": "the bench record -- captures, cards and their corrections, 161,698,867 bytes at c7716fbe (量 git ls-tree -l). No build step reads it, and config/rlxfw-initramfs.tsv puts nothing from it in the image."
+        }
+      ]
+    },
+    "trees": {
+      "rtl819x-toolchain": [
+        {
+          "path": "linux-2.6.30",
+          "why": "the kernel tree tools/rlxfw-kbuild.sh stages whole; config/host-compat/ applies from it and config/rlxfw-marks.tsv inserts into it."
+        },
+        {
+          "path": "boards/rtl8196e/bsp",
+          "why": "compiled into vmlinux: the drop's own symlink linux-2.6.30/arch/rlx/bsp points at ../../../target/bsp, and tools/rlxfw-kbuild.sh links target to boards/rtl8196e. 量 2026-10-05, cell r95q2: irq.c, prom.c, serial.c, setup.c and timer.c compiled from it, and its three headers read. config/rlxfw-marks.tsv inserts into its setup.c."
+        },
+        {
+          "path": "boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW",
+          "why": "the board template config/rlxfw-kernel.delta derives the kernel .config from (its `# baseline-file:`)."
+        },
+        {
+          "path": "users/busybox-1.13",
+          "why": "the source tools/mkbusybox.sh builds /bin/busybox from; config/busybox-patches/ applies to it."
+        },
+        {
+          "path": "toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/config/uclibc",
+          "why": "uClibc 0.9.30, LGPL-2.1, statically linked into every ELF in the image; NOTICE section 5 measured the toolchain's libc.a and libm.a members byte-equal to objects this tree holds."
+        }
+      ]
+    }
   }
 }

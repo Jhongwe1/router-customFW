@@ -24,6 +24,6 @@ taken, because one file naming the directory is one place to keep correct.
 
 WHAT THIS FILE DOES NOT ESTABLISH.
 Which files here are rlxfw's own: `docs/sbom.md` owns the component list and
-`docs/vendor-modifications.md` names the 23 vendor files rlxfw changes.  Where
+`docs/vendor-modifications.md` names the vendor files rlxfw changes.  Where
 this file and either of those disagree, they own the fact and this file is
 wrong.  It is also not legal advice; `NOTICE` says the same and says why.

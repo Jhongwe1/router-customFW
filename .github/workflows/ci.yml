@@ -946,6 +946,30 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/fetch-sources.sh --list
 
+      # P4b's per-file modification record.  `check` derives the record from
+      # config/'s four declarations and compares it with the committed
+      # docs/vendor-modifications.md byte for byte, so a config/ change that
+      # lands without `modrecord.py emit --config config --out
+      # docs/vendor-modifications.md` turns this red.  An exit-code gate, like
+      # `ledgerscan check`: it prints no case lines, so it has no census row.
+      # Until 2026-10-05 no step ran it, and 量 that day it was red: fa36f7a2
+      # had added config/host-compat/0010 and a delta row, and nothing said so.
+      - name: modrecord check (exit-code gate)
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/modrecord.py check --config config --record docs/vendor-modifications.md
+
+      # P4b's corresponding-source archive.  The self-test builds its own drop,
+      # repository and fetched files in a temporary directory, packs them, and
+      # breaks each declared input in turn; S11 runs tools/rlxfw-kbuild.sh
+      # --dry-run as the second source for RECIPE_ID, and S40 is the live case,
+      # `check-decl` over this checkout's own SOURCES.json and config/.  No
+      # $FWRE_WORK, no drop, no dump and no network, so no skip.  The archive
+      # itself is built at the desk (docs/release-process.md): it reads the
+      # pinned drop and this unit's flash dump, which no runner has.
+      - name: srcarchive self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/srcarchive.py --self-test 2>&1 | tee ci-out/srcarchive.out; exit "${PIPESTATUS[0]}"
+
       # hostprobe is P2-1's host-side instrument: the first ICMP echo reply
       # (D8), the first TCP success on a daemon's port (D4), neighbour-table
       # changes and UDP arrivals, stamped on CLOCK_MONOTONIC_RAW from 1.3
