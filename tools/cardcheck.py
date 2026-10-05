@@ -304,13 +304,13 @@ def measured_builtins():
 _MEASURED = None
 
 
-def _measured():
-    """Cached, because the corpus sweep classifies thousands of commands and
-    re-reading the census per command would make `B1` quadratic for nothing."""
+def _measured(img=None):
+    """Cached (the corpus sweep classifies thousands of commands).  A cell
+    on another image reads THAT image's table: image_table(), R8b D22."""
     global _MEASURED
     if _MEASURED is None:
         _MEASURED = frozenset(measured_builtins())
-    return _MEASURED
+    return _MEASURED if not img or img[0] == "mainline" else image_table(img[0])[1]
 
 
 # Word separators that start a NEW simple command, so the word after them is
@@ -406,9 +406,9 @@ def redirect_targets(cmd):
     return out
 
 
-def classify_command(cmd, names, paths, allow_flr=False, flash_ok=frozenset()):
+def classify_command(cmd, names, paths, allow_flr=False, flash_ok=frozenset(), img=None):
     """-> (kind, [issue, ...]).  kind is LOADER / CONFIRM / SHELL / EMPTY.
-
+    `img`: None (mainline) or the cell's (image, excused) -- card_images().
     Both exemptions come per CARD, never from the command: `allow_flr`
     excuses a FROZEN card's `FLR` rows, and `flash_ok` holds the exact
     payloads that card may send although they write flash (owner_yes()).
@@ -445,7 +445,7 @@ def classify_command(cmd, names, paths, allow_flr=False, flash_ok=frozenset()):
             continue
         # 量 first, 推 second.  A name measured in this image's own builtin
         # table is allowed SILENTLY -- there is nothing left to caveat.
-        if base in _measured():
+        if base in _measured(img):
             continue
         if base in ASH_BUILTINS:
             issues.append(f"{base}: ALLOWED as an ash builtin -- 推, this "
@@ -464,7 +464,7 @@ def classify_command(cmd, names, paths, allow_flr=False, flash_ok=frozenset()):
             continue
         if t not in paths:
             issues.append(f"{t}: redirection target is not declared")
-    return "SHELL", issues + memnode(cmd, flash_ok) + devflash(cmd, flash_ok)
+    return "SHELL", issues + memnode(cmd, flash_ok) + devflash(cmd, flash_ok) + applets(cmd, img)
 
 
 ABSENT_RE = re.compile(r"```cardabsent\n(.*?)\n```", re.S)
@@ -519,9 +519,9 @@ def cards_commands(card_rel, decl_rel=DECL, report=print, extra_absent=()):
     # hand us either separator.
     legacy_flr = card_rel.replace("\\", "/") in FLR_LEGACY_CARDS
     flash_ok, bad = memnode_ok(text, card_rel, pairs, report, owner_yes(text, card_rel, pairs, report))
-    intentional, kinds = 0, {}
-    for cid, cmd in pairs:
-        kind, issues = classify_command(cmd, names, paths, legacy_flr, flash_ok)
+    intentional, kinds, imgs = 0, {}, card_images(text, card_rel, pairs)
+    for (cid, cmd), img in zip(pairs, imgs):
+        kind, issues = classify_command(cmd, names, paths, legacy_flr, flash_ok, img)
         kinds[kind] = kinds.get(kind, 0) + 1
         if not issues:
             continue
@@ -545,11 +545,11 @@ def cards_commands(card_rel, decl_rel=DECL, report=print, extra_absent=()):
             report(f"  FAIL  {cell}: --idle {idle:g} <= sleep {sl} in --send")
             report(f"          the capture stops ~{idle:g} s in and the payload "
                    f"speaks at ~{sl} s; use --seconds alone, or --idle > {sl}")
-    bad += idle_bad + host_cells(card_rel, text, report)
+    bad += idle_bad + host_cells(card_rel, text, report) + glued_sends(text, report)
 
     report(f"  {len(pairs)} command(s): "
            + ", ".join(f"{v} {k}" for k, v in sorted(kinds.items()))
-           + f"; declaration has {len(names)} invocable name(s)"
+           + f"; declaration has {len(names)} invocable name(s)" + image_note(text, imgs)
            + (f"; {intentional} declared absence-test(s)" if intentional else ""))
     return bad
 
@@ -738,50 +738,186 @@ def flash_write(cmd):
 # names the region, and for `install` the sha256, because both are inside the
 # string it must equal (owner_yes(), unchanged in kind).
 #
-# What counts, per simple command:
-#   * it writes /proc/rtl819x-spi: a `>`/`>>` redirection, or a `tee`
-#     argument, naming that path.  `-img` (the staging sink, which writes RAM)
-#     and `-map` (read-only) are other files and are not it; anything else
-#     that merely STARTS with the path is treated as it, and
-#   * its content begins `install` or `erase` in ANY case -- the driver's
-#     dispatcher hands every line with either prefix to the install parser,
-#     `eraseprobe` included -- OR its content cannot be read here: a writer
-#     other than `echo`, an echo flag other than -n, or any of $ ` \ * ? [ in
-#     the words.  A line this tool cannot read is a line that could carry the
-#     verb, and refusing it costs a retyped line (flash_write()'s reasoning).
+# What counts, per simple command, read as ash reads it (_sh_tokens()):
+#   * it writes /proc/rtl819x-spi: a redirection whose operator holds `>`, or
+#     a `tee` argument, whose target -- after quote removal -- names
+#     `rtl819x-spi` anywhere other than as the `-img` (the staging sink, which
+#     writes RAM) or `-map` file name, or carries an expansion this tool
+#     cannot read (any of $ ` * ? [): `/proc//rtl819x-spi`, a relative
+#     `rtl819x-spi` and `'/proc/rtl819x-spi'` are all it, and
+#   * the line echo prints begins `install` or `erase` in ANY case, after
+#     its leading whitespace -- the driver's dispatcher hands every line with
+#     either prefix to the install parser, `eraseprobe` included -- OR its
+#     content cannot be read here: a writer other than `echo`, an echo flag
+#     other than -n, or an expansion in the words.  A line this tool cannot
+#     read is a line that could carry the verb, and refusing it costs a
+#     retyped line (flash_write()'s reasoning).
+# Also refused: a program other than a reader or a printer (_SPI_QUIET)
+# given the node as an ARGUMENT -- `cp /tmp/v /proc/rtl819x-spi`, `sh -c
+# "..."`, `ln -s`, `dd of=` -- or a glob that could expand to it, or a $ or
+# backtick in a payload that says `rtl819x` (_spi_arg()); and a payload whose
+# quoting does not close.  `&` separates commands, as `;` does.
 #
-# 量 2026-10-05, before this rule existed: the corpus (95 cards, 2,265 --send
-# payloads) holds 44 simple commands writing /proc/rtl819x-spi, every one an
-# `echo` of literal words -- map 32, verify 5, corrupt 4, probe, trywrite and
-# wedge 1 each -- so the rule changes no committed card's verdict; B16 sweeps
-# that population every run.
+# 🔴 THE FIRST VERSION READ THE WORDS UNQUOTED, AND QUOTING WAS A WAY PAST IT.
+# 量 2026-10-05 (the runsheet agent, on the host): `echo 'install slotA
+# sha=<64> pace=10000' > /proc/rtl819x-spi` passed as a harmless write --
+# its first word was `'install`, and only `"` was stripped -- and so did
+# `in"stall"`, `'/proc/rtl819x-spi'` as the target, and `&` as a separator.
+# Quote removal is now the shell's own rule ('...', "...", \), done once, and
+# A70 holds every spelling.
+#
+# 量 2026-10-05, before either rule existed: the corpus (95 cards, 2,264
+# --send payloads) holds 44 simple commands writing /proc/rtl819x-spi, every
+# one an `echo` of literal words -- map 32, verify 5, corrupt 4, probe,
+# trywrite and wedge 1 each -- and no payload carries a quote, a backslash,
+# `$`, a backtick, `*`, `[` or `#` (three are `?`, the loader's help); 106
+# simple commands name the node as an argument, all of them `cat`.  So
+# neither the rule nor the quoting changes a committed card's verdict; B16
+# sweeps that population every run.
 #
 # ⚠️ WHAT THIS CANNOT SEE: everything the FW-113 note above lists -- a write
 # made outside a single-quoted --send, and a script ON THE DEVICE that writes
-# the verb.  And `arm` is not refused: it writes nothing to flash, and the
-# yes belongs to the verb that does.
+# the verb -- and a file reached by a name that does not say rtl819x-spi (a
+# symlink made in an earlier, unchecked session).  And `arm` is not refused:
+# it writes nothing to flash, and the yes belongs to the verb that does.
 SPI_NODE = "/proc/rtl819x-spi"
-SPI_OTHER = (SPI_NODE + "-img", SPI_NODE + "-map")
-_SPI_SPLIT_RE = re.compile(r"\s*(?:&&|\|\||;|\|)\s*")
-_SPI_TARGET_RE = re.compile(r"(?:\d*>{1,2}\s*|\btee\s+(?:-a\s+)?)(\S+)")
-_SPI_UNREADABLE = frozenset("$`\\*?[")
+_SPI_MENTION_RE = re.compile(r"rtl819x-spi(?!-(?:img|map)(?![\w.-]))")
+_SPI_UNREADABLE = frozenset("$`*?[")
+#: programs that do not write the files they are given: reading or printing.
+_SPI_QUIET = frozenset(("cat", "head", "tail", "wc", "grep", "ls", "echo",
+                        "printf"))
+
+
+def _sh_tokens(cmd):
+    """-> [(kind, text)]: `cmd` read the way ash reads quoting.  kind "w" is
+    a word with '...', "..." and \\ removed (mixed forms joined: `in"st"'all'`
+    is `install`); kind "o" is an unquoted run of ; & | < > -- a separator or
+    a redirection, with an unquoted fd number glued to it (`2>&1` is `>&`,
+    then the word `1`).  An unquoted `#` starting a word ends the line, as in
+    the shell.  Raises ValueError for a quote that does not close or a
+    trailing backslash: a line this cannot read is refused, never guessed."""
+    out, word, inword, bare, i, n = [], [], False, True, 0, len(cmd)
+    while i < n:
+        c = cmd[i]
+        if c in " \t":
+            if inword:
+                out.append(("w", "".join(word)))
+            word, inword, bare, i = [], False, True, i + 1
+            continue
+        if c in ";&|<>":
+            j = i
+            while j < n and cmd[j] in ";&|<>":
+                j += 1
+            fd = inword and bare and "".join(word).isdigit() and c in "<>"
+            if inword and not fd:
+                out.append(("w", "".join(word)))
+            out.append(("o", cmd[i:j]))
+            word, inword, bare, i = [], False, True, j
+            continue
+        if c == "#" and not inword:
+            break
+        inword = True
+        if c == "\\":
+            if i + 1 >= n:
+                raise ValueError("a trailing backslash")
+            word.append(cmd[i + 1])
+            bare, i = False, i + 2
+        elif c == "'":
+            j = cmd.find("'", i + 1)
+            if j < 0:
+                raise ValueError("a ' that does not close")
+            word.append(cmd[i + 1:j])
+            bare, i = False, j + 1
+        elif c == '"':
+            j, buf = i + 1, []
+            while j < n and cmd[j] != '"':
+                if cmd[j] == "\\" and j + 1 < n and cmd[j + 1] in '\\"$`':
+                    j += 1
+                buf.append(cmd[j])
+                j += 1
+            if j >= n:
+                raise ValueError('a " that does not close')
+            word.append("".join(buf))
+            bare, i = False, j + 1
+        else:
+            word.append(c)
+            i += 1
+    if inword:
+        out.append(("w", "".join(word)))
+    return out
+
+
+def _spi_hit(word):
+    """A redirection target that is, or could be, the driver's node."""
+    return bool(_SPI_MENTION_RE.search(word)) or any(
+        ch in _SPI_UNREADABLE for ch in word)
+
+
+def _spi_arg(word, named):
+    """An ARGUMENT that is, or could expand to, the node: it names it, it is
+    a glob, or it expands ($, `) in a payload that says `rtl819x` somewhere.
+    量 2026-10-05: without that last condition `kill $!` in two committed
+    RUN-arm*.md cells was refused -- a $ in a payload that never names the
+    driver is not a way to it."""
+    return (bool(_SPI_MENTION_RE.search(word))
+            or any(ch in "*?[" for ch in word)
+            or (named and any(ch in "$`" for ch in word)))
+
+
+def _spi_simple(toks):
+    """-> [(words, write targets)] per simple command of _sh_tokens()."""
+    out, words, tgts, k = [], [], [], 0
+    while k < len(toks):
+        kind, v = toks[k]
+        if kind == "o" and not set(v) & set("<>"):     # ; & | && || ...
+            out.append((words, tgts))
+            words, tgts = [], []
+        elif kind == "o":                              # a redirection
+            if k + 1 < len(toks) and toks[k + 1][0] == "w":
+                if ">" in v:
+                    tgts.append(toks[k + 1][1])
+                k += 1
+        else:
+            words.append(v)
+        k += 1
+    out.append((words, tgts))
+    return [(w, t + (w[1:] if w and os.path.basename(w[0]) == "tee" else []))
+            for w, t in out if w or t]
 
 
 def devflash(cmd, flash_ok=frozenset()):
     """-> [the refusal] when this --send writes a flash verb to the driver's
-    /proc/rtl819x-spi, else [] -- [] too when the card's owner-yes names this
-    exact payload.  One issue per --send, ending `(FW-113)`, which
-    unsuppressed() never filters."""
+    /proc/rtl819x-spi, or may, else [] -- [] too when the card's owner-yes
+    names this exact payload.  One issue per --send, beginning
+    `/proc/rtl819x-spi:` and ending `(FW-113)`, which unsuppressed() never
+    filters."""
     c = cmd.strip()
     if c in flash_ok:
         return []
-    for simple in _SPI_SPLIT_RE.split(c):
-        tgts = [t.rstrip("\"')") for t in _SPI_TARGET_RE.findall(simple)]
-        if not any(t.startswith(SPI_NODE) and t not in SPI_OTHER for t in tgts):
+    yes = (f"It needs the owner's own dated yes on this card, as a "
+           f"```owner-yes row `YYYY-MM-DD<TAB>{c}`; nothing else silences it "
+           f"(FW-113)")
+    try:
+        toks = _sh_tokens(c)
+    except ValueError as e:
+        return [f"{SPI_NODE}: this payload cannot be read as ash reads it "
+                f"({e}), so it could write a flash verb. {yes}"]
+    named = "rtl819x" in c
+    for words, tgts in _spi_simple(toks):
+        prog = os.path.basename(words[0]) if words else "?"
+        if prog == "busybox" and len(words) > 1:
+            prog = words[1]
+        if not any(_spi_hit(t) for t in tgts if t not in ("-a",)):
+            if prog not in _SPI_QUIET and any(_spi_arg(w, named) for w in words[1:]):
+                return [f"{SPI_NODE}: `{prog}` is given it, or a word this "
+                        f"tool cannot read, as an argument, and may write it "
+                        f"-- with `install` or `erase`, which write flash. "
+                        f"{yes}"]
             continue
-        words = re.sub(r"\d*>{1,2}\s*\S+", " ", simple).split()
         why = None
-        if not words or words[0] != "echo":
+        if any(ch in _SPI_UNREADABLE for t in tgts for ch in t):
+            why = "a target carries a character the shell expands"
+        elif not words or words[0] != "echo":
             why = f"its writer is `{words[0] if words else '?'}`, not echo"
         else:
             body = words[1:]
@@ -794,20 +930,50 @@ def devflash(cmd, flash_ok=frozenset()):
                                    for ch in w):
                 why = "its words carry a character the shell expands"
             if why is None:
-                verb = body[0].strip('"').lower() if body else ""
-                if not verb.startswith(("install", "erase")):
+                line = " ".join(body).lstrip().lower()
+                if not line.startswith(("install", "erase")):
                     continue
-                return [f"{SPI_NODE}: FLASH WRITE -- `{body[0].strip(chr(34))}`"
-                        f" erases or programs flash through the driver's "
-                        f"install path (R8b). It needs the owner's own dated "
-                        f"yes on this card, as a ```owner-yes row "
-                        f"`YYYY-MM-DD<TAB>{c}`; nothing else silences it "
-                        f"(FW-113)"]
+                return [f"{SPI_NODE}: FLASH WRITE -- `{line.split()[0]}` "
+                        f"erases or programs flash through the driver's "
+                        f"install path (R8b). {yes}"]
         return [f"{SPI_NODE}: a write this tool cannot read ({why}) could "
-                f"carry `install` or `erase`, which write flash. It needs the "
-                f"owner's own dated yes on this card, as a ```owner-yes row "
-                f"`YYYY-MM-DD<TAB>{c}`; nothing else silences it (FW-113)"]
+                f"carry `install` or `erase`, which write flash. {yes}"]
     return []
+
+
+# A --send is read as ONE single-quoted shell word.  `--send 'a'\''b'` is
+# bash's way to put a ' inside it, and SEND_RE reads `a` and stops: the
+# payload checked would not be the payload sent.  So a closing quote must
+# end the word -- whitespace, the end of the line, or a markdown backtick
+# after it -- and the forms SEND_RE cannot see at all (`--send=`, a
+# double-quoted `--send "..."`, argparse's abbreviation `--sen`) are refused
+# where they stand.  量 2026-10-05: 3,036 SEND_RE matches in bench/**/*.md,
+# each followed by a space (3,011), a backtick (23) or the line's end (2);
+# none of the three other forms occurs.
+_SEND_ODD_RE = re.compile(r"--send=|--sen\s|--send\s+\"")
+
+
+def glued_sends(text, report=print):
+    """-> the number of --send arguments this tool cannot read whole, each
+    reported as a FAIL naming its cell."""
+    bad = 0
+    for line in text.split("\n"):
+        m0 = CELLID_RE.match(line)
+        cid = m0.group(1) if m0 else "?"
+        why = [f"`{m.group(0).strip()}`: SEND_RE reads only `--send '...'`"
+               for m in _SEND_ODD_RE.finditer(line)]
+        for m in SEND_RE.finditer(line):
+            nxt = line[m.end():m.end() + 1]
+            if nxt and not nxt.isspace() and nxt != "`":
+                why.append(f"`--send '{m.group(1)[:24]}'` is glued to "
+                           f"`{line[m.end():m.end() + 8]}`: a ' inside the "
+                           f"payload, so what is read here is not what is sent")
+        for w in why:
+            bad += 1
+            report(f"  FAIL  {cid}: {w}")
+            report("          rewrite the payload without a single quote in "
+                   "it, as one `--send '...'`")
+    return bad
 
 
 def unsuppressed(kind, issues, absent):
@@ -829,6 +995,183 @@ def unsuppressed(kind, issues, absent):
     if kind == "LOADER":
         return list(issues)
     return [i for i in issues if i.split(":")[0] not in absent]
+
+
+# --------------------------------------------------------------------------
+# which IMAGE a cell runs on -- R8b D22, 2026-10-05
+#
+# Until R8b every cell here ran on one image line, whose busybox
+# `config/image-commands.tsv` measures.  R8b's provisioning image is a second
+# one -- the armed branch, its busybox built with CONFIG_NC and
+# CONFIG_NC_SERVER, so `busybox nc -l` exists there and nowhere else -- and
+# `config/image-commands-armed.tsv` measures THAT busybox, by the same tool.
+# A card says which cells run on which image in one fence:
+#
+#     ```cardimage
+#     armed<TAB>*                every --send on the card, or
+#     armed<TAB>NC1 NC2          these cells: a `| **ID** |` row's id, or
+#     ```                        the last `/` field of a cell's --out
+#
+# 🔴 THE ARMED TABLE IS REACHED ONLY THROUGH THAT FENCE.  A cell no row names,
+# and every cell of a card with no fence, is checked against the mainline
+# table; nothing else selects an image -- no flag, no path in the card, not
+# the image's own System.map.  And the fence is read exactly: an image this
+# tool does not know, a cell no --send carries, a cell named twice, `*` beside
+# anything, two fences or an empty one is REFUSED, never read as `mainline`,
+# because a typo that fell back silently would look like a card that meant it.
+#
+# What the image decides: the applet table `busybox <word>` is checked
+# against (applets(), new here -- until today `busybox <anything>` passed,
+# so `busybox dd` was not refused although `dd` was) and the measured
+# builtins that pass silently (_measured()).  量 2026-10-05, before applets()
+# existed, over every bench .md carrying a --send (100 files, 3,036
+# payloads): 223 `busybox <word>` commands, 222 of them an applet the mainline
+# table has.  The one that is not is card B37's `busybox telnetd`, sent
+# 2026-09-21 to an image carrying the UNIT's busybox; that card is frozen and
+# is excused by name, applet by applet (APPLET_LEGACY_CARDS, B17 both ways).
+#
+# ⚠️ WHAT THIS CANNOT SEE.  The DECLARATION is the same for every image, and
+# the armed branch drops /dev/mtd0ro, mtd1ro and mtd2ro (D23): no file in this
+# tree declares that image's paths, so an armed cell reading one passes here
+# and fails at the board (`--decl` can name the armed branch's own
+# declaration, for a whole card).  A busybox that argv0s() does not read as a
+# command -- `exec busybox nc`, `sh -c '...'` -- is not checked at all, and an
+# applet that exists says nothing about its options (FW-42).
+import appletcensus  # noqa: E402
+
+IMAGES = {"mainline": IMAGE_COMMANDS,
+          "armed": "config/image-commands-armed.tsv"}
+CARDIMAGE_RE = re.compile(r"^```cardimage\r?\n(.*?)\r?\n```", re.S | re.M)
+# Every opening line, so an empty or unclosed fence -- which CARDIMAGE_RE
+# cannot match -- is counted and refused rather than read as no fence.
+CARDIMAGE_OPEN_RE = re.compile(r"^```cardimage[ \t]*\r?$", re.M)
+APPLET_FLOOR = 20
+_TABLES = {}
+
+APPLET_LEGACY_CARDS = {
+    # 2026-09-21c, `T4-LISTEN`: `busybox telnetd -p 9999`, sent to an image
+    # whose busybox was the UNIT's (273,332 bytes, which has telnetd: the
+    # cell's own `busybox ps` lists it running).  rlxfw's build has none, so
+    # the mainline table refuses a cell that ran -- on a busybox this card
+    # never met.  FROZEN: excused, and only for that applet.
+    "bench/2026-09-21c/PREDICTIONS-B37-block35.md": frozenset({"telnetd"}),
+}
+
+
+def image_table(name):
+    """-> (applets, builtins) measured for image `name`, read by the
+    table's own owner, appletcensus.read_tsv().  Refused, never empty: a
+    table under APPLET_FLOOR applets would make every `busybox <word>` NOT
+    IN IMAGE and read as thorough (A25's argument, A68)."""
+    if name not in _TABLES:
+        rel = IMAGES[name]
+        try:
+            kinds, _meta = appletcensus.read_tsv(os.path.join(ROOT, rel))
+        except appletcensus.Refuse as e:
+            raise Refuse(f"the {name} image's command table: {e}")
+        if len(kinds["applet"]) < APPLET_FLOOR:
+            raise Refuse(f"{rel} holds {len(kinds['applet'])} applet(s), "
+                         f"under {APPLET_FLOOR}: a table that parsed to "
+                         f"nothing would refuse every busybox applet")
+        _TABLES[name] = (frozenset(kinds["applet"]),
+                         frozenset(kinds["builtin"]))
+    return _TABLES[name]
+
+
+def applets(cmd, img=None):
+    """-> one issue per `busybox <word>` in `cmd` whose word is no applet
+    measured for the cell's image; `img` as classify_command() takes it.
+    Where the commands are comes from argv0s() itself, by prefix -- word k
+    is a command exactly when argv0s(words[:k+1]) grows -- so there is one
+    tokeniser, and the applet is the first command word after it."""
+    name, excused = img or ("mainline", frozenset())
+    table = image_table(name)[0]
+    words, out, seen = cmd.split(), [], 0
+    for k, w in enumerate(words):
+        n = len(argv0s(" ".join(words[:k + 1])))
+        if n == seen:
+            continue
+        seen = n
+        if os.path.basename(w) != "busybox":
+            continue
+        rest = []
+        for x in words[k + 1:]:
+            if x in SEPARATORS:
+                break
+            rest.append(x)
+        a = argv0s(" ".join(rest))
+        if not a or a[0] in table or a[0] in excused:
+            continue          # a bare `busybox` prints its usage and stops
+        out.append(f"{a[0]}: NOT IN IMAGE -- `busybox {a[0]}` names no "
+                   f"applet among the {len(table)} measured for the {name} "
+                   f"image ({IMAGES[name]})")
+    return out
+
+
+def card_images(text, card_rel, pairs):
+    """-> one `img` per entry of `pairs` (sends_with_cells(), card order):
+    (the image the card's ```cardimage fence names for that cell, or
+    `mainline`; the applets APPLET_LEGACY_CARDS excuses on this card)."""
+    excused = APPLET_LEGACY_CARDS.get(card_rel.replace("\\", "/"), frozenset())
+    ids = []                  # the names each --send answers to, card order
+    for line in text.split("\n"):
+        k = len(SEND_RE.findall(line))
+        if k:
+            m = CELLID_RE.match(line)
+            mine = {o.strip("`'\"").rstrip("/").rsplit("/", 1)[-1]
+                    for o in _OUT_RE.findall(line)}
+            ids += [mine | ({m.group(1)} if m else set())] * k
+    if len(ids) != len(pairs):
+        raise Refuse(f"{card_rel}: the image map read {len(ids)} --send(s) "
+                     f"and sends_with_cells() {len(pairs)}")
+    fences = CARDIMAGE_RE.findall(text)
+    opens = len(CARDIMAGE_OPEN_RE.findall(text))
+    if opens != len(fences):
+        raise Refuse(f"{card_rel}: {opens} ```cardimage line(s) open a fence "
+                     f"and {len(fences)} parse -- an empty or unclosed fence")
+    if len(fences) > 1:
+        raise Refuse(f"{card_rel} has {len(fences)} ```cardimage fences; a "
+                     f"cell's image is read from exactly one")
+    rows = [ln.strip("\r") for ln in (fences[0].split("\n") if fences else [])
+            if ln.strip() and not ln.lstrip().startswith("#")]
+    if fences and not rows:
+        raise Refuse(f"{card_rel}'s ```cardimage fence names no image")
+    got, named = [None] * len(pairs), set()
+    for ln in rows:
+        image, tab, cells = ln.partition("\t")
+        cells = cells.split()
+        if image not in IMAGES or not tab or not cells:
+            raise Refuse(f"{card_rel}: ```cardimage row {ln!r}: want "
+                         f"<image><TAB><cell ...> or <image><TAB>*, the image "
+                         f"one of {', '.join(sorted(IMAGES))}")
+        if "*" in cells and (cells != ["*"] or len(rows) > 1):
+            raise Refuse(f"{card_rel}: ```cardimage `*` names every cell, so "
+                         f"it is the fence's only row and that row's only word")
+        for c in cells:
+            if c in named:
+                raise Refuse(f"{card_rel}: ```cardimage names {c} twice")
+            named.add(c)
+            hit = [i for i, s in enumerate(ids) if c == "*" or c in s]
+            if not hit:
+                raise Refuse(f"{card_rel}: ```cardimage names cell {c}, which "
+                             f"no --send on this card carries")
+            for i in hit:
+                if got[i] not in (None, image):
+                    raise Refuse(f"{card_rel}: ```cardimage puts the --send "
+                                 f"of cell {c} on two images")
+                got[i] = image
+    return [(g or "mainline", excused) for g in got]
+
+
+def image_note(text, imgs):
+    """The summary's image clause -- only on a card that has the fence, so
+    every card without one reports exactly what it reported before."""
+    if not CARDIMAGE_RE.search(text):
+        return ""
+    n = {}
+    for name, _ in imgs:
+        n[name] = n.get(name, 0) + 1
+    return "; images: " + ", ".join(f"{v} {k}" for k, v in sorted(n.items()))
 
 
 # ⚠️ Keyed by (card, exact payload) and not by card alone: a path would also
@@ -2205,6 +2548,10 @@ def run_controls():
     devflash_controls(row, cards, card_at, silent, cells, yes_fence, names,
                       paths)
 
+    # ------------------------------------------------------- A63-A69, B17
+    # R8b D22, which image a cell runs on: image_controls() below.
+    image_controls(row, cards, card_at, silent, cells, names, paths)
+
     print()
     return 0 if ok else 1
 
@@ -2619,11 +2966,91 @@ def devflash_controls(row, cards, card_at, silent, cells, yes_fence, names,
                 + (f": {noisy}" if noisy else ""))
     case("A62", "and the driver's other verbs are not touched by it", a62)
 
+    # A70 -- 🔴 EVERY QUOTING OF THE SAME WRITE, the one measured past the
+    # first version first: refused as one issue with no yes, and passed by a
+    # yes for that exact payload -- through devflash() for all of them, and
+    # through a whole card for the spellings a single-quoted --send can carry
+    s = "install slotA sha=" + sha_x + " pace=10000"
+    spell = ["echo '" + s + "'" + node, 'echo "' + s + '"' + node,
+             "echo 'install' slotA sha=" + sha_x + node,
+             "echo i'nst'\"all\" slotA sha=" + sha_x + node,
+             "echo 'erase barrier'" + node, "echo \"\" eraseprobe" + node,
+             "echo in\"stall\" slotA sha=" + sha_x + node,
+             "echo \\install slotA sha=" + sha_x + node,
+             "echo inst\\all slotA sha=" + sha_x + node,
+             "echo " + s + " > \"" + SPI_NODE + "\"",
+             "echo " + s + " >" + SPI_NODE[:-1] + "\"i\"",
+             "echo " + s + " > /proc//rtl819x-spi",
+             "cd /proc ; echo eraseprobe > rtl819x-spi",
+             "echo -n x & echo eraseprobe" + node,
+             "echo \"eraseprobe" + node, "echo eraseprobe" + node + "\\"]
+
+    def a70():
+        miss = [c for c in spell if len(dev(c)) != 1
+                or devflash(c, frozenset({c.strip()}))]
+        card = [c for c in spell if "'" not in c]
+        n_no, _l = run("dev-quote.md", card, ())
+        n_yes, lines = run("dev-quote-yes.md", card, card)
+        return (not miss and n_no == len(card) and n_yes == 0,
+                f"{len(spell) - len(miss)} of {len(spell)} refused, each passed "
+                f"by its exact yes; a card of {len(card)}: {n_no} bad, with "
+                f"the yeses {n_yes}" + (f"; WRONG: {miss}" if miss else ""))
+    case("A70", "every quoting of a flash verb or the node is REFUSED", a70)
+
+    # A71 -- the node given to a program as an ARGUMENT, or a target this
+    # tool cannot read, is refused; and a reader, a printer, the staging
+    # sink, a quoted harmless verb and a comment are not a blanket's victims
+    def a71():
+        loud = ["cp /tmp/v " + SPI_NODE, "busybox cp /tmp/v " + SPI_NODE,
+                "ln -s " + SPI_NODE + " /tmp/q", "dd of=" + SPI_NODE,
+                "echo eraseprobe > /proc/rtl819x-sp?", "cp /tmp/v /proc/rtl*",
+                "N=" + SPI_NODE + " ; cp /tmp/v $N"]
+        # the last is the committed RUN-armI/II shape: a $ that names nothing
+        quiet = ["head -c 64 " + SPI_NODE, "grep inst_ " + SPI_NODE,
+                 "ls -l " + SPI_NODE, "echo rtl819x-spi > /tmp/x",
+                 "echo 'verify'" + node, 'echo "map 1 3"' + node,
+                 "cat /fw/P.rlxu 2>&1 > " + SPI_NODE + "-img",
+                 "echo eraseprobe #" + node,
+                 'ping 10.1.1.2 & sleep 15 ; kill $! ; echo PING-""END']
+        missed = [c for c in loud if len(dev(c)) != 1]
+        noisy = [c for c in quiet if dev(c)]
+        return (not missed and not noisy,
+                f"{len(loud) - len(missed)} of {len(loud)} refused, "
+                f"{len(noisy)} of {len(quiet)} quiet ones flagged"
+                + (f"; MISSED {missed}" if missed else "")
+                + (f"; NOISY {noisy}" if noisy else ""))
+    case("A71", "an argument or an unreadable target is REFUSED, no blanket",
+         a71)
+
+    # A72 -- 🔴 A --send IS READ WHOLE OR NOT AT ALL: `'...'\''...'` (a '
+    # inside), `--send=`, a double-quoted --send and argparse's `--sen` are
+    # each a FAIL naming the cell -- never a truncated payload, and never
+    # silence; a --send ended by a space, a backtick or the line is fine
+    def a72():
+        odd = ["CAP --out O1 --send 'echo '\\''eraseprobe'\\''" + node + "'",
+               "CAP --out O2 --send='echo eraseprobe" + node + "'",
+               'CAP --out O3 --send "echo eraseprobe' + node + '"',
+               "CAP --out O4 --sen 'echo eraseprobe" + node + "'"]
+        fine = ["CAP --out F1 --send 'echo verify" + node + "' --seconds 5",
+                "| **F2** | `CAP --out F2 --send 'cat " + SPI_NODE + "'` |",
+                "CAP --out F3 --send 'cat /proc/uptime'"]
+        got = [glued_sends(x, silent) for x in odd]
+        clean = [glued_sends(x, silent) for x in fine]
+        with tempfile.TemporaryDirectory() as d:
+            n = cards_commands(card_at(d, "dev-glued.md", "\n".join(
+                fine + odd) + "\n"), report=silent)
+        return (got == [1, 1, 1, 1] and clean == [0, 0, 0] and n == 4,
+                f"odd forms {got} (want 1 each), fine {clean}; the card: "
+                f"{n} bad (want 4)")
+    case("A72", "a --send it cannot read whole is a FAIL, never truncated",
+         a72)
+
     # B16 -- the corpus, with a population floor so a sweep that read nothing
-    # cannot pass: every write to the node is counted, and every flash verb
-    # among them must be under its card's own yes
+    # cannot pass: every write to the node is counted, through the same
+    # reading devflash() makes, and every refusal among them must be under
+    # its card's own yes; and no --send in the corpus is glued (A72's rule)
     def b16():
-        writes, flagged, off = 0, 0, []
+        writes, flagged, off, glued = 0, 0, [], 0
         for c in cards:
             try:
                 t = _read(c).decode("utf-8", "replace")
@@ -2631,20 +3058,184 @@ def devflash_controls(row, cards, card_at, silent, cells, yes_fence, names,
                 continue
             prs = sends_with_cells(t)
             ok_set, _n = owner_yes(t, c, prs, silent)
+            glued += glued_sends(t, silent)
             for _cid, cmd in prs:
-                for simple in _SPI_SPLIT_RE.split(cmd.strip()):
-                    if SPI_NODE in [x.rstrip("\"')") for x in
-                                    _SPI_TARGET_RE.findall(simple)]:
-                        writes += 1
+                try:
+                    simp = _spi_simple(_sh_tokens(cmd.strip()))
+                except ValueError:
+                    simp = []
+                writes += sum(any(_spi_hit(x) for x in tg) for _w, tg in simp)
                 if devflash(cmd):
                     flagged += 1
                     if cmd.strip() not in ok_set:
                         off.append(f"{c}: {cmd}")
-        return (writes >= 40 and not off,
+        return (writes >= 40 and not off and not glued,
                 f"{len(cards)} cards, {writes} writes to {SPI_NODE}, "
-                f"{flagged} flash verb(s)"
+                f"{flagged} refused, {glued} glued --send"
                 + (f", NEW offender(s): {off}" if off else ", none unyessed"))
     case("B16", "every corpus driver flash verb has a yes", b16)
+
+
+def image_controls(row, cards, card_at, silent, cells, names, paths):
+    """R8b D22's cases: the delivery cell is refused on the mainline image
+    and permitted on the armed one; the armed table is reached per cell and
+    only through the card's own fence, read exactly; `busybox <word>` is read
+    at argv0s()'s positions, against a table with a population floor; the
+    frozen exemption is keyed by card and applet, and B17 sweeps it both
+    ways.  Each names, in test-cardcheck-mutants.py, the mutant that must
+    turn it red."""
+    import tempfile
+    deliver = "busybox nc -l -p 5000 </dev/null >/proc/rtl819x-spi-img &"
+
+    def case(tag, name, fn):
+        try:
+            good, detail = fn()
+        except Exception as e:                              # noqa: BLE001
+            good, detail = False, f"{type(e).__name__}: {str(e)[:60]}"
+        row(tag, name, good, detail)
+
+    def nc(iss):
+        return [i for i in iss if i.startswith("nc: NOT IN IMAGE")]
+
+    # A63 -- 🔴 D22's delivery command on a MAINLINE cell: refused, by the
+    # applet table, with the one issue naming nc.  Before applets() it passed.
+    def a63():
+        k, iss = classify_command(deliver, names, paths)
+        return (k == "SHELL" and len(iss) == 1 and len(nc(iss)) == 1,
+                f"{k}, {len(iss)} issue(s): {iss[0][:46] if iss else 'none'}")
+    case("A63", "R8b's `busybox nc -l` on a MAINLINE cell is REFUSED", a63)
+
+    # A64 -- and on an ARMED cell the same command passes with no issue
+    def a64():
+        k, iss = classify_command(deliver, names, paths,
+                                  img=("armed", frozenset()))
+        return (k == "SHELL" and not iss, f"{k}, {len(iss)} issue(s)"
+                + (f": {iss[0][:40]}" if iss else ""))
+    case("A64", "and on an ARMED cell it is PERMITTED", a64)
+
+    # A65 -- 🔴 PER CELL, AND ONLY THROUGH THE FENCE: no fence -> the nc
+    # cell is refused; `armed *` -> permitted; a fence naming the OTHER cell
+    # leaves it mainline, refused; naming it by its --out's last field
+    # (a CELLS-file line, no **ID**) -> permitted
+    def a65():
+        body = (cells(("cat /proc/uptime",), "N")
+                + f"CAP --out bench/x/ZZ-nc --send '{deliver}'\n")
+        got = []
+        with tempfile.TemporaryDirectory() as d:
+            for name, fence in (("none.md", ""), ("all.md", "armed\t*"),
+                                ("other.md", "armed\tN0"),
+                                ("this.md", "armed\tZZ-nc")):
+                text = body + (f"\n```cardimage\n{fence}\n```\n" if fence
+                               else "")
+                got.append(cards_commands(card_at(d, name, text),
+                                          report=silent))
+        return (got == [1, 0, 1, 0], f"bad, no fence / * / other cell / "
+                f"this cell: {got} (want [1, 0, 1, 0])")
+    case("A65", "the armed table is selected per cell, by the fence only",
+         a65)
+
+    # A66 -- 🔴 READ EXACTLY: every fence it cannot read is REFUSED, never
+    # read as mainline -- an unknown image, a space for the TAB, a cell no
+    # --send carries, a cell named twice, `*` beside a row, two fences, a
+    # fence of comments only, and one with no line at all
+    def a66():
+        body = cells(("cat /proc/uptime", deliver), "N")
+        bad = {"unknown image": "Armed\t*", "no TAB": "armed N1",
+               "no such cell": "armed\tN9",
+               "named twice": "armed\tN1\nmainline\tN1",
+               "* beside a row": "armed\t*\nmainline\tN0",
+               "two fences": "armed\tN1\n```\n\n```cardimage\narmed\tN1",
+               "comments only": "# armed\tN1"}
+        texts = {k: body + f"\n```cardimage\n{v}\n```\n" for k, v in bad.items()}
+        texts["no line at all"] = body + "\n```cardimage\n```\n"
+        read = []
+        for what, text in texts.items():
+            try:
+                card_images(text, "a66.md", sends_with_cells(text))
+                read.append(what)
+            except Refuse:
+                pass
+        return (not read, f"{len(texts) - len(read)} of {len(texts)} refused"
+                + (f"; READ: {read}" if read else ""))
+    case("A66", "a ```cardimage fence it cannot read exactly is REFUSED", a66)
+
+    # A67 -- the positions are argv0s()'s: `busybox` as an ARGUMENT is no
+    # command, one after a separator is, and a redirection before the
+    # applet is skipped as the shell skips it
+    def a67():
+        arg = classify_command("echo busybox nc", names, paths)[1]
+        pipe = classify_command("cat /proc/uptime | busybox nc -l -p 5000",
+                                names, paths)[1]
+        redir = classify_command("busybox </dev/null nc -l -p 5000",
+                                 names, paths)[1]
+        return (not arg and len(nc(pipe)) == 1 and len(nc(redir)) == 1,
+                f"as an argument {len(arg)} issue(s); after | {len(nc(pipe))};"
+                f" after a redirection {len(nc(redir))}")
+    case("A67", "`busybox <word>` is read where argv0s() reads a command",
+         a67)
+
+    # A68 -- the population floor: a table that parsed to too few applets
+    # REFUSES, rather than refusing every busybox applet and reading thorough
+    def a68():
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "thin.tsv")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write("kind\tname\n"
+                        + "".join(f"applet\ta{i:02d}\n" for i in range(5))
+                        + "".join(f"builtin\tb{i:02d}\n" for i in range(20)))
+            IMAGES["a68-thin"] = os.path.relpath(p, ROOT)
+            try:
+                image_table("a68-thin")
+                return False, "a 5-applet table was accepted"
+            except Refuse as e:
+                return "under" in str(e), str(e)[:60]
+            finally:
+                IMAGES.pop("a68-thin", None)
+                _TABLES.pop("a68-thin", None)
+    case("A68", "a table under the applet floor is REFUSED", a68)
+
+    # A69 -- the frozen exemption is keyed by CARD and APPLET: card B37
+    # reports what it reported before applets(), and the same `busybox
+    # telnetd` on any other card is refused
+    def a69():
+        n37 = cards_commands("bench/2026-09-21c/PREDICTIONS-B37-block35.md",
+                             report=silent)
+        with tempfile.TemporaryDirectory() as d:
+            n = cards_commands(card_at(d, "telnetd.md", cells(
+                ("busybox telnetd -p 9999",), "T")), report=silent)
+        return (n37 == 0 and n == 1, f"B37: {n37} bad; another card: {n} bad")
+    case("A69", "B37's busybox telnetd is excused there and nowhere else",
+         a69)
+
+    # B17 -- APPLET_LEGACY_CARDS both ways, as B10 sweeps FLR_LEGACY_CARDS:
+    # every corpus `busybox <word>` outside its cell's table is on the list,
+    # and every listed (card, applet) is still sent -- with a population
+    # floor, so a sweep that read nothing cannot pass
+    def b17():
+        n_bb, found = 0, {}
+        for c in cards:
+            try:
+                t = _read(c).decode("utf-8", "replace")
+            except OSError:
+                continue
+            prs = sends_with_cells(t)
+            for (_cid, cmd), (img, _x) in zip(prs, card_images(t, c, prs)):
+                n_bb += sum(os.path.basename(w) == "busybox"
+                            for w in cmd.split())
+                for i in applets(cmd, (img, frozenset())):
+                    found.setdefault(c, set()).add(i.split(":")[0])
+        leg = APPLET_LEGACY_CARDS
+        off = [f"{c}: {sorted(s - leg.get(c, frozenset()))}"
+               for c, s in sorted(found.items()) if s - leg.get(c, frozenset())]
+        stale = [f"{c}: {sorted(s - found.get(c, set()))}"
+                 for c, s in sorted(leg.items()) if s - found.get(c, set())]
+        return (n_bb >= 100 and not off and not stale,
+                f"{len(cards)} swept, {n_bb} busybox word(s); "
+                + (f"NEW offender(s): {off} " if off else "")
+                + (f"STALE: {stale}" if stale else "")
+                + ("list exact" if not off and not stale else ""))
+    case("B17", "every corpus busybox applet off its table is a named frozen "
+         "one", b17)
 
 
 def memnode_controls(row, cards, card_at, silent, names, paths):

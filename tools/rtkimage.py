@@ -81,8 +81,8 @@ the one link between them, and nothing else writes it.
 Exit
     0  built / checked, and every control fired
     1  a comparison the caller asked for did not hold -- for `build`, also:
-       make failed (other than B1's one named failure), make wrote no nfjrom,
-       or the vmlinux it consumed is not the one given
+       make failed (not B1's), wrote no nfjrom, changed its vmlinux, or the
+       image is over the ceiling or cvimg disagrees (ceiling_verdict, D25)
     2  a control failed -- nothing is reported.  For `build`: the tripwire
        said TRIPPED or TOUCHED, found a tree already dirty, could not read a
        tree after make ran, or printed no verdict line or one at odds with
@@ -487,6 +487,80 @@ def cmd_check(args):
 
 
 # --------------------------------------------------------------------------
+# the ceiling, as a refusal -- D25, 2026-10-05
+# --------------------------------------------------------------------------
+# 量 2026-10-05 (the payload agent): `rtkload`'s last summary printed
+# "Error!!!! : Kernel image decompress will overwirte load image" for a
+# 7,494,144-byte image, `cvimg size_chk` exited 0 -- the recipe's `|| exit $$?`
+# never fires -- and `build` returned 0 and wrote a record for an nfjrom
+# that cannot boot: the decompressor writes from 0x80000000 over its own input
+# at 0x80500000 (notes/kernel-build.md § 3.4).  Only `mkinitramfs.py
+# --kernel-image`, which no build script calls, refused it.
+#
+# So `build` measures the payload make wrote -- `vmlinux_img`, the bytes the
+# LZMA stream decompresses to -- with mkinitramfs's own over_ceiling(),
+# imported: one owner of the measurement and of the test, never a copy.  And
+# cvimg's summary, when the log holds one, is a SECOND source by a route with
+# no code in common: its error line refuses, and its "decompress end addr"
+# must equal 0x80000000 plus the measured bytes, or the two disagree and that
+# refuses too.  A log with no summary is said so; the measurement then stands
+# alone, and it is the one that always runs.
+CVIMG_END_RX = re.compile(r'Image decompress end addr\s*:\s*0x([0-9a-fA-F]+)')
+CVIMG_OVERRUN = 'Kernel image decompress will overwirte load image'  # sic
+DECOMP_BASE = 0x80000000
+
+
+def ceiling_verdict(img, logtext):
+    """-> (ok, lines to print).  ok is False on any refusal, with its reason."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    try:
+        import mkinitramfs as mk
+    except ImportError as e:
+        return False, ['  REFUSED: tools/mkinitramfs.py cannot be imported '
+                       '(%s), and the ceiling check is its own: it is not '
+                       'restated here' % e]
+    if not os.path.isfile(img):
+        return False, ['  REFUSED: make wrote no %s, so the decompressed '
+                       'image cannot be measured against the ceiling' % img]
+    saved, mk._RAISE = mk._RAISE, True
+    try:
+        over, n, how, margin = mk.over_ceiling(img)
+    except mk.Refused as e:
+        return False, ['  REFUSED: %s' % e]
+    finally:
+        mk._RAISE = saved
+    lines = ['ceiling    decompressed image %d bytes (%s), ceiling %d, margin '
+             '%d (%.1f%% used) -- mkinitramfs.over_ceiling'
+             % (n, how, mk.CEILING, margin, 100.0 * n / mk.CEILING)]
+    why = []
+    if over:
+        why.append('over the ceiling by %d bytes: the decompressor reads from '
+                   '0x80500000 and writes from 0x80000000, so this image '
+                   'overwrites its own input' % -margin)
+    ends = CVIMG_END_RX.findall(logtext)
+    if ends:
+        end = int(ends[-1], 16)
+        lines.append('cvimg      size_chk: decompress end 0x%08x, and %s'
+                     % (end, 'that is 0x80000000 + the bytes above'
+                        if end == DECOMP_BASE + n else 'the bytes above say '
+                        '0x%08x' % (DECOMP_BASE + n)))
+        if end != DECOMP_BASE + n:
+            why.append('cvimg and mkinitramfs disagree about one image')
+    else:
+        lines.append('cvimg      size_chk printed no summary; the measurement '
+                     'above stands alone')
+    if CVIMG_OVERRUN in logtext:
+        lines.append('cvimg      said: Error!!!! : %s' % CVIMG_OVERRUN)
+        if not over:
+            why.append('cvimg says the image overruns its load address and '
+                       'the measurement says it does not')
+    lines += ['  REFUSED: %s.' % w for w in why]
+    return not why, lines
+
+
+# --------------------------------------------------------------------------
 # build
 # --------------------------------------------------------------------------
 def cmd_build(args):
@@ -656,6 +730,14 @@ def cmd_build(args):
               'given' % vm_used)
         print('  (%s, now %s): the nfjrom cannot be attributed to either, so '
               'no record is written.' % (src_sha[:16], sha(vm_used)[:16]))
+        return 1
+    # D25: the ceiling refuses here, before any record exists.
+    ok, lines = ceiling_verdict(os.path.join(rtk, 'vmlinux_img'), logtext)
+    print('')
+    print('\n'.join(lines))
+    if not ok:
+        print('  No %s is written: an nfjrom that cannot boot is not one a '
+              'card may pin.' % RECORD_NAME)
         return 1
     nf_sha = sha(nf)
     rec = write_record(os.path.join(run, RECORD_NAME), [

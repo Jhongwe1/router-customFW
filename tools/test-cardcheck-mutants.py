@@ -82,10 +82,12 @@ TARGETS = ("tools/cardcheck.py", "tools/cardrun.py")
 # which flashmap.py imports.  🔄 2026-09-26: iperflog.py joined when card B50
 # (7c4df71) called it from 21 HOST cells; without it B0-in-tree refused the
 # whole run on CI (B13: 21 NEW refusals, every one an iperflog cell).
+# 🔄 2026-10-05 (R8b D22): appletcensus.py, whose read_tsv() is how
+# cardcheck reads each image's command table.
 COPIED = ("tools/reply-size.py", "tools/ci-expected.tsv", "tools/hostprobe.py",
           "tools/looprun.py", "tools/boot-timeline.py", "tools/netblast.py",
           "tools/flashmap.py", "tools/flashwin.py", "tools/hostclock.py",
-          "tools/iperflog.py")
+          "tools/iperflog.py", "tools/appletcensus.py")
 
 MUT = [
     # 🔄 2026-09-23: THIS ROW NEVER COMPILED, and it read as a kill.  Its
@@ -158,7 +160,7 @@ MUT = [
      '        if False:'),
 
     ("M24 the measured branch is never taken                (kills A27)",
-     "        if base in _measured():\n            continue",
+     "        if base in _measured(img):\n            continue",
      "        if False:\n            continue"),
 
     # ------------------------------------------------ `FW-113`, 2026-09-23
@@ -468,8 +470,8 @@ MUT = [
      '    return "SHELL", issues + memnode(cmd, flash_ok)'),
 
     ("M72 the driver verb matched case-SENSITIVELY           (kills A57)",
-     "                verb = body[0].strip('\"').lower() if body else \"\"",
-     "                verb = body[0].strip('\"') if body else \"\""),
+     '                line = " ".join(body).lstrip().lower()',
+     '                line = " ".join(body).lstrip()'),
 
     ("M73 a line it cannot read is read as harmless          (kills A57)",
      '            if why is None and any(ch in _SPI_UNREADABLE for w in body',
@@ -485,10 +487,84 @@ MUT = [
      '    if False:'),
 
     ("M76 every write to the driver's node refused           (kills A62, B16)",
-     '                if not verb.startswith(("install", "erase")):\n'
+     '                if not line.startswith(("install", "erase")):\n'
      '                    continue',
      '                if False:\n'
      '                    continue'),
+
+    # ------------------------------------------ R8b D8's quoting, 2026-10-05
+    # The hole the runsheet agent measured (a single-quoted verb passed),
+    # reintroduced, and the three other ways past the first version: a
+    # program given the node as an argument, `&` as a separator, and a
+    # --send whose payload is cut at an inner '.
+    ("M87 single quotes not removed: the measured hole       (kills A70)",
+     '        elif c == "\'":',
+     '        elif c == "\\x00":'),
+
+    ("M88 the node as a program's argument not refused       (kills A71, A57)",
+     '            if prog not in _SPI_QUIET and any(_spi_arg(w, named) for w in '
+     'words[1:]):',
+     '            if False:'),
+
+    ("M89 a glued or unreadable --send not reported          (kills A72)",
+     ' + glued_sends(text, report)',
+     ''),
+
+    ("M90 `&` read as a redirection, not a separator         (kills A70)",
+     '        if kind == "o" and not set(v) & set("<>"):',
+     '        if kind == "o" and not set(v) & set("<>&"):'),
+
+    # ------------------------------------------ R8b D22, 2026-10-05
+    # Which image a cell runs on (card_images(), applets()).  One mutant per
+    # property claimed: the applet check is wired in, the fence is what
+    # selects, a cell with no row and a command with no image are MAINLINE
+    # (two defaults, two mutants), the fence is read exactly, the positions
+    # are argv0s()'s, the floor holds, and B17 both ways.
+    ("M77 the busybox applet check unwired                   (kills A63)",
+     ' + applets(cmd, img)',
+     ''),
+
+    ("M78 the ```cardimage fence never read                  (kills A65, A66)",
+     '    fences = CARDIMAGE_RE.findall(text)\n'
+     '    opens = len(CARDIMAGE_OPEN_RE.findall(text))',
+     '    fences = []\n'
+     '    opens = 0'),
+
+    ("M79 a cell no row names defaults to ARMED              (kills A65)",
+     '    return [(g or "mainline", excused) for g in got]',
+     '    return [(g or "armed", excused) for g in got]'),
+
+    ("M80 a command with no image defaults to ARMED          (kills A63, A67)",
+     '    name, excused = img or ("mainline", frozenset())',
+     '    name, excused = img or ("armed", frozenset())'),
+
+    ("M81 an image the tool does not know is accepted        (kills A66)",
+     '        if image not in IMAGES or not tab or not cells:',
+     '        if not tab or not cells:'),
+
+    ("M82 a cell no --send carries is accepted               (kills A66)",
+     '            if not hit:',
+     '            if False:'),
+
+    ("M83 B37's frozen telnetd dropped from the list         (kills B17, A69)",
+     '    "bench/2026-09-21c/PREDICTIONS-B37-block35.md": frozenset({"telnetd"}),',
+     '    "bench/2026-09-21c/PREDICTIONS-B37-block35.md-NOTHING": '
+     'frozenset({"telnetd"}),'),
+
+    ("M84 an applet no card sends added to the list          (kills B17)",
+     '    "bench/2026-09-21c/PREDICTIONS-B37-block35.md": frozenset({"telnetd"}),',
+     '    "bench/2026-09-21c/PREDICTIONS-B37-block35.md": frozenset({"telnetd", '
+     '"dd"}),'),
+
+    ("M85 every word read as a command, not argv0s()'s       (kills A67)",
+     '        if n == seen:\n'
+     '            continue',
+     '        if False:\n'
+     '            continue'),
+
+    ("M86 the applet population floor removed                (kills A68)",
+     '        if len(kinds["applet"]) < APPLET_FLOOR:',
+     '        if False:'),
 ]
 
 

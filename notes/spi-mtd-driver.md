@@ -1640,9 +1640,11 @@ cat /proc/rtl819x-spi                                 # inst_* lines: the verdic
   budget is capped at `hi - lo` by the arm verb, and an install spends the size
   twice. A cut anywhere before the last operation leaves the new header absent
   and, after operation 0, the old one erased.
-* **Pacing (`D10`).** `pace=1..10000` ms is slept after each 64 KiB block of
-  the erase and program phases, never after the header page; every console
-  line and `/proc`'s `inst_paced` say so.
+* **Pacing (`D10`).** `pace=1..30000` ms (the cap was 10000 until 2026-10-05,
+  raised so a 64 KiB region's paced write lasts 60 s, past the bench's 40 s
+  window) is slept after each 64 KiB block of the erase and program phases,
+  never after the header page or during read-back; every console line and
+  `/proc`'s `inst_paced` say so.
 
 ### 13.3 `D11`, from the code
 

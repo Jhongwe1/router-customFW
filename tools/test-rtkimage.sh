@@ -26,8 +26,12 @@
 #       exit status it can give, its verdict line read and never assumed, and
 #       the argv, stdin, cwd and existence check that allow no other way
 #   P7  `build` with a missing --vmlinux refuses (3), not a traceback
+#   K0-K8  D25: `build` refuses an image over the ceiling itself, through
+#       mkinitramfs.over_ceiling() -- both sides of the boundary, cvimg's
+#       summary as a second source that must agree, the measured 7,494,144
+#       bytes -- and writes no record for one
 #
-# S1-S4, P1-P7 and T/V/W/C/E run anywhere.  B1-B3 and M1-M2 need the GPL drop under
+# S1-S4, P1-P7, T/V/W/C/E and K run anywhere.  B1-B3 and M1-M2 need the GPL drop under
 # $FWRE_WORK/rebuild/src-vendor, which cannot be committed, and they SKIP
 # rather than pass without it.
 set -o nounset
@@ -176,7 +180,7 @@ vm = os.path.join(T, 'pvmlinux')
 write(vm, b'\x7fELF a fake vmlinux ' + bytes(range(256)))
 
 def fake_tripwire(make=True, make_rc=0, nfjrom=True, touch_input=False,
-                  tail=b'', pre=b'', line=None, rc=None):
+                  tail=b'', pre=b'', line=None, rc=None, img=None, noimg=False):
     """`bash vendor-tripwire.sh --quiet -- make -C <rtk>`, faked.
 
     line=None prints the CLEAN line for `make_rc` and rc=None takes the exit
@@ -185,6 +189,8 @@ def fake_tripwire(make=True, make_rc=0, nfjrom=True, touch_input=False,
     before the command runs.  The spawned command is found after `--` when
     there is one and taken whole when there is not, so a cmd_build that
     spawned make directly would still build -- and W alone would catch it.
+    img=N makes vmlinux_img N bytes (the K cases' decompressed image) and
+    noimg=True leaves it out.
     """
     if line is None:
         line = 'VENDOR-TRIPWIRE: CLEAN  cmd-rc=%d  6 tree(s) watched' % make_rc
@@ -197,7 +203,10 @@ def fake_tripwire(make=True, make_rc=0, nfjrom=True, touch_input=False,
         rtk = cmd[cmd.index('-C') + 1]
         if make:
             for f in ('vmlinux-stripped', 'vmlinux_img', 'memload-full', 'linux.bin'):
-                write(os.path.join(rtk, f), f.encode())
+                if f == 'vmlinux_img' and noimg:
+                    continue
+                write(os.path.join(rtk, f), b'\0' * img
+                      if f == 'vmlinux_img' and img is not None else f.encode())
             if nfjrom:
                 with open(os.path.join(rtk, '..', 'vmlinux'), 'rb') as fh:
                     write(os.path.join(rtk, 'nfjrom'), b'NFJROM' + fh.read()[::-1])
@@ -348,6 +357,39 @@ out.append(('E   no tripwire -> 3, nothing spawned, nothing under --work', 'exit
             '%s %d %s %s' % (rc, len(seen),
                              os.path.exists(os.path.join(T, 'pwork', 'e-none')),
                              'no tripwire at' in txt)))
+# K -- D25, 2026-10-05: the ceiling is a refusal in `build` itself, by
+# mkinitramfs's own over_ceiling() (imported, never restated), with cvimg's
+# summary a second source when the log holds one.  K8 is the measured shape:
+# 7,494,144 bytes, cvimg's error printed, make and the old `build` both 0.
+sys.path.insert(0, os.path.dirname(os.path.abspath(sys.argv[1])))
+import mkinitramfs as mk
+E1 = (b'Image loading  addr          :0x80500000\n'
+      b'Image decompress end addr    :0x80725a00\n'
+      b'Error!!!! : Kernel image decompress will overwirte load image\n')
+rc, txt, rp = build('k0')
+out.append(('K0  a normal build runs the ceiling check and passes', '0 True True',
+            '%s %s %s' % (rc, os.path.isfile(rp),
+                          '-- mkinitramfs.over_ceiling' in txt
+                          and 'stands alone' in txt)))
+out.append(('K1  vmlinux_img one byte over the ceiling -> 1, no record', '1 False True',
+            refused('k1', 'over the ceiling by 1 bytes', img=mk.CEILING + 1)))
+rc, txt, rp = build('k2', img=mk.CEILING)
+out.append(('K2  exactly at the ceiling (ends at 0x80500000) passes', '0 True True',
+            '%s %s %s' % (rc, os.path.isfile(rp), 'margin 0 ' in txt)))
+out.append(('K3  cvimg\'s overrun error alone refuses (two sources disagree)', '1 False True',
+            refused('k3', 'and the measurement says it does not',
+                    tail=E1.split(b'\n', 2)[2])))
+out.append(('K4  cvimg\'s end address at odds with the bytes -> 1', '1 False True',
+            refused('k4', 'disagree about one image', tail=E1.split(b'\n')[1] + b'\n')))
+rc, txt, rp = build('k5', tail=b'Image decompress end addr    :0x8000000b\n')
+out.append(('K5  and agreeing with them (11 bytes, 0x8000000b) passes', '0 True True',
+            '%s %s %s' % (rc, os.path.isfile(rp), '0x80000000 + the bytes above' in txt)))
+out.append(('K6  make wrote no vmlinux_img -> 1, no record', '1 False True',
+            refused('k6', 'make wrote no', noimg=True)))
+out.append(('K7  rtkimage.CEILING is mkinitramfs.CEILING', 'True',
+            str(r.CEILING == mk.CEILING)))
+out.append(('K8  the measured D25 image, 7,494,144 bytes + cvimg\'s error -> 1', '1 False True',
+            refused('k8', 'over the ceiling by 2251264 bytes', img=7494144, tail=E1)))
 for lbl, exp, got in out:
     print('%s\t%s\t%s' % (lbl, exp, got))
 PYEOF

@@ -72,6 +72,7 @@ Where this will fail, written before it was used
 Usage
 -----
     appletcensus.py extract [--binary <path>] [--write]
+    appletcensus.py extract --image armed --binary <path> [--write]
     appletcensus.py query cat dd printf awk
     appletcensus.py check                 # the TSV against the silicon truths
     appletcensus.py diff-builtins         # measured table vs cardcheck's 推 list
@@ -84,6 +85,29 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TSV = os.path.join(ROOT, "config", "image-commands.tsv")
+TSV_ARMED = os.path.join(ROOT, "config", "image-commands-armed.tsv")
+
+# One measured table per image a card can say a cell runs on (cardcheck.py's
+# IMAGES, R8b D22, 2026-10-05).  R8b's provisioning image is the armed branch,
+# whose busybox is rlxfw's own build with CONFIG_NC and CONFIG_NC_SERVER added
+# -- the one way a payload reaches the board's staging node -- so it is a
+# third busybox in this project, and its table is extracted from it the same
+# way, never edited by hand.  {image: (path, what it describes, provenance)}
+TABLES = {
+    "mainline": (TSV, "what the first-boot image can INVOKE.", [
+        "# Derived by tools/appletcensus.py from the busybox declared at",
+        "# config/rlxfw-initramfs.tsv:105.  Regenerate with `appletcensus.py",
+        "# extract --write`; that half is BENCH-ONLY because it reads $FWRE_WORK."]),
+    "armed": (TSV_ARMED, "what R8b's ARMED provisioning image can INVOKE.", [
+        "# Derived by tools/appletcensus.py from the armed branch's busybox: the",
+        "# one config/rlxfw-initramfs.tsv:105 declares, built by tools/mkbusybox.sh",
+        "# from config/rlxfw-busybox.config with CONFIG_NC=y and CONFIG_NC_SERVER=y",
+        "# (R8b D22).  Regenerate with `appletcensus.py extract --image armed",
+        "# --binary <that build> --write`; BENCH-ONLY for the same reason."]),
+}
+#: what the armed busybox adds to the mainline one, and all it adds (D22:
+#: CONFIG_NC_SERVER is `nc -l`, an option of the same applet).  T11.
+ARMED_ADDS = {"nc"}
 
 NAME_RE = re.compile(rb"^[a-z][a-z0-9_.\-]*$")
 MIN_RUN = 20
@@ -160,6 +184,12 @@ APPLET_COUNT_BY_ARTEFACT = {
              "FW-25, qemu-mips-static 2026-08-29"),
     447684: ("rlxfw's own build (R7, tools/mkbusybox.sh)", 53,
              "量 2026-09-30, qemu-mips-static AND this tool, agreeing"),
+    # sha256 29e3f66f..., two builds byte-identical.  量 2026-10-05 under
+    # qemu-mips-static (no arguments: the "Currently defined functions"
+    # block), with the 447684-byte build run the same way as the control:
+    # 53 there, 54 here, and the one name between them is `nc`.
+    449916: ("R8b's armed build (+ CONFIG_NC, CONFIG_NC_SERVER)", 54,
+             "量 2026-10-05, qemu-mips-static AND this tool, agreeing"),
 }
 #: kept as a name because SPEC.md FW-25 is cited by it; it is the vendor row's.
 FW25_APPLET_COUNT = APPLET_COUNT_BY_ARTEFACT[273332][1]
@@ -325,16 +355,18 @@ def extract(path):
 
 # ------------------------------------------------------------------- the TSV
 
-def write_tsv(info, out=TSV):
+def write_tsv(info, image="mainline", out=None):
+    path, what, source = TABLES[image]
+    out = out or path
     lines = [
-        "# config/image-commands.tsv -- what the first-boot image can INVOKE.",
-        "# Derived by tools/appletcensus.py from the busybox declared at",
-        "# config/rlxfw-initramfs.tsv:105.  Regenerate with `appletcensus.py",
-        "# extract --write`; that half is BENCH-ONLY because it reads $FWRE_WORK.",
+        f"# {os.path.relpath(path, ROOT).replace(os.sep, '/')} -- {what}",
+        *source,
         "#",
         "# 🔴 kind=applet means `busybox <name>` resolves.  It does NOT mean the",
         "#    applet works, and it says NOTHING about options: SPEC.md FW-42",
-        "#    measured `grep` present and `grep -E` absent on this same image.",
+        ("#    measured `grep` present and `grep -E` absent on this same image."
+         if image == "mainline" else
+         "#    measured `grep` present and `grep -E` absent on the first-boot image."),
         f"# busybox\tv{info['version']}\t{info['size']} bytes",
         "kind\tname",
     ]
@@ -401,6 +433,12 @@ def classify(word, kinds):
 # ------------------------------------------------------------------ commands
 
 def cmd_extract(args):
+    # The armed busybox has no default: it lives in whatever tree built the
+    # armed branch, and falling back to the unit's binary would write the
+    # VENDOR's table under the armed table's name.
+    if args.image != "mainline" and not args.binary:
+        raise Refuse(f"REFUSING: --image {args.image} needs --binary, the "
+                     f"busybox that image carries; there is no default.")
     path = args.binary or default_binary()
     info = extract(path)
     print(f"  {os.path.basename(path)}  BusyBox v{info['version']}  "
@@ -413,8 +451,8 @@ def cmd_extract(args):
     print("  builtins: " + " ".join(info["builtins"]))
     print("  keywords: " + " ".join(info["keywords"]))
     if args.write:
-        write_tsv(info)
-        print(f"\n  wrote {TSV}")
+        write_tsv(info, args.image)
+        print(f"\n  wrote {TABLES[args.image][0]}")
     return 0
 
 
@@ -595,6 +633,41 @@ def _selftest():
          "no keyword rows in the TSV (the extracted run is short -- "
          "`for` and `while` run on the die and are not in it)")
 
+    # T10 -- T8 for the ARMED table (R8b D22): the artefact its header names
+    #        is registered, and its applet count is that artefact's, taken by
+    #        running it.  An armed table nobody can tie to a binary is the
+    #        state T8's split exists to stop, with a second image's name on it.
+    try:
+        ak, am = read_tsv(TSV_ARMED)
+        row = APPLET_COUNT_BY_ARTEFACT.get(am.get("bytes"))
+        case("T10", row is not None and len(ak["applet"]) == row[1]
+             and not ak.get("keyword"),
+             f"armed table: {len(ak['applet'])} applets against "
+             + (f"{row[1]}, measured on {row[0]} ({row[2]})" if row else
+                f"NOTHING -- its header's {am.get('bytes')} bytes are "
+                f"registered nowhere"))
+    except Refuse as e:
+        case("T10", False, f"{e}")
+        ak = None
+
+    # T11 -- D22's own claim about the armed image, read off the two committed
+    #        tables: its busybox is the mainline one plus ARMED_ADDS and
+    #        nothing else, applets and builtins both.  Fails on a table
+    #        regenerated from a busybox built with anything more -- NC_EXTRA's
+    #        `-e`, which D22 excludes, is an option and not an applet, so this
+    #        cannot see it; what it sees is a second applet slipped in.
+    if kinds and ak:
+        got = set(ak["applet"]) - set(kinds["applet"])
+        lost = set(kinds["applet"]) - set(ak["applet"])
+        same_b = set(ak["builtin"]) == set(kinds["builtin"])
+        case("T11", got == ARMED_ADDS and not lost and same_b,
+             f"armed = mainline + {sorted(got)}"
+             + (f" - {sorted(lost)}" if lost else "")
+             + f"; builtins {'equal' if same_b else 'DIFFER'} "
+             f"(D22 says + {sorted(ARMED_ADDS)} only)")
+    else:
+        case("T11", False, "one of the two tables did not parse")
+
     # 🔴 NOT a two-space `ok`: `tools/ci-census.py` parses every line that
     # starts with two spaces and `ok`/`FAIL`/`skip` as a CASE line, and a
     # summary in that shape comes back as "1 line(s) ... did not parse".
@@ -611,6 +684,7 @@ def main():
 
     p = sub.add_parser("extract")
     p.add_argument("--binary")
+    p.add_argument("--image", choices=sorted(TABLES), default="mainline")
     p.add_argument("--write", action="store_true")
     p.set_defaults(fn=cmd_extract)
 

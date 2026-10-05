@@ -239,11 +239,18 @@ static void t_parse(void)
 	ck("install slotB sha=<64 UPPER> pace=500", r, OK);
 	ckb("  ... names slotB, pace 500, same digest",
 	    rq.region == I_SLOTB && rq.pace_ms == 500u && rq.sha[10] == 0xAAu);
-	snprintf(b, sizeof(b), "install rlxboot sha=%s pace=10000", HEX_LO);
-	ck("install rlxboot ... pace=10000 (the longest line)", parse(b, &rq),
+	snprintf(b, sizeof(b), "install rlxboot sha=%s pace=30000", HEX_LO);
+	ck("install rlxboot ... pace=30000 (the longest line)", parse(b, &rq),
 	   OK);
 	ckb("  ... that line is 95 bytes, under the 128-byte buffer",
 	    strlen(b) == 95u && strlen(b) + 1u < RLXFW_SPI_INST_LINE_MAX);
+	/* The rescue drill (R8b): a 64 KiB region is one block, so two paces --
+	 * after its erase and after its program phase -- must reach 60 s, and
+	 * the cell that types it must stay one --send under 127 characters. */
+	ckb("  ... pace 30000 parsed: two pauses on a 64 KiB region = 60 s",
+	    rq.pace_ms == 30000u && 2ul * rq.pace_ms >= 60000ul);
+	ckb("  ... `echo <it> > /proc/rtl819x-spi` is 120 characters, < 127",
+	    strlen("echo ") + strlen(b) + strlen(" > /proc/rtl819x-spi") == 120u);
 	snprintf(b, sizeof(b), "install rescue sha=%s", HEX_LO);
 	ck("install rescue sha=...", parse(b, &rq), OK);
 	ck("erase barrier", parse("erase barrier", &rq), OK);
@@ -271,8 +278,8 @@ static void t_parse(void)
 	snprintf(b, sizeof(b), "install slotA sha=%s pace=0", HEX_LO);
 	ck("pace=0 (paced must mean paced)", parse(b, &rq),
 	   RLXFW_SPI_INST_R_SYNTAX);
-	snprintf(b, sizeof(b), "install slotA sha=%s pace=10001", HEX_LO);
-	ck("pace=10001, over the ceiling", parse(b, &rq),
+	snprintf(b, sizeof(b), "install slotA sha=%s pace=30001", HEX_LO);
+	ck("pace=30001, over the ceiling", parse(b, &rq),
 	   RLXFW_SPI_INST_R_SYNTAX);
 	snprintf(b, sizeof(b), "install slotA sha=%s pace=01", HEX_LO);
 	ck("pace=01, a leading zero", parse(b, &rq), RLXFW_SPI_INST_R_SYNTAX);

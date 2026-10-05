@@ -284,16 +284,21 @@ static inline int rlxfw_spi_inst_dec(const char *s, u32 n, u32 *out)
  *   eraseprobe                     (D19: the probe block is implied)
  *
  * Single spaces, nothing trailing, region names case-sensitive.  Strict on
- * purpose: a malformed line is a refusal, never a guess.  `pace` is 1..10000
- * ms, slept after each 64 KiB block of the erase and program phases (D10); 0
- * is refused, so "paced" is never ambiguous.  The longest line any cell
- * types is `install rlxboot sha=<64> pace=10000`, 95 bytes; the dispatcher's
- * buffer is RLXFW_SPI_INST_LINE_MAX.  The probe block answers to
- * `eraseprobe` and nothing else, and `eraseprobe` takes no argument at all,
- * so no typing can aim the probe's single raw erase anywhere but there.
+ * purpose: a malformed line is a refusal, never a guess.  `pace` is 1..30000
+ * ms, slept after each 64 KiB block of the erase and program phases (D10) --
+ * never after the header page, never in the read-back; 0 is refused, so
+ * "paced" is never ambiguous.  30000 because a 64 KiB region (rlxboot,
+ * rescue) is one block, so two pauses: 2 x 30 s = 60 s for the rescue drill's
+ * pull, over CLAUDE.md's 40 s window for a timed action (10000 gave 20 s).
+ * The longest line any cell types is `install rlxboot sha=<64> pace=30000`,
+ * 95 bytes, 120 with `echo ` and ` > /proc/rtl819x-spi`, under a --send's
+ * 127; the dispatcher's buffer is RLXFW_SPI_INST_LINE_MAX.  The probe block
+ * answers to `eraseprobe` and nothing else, and `eraseprobe` takes no
+ * argument at all, so no typing can aim the probe's single raw erase anywhere
+ * but there.
  * ------------------------------------------------------------------------ */
 #define RLXFW_SPI_INST_LINE_MAX		128
-#define RLXFW_SPI_INST_PACE_MAX		10000u
+#define RLXFW_SPI_INST_PACE_MAX		30000u
 
 enum {
 	RLXFW_SPI_INST_V_NONE = 0,

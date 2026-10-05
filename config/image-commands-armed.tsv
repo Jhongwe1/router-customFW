@@ -1,0 +1,109 @@
+# config/image-commands-armed.tsv -- what R8b's ARMED provisioning image can INVOKE.
+# Derived by tools/appletcensus.py from the armed branch's busybox: the
+# one config/rlxfw-initramfs.tsv:105 declares, built by tools/mkbusybox.sh
+# from config/rlxfw-busybox.config with CONFIG_NC=y and CONFIG_NC_SERVER=y
+# (R8b D22).  Regenerate with `appletcensus.py extract --image armed
+# --binary <that build> --write`; BENCH-ONLY for the same reason.
+#
+# 🔴 kind=applet means `busybox <name>` resolves.  It does NOT mean the
+#    applet works, and it says NOTHING about options: SPEC.md FW-42
+#    measured `grep` present and `grep -E` absent on the first-boot image.
+# busybox	v1.13.4	449916 bytes
+kind	name
+applet	ash
+applet	cat
+applet	cp
+applet	cut
+applet	date
+applet	dmesg
+applet	dumpleases
+applet	echo
+applet	egrep
+applet	expr
+applet	false
+applet	fgrep
+applet	free
+applet	grep
+applet	halt
+applet	head
+applet	hostname
+applet	ifconfig
+applet	ip
+applet	ipaddr
+applet	iplink
+applet	iproute
+applet	kill
+applet	killall
+applet	klogd
+applet	ln
+applet	logger
+applet	ls
+applet	mkdir
+applet	mount
+applet	nc
+applet	netstat
+applet	nslookup
+applet	ping
+applet	poweroff
+applet	printf
+applet	ps
+applet	reboot
+applet	renice
+applet	rm
+applet	route
+applet	sed
+applet	sh
+applet	sleep
+applet	syslogd
+applet	tail
+applet	tr
+applet	traceroute
+applet	true
+applet	udhcpc
+applet	udhcpd
+applet	umount
+applet	uptime
+applet	wc
+builtin	.
+builtin	:
+builtin	[
+builtin	[[
+builtin	alias
+builtin	bg
+builtin	break
+builtin	cd
+builtin	chdir
+builtin	command
+builtin	continue
+builtin	echo
+builtin	eval
+builtin	exec
+builtin	exit
+builtin	export
+builtin	false
+builtin	fg
+builtin	getopts
+builtin	hash
+builtin	help
+builtin	jobs
+builtin	kill
+builtin	let
+builtin	local
+builtin	printf
+builtin	pwd
+builtin	read
+builtin	readonly
+builtin	return
+builtin	set
+builtin	shift
+builtin	source
+builtin	test
+builtin	times
+builtin	trap
+builtin	true
+builtin	type
+builtin	ulimit
+builtin	umask
+builtin	unalias
+builtin	unset
+builtin	wait

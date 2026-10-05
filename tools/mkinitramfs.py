@@ -800,6 +800,17 @@ def loaded_extent(path):
     return hi - lo, "%d PT_LOAD, 0x%08x-0x%08x" % (phnum, lo, hi)
 
 
+def over_ceiling(path, ceiling=CEILING):
+    """(over, bytes, how, margin) -- `build --kernel-image`'s measurement AND
+    its test, as one function, so that tools/rtkimage.py's `build` runs this
+    one rather than a copy of either (D25, 2026-10-05: `cvimg size_chk`
+    printed its overrun error and exited 0, and the image build returned 0).
+    `over` is a negative margin; a margin of 0 ends exactly at 0x80500000."""
+    n, how = loaded_extent(path)
+    margin = ceiling - n
+    return margin < 0, n, how, margin
+
+
 # ==========================================================================
 # `verify` -- the declaration checked against the ARTEFACT.   R3-9, 2026-08-30.
 #
@@ -1071,12 +1082,11 @@ def cmd_build(a):
     if img:
         if not os.path.isfile(img):
             die("--kernel-image %s: no such file" % img)
-        n, how = loaded_extent(img)
-        margin = ceiling - n
+        over, n, how, margin = over_ceiling(img, ceiling)
         print("ceiling     decompressed image %d bytes (%s), ceiling %d, "
               "margin %d (%.1f%% used)"
               % (n, how, ceiling, margin, 100.0 * n / ceiling))
-        if margin < 0:
+        if over:
             print("REFUSED: over the ceiling. The decompressor reads from "
                   "0x80500000 and writes to 0x80000000; this image would "
                   "overwrite its own input. The answer is "

@@ -237,6 +237,7 @@ mutate H3-header-first pure "$ihdr" 's/k = (j + 1u < pl->np) ? j + 1u : 0u;/k = 
 mutate H4-no-sum16     pure "$ihdr" 's/if ((sum & 0xFFFFu) != 0u)/if (0)/'
 mutate H5-overflow     pure "$ihdr" 's/if (count > (unsigned long)(RLXFW_SPI_INST_IMG_CAP - im->len)) {/if (count > (unsigned long)(RLXFW_SPI_INST_IMG_CAP - im->len) + 1ul) {/'
 mutate H6-pace-ceiling pure "$ihdr" 's/v == 0u || v > RLXFW_SPI_INST_PACE_MAX)/v == 0u || v > RLXFW_SPI_INST_PACE_MAX + 1u)/'
+mutate H6b-pace-20s    pure "$ihdr" 's/^#define RLXFW_SPI_INST_PACE_MAX\t\t30000u$/#define RLXFW_SPI_INST_PACE_MAX\t\t10000u/'
 mutate H7-half-erase   pure "$ihdr" 's|pl->ne = rg->size / grain;|pl->ne = rg->size / grain / 2u;|'
 mutate B1-no-disarm    glue "$out/gapA.inc" 's/^\trtl819x_spi_wr_do_disarm();$//'
 mutate B2-no-sha       glue "$out/gapA.inc" 's/if (!r->sha_ok) {/if (0) {/'

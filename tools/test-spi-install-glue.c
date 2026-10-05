@@ -932,13 +932,18 @@ static void scenario_cr6c(const struct blob *R, const struct blob *S)
 	world(0x10000u);
 	stage(R, 1000u);
 	rtl819x_spi_wr_do_arm(0x010000u, 0x020000u, 0x010000u);
-	rc = install("rlxboot", R->hex, " pace=10000");
+	rc = install("rlxboot", R->hex, " pace=30000");
 	note_reason();
-	ckb("rlxboot.cr6c on rlxboot at a 64 KiB grain, pace=10000 -> OK",
+	/* The rescue drill's window (R8b): one 64 KiB block, so exactly two
+	 * pauses -- after the erase, after the program phase -- and none after
+	 * the header page or in the read-back: 60 s in which a pull leaves
+	 * rlxboot without a valid header. */
+	ckb("rlxboot.cr6c on rlxboot at a 64 KiB grain, pace=30000 -> OK, "
+	    "two pauses, 60 s",
 	    rc == 0 && r->reason == RLXFW_SPI_INST_OK && r->cmp_ok == 1 &&
 	    region_is(0x010000u, 0x010000u, R) &&
 	    outside_untouched(0x010000u, 0x010000u) &&
-	    ms_slept == 10000ul * (unsigned long)n_msleep && n_msleep >= 2ul);
+	    n_msleep == 2ul && ms_slept == 60000ul);
 
 	world(0x1000u);
 	stage(S, 4096u);
