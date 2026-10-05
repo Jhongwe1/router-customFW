@@ -1060,6 +1060,14 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/rlxsign.py --self-test 2>&1 | tee ci-out/rlxsign.out; exit "${PIPESTATUS[0]}"
 
+      # R8b-4's slot reader: judges a console capture's rlxboot lines and the
+      # booted kernel's RLXFW-ID0 against an expectation whose id comes from a
+      # build manifest; its self-test re-reads rlxboot's printf strings, so a
+      # changed console format turns it red.
+      - name: bootslot self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/bootslot.py --self-test 2>&1 | tee ci-out/bootslot.out; exit "${PIPESTATUS[0]}"
+
       - name: test-mkfw2
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-mkfw2.sh 2>&1 | tee ci-out/test-mkfw2.out; exit "${PIPESTATUS[0]}"
