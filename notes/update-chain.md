@@ -467,6 +467,69 @@ fall back to when a write is interrupted, so the ten power cuts would be a test
 of `rlxboot-rescue` plus a TFTP upload rather than of A/B at all. The two-slot
 layout is the one `R8b`'s pass criterion ④ needs.
 
+### 🆕 2026-10-05 (124th segment, desk, no power): the payloads cannot ride inside the provisioning image
+
+`R8b-3`'s first plan put the payloads in the armed provisioning image's
+initramfs as plain files, to be `cat`-ed into `/proc/rtl819x-spi-img`. The image's
+own ceiling forbids it. 讀 `FW-23`: the image is entered at `0x80500000` and
+decompresses to `0x80000000`, so the decompressed image must end below
+`0x80500000` — **5,242,880** bytes — or the decompressor overwrites its own input
+(`notes/kernel-build.md` § 3.4).
+
+量, one tree (`a6add876`) and one armed recipe, with only the files under
+`/payload` changed (`s124/p`'s experiments `e1` and `e2`; the ceiling check
+re-run here with `tools/mkinitramfs.py --kernel-image`, `SPEC.md` `FW-240`):
+
+| the initramfs's `/payload` | decompressed | against 5,242,880 |
+|---|---:|---|
+| `rlxboot.cr6c` and `rlxboot-rescue.cr6c` (18,594 B each), containers P, Q and R (1,109,152 B each) | **7,494,144** | **2,251,264 over**, rc 1 |
+| container P alone | 5,238,272 | 4,608 spare, rc 0 |
+| nothing (the armed image as built for network delivery) | 4,130,816 | 1,112,064 spare, rc 0 |
+
+The cpio sits in the decompressed image unchanged and the payloads are already
+compressed images, so each payload byte counts once: the first two rows differ by
+2,255,872 bytes, the four extra files are 2,255,492, and the 380 left over is 推 —
+four cpio headers with their names.
+
+A slot container is the mainline `nfjrom` plus 160 bytes, a 96-byte header and a
+64-byte signature. 量, `s124/p`'s trial 4 at `a6add876`: the mainline image
+(recipe `4be284c6`) is an `nfjrom` of **1,108,992** bytes, decompressing to
+4,096,000 (78.1 %), and the container is **1,109,152** bytes, **94.0 %** of a slot
+(1,179,648). The 1,114,112 this section opens with is not this image's figure.
+
+So the three containers cannot be carried at all, and one fits with 4,608 bytes
+to spare, which a larger release image, one more program or one longer name uses
+up. The payloads therefore reach the provisioning image over the network, and the
+armed image carries none. 量 from `s124/p`'s trial manifest, not re-run here: the
+armed image differs from the mainline in `config/` by three declared edits made on
+the armed branch only — `CONFIG_MTD_RTL819X_WRITE` `n` → `y`, busybox's
+`CONFIG_NC` and `CONFIG_NC_SERVER` with `NC_EXTRA` unset, and no `/dev/mtd{0,1,2}ro`
+nodes (the armed initramfs manifest has 0 `mtd` rows and 8 `nod` rows, the
+mainline's 3 and 11) — so its recipe is `6aede68a` and its `nfjrom` 1,115,136
+bytes; the armed busybox is 449,916 bytes with `nc`, the mainline's is 447,684
+and has no `nc` applet, and under `qemu-mips-static` the armed busybox's `nc -l`
+received `P.rlxu` byte for byte. The listener on the device is the command
+`busybox nc -l -p 5000`, with its standard input from `/dev/null` and its output
+to `/proc/rtl819x-spi-img`, fed by a host-side sender that checks the SHA-256
+(`s124/p/tools/sendimg.py`, which is not a repository file yet).
+
+The kernel's own check is what keeps the route out of the integrity argument:
+`install <region> sha=<64 hex>` refuses unless the staged bytes' SHA-256 equals the
+digest typed on the command (`notes/spi-mtd-driver.md` § 13.2), and `rlxboot`
+verifies the signature at boot, so the owner's yes, which names the exact payload,
+binds the digest and not the route.
+
+**Refutation.** An initramfs holding the five payload files that
+`mkinitramfs --kernel-image` passes would refute *cannot be carried*; an `e2` margin
+other than 4,608 — Realtek's `cvimg size_chk` and `mkinitramfs` both read it —
+would refute *no spare*. Neither happened. **Not established:** any `nc` transfer on
+the die; that busybox `nc` streams 1.1 MiB into a procfs write path on this image
+(`notes/spi-mtd-driver.md` § 13.7 asks the same of `cat`); that the route is quick
+enough for a seating's time; and whether `LOAD_START_ADDR = 0x80A00000`, the
+answer § 3.4 of `notes/kernel-build.md` gives for an image over the ceiling, would
+have been the better remedy — it was not tried. Trial 4 signed its containers with a
+throwaway key, so the container bytes are not the release's; the sizes are.
+
 ## 7. What this does not establish
 
 Stated as `SPEC-R8a.md` § 6 requires:

@@ -489,7 +489,7 @@ builds: `0x0022ee44` = 2,289,220 for the drop's kernel, `0x001b0400` =
 1,770,496 for `quiet`/`quietm`, `0x0019e400` = 1,696,768 for `loud`/`loudm` —
 the same numbers §11.6 computes from the program headers, by a route with no
 code in common. §13.4. **The `mine, 1.3.6@4181` row above is the pre-`R3-4`
-build and is kept as written**; 🔄 **2026-09-15: ~~current~~ — those four are R3-era and the current image is `up2` (`RECIPE_ID 5abefd82`, vmlinux 4,125,078, decompressed 3,609,088, margin 1,633,792, 68.8 % used — the highest this project has built). § 18.6's table is the most recent margin table here and `up2` exceeds every cell in it.** The four R3-era images are in §13.3.
+build and is kept as written**; 🔄 **2026-09-15: ~~current~~ — those four are R3-era and the current image is `up2` (`RECIPE_ID 5abefd82`, vmlinux 4,125,078, decompressed 3,609,088, margin 1,633,792, 68.8 % used — the highest this project has built). § 18.6's table is the most recent margin table here and `up2` exceeds every cell in it.** The four R3-era images are in §13.3. 🔄 **2026-10-05 (124th segment): the ceiling has one refusal, and it is not in the build.** 量: `rtkload`'s `cvimg size_chk` printed *Error!!!! : Kernel image decompress will overwirte load image* on a 7,494,144-byte image and exited 0, `rtkload`'s `make` and `tools/rtkimage.py build` returned 0, and only `tools/mkinitramfs.py --kernel-image` refused it (margin −2,251,264, rc 1) — a tool no build script in this repository calls. What refuses and what only warns is at the end of this file, and `SPEC.md` `FW-239` indexes it.
 
 ---
 
@@ -4623,3 +4623,178 @@ reading of that paragraph caught it. The set and derive figures are **not**
 corrected here: re-deriving them needs the vendor board template
 (sha256 `44f781de…`, 26,548 bytes) out of a staged tree, which costs a stage,
 and inventing them would be worse than leaving them dated.
+
+## 🆕 2026-10-05 (124th segment, desk, no power): the `RECIPE_ID` pair the 123rd segment recorded is the previous tree's, and the shared vendor toolchain tree is dirty
+
+### The pair, and what a full build costs
+
+The 123rd segment's record (`LOG.md`) says *`22ef4e00` → `5ffbaab1`*: the mainline
+`RECIPE_ID`, and the one the armed variant would carry — `config/rlxfw-kernel.delta`'s
+`CONFIG_MTD_RTL819X_WRITE` row flipped from `n` to `y` on a branch, with no new
+variant (`FW-228`). That pair is right, and it belongs to **`c8980fd6`**; it was
+carried on as the value of the tree that followed, and that tree's pair is
+different. A `RECIPE_ID` is a function of the tree's `config/`, so a pair recorded
+without its commit cannot be read back.
+
+量 2026-10-05, re-derived and not copied: the `RECIPE_ID` pipeline of
+`tools/rlxfw-kbuild.sh` (`find config -type f -print0`, `LC_ALL=C sort -z`,
+`xargs -0 sha256sum`, `sha256sum`, the first eight hex digits) run under WSL
+(`uname -s` `Linux`, because of `FW-226`) over `git archive <commit> config`. The
+armed value flips the one `set CONFIG_MTD_RTL819X_WRITE - n` row; the anchor
+matched exactly one row before the flip and exactly one `y` row after.
+
+| commit | files under `config/` | mainline | armed |
+|---|---:|---|---|
+| `c8980fd6` | 56 | **`22ef4e00`** | **`5ffbaab1`** |
+| `66ec2abe` and `c7716fbe` | 56 | **`630eb5de`** | **`d293f25b`** |
+| `a6add876` | 57 | `4be284c6` | `e0d71e17` |
+
+`66ec2abe` changed `config/rlxfw-kernel.delta` (one row) and
+`config/rlxfw-marks.tsv` (fourteen lines), which is why the id moved between
+`c8980fd6` and `c7716fbe`; `a6add876` adds `rtl819x-spi-install.h` under
+`config/rlxfw-src/`, which is why it moved again. The last row's mainline value
+was then built: `s124/p`'s trial 4 built the mainline image from a clone at
+`a6add876`, and its kbuild manifest says `recipe_id` `4be284c6` (`vmlinux`
+4,588,247 B, `rlxfw-marks verify` green with one witness ABSENT), so that value
+reads back. Its armed value is still only derived, and the armed image that run
+built carries two more declared edits — busybox's `nc`, and no `mtd*ro` nodes —
+so its id is its own, `6aede68a`. The second source for the `c7716fbe` row is
+the artefact: the agents built both variants at that tree (`s124/a`) and read
+the id out of each `vmlinux` by disassembly at its two consumers,
+`rtl819x_spi_read_proc`'s `sprintf` and `start_kernel`'s `rlxfw_puts_hex` call —
+mainline `0x630EB5DE` at both, armed `0xD293F25B` at both — and each manifest's
+`recipe_id` says the same (`630eb5de`, `d293f25b`). The armed build passed
+`rlxfw-marks verify` under `--expect-present MK5` with one witness confirmed
+PRESENT (`1d6f6dcc`'s flag), the mainline build with `MK5` confirmed ABSENT; the
+images are 4,588,247 and 4,622,059 bytes.
+
+**A full build is 600 `CC`, not 592.** 量, counting the `^  CC ` lines of each
+fresh stage-and-build log: mainline **600**, armed **601** (the write translation
+unit is one more object), the `f184a` recipe rebuilt at the same tree 600, and
+118 `LD` in all three. The 592 `CC` of `INC-1`'s `S0` (`notes/incremental-build.md`
+§ 7.2, 2026-09-02, also 118 `LD`) is that day's tree's reading — not an error and
+not today's — and the eight extra are not attributed.
+
+No committed state or finding file takes the old pair as current: `FW-226` and the
+section above tie `22ef4e00` to `c8980fd6` and `fa36f7a2`, and `FW-228` states no
+id. The one place that writes the pair is `LOG.md`'s 123rd-segment entry, a record
+that keeps what it said; the correction is this section and `SPEC.md` `FW-231`.
+
+**Refutation conditions.** A re-derived value that differs from the constant read
+out of the built image, or from its manifest, refutes the pair; none differed. The
+600 is refuted if a fresh build of this tree counts 592; the three counted 600,
+601 and 600. **Not established:** which commit a later build will carry, or that
+the derived armed value `e0d71e17` matches any image.
+
+### The shared vendor toolchain tree is dirty
+
+This is the build input this file has treated as clean: § 18.5 records the same
+drop as *`HEAD 5c9be5d9`, worktree clean, 0 ignored files*.
+
+量 2026-10-05, read-only, no vendor binary run. In
+`$FWRE_WORK/rebuild/src-vendor/rtl819x-toolchain`, `HEAD` is
+`5c9be5d943318fdb4d048ae22078129594eb5a10` and `git status --porcelain=v1
+--ignored=matching` returns exactly **3** lines, all ` D`:
+`users/miniigd/miniigd_1.3.6-5281`, `users/miniigd/miniigd_4181` and
+`users/miniigd/miniigd_5281` — each a `100755` blob in the pinned commit, of
+113,493, 117,333 and 104,319 bytes. No ignored file, no other difference. The
+directory `users/miniigd/` has mtime **2026-10-04 20:58:16 +0800** — the last
+unlink in it — and its other three files (`Makefile`, `picsdesc.skl`,
+`picsdesc.xml`) are 2026-08-23 16:47. `tools/vendor-tripwire.sh --check`, run
+from a scratch directory, exits **4**: `VENDOR-TRIPWIRE: DIRTY  6 tree(s)
+watched`, this tree only, those three lines.
+
+**What that does.** The tripwire refuses to run a command on a tree that is
+already dirty, because a diff taken against dirt can be attributed to nothing. So
+on the default tree set, every git directory under `src-vendor/`, every
+tripwire-wrapped build refuses before its command runs — `rlxfw-kbuild.sh`'s
+included.
+
+**What this segment did instead.** Builds ran through a sparse `--shared` clone of
+`rtl819x-toolchain` at the pin, holding only
+`toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30`, with the tripwire watching that clone
+and the five clean trees. The clone was shown equal to the canonical directory
+(`diff -rq --no-dereference` empty, rc 0; the same diff over a copy with one byte
+changed, rc 1), and the tripwire was shown both ways on that tree set (rc 0 on
+`true`, rc 2 on a file created in the clone). The canonical tree's porcelain was
+read before and after those builds and was the same three lines.
+
+**Cause: not found.** 讀 `users/miniigd/Makefile`: `clean` only echoes and `romfs`
+only reads, so no target there deletes. The mtime is earlier than any artefact of
+the 124th segment (the first is 01:24 on 10-05). The window in which the tree
+went dirty is not bounded: 27 files in `s122`–`s124` (small `.log`, `.out`,
+`.txt` and `.rc` files, 2026-10-04 17:00 to 10-05 02:30) name the tripwire, and
+I read the verdict line of the first dozen — this segment's clone-set builds and
+one test case's output — and not the rest for which trees they watched.
+
+**Restoring it is the owner's.** It is a write into a tree that the sibling
+checkout `../router` shares through `$FWRE_WORK` (`git -C <tree> checkout --
+users/miniigd`, or a re-clone at the pin), and this section measures without
+doing it. 推 that nothing this project builds reads the three files: no committed
+initramfs declaration, tool or script names `miniigd` as a path
+(`config/rlxfw-initramfs.tsv`: 0), and the vendor's own image would install them
+into the vendor's own root filesystem — but that was not measured as a negative on
+a build. `SPEC.md` `FW-235`.
+
+**Why this file.** The tree is the build's input, and this file owns the build
+environment: staging, the tripwire's use, `RECIPE_ID`, and the drop's recorded
+state in § 18.5 — which is the same field this reading finds changed.
+`docs/KNOWN-ISSUES.md` lists what a *release* does not establish, its copy at each
+tag is frozen, and three files cite its lines; a workstation defect that one
+command from the owner removes is not a property of a release. `PROGRESS.md`
+§ Now carries the state sentence and says the restoring is the owner's, which
+leaves the reading to a finding file.
+
+### The decompression ceiling: what refuses it and what only warns
+
+`FW-23` and § 3.4 give the ceiling: the image is entered at `0x80500000` and
+decompresses to `0x80000000`, so the decompressed image must end below its own
+input — 5,242,880 bytes. One instrument in this repository refuses an image over
+it. Realtek's own tool prints a warning, and the build path between them passes.
+
+量 2026-10-05, from `s124/p`'s experiment `e1` — the armed image at `a6add876`
+with `rlxboot.cr6c`, `rlxboot-rescue.cr6c` (18,594 B each) and three containers
+(1,109,152 B each) in its initramfs, checked against
+`s124p-exp-e1.initramfs.manifest.tsv` — and its control `e2`, the same tree with
+one container:
+
+* `rtkload`'s `cvimg size_chk` printed *Image loading addr :0x80500000*, *Image
+  decompress end addr :0x80725a00* and *Error!!!! : Kernel image decompress will
+  overwirte load image*, and the Makefile went on to print *RAMFS no need to
+  check flash size*. 讀 the recipe line, `@$(CVIMG) size_chk vmlinux_img
+  $(LOAD_START_ADDR)` followed by `exit $$?` on a non-zero status: the Makefile
+  is built to stop, `make` returned 0, so `cvimg` printed the error and exited
+  0. That is inferred from the Makefile and `make`'s status; `cvimg` itself was
+  not run on its own.
+* `tools/rtkimage.py build` returned 0 and wrote its record (`make_rc 0`,
+  `make_tolerated -`; the record is written only when `build` does not refuse,
+  and `s124/p`'s own comment says it returned 0): a 2,241,536-byte `nfjrom`
+  around a 7,494,144-byte decompressed image. 讀 `cmd_build`: it names exactly
+  one tolerated non-zero,
+  `cvimg flash_size_chk`, and calls no ceiling check. `cmd_check` does have one
+  (*OVER THE CEILING*, exit 1), but `build` never runs it, and `e1`'s `nfjrom`
+  was not kept, so that arm was not re-run.
+* `tools/mkinitramfs.py build … --kernel-image <e1's vmlinux>`, run again here,
+  returned **1**: *decompressed image 7494144 bytes (2 PT_LOAD,
+  0x80000000-0x80725a00), ceiling 5242880, margin -2251264 (142.9% used)* and
+  *REFUSED: over the ceiling. The decompressor reads from 0x80500000 and writes
+  to 0x80000000; this image would overwrite its own input.* Its controls in the
+  same run: `e2` returned 0 at 5,238,272 B with a margin of 4,608 (99.9 %), which
+  Realtek's tool also printed for it (*Available size :0x00001200*), and the
+  mainline image of `s124/p`'s trial 4 returned 0 at 4,096,000 B, margin
+  1,146,880 (78.1 %).
+
+So the only refusal is `tools/mkinitramfs.py --kernel-image`, which measures the
+`PT_LOAD` extent of the linked `vmlinux` (§ 11.7). 讀 `tools/rlxfw-kbuild.sh` and
+`tools/rtkimage.py`: neither contains `--kernel-image`, and across `tools/`, the
+CI workflow, `docs/`, `notes/` and `README.md` the string occurs in
+`tools/mkinitramfs.py` itself and in prose. A build path that does not invoke it
+has no refusal: `s124/p`'s build script runs it on every image, and that script
+is not a repository file.
+
+**Refutation.** `cvimg size_chk` returning non-zero on `e1`, or `rtkimage.py
+build` refusing it, would refute the first two bullets; `mkinitramfs` returning 0
+on `e1` would refute the third, and it returned 1. **Not established:** that
+`cvimg` exits 0 when run alone; that `e1`'s image fails to boot — 讀 the
+addresses, never booted; that `rtkimage.py check` would refuse it; and anything
+about the ceiling itself, which is `FW-23`'s and unmoved. `SPEC.md` `FW-239`.

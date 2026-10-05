@@ -633,14 +633,14 @@ reset type, and gives an initial value that this unit's reading **does not
 match** — which is § 0 ①'s whole point, since D is a draft for a different
 variant.
 
-🟢 **The value has a second reading, thirty-four days apart, and `SPEC.md` does
-not cite it.** 量: `bench/2026-08-24b/B7b.log` (`DW B8000000 1`, 2026-08-24) and
+🟢 **The value has a second reading, thirty-four days apart, and `SPEC.md`
+cites both.** 量: `bench/2026-08-24b/B7b.log` (`DW B8000000 1`, 2026-08-24) and
 `bench/2026-09-27d/AL-D01.log` (`DW B8000000 4`, 2026-09-27) return the **same
 four words**, and `bench/2026-09-27d/CELLS-A.md` § 5 puts the second at the cold
 loader prompt with a gate that fails the capture if it contains `Booting...`,
-`---RealTek` or `Linux version`. ⚠️ `REG-29`'s source cell names only `B7b`, so
-**this row is `n = 2` and its owner says `n = 1`** — a debt on that cell, still
-unpaid on 2026-10-05 and `SPEC.md`'s to pay, not a finding this file may hold.
+`---RealTek` or `Linux version`. `REG-29`'s source cell named only `B7b` until
+2026-10-05, when `SPEC.md` added `AL-D01`, so this row and its owner both read
+**`n = 2`**; the debt this paragraph recorded is paid.
 
 🟢 **`REG-30` is the one strap on this board whose field, value and consequence
 are all established**, and it is worth the space because it is what a strap

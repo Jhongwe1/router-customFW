@@ -8,6 +8,15 @@ last section says which of them the bench can still refute.
 `SPEC-R8a.md` §§ 2 and 4 own the format and the memory map; this file owns the
 reasons.
 
+🔄 **2026-10-05 (124th segment): §§ 1–10 describe the `BOOT=ram` build, which was
+the only build when they were written.** The default device build is now
+`BOOT=slots` with `KEY=prod` (`R8b-1`, `94d97924`): it reads two flash slots
+instead of a container staged in RAM, and the last section below says how. The
+numbers in §§ 1, 2 and 8 — 16,240 bytes, 405 loads, the container at
+`0x81000000`, the suite counts — are the older build's, and `t_container`'s 71 in
+§ 8 was already stale at format 2. The sections after § 10 are dated and are
+read in order.
+
 ## 1. What it is
 
 `rlxboot` is a bare-metal payload for the RTL8196E, linked at `0x81800000`,
@@ -326,6 +335,10 @@ negative-array-size idiom, because gcc 3.4.6 has no `_Static_assert`.
 
 ## 8. Counts
 
+🔄 2026-10-05: these are `R8a`'s counts (`BOOT=ram`, format 1 at the time); the
+suites today are `t_crypto` 36, `t_container` 99 and `t_slots` 61, in the last
+section.
+
 | | |
 |---|---|
 | host suite, `t_crypto` | 36 checks, 0 failures |
@@ -459,11 +472,14 @@ reproduced from the committed tree** — a rebuild from `66ec2abe` compiles a
 different `-DRLXBOOT_BUILD`, so the payload bytes, its sha256, the `cr6c`
 length and the 16-bit sum all move with it. This note's own `Makefile` comment
 states the stake: *"a rescue that differed in C would carry a different id …
-and would stop being the known-good copy a rescue slot exists to hold"*. The
-difference here is not in C — 讀 the id is a digest of the sources, and
-`c7e27842`'s change to them was a container-format change the rescue payload
-does not use — but the instrument cannot tell those apart, which is the whole
-reason it is a digest.
+and would stop being the known-good copy a rescue slot exists to hold"*.
+🔄 **2026-10-05 (124th segment): the sentence that followed here said the
+difference was not in C, and that was wrong.** It read *"the difference here is
+not in C — 讀 the id is a digest of the sources, and `c7e27842`'s change to them
+was a container-format change the rescue payload does not use"*. 量, in the
+next section (`FW-232`): the format-2 verifier is the payload's own
+`rlxu_verify`, and the payload is 336 bytes larger. The difference **is** in C,
+and the digest — which cannot tell a comment from code — was right to move.
 
 **Refutation conditions, written before the readings.** *The id moved* is
 refuted by HEAD giving `6395889d`; it did not. *The recipe is being read
@@ -480,3 +496,247 @@ not establish what the rescue slot should hold: whether `R8b` writes the
 `FW-215` artefact (reproducible only from `457b2314`-era sources) or a rebuild
 at HEAD's id is a decision about what *known-good* means, and it is the
 owner's. And nothing was built or compiled for this reading.
+
+## 🆕 2026-10-05 (124th segment, desk, no power): format 2 changed `rlxboot`'s code, not only its id
+
+The section above ends on a reading and an inference. The reading, that
+`BUILD_ID` moved at `c7e27842`, stands. The inference, that the difference is not
+in C, is refuted here, and that paragraph is corrected where it stands.
+
+**Refutation conditions, in place before the first build** (`s124/e/prereg.md`,
+R4; 推 when written, from reading `c7e27842`'s diff): *the format-2 change
+reached the payload's code, not only its id* is refuted if `c7716fbe`'s
+`rlxboot.bin` is still 16,240 bytes and differs from `FW-215`'s only in the
+instruction words that carry the build id, or if none of the strings
+`flash_dst`, `flash_match`, `flash_form` occurs in it. Neither fired.
+
+量, tree `c7716fbe`, the recipe `FW-215` used (`make payload`, `make rescue`,
+`make rescue-controls`), every `make` under `tools/vendor-tripwire.sh` from a
+scratch directory, the toolchain being a sparse `--shared` clone of
+`src-vendor/rtl819x-toolchain` at its pin `5c9be5d9`: `diff -rq
+--no-dereference` against the canonical `rsdk-1.3.6-4181-EB-2.6.30-0.9.30`
+directory was empty (rc 0), the same diff over a copy with one byte changed
+returned 1, and the tripwire returned 0 on `true` and 2 on a file created inside
+the clone.
+
+| | `FW-215`'s tree (`2200d1d7`, which is `c7e27842^`) | `c7716fbe` |
+|---|---:|---:|
+| `rlxboot.bin` | 16,240 B | **16,576 B** |
+| `.text` | 13,520 | 13,808 (+288) |
+| `.rodata` | 2,720 | 2,768 (+48) |
+| `.bss` | 2,000 | 2,000 |
+| `rlxu_verify` | 1,296 B | **1,572 B** |
+| `reason_names` | 72 B | 84 B |
+| `rlxprobe_main` | 508 B | 520 B |
+| strings `flash_dst`, `flash_match`, `flash_form` | 0 each | 1 each |
+| bytes that differ over the common 16,240 | — | 13,572 |
+| each `cr6c` image | 16,258 B | 16,594 B (`len` 16,578, 16-bit sum `0x0000`) |
+| build id | `6395889d` | `a9727473` |
+
+`reason_names` is 18 four-byte entries before and 21 after: the three reasons
+that § 3 lists as arriving with format 2. The control: `c7e27842^` rebuilt in
+this same environment gives `rlxboot.bin` and both `cr6c` images byte-identical
+to `FW-215`'s (`cmp` rc 0 on all three), so the recorded artefact **is**
+reproducible — from `2200d1d7`'s tree and from no later one. Two clones at
+different paths built `c7716fbe`'s three artefacts and the ELF byte for byte
+(23 of the 26 files each build leaves are identical; the three that differ are
+`objdump` listings that print the ELF's path, first difference at byte 38). The
+two `cr6c` images differ in one byte, at offset 9 (`0x01` against `0x02`, the
+flash-offset field), use 25.3 % of their region and end 48,942 bytes short of
+the next scan candidate.
+
+**The second half, 讀 and not run.** `FW-215`'s artefact would refuse every
+container this repository's tools now make. 讀 `container.c` at `2200d1d7`:
+step 1 requires `format == RLXU_FORMAT`, which is 1 there, and refuses by the
+name `format` otherwise. 讀 `tools/mkfw2.py` at `c7716fbe` and at `a6add876`:
+`FORMAT = 2`, and `build` refuses to leave `flash_at` or `flash_form` out. Two
+sources, and neither is a run — no format-2 container was fed to a format-1
+verifier here.
+
+**What this does not establish.** Which source file or line produced the 336
+bytes: that is attribution, and this reading makes none. That any of it ran on
+the die. What the rescue slot should hold, which the previous section left to
+the owner and this one leaves there. And it measures `c7716fbe`'s tree: after
+`R8b-1` (next section) the default recipe builds a different program, so none of
+these sizes is the current tree's.
+
+## 🆕 2026-10-05 (124th segment, desk, no power): `rlxboot` boots from flash slot A or B (`R8b-1`)
+
+`94d97924`. 讀 from `src/rlxboot/{main.c, slots.c, slots.h, flashread.c,
+rlxboot.h, Makefile, prodkey.h, mkprodkey.py}` at that commit unless marked; 量
+is about the host, qemu and the compiler. **None of it has run on the die**, and
+nobody has seen the stock loader start this payload with the flash window
+decoding over the slots.
+
+### Why it exists
+
+§§ 1–10 verify one container, staged in RAM at `0x81000000` by the loader's
+TFTP, and the only flash address the payload formed was the counter's. 讀
+`src/rlxboot/*.c` and `*.h` at `94d97924^`: **0** lines name a slot's flash
+address or a slot macro; at `a6add876` **43** do, which is the control. So the 123rd
+segment's *"no tool question is left undecided"* was wrong on this side, as it
+was on the kernel's (`SPEC.md` `FW-230`): there was no flash boot at all, and
+`R8b` is a write that has to be booted from.
+
+### Two selectors, both fixed when the image is built
+
+**`BOOT=slots`** is the default and the artefact; **`BOOT=ram`** is `R8a`'s path,
+kept buildable and not linking `slots.c`. There is no build that tries one and
+then the other: `MEM-17`, DRAM survives a power cycle, so a run-time *RAM first*
+would let a stale container from any earlier seating win over both slots
+without anyone typing a thing. **`KEY=prod`** is the default: the public half of
+the owner's production key, compiled in from the generated `prodkey.h`.
+**`KEY=dev`** is the development key, whose seed is published in `devkey.h`, so
+an image built with it accepts a container anyone signed; it has to be typed.
+`RLXBOOT-KEY prod <hex>` or `dev <hex>` is the second console line, so a capture
+says which key an image trusts without anyone recomputing an id.
+
+The Makefile's `keycheck` runs before anything is compiled and refuses, naming
+the command that fixes it, while `prodkey.h` holds no key — the committed header
+is the placeholder — or the development key, text that is not 64 hex digits, 32
+bytes that are not a curve point, or a point of small order; `main.c` stops at
+`#error` if the Makefile is bypassed. `mkprodkey.py write --pubkey <64 hex>`
+writes the header, and its `check` also refuses a header whose three copies of
+the key disagree. The seed never enters this repository or `$FWRE_WORK`; the
+public half is meant to be committed, so anyone can rebuild the flash image.
+Built with `KEY=prod` on the committed tree, `make payload` exits 2 with
+*`prodkey.h holds NO production key (it is the placeholder)`* (an agent run,
+`s124/f`, tripwire CLEAN).
+
+BUILD_ID is the first eight hex digits of the digest over every source that
+reaches the image plus the key header, so each choice has its own. 量 by `make
+-pn`, the method of the 123rd segment's section (it evaluates the immediate
+assignment and runs no rule), at `94d97924` — `a6add876` gives the same four:
+
+| recipe | `BUILD_ID` | |
+|---|---|---|
+| default (`BOOT=slots KEY=prod`, placeholder key) | `ef430386` | names a build that refuses, so no artefact carries it |
+| `BOOT=slots KEY=dev` | `239582cc` | 18,576 B, `tools/hazlint` 0 violations in 508 loads |
+| `BOOT=ram KEY=dev` | `94771052` | 16,704 B, 0 violations in 413 loads |
+| `BOOT=ram KEY=prod` | `4b16a0c2` | |
+
+The two sizes are from the agents' builds under the tripwire (`s124/f`), and the
+ids reproduce there. Neither `BOOT=ram KEY=dev`'s id nor any other is `FW-215`'s
+`6395889d`: `FW-215`'s artefact stays reproducible only from `2200d1d7`'s tree
+(`FW-232`). The production-key ids arrive in `R8b-3`.
+
+### D4's rule, as the code does it
+
+1. **Copy.** Slot A (`0x070000`) goes to RAM at `0x81000000` and slot B
+   (`0x190000`) to `0x81200000`, 1,179,648 bytes of room each, through the
+   uncached window at `0xBD000000` one aligned word at a time. Each slot has its
+   own buffer, so verifying B cannot overwrite A's verified copy. The copy is
+   sized by the 160-byte header already in RAM: those 160 bytes come first, and
+   the rest follows only if they begin `RLXU` and their `payload_len` fits the
+   slot, so an erased or torn slot costs a 160-byte read and not 1.1 MB.
+2. **Verify each copy where it sits** with the unchanged `rlxu_verify`, with
+   `write_at` set to that slot's own base and `write_form` to `WHOL`. This is a
+   decision the spec did not make (`slots.c`'s header): a container signed for
+   slot B and found in slot A, one that declares no destination, and one declared
+   `PAYL` are all refused as `flash_match`, because the signed `flash_at` has to
+   name the place the container was read from, in the form that puts a header
+   there.
+3. **Choose.** The valid slot with the higher `version` boots, and a tie boots A.
+   An unverified slot never wins whatever its header claims, because that
+   version is an unauthenticated field until `rlxu_verify` returns.
+4. **Boot from the winner's own buffer.** Nothing is read from flash after a
+   slot's verdict, so there is no second copy whose bytes could differ from the
+   ones that were checked.
+5. **Neither verifies:** print both reasons, then halt — no reset. A reset would
+   come back through the stock loader's scan to this same `rlxboot` and the same
+   two slots, forever, and 讀 `docs/loader-command-semantics.md`: the loader's
+   only two `WDTCNR` writes are its own deliberate reboots, so nothing arms the
+   watchdog under a spin this payload did not arm itself.
+
+The console, from `t_slots show` run here (host, exit 0; the device adds the
+per-stage lines between a `READ` and its `VERDICT`, and `refuse-action halt`
+after a `HALT`):
+
+```
+RLXBOOT-READ A flash=00070000 buf=81000000 n=100160 .
+RLXBOOT-VERDICT A ok ver=1
+RLXBOOT-READ B flash=00190000 buf=81200000 n=1114272 .................
+RLXBOOT-VERDICT B ok ver=2
+RLXBOOT-SLOT B
+```
+
+```
+RLXBOOT-READ A flash=00070000 buf=81000000 n=160
+RLXBOOT-VERDICT A bad=magic
+RLXBOOT-READ B flash=00190000 buf=81200000 n=300160 ....
+RLXBOOT-VERDICT B bad=digest
+RLXBOOT-HALT A=magic B=digest
+```
+
+`n=` is the byte count this read will cover, printed before the copy so a hang in
+the first read of the part ends the console on that line; one dot is printed per
+64 KiB copied, so a copy that has stopped shows as dots that stopped.
+
+### D21 — the counter is the flash bitmap, and only that
+
+The slots build reads the anti-rollback counter from the bitmap at flash
+`0x3F0000` and nowhere else; the RAM-staged `RCNT` path is not compiled. A stale
+or planted block in DRAM (`MEM-17`) would otherwise set the floor lower than
+flash's, letting a rollback through, or higher, refusing both slots. The
+Makefile's payload gate reads the disassembly and refuses a slots image that
+forms `0x81700000` at all, with the RAM image as the control that the census can
+see it: 量, in the `s124/f` build logs, **0** census rows naming it in the slots
+image and **2** in the RAM image. `RLXBOOT-CTRSRC flash` is therefore a
+constant in the slots build. ⚠️ The flash source itself stays 推: § 10 says why
+an undecoded window and an erased region both give counter 0.
+
+### The test runners could not fail
+
+`run-host-tests.sh` ran each suite as `"$o/t_container" | tail -3` and
+`run-qemu-tests.sh` as `qemu-mips-static ./t_container | tail -8`. Under `set -e`
+a pipeline's status is its last command's — `tail`'s, 0 — so a suite that printed
+its own `N failures` line did not stop the run, and the script went on to print
+*"both suites exited 0"* and *"host suite: PASS"*. 讀 both scripts at
+`94d97924^`. 量 2026-10-05, re-measured here with one planted failing check (a
+`checks++; failures++;` before `t_container`'s summary line), each runner on its
+own `git archive`:
+
+| runner | plant | exit | `host suite: PASS` | `t_container` |
+|---|---|---:|---:|---|
+| `94d97924^` | none | 0 | 1 | 97 checks, 0 failures |
+| `94d97924^` | yes | **0** | **1** | 98 checks, **1 failure**, in all three builds |
+| `94d97924` | yes | **1** | 0 | stopped at `cc1`: 100 checks, 1 failure |
+| `94d97924` | none | 0 | 1 | 99 / 0, with `t_crypto` 36 / 0 and `t_slots` 61 / 0, in each of the three builds |
+
+So the guard permits as well as refuses. ⚠️ My first unplanted run of the new
+runner used an archive of `src/` alone and failed on `mkprodkey.py --self-test`,
+which imports `tools/rlxsign.py`: a defect of my scratch tree, but also the new
+runner refusing a failure at a later step, which the old one could not do. The
+fix writes each suite's output to a file, reads its status with no pipe on the
+command, and stops naming the suite; `mkprodkey.py --self-test` is read the same
+way. The qemu runner's old shape is 讀, not re-measured, and the commit message
+reports `t_slots` 61 / 0 under big-endian qemu, which was not re-run here.
+`SPEC.md` `FW-234`.
+
+### What the suites and mutations cover
+
+`t_slots` (61 checks) drives `slots.c` and `container.c` against a 4 MiB array
+standing in for the part and two host arrays standing in for the buffers; every
+container is built and signed there, every case asserts both verdicts by name and
+the console lines exactly, and `rlxb_choose` is checked on eight rows of the D4
+table. `mutate.sh` has eight mutations, each confirmed to apply and each caught
+after the unmutated suite is shown to pass (`s124/f`'s run ends *all eight
+mutations were applied and all eight were caught*; not re-run here): M1 and M2
+are § 9's; M3 makes a tie
+boot B; M4 verifies the flash and boots the buffer, the *second copy* D4 rules
+out; M5 lets a claimed higher version count as valid; M6 verifies a slot without
+naming its own base; M7 compiles the RAM counter into the slots build, and M8
+compiles it out of the RAM build.
+
+### What this does not establish
+
+Anything on the die: that the stock loader's scan starts this payload at all
+with the window decoding over the slots at that moment, and that a slot read
+returns what the 2026-08-16 dump holds. What the two reads cost: copying a full
+slot is 294,912 words, and at the 2.075 µs `FLS-11` measured for one uncached
+load through that window it would be about 0.6 s a slot (推 — that figure is
+`probe3`'s loop, not this one), before Ed25519 and SHA-256 over up to 1 MiB on a
+core nothing has timed (§ 10). That the owner's key exists: the prod build
+refuses until it does, and no container signed with it exists (`R8b-3`). That
+`main.c`'s halt and jump behave, which only the qemu payload run reaches and
+qemu certifies logic, not the ISA.
