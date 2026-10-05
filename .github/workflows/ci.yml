@@ -1068,6 +1068,12 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/bootslot.py --self-test 2>&1 | tee ci-out/bootslot.out; exit "${PIPESTATUS[0]}"
 
+      # R8b-3's payload sender (FW-240): every byte delivered, the digest
+      # guard refusing before it connects, and FW-124's contract both ways.
+      - name: sendimg self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/sendimg.py --self-test 2>&1 | tee ci-out/sendimg.out; exit "${PIPESTATUS[0]}"
+
       - name: test-mkfw2
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-mkfw2.sh 2>&1 | tee ci-out/test-mkfw2.out; exit "${PIPESTATUS[0]}"

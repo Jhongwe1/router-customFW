@@ -661,16 +661,47 @@ def self_test():
     r, why = run(pf, "B", "ok:1", "ok:2", good)
     case("F6", "a FROM line and no expectation: judged as before, PASS",
          r == "PASS", "%s %s" % (r, why))
+
+    # FW-124's contract, which cardcheck uses to judge a card's HOST cell
+    # before power: refuse_args() permits and refuses on the arguments alone,
+    # reading no file, and the parser refuses an abbreviated option.
+    def av(argv):
+        try:
+            refuse_args(build_parser().parse_args(argv))
+            return "ok"
+        except Refused as e:
+            return "REFUSED " + str(e)
+    gl = ["judge", os.path.join(tmp, "absent.log"), "--expect-slot", "A",
+          "--expect-a", "ok:1", "--expect-b", "bad", "--build-manifest",
+          os.path.join(tmp, "absent.manifest")]
+    v = av(gl)
+    case("K1", "refuse_args permits a well-formed judge line whose files do not exist yet",
+         v == "ok", v)
+    v = av(gl[:3] + ["C"] + gl[4:])
+    case("K2", "refuse_args refuses an unknown slot", v.startswith("REFUSED --expect-slot"), v)
+    v = av(gl + ["--expect-from", "zz"])
+    case("K3", "refuse_args refuses a malformed --expect-from",
+         v.startswith("REFUSED --expect-from"), v)
+    v = av(gl[:8])
+    case("K4", "refuse_args refuses a slot expectation with no build manifest",
+         v.startswith("REFUSED an expected slot"), v)
+    v = av(["judge", "x.log", "--expect-s", "A", "--expect-a", "ok", "--expect-b",
+            "ok", "--build-manifest", "m"])
+    case("K5", "the parser refuses an abbreviated option",
+         v.startswith("REFUSED usage"), v)
     print("bootslot %s self-test: %d passed, %d failed" % (VERSION, len(cases) - bad, bad))
     return 2 if bad else 0
 
 
 # ------------------------------------------------------------------- main
-def main(argv=None, quiet=False):
-    ap = _Parser(prog="bootslot.py")
+def build_parser():
+    """The parser main() uses -- and the one cardcheck builds to judge a card's
+    HOST cell before the board is powered (FW-124's contract). No option may
+    be abbreviated."""
+    ap = _Parser(prog="bootslot.py", allow_abbrev=False)
     ap.add_argument("--self-test", action="store_true")
     sub = ap.add_subparsers(dest="cmd")
-    j = sub.add_parser("judge")
+    j = sub.add_parser("judge", allow_abbrev=False)
     j.add_argument("capture")
     j.add_argument("--expect-slot", required=True)
     j.add_argument("--expect-a", required=True)
@@ -679,15 +710,44 @@ def main(argv=None, quiet=False):
     j.add_argument("--allow-dev-key", action="store_true")
     j.add_argument("--expect-from", help="the RLXBOOT-FROM word to require, in "
                    "hex; a capture without the line is then REFUSED")
-    sh = sub.add_parser("show")
+    sh = sub.add_parser("show", allow_abbrev=False)
     sh.add_argument("capture")
+    return ap
+
+
+def refuse_args(a):
+    """FW-124's contract: refuse what the arguments alone show is wrong, with
+    judge()'s own rules and messages, and READ NO FILE -- a card is checked
+    before the capture it judges exists."""
+    if a.self_test:
+        return
+    if a.cmd not in ("judge", "show"):
+        raise Refused("no subcommand: judge, show or --self-test")
+    if a.cmd == "show":
+        return
+    if a.expect_slot not in ("A", "B", "HALT"):
+        raise Refused("--expect-slot %r: want A, B or HALT" % (a.expect_slot,))
+    parse_expect(a.expect_a, "--expect-a")
+    parse_expect(a.expect_b, "--expect-b")
+    if a.expect_from is not None and not FROM_EXPECT_RE.match(a.expect_from):
+        raise Refused("--expect-from %r: want up to eight hex digits, 0x "
+                      "optional" % (a.expect_from,))
+    if a.expect_slot == "HALT" and a.build_manifest:
+        raise Refused("a HALT boots no kernel, so there is no id to compare "
+                      "-- drop --build-manifest")
+    if a.expect_slot in SLOTS and not a.build_manifest:
+        raise Refused("an expected slot needs --build-manifest: the expected "
+                      "id comes from the build, never from a typed value")
+
+
+def main(argv=None, quiet=False):
+    ap = build_parser()
     say = (lambda *a: None) if quiet else print
     try:
         a = ap.parse_args(argv)
+        refuse_args(a)
         if a.self_test:
             return self_test()
-        if a.cmd not in ("judge", "show"):
-            raise Refused("no subcommand: judge, show or --self-test")
         try:
             with open(a.capture, encoding="utf-8", errors="replace") as fh:
                 text = fh.read()

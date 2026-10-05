@@ -126,6 +126,8 @@ Exit codes for `run`, and only one of them means the window was read:
       2  a refusal before anything was sent (bad arguments, containment)
 """
 import argparse
+import contextlib
+import io
 import json
 import os
 import re
@@ -1082,6 +1084,35 @@ def self_test():
     finally:
         shutil.rmtree(outside, ignore_errors=True)
 
+    # FW-124's contract: refuse_args() is cmd_run's own pre-port guard, so a
+    # card's HOST cell is judged by it before power; shown both ways.
+    def kargs(pre):
+        return build_parser().parse_args(
+            ["run", "--port", "/dev/null", "--stem", "K", "--suffix", "1",
+             "--src", "030000", "--dst", "80D00000", "--bytes", "100",
+             "--echo-dir", os.path.join(root, "bench", "k"), "--dw-dir",
+             os.path.join(root, "bench", "k"), "--pre-dir", pre])
+    try:
+        refuse_args(kargs("/home/key/fwre-work/rebuild/bench-only/k1"))
+        good("K1 refuse_args permits a run whose pre-read lands outside the "
+             "repository, reading no file")
+    except Refused as e:
+        bad(f"K1 refuse_args refused a well-formed run: {e}")
+    try:
+        refuse_args(kargs(os.path.join(root, "bench", "k")))
+        bad("K2 refuse_args permitted a pre-read inside the repository")
+    except Refused as e:
+        if "pre-read" in str(e):
+            good("K2 refuse_args refuses a pre-read inside the repository")
+        else:
+            bad(f"K2 refused, but for another reason: {e}")
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            build_parser().parse_args(["run", "--por", "/dev/null"])
+        bad("K3 the parser accepted an abbreviated option")
+    except SystemExit:
+        good("K3 the parser refuses an abbreviated option")
+
     print()
     print(f"{ok} ok, {fail} FAIL")
     return 1 if fail else 0
@@ -1091,19 +1122,57 @@ def _hexint(s):
     return int(s, 16)
 
 
+class Refused(Exception):
+    pass
+
+
+def refuse_args(args):
+    """FW-124's contract: every refusal cmd_run makes before a port is opened,
+    from the same functions, raised as Refused -- so cardcheck judges a card's
+    HOST cell with the run's own guard, before power, reading no file."""
+    if args.self_test or args.cmd != "run":
+        return
+    bad = check_ranges(args.src, args.dst, args.bytes)
+    if bad:
+        raise Refused(bad)
+    plan = build_plan(args.stem, args.suffix, args.dst, args.src, args.bytes,
+                      args.echo_dir, args.dw_dir, args.pre_dir)
+    bad = preread_target(plan[0][1])
+    if bad:
+        raise Refused("the pre-read capture may not go there: " + bad)
+    bad = readback_target(args.src, args.bytes, plan[3][1])
+    if bad:
+        raise Refused("the read-back capture may not go there: " + bad)
+
+
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap = build_parser()
+    args = ap.parse_args()
+    if args.self_test:
+        return self_test()
+    if not args.cmd:
+        ap.print_help()
+        return 2
+    return args.func(args)
+
+
+def build_parser():
+    """The parser main() uses, and the one cardcheck builds (FW-124). No
+    option may be abbreviated."""
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0],
+                                 allow_abbrev=False)
     ap.add_argument("--self-test", action="store_true")
     sub = ap.add_subparsers(dest="cmd")
 
-    v = sub.add_parser("verify", help="classify a recorded FLR echo")
+    v = sub.add_parser("verify", help="classify a recorded FLR echo",
+                       allow_abbrev=False)
     v.add_argument("file")
     v.add_argument("--src", type=_hexint, required=True)
     v.add_argument("--dst", type=_hexint, required=True)
     v.add_argument("--bytes", type=_hexint, required=True)
     v.set_defaults(func=cmd_verify)
 
-    r = sub.add_parser("run", help="drive one FLR window")
+    r = sub.add_parser("run", help="drive one FLR window", allow_abbrev=False)
     r.add_argument("--port", required=True)
     r.add_argument("--stem", required=True, help="e.g. W")
     r.add_argument("--suffix", required=True, help="e.g. 0 / 6 / h / c")
@@ -1120,14 +1189,7 @@ def main():
     r.add_argument("--go", action="store_true",
                    help="actually open the port; without it this is a dry run")
     r.set_defaults(func=cmd_run)
-
-    args = ap.parse_args()
-    if args.self_test:
-        return self_test()
-    if not args.cmd:
-        ap.print_help()
-        return 2
-    return args.func(args)
+    return ap
 
 
 if __name__ == "__main__":
