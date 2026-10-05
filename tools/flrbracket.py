@@ -1098,8 +1098,12 @@ def self_test():
              "repository, reading no file")
     except Refused as e:
         bad(f"K1 refuse_args refused a well-formed run: {e}")
+    # tools/ and not bench/: test-flrbracket-mutants runs this from a tree in
+    # which every top-level entry but tools/ is a symlink into the real
+    # repository, so <root>/bench/k resolves OUTSIDE that tree and the guard,
+    # correctly, would not refuse it (量 2026-10-06, its B0 went red on K2).
     try:
-        refuse_args(kargs(os.path.join(root, "bench", "k")))
+        refuse_args(kargs(os.path.join(root, "tools", "k-pre")))
         bad("K2 refuse_args permitted a pre-read inside the repository")
     except Refused as e:
         if "pre-read" in str(e):
