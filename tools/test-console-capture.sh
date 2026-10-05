@@ -2242,6 +2242,28 @@ else
   bad "N51 refuse_args() does not refuse in a way a card check can catch: ${CK#BAD }"
 fi
 
+# --- N52 / P52 an abbreviated option (2026-10-05) -------------------------
+# argparse accepted any unambiguous prefix of an option, so `--sen 'EW ...'`
+# reached the port as a --send that a card check reading for `--send` could
+# not see. The parser and both subparsers now set allow_abbrev=False; N52 is
+# the refusal, before the port is opened, and P52 the control that the full
+# spelling still parses.
+OUTAB="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/ab" --sen 'ABC' --seconds 1 2>&1)"; RCAB=$?
+if [ "$RCAB" -eq 2 ] && printf '%s\n' "$OUTAB" | grep -q 'unrecognized arguments: --sen' \
+   && ! printf '%s\n' "$OUTAB" | grep -q 'cannot open'; then
+  ok "N52 an abbreviated --sen is refused by the parser before the port is opened"
+else
+  bad "N52 an abbreviated --sen was not refused before the port (rc $RCAB)"
+  printf '%s\n' "$OUTAB" | sed 's/^/        /'
+fi
+OUTFS="$("$PY" "$TOOL" capture --port /dev/null --out "$WORK/fs" --send 'ABC' --seconds 1 2>&1)"
+if printf '%s\n' "$OUTFS" | grep -q 'unrecognized arguments'; then
+  bad "P52 the full --send spelling no longer parses"
+  printf '%s\n' "$OUTFS" | sed 's/^/        /'
+else
+  ok "P52 the full --send spelling still parses (the control for N52)"
+fi
+
 echo
 echo "  $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

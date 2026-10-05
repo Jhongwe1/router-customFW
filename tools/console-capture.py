@@ -1012,10 +1012,10 @@ def _raw_clock() -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """The parser main() uses -- the one a card's HOST-cell check builds too."""
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0], allow_abbrev=False)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    c = sub.add_parser("capture", help="stream the console to PREFIX.log/.timing/.meta.json")
+    c = sub.add_parser("capture", help="stream the console to PREFIX.log/.timing/.meta.json", allow_abbrev=False)
     c.add_argument("--port", required=True, help="e.g. /dev/ttyUSB0 (usbipd attach first)")
     c.add_argument("--baud", type=int, default=DEFAULT_BAUD)
     c.add_argument("--out", required=True, help="output path prefix, no extension")
@@ -1069,7 +1069,7 @@ def build_parser() -> argparse.ArgumentParser:
     c.add_argument("--force", action="store_true", help="overwrite an existing capture")
     c.set_defaults(func=capture)
 
-    r = sub.add_parser("report", help="interval between two patterns in a capture")
+    r = sub.add_parser("report", help="interval between two patterns in a capture", allow_abbrev=False)
     r.add_argument("prefix")
     r.add_argument("--from", dest="pat_from", required=True, help="regex, first match")
     r.add_argument("--to", dest="pat_to", required=True, help="regex, first match after FROM")
