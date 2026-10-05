@@ -17,7 +17,8 @@ sources on every self-test so a changed printf turns this file red instead of
 turning a capture silently unreadable:
 
     RLXBOOT-V1 build=<8 hex>                          main.c, once per run
-    RLXBOOT-KEY prod|dev <64 hex>                     main.c, right after it
+    RLXBOOT-FROM <8 hex>                              main.c, right after it (D28)
+    RLXBOOT-KEY prod|dev <64 hex>                     main.c, after those
     RLXBOOT-CTRSRC flash                              main.c (slots build)
     RLXBOOT-READ A flash=00070000 buf=81000000 n=<dec>[ <dots>]   slots.c
     RLXBOOT-HDR ok | RLXBOOT-HDR bad=<r>              main.c report()
@@ -44,6 +45,16 @@ digest): `--build-manifest` names the `rlxfw-build-manifest` that
 `tools/rlxfw-kbuild.sh` writes beside the image, and its `recipe_id` row is
 the expectation.
 
+`RLXBOOT-FROM` (D28) is the word rlxboot reads at the stock loader's global
+0x8040DD3C: the flash candidate the loader accepted, so it separates a boot of
+`rlxboot` at 0x010000 from one of the rescue at 0x020000.  It is judged only
+when `--expect-from <hex>` is given, and then a capture without the line is
+REFUSED rather than passed.  ⚠️ What the word holds is 讀 only:
+`docs/loader-command-semantics.md` s a and s 8 row 1 predict the offset
+biased by 0x05000000 (0x05010000 and 0x05020000).  Nothing has read it on this
+unit, so the first bench reading is the measurement and an expectation is
+written from it, not from this paragraph.
+
 Refusals, and why they are not verdicts
 ---------------------------------------
 * No `RLXBOOT-V1` line: the capture never reached rlxboot (a vendor boot, a
@@ -59,6 +70,8 @@ Refusals, and why they are not verdicts
   `CTRSRC ram` build (it reads no slot), a capture that ends before the choice,
   an unreadable file, a malformed expectation, or a manifest without a
   well-formed `recipe_id`.
+* `--expect-from` given and no `RLXBOOT-FROM` line (an rlxboot older than
+  D28), or two of them after one banner.
 
 Exit: 0 PASS, 1 FAIL (the capture contradicts the expectation or itself),
 2 a self-test control failed, 3 REFUSED -- one line and a reason, never a
@@ -71,13 +84,14 @@ That the key printed is the owner's: it requires `prod` (unless
 `--allow-dev-key`) and prints the hex; comparing the hex with the committed
 key is `src/rlxboot/mkprodkey.py check`'s, and not restated here.  Where in a
 write a power cut landed: the install's own `RLXFW-SI` lines say that.  And
-anything about the stock loader: a boot of the rescue at `0x020000` prints
-exactly what a boot of `rlxboot` at `0x010000` prints (one payload, two
-headers that differ in one byte the loader does not echo), so this tool
-cannot tell them apart and does not try.
+what the loader's word MEANS: the rescue and `rlxboot` are one payload under
+two headers, so without `RLXBOOT-FROM` this tool cannot tell their boots
+apart; with it, it compares a word with an expectation, and that the word is
+the accepted candidate is the loader's reading above, not this tool's.
 
 Run:  /usr/bin/python3 tools/bootslot.py judge CAPTURE.log --expect-slot B \\
-          --expect-a bad --expect-b ok:2 --build-manifest IMAGE.kbuild-manifest
+          --expect-a bad --expect-b ok:2 --build-manifest IMAGE.kbuild-manifest \\
+          [--expect-from 05010000]
       /usr/bin/python3 tools/bootslot.py show CAPTURE.log
       /usr/bin/python3 tools/bootslot.py --self-test
 """
@@ -91,7 +105,7 @@ sys.dont_write_bytecode = True          # an import must not write the tree
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import looprun  # noqa: E402  -- one owner for the RLXFW-ID0 pattern
 
-VERSION = "1.0"
+VERSION = "1.1"
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 讀 src/rlxboot/container.c reason_names[] (S2 re-reads it)
@@ -106,6 +120,8 @@ SLOT_SIZE = 0x00120000
 TICK = 0x10000
 
 BANNER_RE = re.compile(r"RLXBOOT-V1 build=([0-9a-f]{8})")
+FROM_RE = re.compile(r"^RLXBOOT-FROM ([0-9a-f]{8})$")
+FROM_EXPECT_RE = re.compile(r"^(?:0x)?([0-9a-fA-F]{1,8})$")
 KEY_RE = re.compile(r"^RLXBOOT-KEY (prod|dev) ([0-9a-f]{64})$")
 CTR_RE = re.compile(r"^RLXBOOT-CTRSRC (flash|ram)$")
 READ_RE = re.compile(r"^RLXBOOT-READ ([AB]) flash=([0-9a-f]{8}) "
@@ -159,6 +175,10 @@ def parse(text):
     if len(keys) > 1:
         raise Refused("%d KEY lines after one banner" % len(keys))
     f["key"] = (keys[0][1].group(1), keys[0][1].group(2))
+    froms = [FROM_RE.match(s).group(1) for _i, s in seg if FROM_RE.match(s)]
+    if len(froms) > 1:
+        raise Refused("%d `RLXBOOT-FROM` lines after one banner" % len(froms))
+    f["from"] = froms[0] if froms else None
     ctrs = [CTR_RE.match(s).group(1) for _i, s in seg if CTR_RE.match(s)]
     if len(ctrs) != 1:
         raise Refused("%d `RLXBOOT-CTRSRC` lines after the banner, want 1"
@@ -275,13 +295,20 @@ def d4(slots):
 
 
 # ------------------------------------------------------------------ judge
-def judge(text, want_slot, want_a, want_b, manifest=None, allow_dev=False):
+def judge(text, want_slot, want_a, want_b, manifest=None, allow_dev=False,
+          want_from=None):
     """-> (result, [(ok, label, detail)], facts).  result: PASS or FAIL.
     Raises Refused when there is nothing to judge."""
     if want_slot not in ("A", "B", "HALT"):
         raise Refused("--expect-slot %r: want A, B or HALT" % (want_slot,))
     exp = {"A": parse_expect(want_a, "--expect-a"),
            "B": parse_expect(want_b, "--expect-b")}
+    if want_from is not None:
+        m = FROM_EXPECT_RE.match(want_from)
+        if not m:
+            raise Refused("--expect-from %r: want up to eight hex digits, 0x "
+                          "optional" % (want_from,))
+        want_from = "%08x" % int(m.group(1), 16)
     if want_slot == "HALT" and manifest:
         raise Refused("a HALT boots no kernel, so there is no id to compare "
                       "-- drop --build-manifest")
@@ -290,10 +317,19 @@ def judge(text, want_slot, want_a, want_b, manifest=None, allow_dev=False):
                       "id comes from the build, never from a typed value")
     want_id = read_manifest(manifest) if manifest else None
     f = parse(text)
+    if want_from is not None and f["from"] is None:
+        raise Refused("--expect-from %s given and the capture has no "
+                      "`RLXBOOT-FROM` line: an rlxboot older than D28, which "
+                      "never read the loader's word -- not a mismatch" % want_from)
     res = []
 
     def chk(okv, label, detail):
         res.append((bool(okv), label, detail))
+
+    if want_from is not None:
+        chk(f["from"] == want_from, "from",
+            "the loader's word at 0x8040DD3C read %s, want %s"
+            % (f["from"], want_from))
 
     chk(f["key"][0] == "prod" or allow_dev, "key",
         "%s %s...%s" % (f["key"][0], f["key"][1][:8],
@@ -372,10 +408,12 @@ def fx_slot(name, verdict, arg, n=None, dots=None, ctr=0, ver_cur=None):
 
 
 def fx_capture(a, b, choice, key="prod", ctr="flash", id0="4BE284C6", eol="\r\n",
-               boot=True, ids_after=1, pre=(), banners=1, keyline=True, cut=False):
+               boot=True, ids_after=1, pre=(), banners=1, keyline=True, cut=False,
+               froms=()):
     ln = ["Reboot Result from Watchdog Timeout!", "Booting..."] + list(pre)
     for _ in range(banners):
         ln += ["RLXBOOT-V1 build=6b1dc4fd"]
+    ln += ["RLXBOOT-FROM %s" % w for w in froms]     # D28, right after the banner
     if keyline:
         ln += ["RLXBOOT-KEY %s %s" % (key, KEY_FX)]
     ln += ["RLXBOOT-CTRSRC %s" % ctr] + a + b
@@ -417,9 +455,9 @@ def self_test():
 
     good = man("4be284c6")
 
-    def run(text, slot, a, b, m=None, dev=False):
+    def run(text, slot, a, b, m=None, dev=False, frm=None):
         try:
-            r, _res, _f = judge(text, slot, a, b, m, dev)
+            r, _res, _f = judge(text, slot, a, b, m, dev, frm)
             return r, [x for x in _res if not x[0]]
         except Refused as e:
             return "REFUSED", str(e)
@@ -438,7 +476,8 @@ def self_test():
     try:
         lit = {"main.c": _c_literals(os.path.join(rb, "main.c")),
                "slots.c": _c_literals(os.path.join(rb, "slots.c"))}
-        need = {"main.c": ("RLXBOOT-V1 build=", "RLXBOOT-KEY prod ", "RLXBOOT-KEY dev ",
+        need = {"main.c": ("RLXBOOT-V1 build=", "RLXBOOT-FROM ",
+                           "RLXBOOT-KEY prod ", "RLXBOOT-KEY dev ",
                            "RLXBOOT-CTRSRC flash", "RLXBOOT-HDR ", "RLXBOOT-SIG ok",
                            "RLXBOOT-DIGEST ok", "RLXBOOT-VER cur=", " ctr=", " ok",
                            "RLXBOOT-BOOT load=", " entry=", "refuse-action halt"),
@@ -597,6 +636,31 @@ def self_test():
                "--expect-a", "ok", "--expect-b", "ok", "--build-manifest", good],
               quiet=True)
     case("R14", "an unreadable capture: rc 3, not a traceback", rc == 3, "rc=%s" % rc)
+
+    # ---- F: RLXBOOT-FROM (D28), judged only when an expectation is given --
+    # 05010000 is s 8 row 1's 讀 for a boot of 0x010000, a fixture value here.
+    pf = fx_capture(fx_slot("A", "ok", 1), fx_slot("B", "ok", 2), "B",
+                    froms=("05010000",))
+    r, why = run(pf, "B", "ok:1", "ok:2", good, False, "0x5010000")
+    case("F1", "FROM 05010000 expected as 0x5010000 (normalised): PASS",
+         r == "PASS", "%s %s" % (r, why))
+    r, why = run(pf, "B", "ok:1", "ok:2", good, False, "05020000")
+    case("F2", "FROM 05010000 expected 05020000 (the rescue's word): FAIL",
+         r == "FAIL" and any(x[1] == "from" for x in why), "%s %s" % (r, why))
+    r, why = run(p1, "B", "ok:1", "ok:2", good, False, "05010000")
+    case("F3", "an expectation and NO FROM line: REFUSED, not FAIL",
+         r == "REFUSED" and "no `RLXBOOT-FROM`" in str(why), "%s %s" % (r, why))
+    r, why = run(pf, "B", "ok:1", "ok:2", good, False, "0x0501000g")
+    case("F4", "a malformed --expect-from: REFUSED",
+         r == "REFUSED" and "eight hex digits" in str(why), "%s %s" % (r, why))
+    r, why = run(fx_capture(fx_slot("A", "ok", 1), fx_slot("B", "ok", 2), "B",
+                            froms=("05010000", "05020000")),
+                 "B", "ok:1", "ok:2", good, False, "05010000")
+    case("F5", "two FROM lines after one banner: REFUSED",
+         r == "REFUSED" and "RLXBOOT-FROM" in str(why), "%s %s" % (r, why))
+    r, why = run(pf, "B", "ok:1", "ok:2", good)
+    case("F6", "a FROM line and no expectation: judged as before, PASS",
+         r == "PASS", "%s %s" % (r, why))
     print("bootslot %s self-test: %d passed, %d failed" % (VERSION, len(cases) - bad, bad))
     return 2 if bad else 0
 
@@ -613,6 +677,8 @@ def main(argv=None, quiet=False):
     j.add_argument("--expect-b", required=True)
     j.add_argument("--build-manifest")
     j.add_argument("--allow-dev-key", action="store_true")
+    j.add_argument("--expect-from", help="the RLXBOOT-FROM word to require, in "
+                   "hex; a capture without the line is then REFUSED")
     sh = sub.add_parser("show")
     sh.add_argument("capture")
     say = (lambda *a: None) if quiet else print
@@ -631,6 +697,7 @@ def main(argv=None, quiet=False):
             f = parse(text)
             say("bootslot %s: %s" % (VERSION, a.capture))
             say("banner   build=%s (line %d)" % (f["build"], f["banner_line"]))
+            say("from     %s" % (f["from"] or "(no RLXBOOT-FROM line)"))
             say("key      %s %s" % f["key"])
             for s in ("A", "B"):
                 say("slot %s   %s" % (s, f["slots"].get(s)))
@@ -638,7 +705,7 @@ def main(argv=None, quiet=False):
                 % (f["choice"], f["boot"], f["id0"], f["id0_before"]))
             return 0
         r, res, f = judge(text, a.expect_slot, a.expect_a, a.expect_b,
-                          a.build_manifest, a.allow_dev_key)
+                          a.build_manifest, a.allow_dev_key, a.expect_from)
         say("bootslot %s: %s (rlxboot build %s, banner line %d)"
             % (VERSION, a.capture, f["build"], f["banner_line"]))
         for okv, label, detail in res:

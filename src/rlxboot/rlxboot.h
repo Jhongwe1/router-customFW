@@ -77,6 +77,15 @@
 #define RLXB_SLOT_A_BUF   0x81000000UL
 #define RLXB_SLOT_B_BUF   0x81200000UL
 
+/* R8b's D28: the stock loader's own record of which flash candidate it
+ * accepted -- the global its image locator writes on every candidate it tries
+ * (`sw a0,-8900(s0)` at 0x804080C0), so after the scan it holds the one that
+ * booted.  讀 only: `docs/loader-command-semantics.md` s a and s 8 row 1 (which
+ * also predicts the value is the offset biased by 0x05000000), and
+ * `PROGRESS.md` `C-1`.  A RAM address inside stage 2's data, NOT a flash
+ * offset.  BOOT=slots prints it and nothing reads it for any decision. */
+#define RLXB_LDR_FROM     0x8040DD3CUL
+
 /* --- from tools/rlxprobe, reused unmodified ------------------------------- */
 /* `rlxprobe.h` is included by the payload for the real prototypes; these
  * comments record WHICH pieces rlxboot depends on, so a change there that

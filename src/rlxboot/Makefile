@@ -306,21 +306,25 @@ $(BIN): $(BD)/rlxboot.gate
 	     echo "  FAIL   the device image contains a signer"; exit 1; \
 	 fi
 	@echo "  ok     no signer and no key generator in the device image"
-	@# D21, from the artefact as well: a slots image forms NO address of the
-	@# RAM-staged counter (0x81700000), so no RAM source is compiled in; a RAM
-	@# image must form it, which is the control that the census can see it.
-	@n=$$($(OBJDUMP) -d $(ELF) | $(PYTHON) $(HERE)test/flashscan.py \
-	        | grep -c '0x81700000'); \
-	 if [ "$(BOOT)" = slots ] && [ "$$n" != 0 ]; then \
-	     echo "  FAIL   the slots image forms 0x81700000 ($$n census rows):"\
-	          "D21 says the flash bitmap only"; exit 1; \
+	@# D21 and D28, from the artefact as well, each address checked in both
+	@# builds so each build is the other's control that the census can see it:
+	@#   0x81700000  the RAM-staged counter: slots image 0 rows (no RAM source
+	@#               compiled in), RAM image at least 1
+	@#   0x8040DD3C  the loader's accepted-candidate word: slots image at least
+	@#               1 (RLXBOOT-FROM is read), RAM image 0 (its output is R8a's)
+	@$(OBJDUMP) -d $(ELF) | $(PYTHON) $(HERE)test/flashscan.py > $(BD)/census.txt
+	@c=$$(grep -c '0x81700000' $(BD)/census.txt); \
+	 f=$$(grep -c '0x8040DD3C' $(BD)/census.txt); \
+	 if [ "$(BOOT)" = slots ] && { [ "$$c" != 0 ] || [ "$$f" = 0 ]; }; then \
+	     echo "  FAIL   slots image: $$c rows name 0x81700000 (D21 wants 0),"\
+	          "$$f name 0x8040DD3C (D28 wants >= 1)"; exit 1; \
 	 fi; \
-	 if [ "$(BOOT)" = ram ] && [ "$$n" = 0 ]; then \
-	     echo "  FAIL   the RAM image forms no 0x81700000: the census cannot"\
-	          "see the RAM counter, so the slots check would prove nothing"; exit 1; \
+	 if [ "$(BOOT)" = ram ] && { [ "$$c" = 0 ] || [ "$$f" != 0 ]; }; then \
+	     echo "  FAIL   RAM image: $$c rows name 0x81700000 (want >= 1),"\
+	          "$$f name 0x8040DD3C (want 0: no FROM line in BOOT=ram)"; exit 1; \
 	 fi; \
-	 echo "  ok     census rows naming 0x81700000: $$n (BOOT=$(BOOT); slots"\
-	      "must be 0, ram must not)"
+	 echo "  ok     census rows naming 0x81700000: $$c, 0x8040DD3C: $$f"\
+	      "(BOOT=$(BOOT); slots must be 0 and >= 1, ram >= 1 and 0)"
 
 payload: $(BIN) flashsafe
 	@$(MAKE) --no-print-directory show
@@ -344,6 +348,8 @@ ifeq ($(BOOT),slots)
 	@echo 'slot B      flash 0x190000 + 0x120000, READ ONLY, into 0x81200000'
 	@echo 'choice      both verified; higher version wins, A on a tie; neither: halt'
 	@echo 'ram counter NONE -- not compiled (D21): the flash bitmap is the only source'
+	@echo 'from        0x8040DD3C   the loader'"'"'s accepted candidate, KSEG0, printed as'
+	@echo '                         RLXBOOT-FROM and read for nothing else (D28)'
 else
 	@echo 'container   0x81000000   staged by the loader TFTP, limit 0x81700000'
 	@echo 'ram counter 0x81700000   "RCNT" + 512 bytes, used when the magic matches'

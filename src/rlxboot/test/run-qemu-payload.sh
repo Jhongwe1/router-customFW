@@ -273,14 +273,23 @@ mkflash "$BD/f_prod.bin" A="$BD/pA7.bin" B="$BD/sB8.bin"
 
 # The runs go side by side: each is bounded by `timeout` and none's status is
 # read (the verdict is the capture), so nothing waits on a status it needs.
-srun() {     # srun <case> <flash image> [elf] [RCNT block for 0x81700000]
+srun() {     # srun <case> <flash image> [elf] [RCNT block] [word for 0x8040DD3C]
 	rm -f "$BD/$1.txt"
 	timeout "$SEC" qemu-system-mips -M malta -m 32 -nographic -monitor none \
 		-kernel "${3:-$BD/rlxboot-slots-qemu.elf}" \
 		-device loader,file="$2",addr=$QWIN_PHYS \
 		${4:+-device} ${4:+loader,file=$4,addr=0x01700000} \
+		${5:+-device} ${5:+loader,file=$5,addr=0x0040DD3C} \
 		-serial file:"$BD/$1.txt" </dev/null >/dev/null 2>&1 || true
 }
+# D28: the loader's accepted-candidate word, planted where the stock loader
+# leaves it (KSEG0 0x8040DD3C), two different values over the SAME flash: the
+# FROM line must print each, and nothing else in the two runs may differ --
+# the word is informational and no decision may read it.
+printf '\005\001\000\000' > "$BD/from1.bin"     # 0x05010000, big-endian
+printf '\005\002\000\000' > "$BD/from2.bin"     # 0x05020000
+srun s_from1    "$BD/f_b_higher.bin" "$BD/rlxboot-slots-qemu.elf" "" "$BD/from1.bin" &
+srun s_from2    "$BD/f_b_higher.bin" "$BD/rlxboot-slots-qemu.elf" "" "$BD/from2.bin" &
 # D21: a valid RCNT block (count 9) staged where R8a's bench put one.  The
 # RAM image honours exactly this block in `rollback` above (ctr=9, refused);
 # the slots image must not read it at all.
@@ -293,7 +302,7 @@ srun s_wrong    "$BD/f_wrong.bin" &
 srun p_prod     "$BD/f_prod.bin" "$BD/rlxboot-prod-qemu.elf" &
 srun p_devimg   "$BD/f_prod.bin" &
 wait
-for name in s_rcnt s_a_only s_b_higher s_tie s_none s_wrong p_prod p_devimg; do
+for name in s_from1 s_from2 s_rcnt s_a_only s_b_higher s_tie s_none s_wrong p_prod p_devimg; do
 	echo "--- $name"
 	tr -d '\r' < "$BD/$name.txt" \
 	    | grep -E '^(RLXBOOT-|RLXPAY-|refuse-action|ctr-bitmap)' \
@@ -343,6 +352,33 @@ chk s_wrong    '^RLXBOOT-VERDICT A bad=flash_match$'
 chk s_wrong    '^RLXBOOT-HALT A=flash_match B=magic$'
 nono s_wrong   'RLXPAY-'
 echo
+echo "=== D28: RLXBOOT-FROM, printed and read for nothing else"
+chk s_from1    '^RLXBOOT-FROM 05010000$'
+chk s_from2    '^RLXBOOT-FROM 05020000$'
+chk s_from1    '^RLXBOOT-SLOT B$'
+for name in s_from1 s_from2; do
+	nxt=$(tr -d '\r' < "$BD/$name.txt" | awk 'p { print; exit } /^RLXBOOT-V1 build=/ { p = 1 }')
+	case "$nxt" in
+	RLXBOOT-FROM\ *) echo "  ok    $name: the line right after the banner is $nxt" ;;
+	*) echo "  FAIL  $name: the line after the banner is '$nxt', not RLXBOOT-FROM"; fail=1 ;;
+	esac
+done
+tr -d '\r' < "$BD/s_from1.txt" | grep -E '^(RLXBOOT-|RLXPAY-|refuse-action)' \
+    | grep -v '^RLXBOOT-FROM ' > "$BD/s_from1.rest"
+tr -d '\r' < "$BD/s_from2.txt" | grep -E '^(RLXBOOT-|RLXPAY-|refuse-action)' \
+    | grep -v '^RLXBOOT-FROM ' > "$BD/s_from2.rest"
+if [ -s "$BD/s_from1.rest" ] && cmp -s "$BD/s_from1.rest" "$BD/s_from2.rest"; then
+	echo "  ok    two FROM words, $(wc -l < "$BD/s_from1.rest") other lines, identical"
+else
+	echo "  FAIL  the FROM word changed something besides the FROM line:"
+	diff "$BD/s_from1.rest" "$BD/s_from2.rest" | head -6 | sed 's/^/        /'
+	fail=1
+fi
+for r in accept reject_sig reject_hdr reject_pay rollback ctr_flash; do
+	nono "$r" 'RLXBOOT-FROM'
+done
+
+echo
 echo "=== D21: the RAM counter, both builds"
 chk rollback   '^RLXBOOT-CTRSRC ram$'
 chk rollback   '^RLXBOOT-VER cur=7 ctr=9 bad$'
@@ -369,7 +405,7 @@ chk p_devimg   '^RLXBOOT-SLOT B$'
 chk p_devimg   '^RLXPAY-OB$'
 nono p_devimg  'RLXPAY-OK'
 # One banner per run: a halt that reset would print it again.
-for name in s_rcnt s_a_only s_b_higher s_tie s_none s_wrong p_prod p_devimg; do
+for name in s_from1 s_from2 s_rcnt s_a_only s_b_higher s_tie s_none s_wrong p_prod p_devimg; do
 	nb=$(tr -d '\r' < "$BD/$name.txt" | grep -c '^RLXBOOT-V1 ' || true)
 	if [ "$nb" = 1 ]; then
 		echo "  ok    $name printed the banner once"

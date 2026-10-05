@@ -271,6 +271,31 @@ static void boot_verified(const struct rlxu *r, const unsigned char *body)
 static struct rlxb_slot slot_a, slot_b;
 
 static const struct rlxb_io console = { rlx_putc };
+
+/* D28: `RLXBOOT-FROM <8 hex>`, the loader's word saying which candidate it
+ * accepted (rlxboot.h).  INFORMATIONAL ONLY, BY CONSTRUCTION: the word is
+ * loaded inside the argument list of `rlx_puthex32` (report.c: prints eight
+ * nibbles, stores nothing), into no variable, in this one function that
+ * returns nothing -- so no decision in this file or in `slots.c` can see it.
+ *
+ * THROUGH KSEG0, ON PURPOSE: the loader wrote it with an ordinary cached
+ * store and the D side is write-back, so if the loader jumped here without
+ * writing that line back, DRAM is stale and only a cached load sees what it
+ * last wrote; a KSEG0 load hits the dirty line or fills from DRAM, right
+ * either way.  A KSEG1 load would be right only if the write-back happened,
+ * which nothing has measured -- `flashread.c`'s argument for the RAM counter.
+ * Word aligned and inside stage 2's window, or this does not compile: an
+ * unaligned `lw` is an AdEL on this core, and a typo must not read elsewhere. */
+typedef char rlxb_from_in_loader[
+	(RLXB_LDR_FROM >= RLXB_LDR_BASE && RLXB_LDR_FROM + 4UL <= RLXB_LDR_END
+	 && (RLXB_LDR_FROM & 3UL) == 0) ? 1 : -1];
+
+static void print_from(void)
+{
+	rlx_puts("RLXBOOT-FROM ");
+	rlx_puthex32(*(volatile const u32 *)RLXB_LDR_FROM);
+	nl();
+}
 #endif
 
 /* ----------------------------------------------------------------- main --- */
@@ -289,6 +314,9 @@ void rlxprobe_main(void)
 	rlx_puts("RLXBOOT-V1 build=");
 	rlx_puthex32(RLXBOOT_BUILD);
 	nl();
+#if RLXBOOT_SLOTS
+	print_from();           /* D28; the BOOT=ram build prints no FROM line */
+#endif
 	rlx_puts(RLXBOOT_KEY_LINE);
 	nl();
 
