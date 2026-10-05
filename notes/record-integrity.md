@@ -238,9 +238,9 @@ owned each thing, and found four owner files with nothing in them — and
 `C5` follows a *literal value* into its owner file and those rows had no
 literal to follow.
 
-`U6` is what keeps that from being a sentence nobody tests: the live file must
-yield at least one open row owned by a live gate, or the census refuses. A
-debt census that finds everything closed has stopped reading.
+`U6` is what keeps that from being a sentence nobody tests. While a gate is in
+progress the live file must yield an open row owned by a live gate, or the
+census refuses; with none (since 2026-10-05) every open row must be standing.
 
 🔴 **And `SPEC.md` § 19 is outside `spec-check`'s row-level window.** 量
 2026-09-16: `tools/spec-check.py` selects `1 <= section <= 16`, § 17 gets its

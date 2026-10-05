@@ -91,10 +91,10 @@ exemptions -- not a heuristic.
   populations come from ONE file.  This is the record auditing itself, and it
   cannot see a debt this project incurred and never wrote down -- which is
   exactly the class the seventy-seventh segment's eighth audit method found by
-  hand (four owner files, no checker able to see them).  `U6` is the control
-  that keeps that from being a sentence nobody tests: the live file must yield
-  at least one OPEN row owned by a LIVE gate, or the census refuses -- a census
-  that finds everything closed has stopped reading.
+  hand (four owner files, no checker able to see them).  `U6` keeps that from
+  being a sentence nobody tests: a census that finds everything closed has
+  stopped reading, and `population_guard` refuses it by what the board shows,
+  a gate in progress or none (2026-10-05; the comment above that function).
 
   axis B -- the JOIN, per row.  An owning-gate cell is scanned for ids that
   are IN the gate population; the row's owner state is then:
@@ -1378,16 +1378,110 @@ def report_census():
     return 0
 
 
-def report_check():
-    pop = population()
-    f = check(pop)
+# 🔴 THE POPULATION GUARD TESTS THE INVARIANT, NOT THE PROXY IT USED TO.
+# Until 2026-10-05 `report_check` refused unless at least one OPEN row was
+# owned by a LIVE gate, and that proxy assumed a gate is always open.  量
+# 2026-10-05 (124th segment), on a scratch copy with `R8b`, `P3` and `P4b`
+# all closed and every carried-forward row disposed of: rc 3, *no OPEN row is
+# owned by a LIVE gate* -- so the commit that closes the last open gate, which
+# is the commit `v1.0` is defined by, could not pass `check` whatever its rows
+# said.  The invariant underneath is that a census which reads everything as
+# closed may not report green, and the board says which of two states holds:
+#   * a gate in progress (`~`): the old rule -- at least one OPEN row is
+#     live-owned, or refuse;
+#   * no gate in progress: nothing can be live-owned, so every OPEN row must be
+#     a standing instruction (`SEGMENT`).  An `ORPHAN`, `DEAD`, `NONE` or
+#     `ORPHAN?` row is already a finding of its own (`L1`, `L2`, `L3`, `L8`)
+#     and is reported as one, rc 1, naming the row -- a debt is not an
+#     unreadable instrument.  A `LIVE` row is refused (its owner is a gate
+#     that has not started, a declined one, or a step-list header the board
+#     lacks, and no check reports that), and so is any other OPEN row that no
+#     finding names.  At least one row must be OPEN: every gate AND every row
+#     reading closed cannot be told from a census that stopped reading.
+# Zero rows is refused in both states; `cf_rows` refuses it first, and the
+# guard says it again so that the guard alone is its whole contract (`U6a`).
+def population_guard(pop, rows, findings):
+    """-> the line `check` prints about the population, or raise `Refused`.
+
+    `rows` is `census(pop)` and `findings` is `check(pop)`; `pop['board']` is
+    read for the gates in progress, which `board_gates` maps from `~` to
+    `LIVE`."""
+    if not rows:
+        raise Refused('the census parsed 0 rows -- a debt census with no '
+                      'population has nothing it could report')
+    board = pop['board']
+    going = sorted(g for g, s in board.items() if s == 'LIVE')
+    opened = [r for r in rows if r['state'] == 'OPEN']
+    live = [r for r in opened if r['kind'] == 'LIVE']
+    if going:
+        if not live:
+            raise Refused('the board shows %d gate(s) in progress (%s) and no '
+                          'OPEN row is owned by a LIVE gate -- a debt census '
+                          'that finds everything closed while a gate is open '
+                          'has stopped reading'
+                          % (len(going), ' '.join(going)))
+        return ('guard: the board shows %d gate(s) in progress (%s); %d OPEN '
+                'row(s) live-owned' % (len(going), ' '.join(going), len(live)))
+    if not opened:
+        raise Refused('the board shows no gate in progress (%d gates read) '
+                      'and no row is OPEN -- every gate and every row reading '
+                      'closed cannot be told from a census that stopped '
+                      'reading' % len(board))
+    if live:
+        raise Refused('the board shows no gate in progress, so nothing can be '
+                      'live-owned, and %d OPEN row(s) read LIVE (%s) -- the '
+                      'owner is a gate that has not started, a declined one '
+                      'or a step-list header the board lacks; open that gate '
+                      'or re-own the row as a standing instruction'
+                      % (len(live), ', '.join('%s owned by %s'
+                                              % (r['id'], r['owner_ev'])
+                                              for r in live)))
+    named = set(ln.split()[1].rstrip(':') for ln in findings
+                if len(ln.split()) > 1)
+    seg = [r for r in opened if r['kind'] == 'SEGMENT']
+    rest = [r for r in opened if r['kind'] != 'SEGMENT']
+    silent = [r for r in rest if r['id'] not in named]
+    if silent:
+        raise Refused('the board shows no gate in progress, so every OPEN row '
+                      'must be a standing instruction, and %d read otherwise '
+                      'with no finding naming them (%s)'
+                      % (len(silent), ', '.join('%s %s' % (r['id'], r['kind'])
+                                                for r in silent)))
+    line = ('guard: the board was read -- 0 of %d gates in progress; %d OPEN '
+            'row(s), %d of them standing instructions'
+            % (len(board), len(opened), len(seg)))
+    if rest:
+        line += ('; %d reported as findings (%s)'
+                 % (len(rest), ' '.join(r['id'] for r in rest)))
+    return line
+
+
+# The guard's controls, declared here rather than in `CASE_WHAT`'s literal:
+# two committed files cite a line of `resolve()` by its number (`FW-110`), and
+# an entry added up there would move it.
+CASE_WHAT.update({
+    'U6a': 'the guard itself refuses 0 rows, not only the parser before it',
+    'U6b+': 'a gate in progress and no live-owned row is REFUSED',
+    'U6b-': 'a gate in progress owning an open row is permitted, gate named',
+    'U6c+': 'no gate in progress and no OPEN row at all is REFUSED',
+    'U6d+': 'no gate in progress and an OPEN row reading LIVE is REFUSED',
+    'U6e-': 'no gate in progress, every OPEN row a standing instruction: '
+            'permitted, and the line says the board was read',
+    'U6f': 'no gate in progress and an orphan: rc 1 naming exactly that row, '
+           'not a refusal',
+    'U6g+': 'an OPEN non-standing row that no finding names is REFUSED',
+})
+
+
+def report_check(pop=None, exempt=None):
+    pop = population() if pop is None else pop
+    f = check(pop, exempt=exempt)
     rows = census(pop)
+    line = population_guard(pop, rows, f)
     live = [r for r in rows if r['state'] == 'OPEN' and r['kind'] == 'LIVE']
-    if not live:
-        raise Refused('no OPEN row is owned by a LIVE gate -- a debt census '
-                      'that finds everything closed has stopped reading')
     for ln in f:
         print('FAIL ' + ln)
+    print(line)
     print('%d row(s), %d finding(s), %d live-owned'
           % (len(rows), len(f), len(live)))
     return 1 if f else 0
@@ -1734,6 +1828,73 @@ def self_test():
              'the all-closed fixture still reported a live-owned row')
     except Refused:
         case('U6', True)
+
+    # ---- U6a..U6g: `population_guard`, each branch both ways -------------
+    # 🔴 Until 2026-10-05 the guard itself had no case: `U6` asserts the
+    # census side, and the refusal lived inside `report_check`, which read
+    # only the live file.  The board decides the branch, so each fixture
+    # names its board.
+    import contextlib
+
+    def guard(t, exempt=None):
+        """-> (refused?, the line or the reason) for a fixture."""
+        p = population(t)
+        try:
+            return False, population_guard(p, census(p),
+                                           check(p, exempt=exempt))
+        except Refused as e:
+            return True, str(e)
+
+    b_going = ['| **R5** | closed thing | 1 | 1 | **`✓`** | ev |',
+               '| **R6** | open thing | 1 | — | `~` | |']
+    b_shut = ['| **R5** | closed thing | 1 | 1 | **`✓`** | ev |',
+              '| **R6** | closed too | 1 | 1 | **`✓`** | ev |']
+    seg_row = '| `A-1` 🆕 | q | 任何一段動 `x` 的桌面段 |'
+    try:
+        population_guard(population(_fixture()), [], [])
+        case('U6a', False, 'the guard accepted a census of 0 rows')
+    except Refused:
+        case('U6a', True)
+    g = guard(_fixture(rows_md=['| `A-1` ✅ | q | `R5` |'], board_md=b_going),
+              exempt={})
+    case('U6b+', g[0] and 'in progress (R6)' in g[1],
+         'a gate in progress with no live-owned row gave %r' % (g,))
+    g = guard(_fixture(rows_md=['| `A-1` 🆕 | q | `R6` |'], board_md=b_going),
+              exempt={})
+    case('U6b-', not g[0] and 'in progress (R6)' in g[1]
+         and '1 OPEN row(s) live-owned' in g[1],
+         'a gate in progress owning an open row gave %r' % (g,))
+    g = guard(_fixture(rows_md=['| `A-1` ✅ | q | `R5` |'], board_md=b_shut),
+              exempt={})
+    case('U6c+', g[0] and 'no row is OPEN' in g[1],
+         'every gate and every row closed gave %r' % (g,))
+    # the default fixture board: `R5` closed, `R6` not started (`·`)
+    g = guard(_fixture(rows_md=['| `A-1` 🆕 | q | `R6` |']), exempt={})
+    case('U6d+', g[0] and 'A-1 owned by R6' in g[1],
+         'a row live-owned by a not-started gate, none in progress, gave %r'
+         % (g,))
+    g = guard(_fixture(rows_md=[seg_row], board_md=b_shut), exempt={})
+    case('U6e-', not g[0] and '0 of 2 gates in progress' in g[1]
+         and '1 OPEN row(s), 1 of them standing instructions' in g[1],
+         'standing instructions only, no gate in progress, gave %r' % (g,))
+    t6f = _fixture(rows_md=[seg_row, '| `B-1` 🆕 | q | `R5` |'],
+                   board_md=b_shut)
+    out6f = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out6f):
+            rc6f = report_check(population(t6f), exempt={})
+    except Refused as e:
+        rc6f, out6f = 3, io.StringIO(str(e))
+    fails6f = [ln.split()[2].rstrip(':') for ln in out6f.getvalue().split('\n')
+               if ln.startswith('FAIL ')]
+    case('U6f', rc6f == 1 and fails6f == ['B-1']
+         and '1 reported as findings (B-1)' in out6f.getvalue(),
+         'an orphan with no gate in progress gave rc %r, rows %r: %r'
+         % (rc6f, fails6f, out6f.getvalue()[-200:]))
+    g = guard(_fixture(rows_md=[seg_row, '| `B-1` 🆕 | q | **✅ 關了** `R5` |'],
+                       board_md=b_shut), exempt={'B-1': 'a fixture'})
+    case('U6g+', g[0] and 'B-1 ORPHAN?' in g[1],
+         'an L8-exempted ORPHAN? row, which no finding names, gave %r' % (g,))
 
     # ---- L1: the orphan ------------------------------------------------
     t = _fixture(rows_md=['| `A-1` 🆕 | q | `R5` |'])

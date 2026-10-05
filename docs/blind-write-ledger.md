@@ -57,9 +57,9 @@ this repository at an instant, and recording it changed that state.
 
 ⚠️ That closes one gap and not the general one: a file read and never written
 about at all is still invisible, and no amount of history scanning reaches it.
-The sweep is not yet a `ledgerscan` action — see `PROGRESS.md` `LEDGER-1` — so
-this reading is a one-off with its method stated rather than a check that
-re-runs.
+The sweep is not a `ledgerscan` action, by decision (`PROGRESS.md` `LEDGER-1`,
+declined 2026-10-05), so this reading is a one-off with its method stated
+rather than a check that re-runs.
 
 🔴 **Does not claim ② — that a citation's absence proves a file was not read.**
 Three domains — `gpio`, `wdt`, `led` — have **zero** cited paths, and `keys`

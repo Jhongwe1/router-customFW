@@ -72,6 +72,12 @@ here that came from something other than counting instructions in an image.
 
 ## What is in here
 
+**Every list in this README is a selection, not a census.** The notes below and
+the tools and tests under *How to check it* are the ones a reader needs to follow
+the argument. The directories are the census: `tools/` and `notes/` hold
+everything, and `tools/ci-expected.tsv` owns the control count of every suite
+CI runs, so no count of controls is kept in this file.
+
 **[`config/`](config)** 🆕 — every input rlxfw's kernel build takes
 that is not the pinned vendor drop, written down instead of remembered.
 [`rlxfw-kernel.delta`](config/rlxfw-kernel.delta) is the configuration as 35
@@ -247,7 +253,7 @@ carries an older correction: the general exception vector here is `0x80000080`,
 not MIPS32's `0x80000180`, and the wrong address had propagated into four files.
 
 **[`notes/binsim.md`](notes/binsim.md)** — a structural similarity metric over
-six vendor firmware trees, with thirty-five controls that run before any number
+six vendor firmware trees, with controls that run before any number
 is reported, because almost any function of two MIPS binaries from one vendor
 returns something near 0.8 and a matrix of numbers near 0.8 reads like a result.
 `k` is 7 and not the 4 a reader would expect: a word-permutation — the identical
@@ -408,13 +414,15 @@ gated: no payload exists unless `tools/hazlint` exited 0 on the linked image.
 **[`tools/modrecord.py`](tools/modrecord.py)** — `P4b`'s per-file modification
 record, generated from the four declarations rather than kept by hand, because a
 hand-kept list is a count about this repository's own contents in a second place.
-**13 controls**, taken from the suite's own output and not from prose. Its
-`emit` without `--tree` is a *listing* and the record it writes says so in its
-own header; `--tree` resolves every anchor against a staged tree and is the
-check that matters. 🔴 量 2026-10-04: `--tree` cannot be pointed at a tree a
-build has already used, because `tools/rlxfw-kbuild.sh` applies the patch series
-in place and the pre-images are then gone — the tool refuses with that reason,
-which is correct and means the check needs a tree staged for it.
+Its `emit` without `--tree` is a *listing* and the record it writes says so in
+its own header. `check --tree` is the check that matters: it resolves every
+anchor against a fresh stage of the pinned drop in the build's own order — the
+host-compat patches, then the marks rows, each against the file the earlier ones
+left — places a hunk whose pre-image occurs twice where GNU `patch` places it,
+and then compares the committed listing on its content, never on the tree's
+path. 🟢 量 2026-10-05, on a stage of the pin: rc 0, and the 23 vendor files GNU
+`patch` and `tools/rlxfw-marks.py` write are byte-identical to what it computes.
+A tree a build has already used is refused, because its pre-images are gone.
 
 ## How the work is recorded
 
@@ -444,62 +452,12 @@ Three rules run through all of it:
 Every instrument here is expected to be able to fail, and ships with the
 controls that show it can:
 
-⚠️ **This is a selection, not a census, and the numbers are derived rather than counted by
-eye.** 🔄 **量 2026-10-04 (120th segment, `R9-8`), re-derived and not incremented**, over `git ls-files tools/` (**181** files), taking those whose
-first two bytes are `#!` and excluding `tools/test-*`: **93** programs, of which **21 are
-described below and 72 are not** — 🔄 **the row this replaces read 144 / 67 and had been stale since 2026-09-17, and it also did not close: 21 + 42 = 63 against its own 67, because that re-derivation moved the total and left the breakdown alone. The names that follow are the 42 measured on 2026-09-16, so they are 42 of the 72 rather than a census of them; whether this list should be a census at all is the open half of `CI-4`, reassigned to `P4b`, and quietly adding thirty names would answer the owner's question by stealth. 🔴 There is still nothing that compares these numbers — `ci-census` has no README action — which is `CI-4`'s other half, and it is why this row goes stale every time rather than once.** The 42: **`appletcensus`**, `audit-bench-log`, `binsim`, `capdate`, `capfield`,
-**`cfcensus`**, `ci-census`, **`citecheck`**, `citime`, `derivcheck`, `desk-sweep`, `dtcheck`,
-**`elfops`**, **`emueq`**, **`emupredict`**, `fetch-sources`, `flashmap`, `fsmanifest`,
-**`hazdecl`**, **`hazpay`**, `isa-probe`, `isacensus`, **`isapay`**, `leakscan`, `marchcmp`,
-**`mustrun`**, `opcount`, **`procgrow`**, `rbcheck`, `rebuild-census`, `regcensus`, `repdiff`,
-`rlxfw-kbuild`, `rlxprobe/qemu-run`, `tc-smoke`, `tccensus`, **`tcpay`**, **`uartrate`**,
-**`ucostcheck`**, **`ucostfit`**, `vendor-tripwire` and `verify-backup-copy`.
-🔴 **A SIXTH time, and this time it was stale by ELEVEN.** 量 2026-09-16: the
-fifteen new programs are `hazdecl`, `hazpay` and `isapay` (2026-09-13, all
-three committed AFTER the 01:24 commit that wrote the count above), `emueq` and
-`tcpay` (09-14), `citecheck`, `elfops`, `emupredict`, `mustrun`, `procgrow` and
-`uartrate` (09-15), and `cfcensus`, `ucostcheck` and `ucostfit` (09-16) — so
-**eleven had landed and been committed before today and none of them moved this
-count.** 🔄 **2026-09-16 (`P1-0`), and this is the first time the count moved in the SAME segment that added the program**: `appletcensus` (09-16) is the fifteenth, and 量 re-derived rather than incremented — `git ls-files tools/` is **140** and the `#!`-and-not-`test-*` filter gives **63**. It was found by the closeout audit asking who owns each thing the segment produced, not by reading this row. The **+39 in files** is those fourteen plus three `tools/test-*`, four
-`.tsv` and **eighteen payload sources under `tools/rlxprobe/`**, with nothing
-removed. **Described stayed at 21**, so the whole of the growth is undescribed.
-🔴 **A FIFTH time, and it was stale by TWO before this segment added two.**
-`derivcheck` landed 2026-09-11 and `isacensus` 2026-09-12, and neither moved
-this count; `marchcmp` and `tccensus` are this segment's. **The +4 in programs
-and the +6 in files are those four plus two `.tsv`**, and the only reason the
-two older ones are visible at all is that the count was re-derived rather than
-incremented — which is what the sentence below this one has now said four
-times.
-🔴 **A FOURTH time, and the mechanism is now boringly reliable.** `dtcheck`
-landed on 2026-09-09 (`R5`'s `D2` instrument, 44 cases) and did not move this
-count; `regcensus` landed on 2026-09-10 with it. **The +2 in both columns is
-those two**, and only one of them is this segment's. *(量 2026-09-08 read
-**92** / **42**.)*
-🔴 **And it was stale by TWO before this segment added three, which is the
-third time this paragraph has caught itself.** `citime` landed 2026-09-04 and
-`desk-sweep` 2026-09-07; both were committed, neither moved this count. The
-+5 in programs is those two plus `capdate`, `capfield` and `flashmap`; the +6
-in files is those five plus `ci-suite-cost.tsv`. **A count that is re-derived
-catches the segments in between; a count that is incremented would have
-carried them forward** — which is what the paragraph below already said, about
-`ledgerscan`, and it happened again anyway.
-🔴 **The previous numbers — 83 files, 35 programs, 19 described — were stale
-before this session touched anything, and re-deriving is what showed it.**
-`tools/ledgerscan.py` landed on 2026-09-03 (`aa89317`) and was described in
-the block below without the paragraph above it moving. So the +2 in this
-line is `ledgerscan` (already described, 19 → 20) and `tcheck` (new today,
-20 → 21); the +3 in files is those two plus `test-tcheck.py`. **A count that
-is re-derived catches the session before last's omission; a count that is
-incremented would have carried it forward.** Each has its own controls and `tools/ci-expected.tsv` is
-the census; this list is prose and it has been behind for several sessions.
-🔴 **The first version of this paragraph said 25 and 7**, which were
-taken off a list written by hand rather than derived — `CNT-1`'s class, inside
-a note about `CNT-1`'s class, caught by re-deriving it one line later. Said here
-so that an absence below is not read as an instrument without controls.
+⚠️ **This list is a selection, not a census.** `tools/` holds every program and `tools/ci-expected.tsv` the control count of every suite CI runs; no count is kept
+here, because one kept beside a tool is wrong the day a case is added (`CI-4` measured it: the `tools/cardcheck.py` entry was already behind the census).
 
 ```
 tools/hazlint              refuses a payload that reads a register in the load delay
-                           slot. Twenty controls run before it will report (seventeen on a clone, where the two population controls have no vendor material to read), including a
+                           slot. Its controls run before it will report (fewer on a clone, where the population controls have no vendor material to read), including a
                            negative control that must produce exactly 2 violations at
                            two named addresses, and a population control over 1,474
                            loads of vendor code. A control that fails stops the run.
@@ -510,7 +468,7 @@ tools/hazlint              refuses a payload that reads a register in the load d
                            scan, and sys_call_table is a data table linked into .text
 tools/kconfig-delta.py     answers one question: is every difference between the vendor's
                            board template and the .config THIS BUILD USED on the declared
-                           list? Twenty-four controls, and C6 is the one it exists for -- it
+                           list? C6 is the control it exists for -- it
                            feeds the gate the file that was copied in rather than the one
                            the compiler saw, and must refuse. `apply` and `check` read
                            the same delta file, so the generator and the auditor cannot
@@ -519,17 +477,17 @@ tools/mkinitramfs.py       builds R3's initramfs from a declaration in which eve
                            names its source and is tagged `unit` or `rlxfw` -- and the
                            tag is CHECKED against the path, not trusted. A declared
                            source that is not there is refused, never replaced with
-                           something similar. FORTY-THREE controls: four exist because
+                           something similar. Four of its controls exist because
                            the ceiling was being measured on the ELF FILE SIZE rather
                            than on the image the decompressor writes -- 495,729 bytes
                            out, 75.7 % reported where the truth is 66.2 % -- EIGHT
                            (2026-08-31) are the first `verify` has had, and NINE
-                           (2026-09-27) are `build --init`'s. The other twenty-six are
+                           (2026-09-27) are `build --init`'s. The rest are
                            about the DECLARATION; `verify` is the half that reads the
                            built artefact, and it is the only one that can catch a
                            mark that compiled and is not in the image
 tools/test-mkinitramfs-mutants.py
-                           25 mutants, baseline first, and it is the answer to a debt
+                           Baseline first, and it is the answer to a debt
                            this repository carried for five sessions. It could not be
                            written earlier: with no control touching `verify`, every
                            mutation of it would have survived and said nothing. Two
@@ -553,14 +511,14 @@ tools/rlxfw-marks.py       one of the two tools that edit somebody else's source
                            a tree with some marks present builds, and what it builds is
                            not what the table describes. A20 requires plain `apply` to
                            still refuse a marked tree, so A4 is bypassed only when asked.
-                           71 controls, and the one that earns
+                           The verb that earns
                            its keep is `verify` -- `check` reads the staged tree and
                            answers "did the insertion happen", which a mark can pass
                            while being absent from the image; `verify` reads the BUILT
                            artefact and the vendor's, and refuses if `--absent` is not
                            given, because "present in mine" alone is a label. It caught
                            two real defects the day it was written
-tools/spec-check.py        THIRTEEN checks and fifty case lines. C1-C7 are about
+tools/spec-check.py        C1-C7 are about
                            SPEC.md; C8/C8b/C8c/C9 are about how EVERY tracked
                            `.md` renders -- 71 files, 620 tables, ~43,000 code
                            spans -- because that is not a property of one file.
@@ -573,8 +531,8 @@ tools/spec-check.py        THIRTEEN checks and fifty case lines. C1-C7 are about
                            table (nine of them on the findings page, stranded by
                            one blank line), and a code span whose whole content
                            is whitespace -- one of which had made a READING
-                           wrong, not a rendering. Nine mutations of SPEC.md and
-                           ten controls on a fixture built in the process, of
+                           wrong, not a rendering. Mutations of SPEC.md and
+                           controls on a fixture built in the process, of
                            which T1 is positive and T5 is a control on T1.
                            C11 (2026-08-31) is the twelfth: a reference to a line
                            of a payload source must carry a TOKEN from that line,
@@ -583,7 +541,7 @@ tools/spec-check.py        THIRTEEN checks and fifty case lines. C1-C7 are about
                            invalidated fourteen such references at once and an
                            owner audit, not a check, is what found them -- the
                            line still exists, so `does this line exist` passes.
-                           Ten more case lines, of which T20a and T20b are ONE
+                           More case lines came with it, of which T20a and T20b are ONE
                            EDGE EACH of the tolerance (a single case at a
                            boundary passes whether the comparison is `<` or
                            `<=`) and T21/T22 are population controls on the real
@@ -613,7 +571,7 @@ tools/console-capture.py   records each capture's origin, and since 1.5 times ev
                            N29 sends 128 and requires the LENGTH refusal, which
                            is the assertion the sentence claimed
 tools/test-console-capture-mutants.py
-                           25 mutations of that guard, each run against the WHOLE
+                           Mutations of that guard, each run against the WHOLE
                            suite above, because "the committed cases catch it" is
                            the claim and a fast proxy for the suite would be a
                            different one. Anchors must occur EXACTLY ONCE and a
@@ -622,12 +580,11 @@ tools/test-console-capture-mutants.py
                            is not green, since every mutation would then "kill" on
                            a suite that was already red. It exists because "ten
                            survived" was a sentence in LOG.md that nothing re-ran
-tools/flashwin.py          41 cases (35 on a machine without this unit's dump,
-                           plus one skip covering 6), and it exists for a
+tools/flashwin.py          It exists for a
                            🔴 (this line read `27 cases ... covering 3` until
                            2026-09-04 -- both halves were the pre-`scan` numbers,
-                           stale since 2026-08-31. It is a live CI-4 instance:
-                           nothing compares this file's control numbers to the
+                           stale since 2026-08-31. It was a CI-4 instance:
+                           nothing compared this file's control numbers to the
                            tools, and a complete enumeration of owner files is
                            what found it, not a diff.)
                            region whose reading can
@@ -653,7 +610,7 @@ tools/xcheck.py            asks whether two committed instruments agree about on
                            third while SPEC.md cited the one without the model. Three
                            identities, the third EXACT rather than tolerant: a tolerance
                            is where a 2 ms anchor error hides. 390 artefacts, 0
-                           disagreements. Its three controls each document a real
+                           disagreements. C1-C3 each document a real
                            divergence the corpus cannot reach -- one parser sorts and the
                            other does not, while the one that does not breaks its scan
                            early, which is correct only on sorted input -- and C4 is
@@ -687,7 +644,7 @@ tools/ledgerscan.py        R5's blind-write ledger is COMPUTED, not written. It
                            claimed those domains are empty on the real tree, which is
                            the LEDGER's claim, and it went red on this repository's own
                            prose naming a path as an example. The prose was not
-                           rewritten to make it green. 99 controls, and `check` also
+                           rewritten to make it green. `check` also
                            has a negative control on real material: removing one row
                            from the committed ledger must name the path it lost.
 
@@ -724,8 +681,8 @@ tools/looprun.py           two of its ten stages exist only to make it safe to r
                            r51quiet and r51loud, both 229d2983, different vmlinux)
 
 tools/check-predictions.py refuses to compare a prediction against a capture unless
-                           the prediction file's mtime is earlier. Six controls, four
-                           of which must FAIL. Two of the six exist only because
+                           the prediction file's mtime is earlier. Some of its
+                           controls must FAIL. Two exist only because
                            `--sweep` deliberately disagrees with the per-file check
                            on one case — a predicted cell with no capture is a
                            violation there and is not one in the sweep, and without a
@@ -735,8 +692,8 @@ tools/check-predictions.py refuses to compare a prediction against a capture unl
                            paragraph below this list gives
 tools/tcheck.py            reads an `rtl819x-timer` `/proc` dump out of a console
                            capture and RECOMPUTES the fields the driver says it
-                           derived, rather than transcribing them. 14 controls,
-                           9 mutants; the fixtures are captures committed here, so
+                           derived, rather than transcribing them. Its
+                           fixtures are captures committed here, so
                            it needs nothing outside the repository. 🔴 Three of
                            the controls exist because this tool was wrong about a
                            real dump before they were written — it reported the
@@ -748,7 +705,7 @@ tools/tcheck.py            reads an `rtl819x-timer` `/proc` dump out of a consol
                            `rate` refuses a pair of dumps whose `period_cycles`
                            differ, because such a pair spans a re-arm and would be
                            scored against one of the two periods silently
-tools/flrbracket.py        50 controls, and its corpus is hardware: the nine `FLR`
+tools/flrbracket.py        Its corpus is hardware: the nine `FLR`
                            echoes, eight replies to `Y` and one to `N` that seating 7
                            recorded. It answers one question -- should the operator
                            type `Y` -- with three outcomes rather than two, because
@@ -756,7 +713,7 @@ tools/flrbracket.py        50 controls, and its corpus is hardware: the nine `FL
                            asked about something else* must send `N`. It exists
                            because the script that drove seating 7's bracket had been
                            shown to refuse a CORRECT echo and never to refuse a wrong
-                           one. Seven of the 50 drive the containment guard as a
+                           one. Some of its controls drive the containment guard as a
                            subprocess: the read-back of an `H601` window may not be
                            written inside this repository, and the PRE-READ may not be
                            written there for ANY window -- its content is decided by
@@ -764,14 +721,14 @@ tools/flrbracket.py        50 controls, and its corpus is hardware: the nine `FL
                            previous cycle's FLR output across a power cycle, and `G3` is the control that says that is a
                            guard rather than a blanket refusal
 tools/test-flrbracket-mutants.py
-                           41 mutants plus `B0`, and `B0` is first and is not a
+                           `B0` runs first and is not a
                            mutant: the unmutated tool must be green through the same
                            temp root or the run refuses to report kills. Every row
                            also NAMES the case it must turn red and is a kill only if
                            that case failed. Both controls exist because a pass over
                            `flashwin` reported 8 of 8 killed and every kill was
                            invalid
-tools/cardcheck.py         63 controls, and it reads a card the way the DEVICE will.
+tools/cardcheck.py         It reads a card the way the DEVICE will.
                            `commands` checks every command a card types against what
                            the image DECLARES it can invoke; `numbers` re-derives every
                            number a card states from the artefact it names. It exists
@@ -785,7 +742,7 @@ tools/cardcheck.py         63 controls, and it reads a card the way the DEVICE w
                            reporting `0 of 0`, which is why the five frozen blocks
                            come back refused and that is the correct output. Since 2026-09-23 `commands` refuses `FLW`, `EW`, `EB` and a non-zero `AUTOBURN` unless the card carries the owner's dated `owner-yes` row for that exact payload (FW-113). Since 2026-09-24 it also refuses a `HOST` cell whose own tool rejects its arguments, reading the card through `tools/cardrun.py`, the runner that executes it (FW-124, FW-132)
 tools/test-cardcheck-mutants.py
-                           59 mutants, baseline first. Two survived the 23 controls
+                           Baseline first. Two survived the 23 controls
                            that existed when they were written, and neither was
                            visible to any card in the corpus — one of them exposed a
                            real defect, that `/proc` and `/sys` belong to the kernel
@@ -795,7 +752,7 @@ tools/test-cardcheck-mutants.py
                            lines `M6` matched, and the suite reported `ANCHOR x0`
                            and FAILED rather than passing — which is how the edit
                            was noticed
-tools/replay-capture.py    23 controls, and it turns a committed `.log` + `.timing`
+tools/replay-capture.py    It turns a committed `.log` + `.timing`
                            back into the terminal it came from - so R3-11's
                            artefact is DERIVED from evidence rather than recorded
                            beside it, and anyone with a clone can re-run it.
@@ -809,22 +766,22 @@ tools/replay-capture.py    23 controls, and it turns a committed `.log` + `.timi
                            `R13` is its negative, because without a header line
                            `scriptreplay` silently eats the first ten bytes
 tools/test-replay-capture-mutants.py
-                           13 killed and one declared EQUIVALENT with a proof -
+                           One mutant is declared EQUIVALENT with a proof -
                            the byte-count reconciliation cannot fire, because the
                            three checks before it make the counts telescope. An
                            equivalent row is still run and is required to SURVIVE,
                            so an edit that makes the check reachable turns it red
                            in the other direction
-tools/test-gitignore.sh    six of its cases are positive controls, because a .gitignore
+tools/test-gitignore.sh    has positive controls, because a .gitignore
                            of a single `*` would pass every negative one
 tools/test-opcount.sh      two of its cases exist because a counter reading the wrong
                            endianness, or ignoring alignment, is still a counter
 tools/test-file-modes.sh   reads the git index rather than the working tree, because the
                            working tree is what DrvFs lies about
-tools/test-rlxprobe.sh     the bare-metal payloads. Four of its cases are mutations that
+tools/test-rlxprobe.sh     the bare-metal payloads. Some of its cases are mutations that
                            BUILD a deliberately broken payload and run it under qemu,
                            because a suite that cannot tell a fixed payload from a
-                           shipped one is not a suite. One of those four exists because
+                           shipped one is not a suite. One of those exists because
                            qemu cannot reach the state it tests at all
 tools/rtkimage.py          runs Realtek's own nfjrom pipeline and reads what it produced.
                            Its R1 control is the drop's OWN shipped nfjrom, re-parsed on
@@ -845,7 +802,7 @@ tools/deskchan.py          runs an image under qemu and reads how far it got. C1
                            "the mark did not run" and "the instrument does not carry"
                            are the two answers a silent run has to be split into
 tools/reply-size.py        what the loader will send back, in bytes, before it sends it.
-                           Twelve controls, and the model's constants were fitted from
+                           Its model's constants were fitted from
                            121 captures rather than counted by hand -- which is the
                            error it was built to remove
 tools/boot-timeline.py     the named intervals of a boot, with the anchor bytes stated.
@@ -925,7 +882,7 @@ repository the sweep reads 128 of 156 cells as out of order; 量 twice. So *the
 expectation was written first* is verifiable **on the machine that took the
 captures and nowhere else**, which is a harder limit than the tool's own
 docstring used to state, and it is stated there now. What CI runs is that tool's
-fifteen controls — eight of which must fail, four of them driving the file as a
+controls — some of which must fail, four of them driving the file as a
 subprocess after a mutation pass found that six function-level controls killed
 only 7 of 15 mutants. Both tools refuse rather than reporting green when they
 find nothing to look at.

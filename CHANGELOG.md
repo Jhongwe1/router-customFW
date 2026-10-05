@@ -1,5 +1,12 @@
 # Changelog
 
+> **How this file is organised (2026-10-05).** The entries below this note and above `## Unreleased` are per-segment
+> entries written until 2026-09-16 (the 77th segment's is the newest). They are a frozen record: nothing is added to
+> them and nothing in them is rewritten. Since that date per-segment history is `LOG.md`'s. This file says what each tag contains:
+> `## Unreleased` accumulates what the next tag will carry and is cut into `## vX.Y — date` in the commit that makes
+> the tag, as `v0.3` to `v0.6` were; `docs/release-process.md` phase A4 requires the section and has it name the
+> release image's sha256.
+
 🟢🟢 **2026-09-16, seventy-seventh segment, desk, zero power cycles: `R1-pub
 + R2c` is CLOSED.** Ten steps of ten, the 58th segment to the 77th — **20
 segments, 1.00× the plan's estimate of 20**, inside the calibrated band of 7–28

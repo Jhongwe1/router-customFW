@@ -638,10 +638,10 @@ section is what none of that settled.**
 construction.** Both of `cfcensus`'s populations come from one file. It cannot
 see a debt this project incurred and never wrote down — which is the class the
 seventy-seventh segment's closeout found **by hand**, four owner files that no
-checker could reach. `U6` keeps that from being a sentence nobody tests (the
-live file must yield at least one open row owned by a live gate, or the census
-refuses), but a control that the tool is still reading is not a control that
-the tool is reading enough.
+checker could reach. `U6` keeps that from being a sentence nobody tests (with
+a gate in progress an open row must be live-owned, with none some row must be
+open and every open one a standing instruction, or `check` refuses), but a
+control that the tool is still reading is not one that it is reading enough.
 
 🔴 **The 44 orphans are not 44 things still to do.** An adversarial review and
 three independent triage passes agree that the classification has false
