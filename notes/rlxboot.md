@@ -740,3 +740,77 @@ core nothing has timed (§ 10). That the owner's key exists: the prod build
 refuses until it does, and no container signed with it exists (`R8b-3`). That
 `main.c`'s halt and jump behave, which only the qemu payload run reaches and
 qemu certifies logic, not the ISA.
+
+## 🆕 2026-10-07 (125th segment, bench): `rlxboot` from flash — the slot choice, the rescue copy and ten power cuts (`R8b-5`, `R8b-6`)
+
+**What ran.** 量 `bench/2026-10-07`, one seating. `rlxboot` build `127a71cf` with the owner's
+production key — `RLXBOOT-KEY prod 4a6eda72…3096e` on every boot — installed at `0x010000` and its
+rescue copy at `0x020000`, first as `cr6c` and, after `T2a`, as `cs6c` (`SPEC.md` `FW-241`;
+`notes/update-chain.md` § 6): the same payload, the signature's second byte changed. Containers
+P, Q and R (versions 1, 2, 3), each 1,109,152 bytes, wrapping mainline recipe `f9adc9e8`. Every
+judgement below is `tools/bootslot.py judge`'s, with `RLXFW-ID0` checked against the build
+manifest's `recipe_id`.
+
+**The slot choice, as D4 says and the silicon did** (`SPEC.md` `FW-242`):
+
+| capture | slot A | slot B | `rlxboot` printed | `bootslot` |
+|---|---|---|---|---|
+| `T1a` | vendor data | vendor data | `VERDICT A bad=magic`, `VERDICT B bad=magic`, `RLXBOOT-HALT A=magic B=magic`, `refuse-action halt` | PASS |
+| `T2ra` | P, version 1 | vendor data | `VERDICT A ok ver=1`, `VERDICT B bad=magic`, `RLXBOOT-SLOT A` | PASS |
+| `T3a` | P, version 1 | Q, version 2 | `VERDICT A ok ver=1`, `VERDICT B ok ver=2`, `RLXBOOT-SLOT B` | PASS |
+| `F05` | R, version 3 | Q, version 2 | `VERDICT A ok ver=3`, `VERDICT B ok ver=2`, `RLXBOOT-SLOT A` | PASS |
+
+Each `ok` stands on `HDR ok`, `SIG ok`, `DIGEST ok` and `VER cur=N ctr=0 ok` in the same capture,
+and every boot ends `RLXBOOT-BOOT load=80500000 entry=80500000` then `RLXFW-ID0=F9ADC9E8`. The
+counter read `ctr=0` in all 17 slot boots of the seating: nothing writes the state block (`D3`).
+
+**The verify time** (`FW-250`), 量 from the captures' `.timing` by `FW-35`'s rule, with the USB
+serial latency (1–16 ms) as the floor: `RLXBOOT-V1` to `RLXBOOT-BOOT` is 2.623–2.624 s on the six
+boots that verified both slots (`T3a`, `RD05`, `RD09`, `BCc`, `ACc`, `F05`) and 1.382–1.384 s on the
+three that verified one and refused the other at `bad=magic` (`T2ra`, `B1B`, `A1B`); `T1a`'s two
+`bad=magic` refusals took 0.096 s. So one slot — 1,109,152 bytes read through the flash window,
+SHA-256, Ed25519 — costs about 1.3 s, console output included. From `busybox reboot -f` to the
+mainline prompt is about 15.6 s (`F05`). This is `R8b-1`'s hazard column, *the delay of two
+verifies through the flash window*, read.
+
+**The rescue copy** (`FW-242`). `RD03` installed `rlxboot` with `pace=30000`; the console printed
+`RLXFW-SI E 00 370 paced=30000` — the 64 KiB region erased — and nothing more before the pull.
+`RD05`, power on with no ESC: `RLXBOOT-FROM 05020000`, both slots `ok`, `RLXBOOT-SLOT B`, PASS with
+`--expect-from 05020000`. `RD07a` read `0x010000` as `FFFFFFFF` ×4 and `RD07b` read the rescue
+header at `0x020000` (`63733663 81800000 00020000 000048C2`); `RD08b` re-installed `rlxboot`
+(`cmp=1`) and `RD09` read `RLXBOOT-FROM 05010000` again. The rescue copy's boot is told apart from
+`rlxboot`'s only by that `RLXBOOT-FROM` line (`5be604d5`).
+
+**Ten power cuts** (`FW-243`). Each pull cut a write of the slot that wins if the write completes —
+slot B ← Q while A held P, then slot A ← R while B held Q — so a torn write boots the other slot and
+a completed one boots the written slot. Before each pull the target slot was rewritten unpaced with
+the same container and read back (`…Rb`, `cmp=1`; B1 used `W5b`'s), so a cut before the first erase
+would read as a control. Writes were paced at `pace=2000`.
+
+| round | last line before the cut | boot |
+|---|---|---|
+| B1 | `RLXFW-SI E 03 7750 paced=2000` | `VERDICT A ok ver=1`, `VERDICT B bad=magic`, `SLOT A` |
+| B2 | `E 11 27120` | 〃 |
+| B3 | `P 06 56790` | 〃 |
+| B4 | `P 06 56920` | 〃 |
+| B5 | `P 09 63480` | 〃 |
+| A1 | `E 02 5360` | `VERDICT A bad=magic`, `VERDICT B ok ver=2`, `SLOT B` |
+| A2 | `E 10 24560` | 〃 |
+| A3 | `E 16 39140` | 〃 |
+| A4 | `P 03 50250` | 〃 |
+| A5 | `P 14 74220` | 〃 |
+
+10 of 10 PASS (`B1J`–`B5J`, `A1J`–`A5J`); no control round, no refusal, no halt. The closing
+controls show the other half: `BCc`, after slot B was rewritten unpaced, booted B over A; `ACc`,
+after slot A ← R unpaced, booted A over B.
+
+**What this does not establish.** That `v1.0`'s image boots from flash: every boot here is
+`f9adc9e8`, and the `cs6c` commit (`f257a848`) moved the recipe to `6a11de02`. That a cut
+anywhere survives:
+ten points in paced writes, of which 推 about 83 % (erase phase) and 92 % (program phase) of the
+time is the pace's sleep (an erase step is about 2,415 ms, of which about 415 ms is flash work; a
+program step about 2,170 ms, of which about 170 ms; `notes/spi-mtd-driver.md` § 14.3); none in block
+0's erase, the last six seconds before the header, the header page, the read-back or an unpaced
+write. That `rlxboot` refuses a torn slot at its signature or digest on the die — every torn slot
+failed at `bad=magic`. That rollback is refused from flash — `ctr=0` throughout. That the rescue
+copy takes over from a `rlxboot` that is signed and wrong — the drill erased it.

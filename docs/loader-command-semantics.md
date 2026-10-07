@@ -1172,6 +1172,21 @@ confirmed against D and the argument has not been traced. **Inferred, and worth
 fifteen minutes before R8**, because a global that makes the loader declare
 every image bad is a rescue path and possibly a hazard.
 
+🔄 **2026-10-08 (`FW-249`): on `R8b`'s layout ESC is not caught here, and the flag does not refuse
+a `cs6c` image.** 量 `bench/2026-10-07`: after `rlxboot` and its rescue copy went to `cs6c`, all 16
+ESC-streamed watchdog reboots printed `---Escape booting by user` — `doBooting()`'s non-zero branch,
+`0x804086d4` above — while 0 of the 238 ESC-streamed reboots captured before `R8b`, with the vendor's
+`cr6c` at `0x060000`, did (population: every `bench/**/*.meta.json` with `esc_after_seconds` > 0 whose
+log holds `Reboot Result from Watchdog Timeout!` and `<RealTek>`, 255; ten of the 238 at the same
+20 ms period; `bench/2026-09-06/SQ-A` is the control that the line can be captured). Banner to
+`Jump to image` is 2.018–2.019 s on six `cs6c` boots against 4.968 s on `T1a` (`cr6c`, vendor
+rootfs present), and under ESC the line arrives 22–24 ms after the banner. `docs/FINDINGS.md`'s
+`C-16` reading predicts it: `check_image()` reads `0x8040DBA4` at its seventeenth instruction, and
+the ESC poll that sets it runs inside the rootfs scan at `0x80407FF4`, which only a `cr6c` hit
+reaches — a `cs6c` hit returns 1 without it, and `user_interrupt()` sees the ESC instead. Every
+ESC-streamed boot of that seating reached the prompt. Not read: the flag's value after a `cs6c`
+boot, the writer's callers, a cold boot under ESC with `cs6c` (`SPEC.md` `LDR-21`, § 17).
+
 ### 🔴 The copier runs on a WARM reset too, and that is structural
 
 **量 2026-08-25b, directly, and it cost a power cycle to find out.** `C-16` asks

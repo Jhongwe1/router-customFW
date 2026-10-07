@@ -1770,3 +1770,112 @@ delivery, because the payloads cannot ride inside the initramfs (`SPEC.md`
 `FW-240`). That a container's signature is valid, or that rlxboot accepts
 what was written (Gap B). That the simulated cuts -- an operation not done, half
 a header page -- cover the part's real partial states.
+
+## 14. 🆕 2026-10-07 (`R8b`, 125th segment, bench): the install path and `eraseprobe` on the die
+
+§ 13 said not one line of the install path had run on the die. 量 `bench/2026-10-07`: 33 write verbs
+ran, from armed images `75cfa588` and, after `T2a`, `6b1bde59` (the same code with the `cs6c` guard,
+built from a clone-only commit; the committed equivalent is the `cs6c` commit, `f257a848`). 20
+completed and
+read back equal, 11 were stopped by a power pull after at least one 64 KiB erase block, 2 were
+refused before any operation. Every string was an `owner-yes` row of its card (`FW-113`).
+
+### 14.1 The erase size: 4,096, bounded from both sides (`SPEC.md` `FW-244`)
+
+Upper bound. `E02`, under an arm equal to `probe`:
+`RLXFW-SI-PROBE se_bytes=4096 m=EII polls=8664 ticks=2`, then `RLXFW-SI-END OK`; `E03`:
+`eraseprobe se_bytes=4096 se_polls=8664 se_us=20000 pp_us=0 clean=1` and
+`eraseprobe_detail ran=1 m0000=E m1000=I m8000=I se_jiffies=2 pp_polls=144 pp_jiffies=0
+cal_polls=40345 cal_ticks=10 clean_step=4096 clean_ops=16`. One `SE` at `0x3E0000 + 0` cleared the
+marker there and left the one at `+0x1000`: 256 ≤ S ≤ 4,096 (§ 13.4's own reading of `EII`). The
+`STOP` rule written before the reading passed on all four terms.
+
+Lower bound. `W4b` erased the barrier, `0x030000`–`0x06FFFF`, with 64 `SE`s at a 4,096-byte stride,
+and read all 262,144 bytes back as `0xFF` (`inst_cmp_ok 1`, `inst_cmp_bytes 262144`,
+`inst_cmp_diff 0`; for an erase-only region `rlxfw_spi_inst_cmp()` expects `0xFF` everywhere). Before
+the erase that region held only 883 bytes of `0xFF` — `SPEC.md` `FW-225`, two dumps — and was still
+the dump's at the seating's start (`A04`'s `map 0`: groups 1–3 equal to the dump, `LOG.md` 125th),
+outside every region `W1b`–`W3b` named (`rlxboot`, `rescue`, `slotA`; 讀 the compiled-in region
+table), and still not erased after `W2b` (`X-W2c-m1f`: none of units `0x030000`–`0x03F000` carries
+`f47a8ec3…`, the sha256 of 4,096 bytes of `0xFF`). If an `SE` cleared S < 4,096 bytes, at least
+64 × (4,096 − S) bytes would have kept their old values, at most 883 of them `0xFF`; the read-back
+passes only for S ≥ 4,083, so S = 4,096 for any power-of-two erase unit.
+
+So `RLXFW_SPI_WR_ERASE_GRAIN` and `RTL819X_SPI_ERASESIZE`, both `0x00001000u`, are right, and no
+code changes; `H601` and `0x010000` are eight erase blocks apart (`FW-187`'s 4 KiB case). Page and
+block size were not measured: no `0xD8` was ever issued, and the page is only bounded below
+(§ 14.3).
+
+### 14.2 The `RDSR` ceiling, with both of its readings (`FW-245`)
+
+`FW-238` named the two readings that would turn the ceiling into a measurement. 量: the real `SE`
+took `se_polls=8664`, against `RTL819X_SPI_WIP_SPINS` = 200,000, about 23 times fewer; the idle
+calibration counted 40,345 polls in 10 ticks. 推, on § 13.4's assumption that a busy poll costs
+what an idle one does: one `SE` about 21.5 ms, one page program's `WIP` wait about 0.36 ms, and the
+200,000-poll ceiling about 0.50 s. The `SE` time has two more readings that agree with the first:
+`se_jiffies=2` bounds it to 10–30 ms, and the first 64 KiB erase block (16 `SE`s) of each unpaced
+64 KiB install printed at 360–380 ms after its GO line (`W1b`, `W2b`, `K1b`, `K2b`, `RD08b`), about
+23 ms each with command overhead. Every armed `/proc` read after an install in the seating reads
+`n_wip_timeout 0` and `n_rdy_timeout 0`. `FW-238`'s 推 upper bound of 3.3–4.2 s is loose by about
+seven times.
+
+### 14.3 What the path costs (`FW-246`)
+
+From the installs' own `ms=` (two `END` lines cut short by `--until`'s 0–50 ms read-on, `FW-135`,
+were read from `/proc`'s `inst_ms`): a 64 KiB region 480–510 ms (`W1b` 500, `W2b` 510, `K1b` 490,
+`K2b` 480, `RD08b` 510); a slot — 288 `SE`s, 4,333 page programs, the whole region read back —
+10,260 to 11,240 ms over thirteen installs (`W3b` 10,260, `W5b` 10,680, `B2Rb` 10,900, `B3Rb`
+10,910, `B4Rb` 11,000, `B5Rb` 11,070, `BCi` 11,240, `A1Rb` 10,690, `A2Rb` 10,760, `A3Rb` 10,760,
+`A4Rb` 10,700, `A5Rb` 10,870, `ACb` 11,180); the barrier 1,670 ms. `n_writes` agrees with the
+plans: 4,621 per slot (288 + 4,333), 178 for the two 64 KiB regions, 4,685 for slot A plus the
+barrier.
+
+Paced at `pace=2000`, from the ten cut writes' progress lines (slopes, not intercepts): `E k` at
+about 612 + 2,415·k ms and `P k` at about 43,840 + 2,170·k ms; the latest line seen is
+`P 14 74220`. 推, because no paced slot write ran to its end: `P 16` at about 78.6 s, then one more
+2 s sleep — the loop sleeps after every block but the header (`rtl819x-spi.c`, `if (r->pace_ms &&
+!op.commit) msleep(...)`) — so the header at about 80.6 s and `END` at about 81.8 s. The 125th
+segment's *header at about 79 s* left out that sleep.
+
+Page. Each slot install issued 4,333 page programs of 256 bytes and read back equal, so this part's
+page is at least 256 bytes; 推 that a smaller page would have wrapped and failed the compare
+(JEDEC's definition of `PP`, the part's datasheet not being in hand).
+
+### 14.4 Refusals seen on the die, and one `echo` that called the handler three times (`FW-247`)
+
+Two refusals ran on the die, both before any operation, both with `n_writes 0` after: `Z03`, the
+deliberate wrong digest (`RLXFW-SI-END SHA rc=-77`, `RLXFW-SI-RC=FFFFFFB3`), and `BCb`, an install
+sent without its arm (`RLXFW-SI-END UNARMED rc=-13`, interleaved with the command's echo as `FW-47`
+describes, then `RLXFW-SI-RC=FFFFFFF3`). Both were followed by `RLXFW-SI-END SYNTAX rc=-22`, and
+both left `inst_attempts 3`, `inst_refused 3` and `inst_reason SYNTAX` (`Z04`, `X-BCbc-cat`): one
+`echo` reached the handler three times, and `/proc` keeps the last call's reason. A success adds one
+(`E02`: 3 → 4; `BCi`: 3 → 4). 讀 why the re-sends cannot write: `rtl819x_spi_verb_inst` disarms on
+every exit, and the arm check precedes every erase and program. 推 the mechanism: busybox ash's
+built-in `echo` re-writing its buffer after a failed `write()`, the path `FW-41` already shows
+printing a refused payload minus its last character. **A gate reads the refusal reason from the
+console's first `RLXFW-SI-END` line, not from `inst_reason`.**
+
+### 14.5 Staging: the sender finishes before the device has (`FW-248`)
+
+`W3s4` read `img_len 979183` (`img_writes 239`) right after `sendimg: sent 1109152 bytes`; 36 s later
+`X-W3s4w1` read 1,109,152 (271 writes). From then on the session's `stage.sh` polled: the first read
+of each of the other thirteen 1.1 MB stagings fell between 839,885 and 995,571 bytes, and the next,
+about 7 s later, was complete. All seven 18,642-byte stagings were complete at the first read. The
+gate that stopped `W3` was `stage.sh`'s *`img_len` equals the manifest's size*; had it not, the
+install's sha256 would have refused, so an early read costs a refusal, never a wrong write. 推 the
+mechanism: TCP counts the bytes sent once they are in the host's socket buffer, and the device's `nc`
+then drains them into procfs at most 4 KiB per `write()`.
+
+### 14.6 Five comments that still mark the erase size open, on purpose
+
+`rtl819x-spi-wrpolicy.h` (three places, including `RLXFW_SPI_WR_ERASE_GRAIN`'s own line) and
+`rtl819x-spi.c` (two) still call the erase size unsettled. They are left: every byte under `config/`
+moves `RECIPE_ID`, and `v1.0`'s recipe is `6a11de02`. They change in the next commit that moves the
+recipe for another reason, and § 12.4's quotation of that line stays a true quotation until then.
+
+### 14.7 What § 14 does not establish
+
+The exact page and block size. The `SE` count of any erase but the probe's. A busy poll's cost. The
+length of a paced slot write. The re-send's mechanism. That the committed `cs6c` guard runs on the
+die — the image that wrote is `6b1bde59`, built from a commit not in this repository. Any part but
+this one (`1C7016`), any temperature or supply.

@@ -454,3 +454,38 @@ differing only in `--id-scope` produced a byte-identical `vmlinux`
 comparison across two incremental builds compares two build counters and
 reports a false difference; nobody has made that mistake here yet, and this
 paragraph is so that it stays that way. `notes/incremental-build.md` § 7.3.
+
+## 9. 🆕 2026-10-08: `v1.0`'s image against the image every `R8b` reading ran — the recipe id, and nothing else
+
+**Why this comparison exists.** `R8b`'s seating (`bench/2026-10-07`) ran mainline recipe `f9adc9e8`,
+the image containers P, Q and R wrap. The commit that made `rlxboot` and its rescue copy `cs6c`,
+`f257a848`, changed one file under `config/` — the install guard, which compiles only under
+`CONFIG_MTD_RTL819X_WRITE=y` and so never into mainline — and every byte under `config/` is an
+input of `RECIPE_ID`, so the mainline recipe moved to `6a11de02`. `docs/release-process.md` A1/B1
+tie the release image to the release commit's recipe, so `v1.0` ships a `6a11de02` image, and the
+question is how far it is from the bytes that were tested. `SPEC.md` `FW-236` is the precedent: an
+armed-only change left mainline's `vmlinux` 8 bytes apart, the two copies of the id.
+
+**What was built.** 量 2026-10-08, `$FWRE_WORK/rebuild/s126/p/build-v10.sh` (derived from the
+pipeline that built `f9adc9e8`), run `v10` from an ext4 clone at `f257a848`: userspace twice, its 17
+initramfs file rows equal to `f184a`'s; mainline twice, `s126p-v10-mA` == `s126p-v10-mB` byte for
+byte (`vmlinux` `f40bb01a…`, image `a3a75f8c…`, 1,108,992 bytes); the decompressed image 4,096,000
+bytes against the 5,242,880-byte ceiling, which `mkinitramfs --kernel-image` enforces.
+
+**The comparison**, `tools/repdiff.py` and `cmp -l`, with `f9adc9e8` against itself as the control
+(0 differing bytes):
+
+* the two `vmlinux` files, both 4,588,247 bytes, differ in **8 bytes, in three runs**: two runs of
+  two bytes in `rtl819x_spi_read_proc` (`+0x69a`, `+0x6aa`) and one of four in `start_kernel`
+  (`+0x7e`) — the recipe id loaded as two 16-bit immediates in each place, `f9ad`/`c9e8` becoming
+  `6a11`/`de02` (`cmp` at file offsets 1641019–1641020, 1641035–1641036, 2749927–2749928 and
+  2749935–2749936);
+* the two `System.map` files are identical;
+* the two compressed images are both 1,108,992 bytes and differ in 609,924 of them from offset
+  5,860 on, which is what an LZMA stream does with an input change and says nothing more.
+
+**So `v1.0`'s image is the tested code with a different id**, which is the same eight-byte shape
+`FW-236` measured. ⚠️ **What this does not establish**: that the `6a11de02` image boots, from RAM
+or from a slot — it has not run anywhere; that the container wrapping it verifies — container S is
+not yet signed; anything a byte comparison of `vmlinux` cannot see, such as a difference in how the
+same bytes are staged. `SPEC.md` `FW-254`.

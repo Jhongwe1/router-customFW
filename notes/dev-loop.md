@@ -1790,3 +1790,39 @@ and nothing will catch the next.
 
 **What this does not establish:** that any other case pointer in `tools/` is
 right (none was surveyed).
+
+## 21. 🆕 2026-10-07 (125th segment, bench): three host-side defects the `R8b` seating paid for
+
+### 21.1 `bench/` folds case, so two cells whose names differ only in case are one file (`SPEC.md` `FW-251`)
+
+量 2026-10-08 at the desk: `fsutil file queryCaseSensitiveInfo` reports the case-sensitive attribute
+**disabled** on `bench` and on `bench/2026-10-07`, and `ls bench/2026-10-07/BCa.log
+bench/2026-10-07/bca.log` lists both while `git ls-files` holds only `BCA.log`. At the bench this
+made `R8B-CARD.md`'s arm cell `BCa` and `looprun`'s cell `BCA` one file: the session's `cell.py`
+refused `BCa` because its `.log` existed, `stage.sh` did not check that rc, and `BCb` sent its install
+unarmed — refused by the kernel (`UNARMED`), `n_writes 0`. The retry used `BCm`/`BCi`, and `ACa`
+became `ACm`. The 126th segment's own desk loop then read `BCb.log` when it asked for `BCB.log`.
+`CLAUDE.md` records the same mechanism for vendor trees (254 files); this is it inside `bench/`.
+`tools/cardcheck.py` has no check for two cell names that differ only in case; the session's
+`mkcard2.py` refuses them. Not measured: what WSL sees through `/mnt/c` (DrvFs follows the
+directory's NTFS attribute — 讀).
+
+### 21.2 `looprun`'s `A4` reads the last line, and init writes after the prompt (`FW-252`)
+
+Four of twenty `looprun` runs stopped at `round 1 S8 -- A4 failed` (`RDA`, `RDB`, `B1A`, `B4A`) with
+`A3` passing — the board printed the id the build computed. The boot capture's last line was the
+prompt with init's message after it on the same line, e.g. `B1A-boot`:
+`# rlxfw: init: shell started pid=16`. Each was confirmed by an off-card `cat /proc/uptime`
+(`X-RDAp`, `X-RDBp`, `X-B1Ap`, `X-B4Ap`). `LOG.md`'s 125th entry says five; the record holds four.
+`tools/looprun.py` is unchanged.
+
+### 21.3 The image since `R7` prints no `job control turned off` (`FW-253`)
+
+The cards' and `looprun`'s boot terminator was `job control turned off[^#]{1,2}# `, which the
+`r6b8i`-era image (`RLXFW-ID0=3685A3A4`) printed (`bench/2026-09-30/R8A-1j`: `/bin/sh: can't access tty; job control
+turned off`). The mainline and armed images since `R7` end their banner with `Enter 'help' for a list
+of built-in commands.`, two newlines and `# `: 0 of the day's 425 captures hold the old line, 37 hold
+the new one. So all twenty `looprun` boot captures ran to their 45 s cap and `T2ra` to its 180 s cap,
+although the prompt arrived at about 15 s. `R8B-CARD-2.md` switched the cells not yet run to
+`for a list of built-in commands[.][^#]{1,8}# |refuse-action halt`, and those ended on the match in
+15.7–30.3 s. `tools/looprun.py`'s `--boot-until` was not changed.

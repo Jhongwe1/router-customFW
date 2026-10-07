@@ -3783,7 +3783,335 @@ outside the units read, and `H601`, which is never hashed. The `FLR` bracket sta
 
 ---
 
-## The operating clause, re-run at nineteen entries
+## 2026-10-08 — `R8b` (an update written to a flash slot boots through `rlxboot`, ten power cuts inside a slot write each boot the other slot, and the stock loader's rootfs rule found by the gate failing once)
+
+### One line
+
+**v0.6+, three segments — the 124th for the opening and `R8b-0` to `R8b-4`, the 125th for the
+seating (`R8b-5`, `R8b-6`), the 126th for `R8b-7` and this closing — and twenty-five power
+actions, all in the 125th.** § Gate board leaves `R8b` uncosted for `R1h`'s reason, `R8`'s 18
+already carrying the work, so there is no estimate to divide by; the desk work orders the 122nd
+and 123rd segments ran before the gate opened are not counted. One seating, 2026-10-07, read both
+clauses of the row on the die. **An update written to a flash slot boots through `rlxboot`**:
+container P (version 1) in slot A gives `RLXBOOT-SLOT A` and `RLXFW-ID0=F9ADC9E8`, the id the
+build manifest records (`T2ra`); Q (version 2) beside it in slot B boots B, the higher (`T3a`);
+R (version 3) in A boots A again (`F05`). **Ten power pulls inside a slot write each booted the
+other slot**, 10 of 10 by `tools/bootslot.py`, with no control round, no refusal and no halt. A
+torn `rlxboot` hands over to its rescue copy through the stock loader's own scan (`RD05`,
+`RLXBOOT-FROM 05020000`). Every write went through the RAM-booted armed image's install path,
+each under the owner's dated yes for that exact string: 33 driver write verbs, of which 20
+completed and read back equal, 11 were stopped by a pull and 2 were refused before any operation;
+no `FLW`, `EW`, `EB` or non-zero `AUTOBURN` was sent.
+
+**The gate failed once, and that failure is its most consequential reading** (`FW-241`, the
+main session's row): behind a `cr6c` header the stock loader also looks for a rootfs, at eleven
+candidates that all lie inside slot A, and returns nothing when none is there — so once slot A
+held a container the board stopped at `<RealTek>` silently (`T2a`). `rlxboot` and its rescue
+copy were re-installed as `cs6c`, which the locator returns without that search, and every boot
+after that is on `cs6c`; the repository carries the change in `f257a848`, whose tree rebuilds the
+device's `rlxboot` and rescue bytes exactly (build `127a71cf`, `14cebbf5…`, `0c9db2ec…`). That
+commit moves the mainline `RECIPE_ID` from `f9adc9e8` to `6a11de02` (the install header compiles
+only under `CONFIG_MTD_RTL819X_WRITE=y`), and 量 the `6a11de02` `vmlinux`, built twice
+byte-equal, differs from `f9adc9e8`'s in 8 of 4,588,247 bytes — the recipe id, twice — with
+`System.map` identical (`FW-254`). **Every reading here is on `f9adc9e8`**; `v1.0` ships
+`6a11de02`, to be qualified on the device at a later seating.
+
+**The weakest thing here is that all ten pulls cut a paced write, and the pace is most of what
+they cut.** 量 from the ten paced captures' own progress lines, as slopes: an erase block's line
+arrives every 2,415 ms and a program block's every 2,170 ms, against `pace=2000`, so about 415 ms
+of each erase step and 170 ms of each program step is flash work and the rest is the sleep the
+pace inserts (`FW-246`). 推 a pull landing uniformly in time lands in that sleep about 83 % of the
+time in the erase phase and 92 % in the program phase, and the record cannot say which pulls did
+not: the console prints a block's end, never the moment of the cut. So the torn states measured are mostly
+*block k finished, block k+1 not started*; a cut inside one sector erase or one page program is
+covered by the design's argument — page 0 is erased first and programmed last — and not by a pull.
+No pull was made on an unpaced write, which takes 10.26–11.24 s and is the one an update uses.
+
+### Three claims that stand
+
+**① An update in a flash slot boots through `rlxboot`, and of two valid slots the higher version
+boots.** 量 `bench/2026-10-07` (`FW-242`). After the `cs6c` re-install, `T2ra` read, verbatim:
+`RLXBOOT-FROM 05010000` · `RLXBOOT-KEY prod 4a6eda72…3096e` · `RLXBOOT-CTRSRC flash` ·
+`RLXBOOT-READ A flash=00070000 buf=81000000 n=1109152` with sixteen progress dots · `HDR ok` /
+`SIG ok` / `DIGEST ok` / `VER cur=1 ctr=0 ok` · `RLXBOOT-VERDICT A ok ver=1` · slot B `HDR
+bad=magic` · `RLXBOOT-SLOT A` · `RLXBOOT-BOOT load=80500000 entry=80500000` · `RLXFW-ID0=F9ADC9E8`.
+`T3a` with both slots holding containers read `VERDICT A ok ver=1`, `VERDICT B ok ver=2`, `SLOT B`;
+`F05`, after R went into slot A, `VERDICT A ok ver=3`, `VERDICT B ok ver=2`, `SLOT A`. 🟢 **The
+verdict is a tool's, not a reader's**: `tools/bootslot.py judge` checked the loader's candidate,
+the key, the read/verdict order, each slot's address and copy, the stages behind every `ok`, that
+`rlxboot`'s choice follows from its own verdicts, the jump, and the id the board printed against
+the build manifest's `recipe_id`, and read PASS on all 18 `rlxboot` runs from flash in the seating
+(`T1b`, `T2rb`, `T3b`, `RD06`, `RD09b`, ten `…J`, `BCJ`, `ACJ`, `F05b`); on `T2a`, which never
+reached `rlxboot`, it read REFUSED, which is the right answer. 量 off the captures' `.timing` (the
+`FW-35` rule): `RLXBOOT-V1` to `RLXBOOT-BOOT` takes 2.62 s with two full verifies and 1.38 s with
+one, so one slot — 1,109,152 bytes read, hashed and its signature checked — costs about 1.3 s
+(`FW-250`). ⚠️ What this does not reach: one container recipe, one key, and a counter that read
+`ctr=0` in every boot; the signature under the production key is checked by `rlxboot` on the die,
+and the payload's integrity at install time by the kernel's sha256, never by the loader.
+
+**② Ten physical power pulls during a slot write each booted the other slot.** 量 (`FW-243`). The
+design makes the boot itself the reading (`LOG.md` 2026-10-05): each pull cuts a write of the slot
+that would win if the write completed — slot B ← Q (version 2) while A holds P (version 1), then
+slot A ← R (version 3) while B holds Q — so a torn write boots the other slot and a completed one
+the written slot, and the target slot was first rewritten unpaced and read back (`…Rb`, `cmp=1`)
+so a cut before the first erase would read as a control. Where each pull landed, from the last
+`RLXFW-SI` line of each `…Pb` capture before 32 s of silence ended it:
+
+| round | write | last line before the cut | boot (`…B`) | `bootslot` |
+|---|---|---|---|---|
+| B1 | slot B ← Q, `pace=2000` | `E 03 7750` | `VERDICT A ok ver=1`, `VERDICT B bad=magic`, `SLOT A` | PASS |
+| B2 | 〃 | `E 11 27120` | 〃 | PASS |
+| B3 | 〃 | `P 06 56790` | 〃 | PASS |
+| B4 | 〃 | `P 06 56920` | 〃 | PASS |
+| B5 | 〃 | `P 09 63480` | 〃 | PASS |
+| A1 | slot A ← R, `pace=2000` | `E 02 5360` | `VERDICT A bad=magic`, `VERDICT B ok ver=2`, `SLOT B` | PASS |
+| A2 | 〃 | `E 10 24560` | 〃 | PASS |
+| A3 | 〃 | `E 16 39140` | 〃 | PASS |
+| A4 | 〃 | `P 03 50250` | 〃 | PASS |
+| A5 | 〃 | `P 14 74220` | 〃 | PASS |
+
+Every boot printed `RLXFW-ID0=F9ADC9E8`. 🟢 **The other half of the design was shown too**: `BCc`
+(slot B rewritten unpaced, `BCi`) booted B over A, and `ACc` (slot A ← R unpaced, `ACb`) booted A
+over B — so a write that completes does win, and the ten boots of the other slot are not what
+`rlxboot` would have done anyway. ⚠️ All ten torn slots failed at the same check, `HDR bad=magic`,
+because the header page is the last one programmed (`D5`); `rlxboot`'s signature and digest
+refusals were never reached by a torn slot on the die.
+
+**③ When `rlxboot` is torn the stock loader reaches the rescue copy, and when it finds nothing it
+will boot it stops at its own prompt — both on this die, the second by accident.** 量 (`FW-242`,
+`FW-241`). `RD03`, a `pace=30000` install of `rlxboot`, was cut after `RLXFW-SI E 00 370
+paced=30000`; `RD07a` read `0x010000` as `FFFFFFFF` ×4; `RD05`, the next power-on with no ESC,
+read `RLXBOOT-FROM 05020000` and `SLOT B`, PASS; `RD08b` put `rlxboot` back (`cmp=1`) and `RD09`
+read `RLXBOOT-FROM 05010000` again. The second half is `T2a`: after slot A's first write, a
+`busybox reboot -f` with no ESC printed the banner, `P0phymode=01, embedded phy`, `---Ethernet
+init Okay!` and `<RealTek>` 0.34 s later — no `Jump to image`, no `---Escape booting by user`;
+`X-T2-dba4` read the ESC flag at `0x8040DBA4` as `00000000` and `X-T2-dd3c` read `0x8040DD3C` as
+`05010000`, so the loader had accepted `0x010000` and returned nothing for it. The board was
+recovered without a power action: `AR3` RAM-booted the armed image from that prompt nine minutes
+later, and `K1b`/`K2b` re-installed `rlxboot` and its rescue copy as `cs6c`. 🟢 **The loader region
+was never touched**: `map 1 0` read units `0x000000`–`0x005000` equal to the opening baseline at
+five points — before the first write, after `W2`, after `W4`, after `K2b` and at the end (`X-A04f`,
+`X-W2c-m0f`, `X-W4c-m0f`, `X-K2c-m0f`, `X-F-m0f`). ⚠️ `T2a` reached the prompt through the
+locator's rootfs search, not through six content-invalid candidates; what each half shows is
+below, under `C-4`.
+
+### The board row's clauses, read one at a time
+
+| the row says | verdict |
+|---|---|
+| **an update written to a flash slot** | 🟢 **met**: `W3b` slot A ← P, `END OK rc=0 cmp=1 ms=10260`; `W5b` slot B ← Q, `ms=10680`; `ACb` slot A ← R, `ms=11180`, each a whole-region read-back equal to the staged bytes and then `0xFF` (`inst_cmp_bytes 1179648`, `inst_cmp_diff 0`) |
+| **and booted from it through `rlxboot`** | 🟢 **met** on `T2ra`, `T3a`, `F05` and the two closing controls (claim ①). ⚠️ Only after `rlxboot` went to `cs6c`: as first installed (`cr6c`) it booted only while the vendor's SquashFS sat at `0x180000` (`T1a`), and stopped booting the moment slot A held a container (`T2a`, `FW-241`) |
+| **ten physical power pulls during a write** | 🟢 **met**: ten, B1–B5 and A1–A5, each landing between the write's first and last progress line (claim ②) — ⚠️ all inside writes paced at 2 s per 64 KiB block |
+| **each followed by a boot from the other slot** | 🟢 **met**, 10 of 10 by `bootslot`, with `RLXFW-ID0=F9ADC9E8` in every boot |
+| *(entry 16's refutation)* any one that enters no slot means the A/B design has a hole | **did not fire**: 0 halts, 0 REFUSED, 0 control rounds |
+
+### The plan's preconditions, as entry 16 booked them
+
+| the plan's precondition | where it stands at this close |
+|---|---|
+| **①** the rescue drill done | 🟢 **its `rlxboot` half, on the stock loader's own scan** (claim ③). ⚠️ Not its state-block half — `0x3F0000` written to garbage and a TFTP rescue walked and timed: `D3` writes no state block. A TFTP rescue *was* walked, unplanned, after `T2a` (`AR3`, then `K1b`/`K2b`), and was not timed as a drill |
+| **②** `burn()`'s flash target read out | unchanged: met at the desk before this gate; `C-3`'s question about its callees is declined below, because nothing in rlxfw reaches `burn()` |
+| **③** a destination in a forbidden range refused, with a positive control | 🟢 **by construction, on the host**: format 2 signs `flash_at`, the install path refuses a container whose `flash_at` is not its region's base, and the region table is compiled in (`notes/spi-mtd-driver.md` § 13.2). ⚠️ The refusals exercised **on the die** are two — `Z03`'s `SHA` and `BCb`'s `UNARMED`; every other refusal is the host suite's |
+| **④** the main write path is rlxfw's own MTD driver | 🟢 **met**: every write went through `rtl819x-spi`'s install path in the armed image; the loader's write verbs were never sent. ⚠️ That path exists only in an image RAM-booted through the loader: the mainline image in the slots has none (`MTD_CAP_ROM`, `CONFIG_MTD_RTL819X_WRITE=n`) |
+| **⑤** with the kernel region garbage, the loader still reaches its rescue path | 🟢 **in practice, by `T2a`**: a locator result of 0 left the board at `<RealTek>` with no ESC and no message, and the prompt carried the recovery. ⚠️ The trigger was the rootfs search, not garbage at all six candidates; the `C-4` extension that would have torn both `rlxboot` and the rescue copy was not run |
+
+One input entries 16 and 18 called unread, and one this gate's step list called 未定, now have
+readings. `bank_offset`: the loader found `rlxboot` at `0x010000` and the rescue copy at
+`0x020000`, where a zero offset puts them (`FW-241`). The erase size, which `R8b-5`'s hazard
+column named: **4,096 bytes** (`FW-244`) — `E02`'s single
+`SE` cleared the marker at `+0x0000` and left the one at `+0x1000` (`m=EII`, so at most 4,096),
+and `W4b` erased 262,144 bytes that held only 883 `0xFF` before it (`FW-225`) with 64 `SE`s at a
+4,096-byte stride and read all of them back as `0xFF` (so at least 4,083, and 4,096 for any
+power-of-two erase unit).
+
+### The steps' DoD, read one row at a time
+
+| the DoD says | verdict |
+|---|---|
+| **`R8b-0`** the board row reads `~` and names this list | 🟢 met 2026-10-05 |
+| **`R8b-1`** a host test per case, `qemutest`, and the flash build shown refusing and building | 🟢 met at the desk 2026-10-05 (`94d97924`); the runners that could not fail were repaired first (`FW-234`). On the die: 17 slot boots and one halt (claim ①) |
+| **`R8b-2`** each guard shown refusing and permitting; a mainline image's driver code unchanged | 🟢 met at the desk (`a6add876`, `FW-236`); on the die the guards permitted 31 writes and refused 2 (`Z03`, `BCb`) |
+| **`R8b-3`** every digest recorded, two builds byte-equal | 🟢 met 2026-10-05 for P, Q, R, `rlxboot` and the armed `75cfa588`. ⚠️ The armed image that wrote after `T2a`, `6b1bde59` (A == B), was built from a clone-only commit (`c05e2671`); 量 2026-10-08, `f257a848`'s `config/` plus the armed flip is that commit's `config/` file for file, so its recipe is reproducible from the repository — the build itself was not repeated |
+| **`R8b-4`** one `owner-yes` row per payload, and `cardcheck` reading them | 🟢 met: `R8B-CARD.md` carries eleven rows (nine dated 2026-10-05, the two `pace=2000` strings 2026-10-07), `R8B-CARD-2.md` seven (three `cs6c` strings dated 2026-10-07). ⚠️ `R8B-CARD-2.md` was generated mid-seating and committed after it, under the relaxation in force; `LOG.md` records `cardcheck` refusing its four unsigned cells and then passing, and that output is not committed |
+| **`R8b-5`** every write read back and every boot identified by tool | 🟢 met: 20 of 20 completed writes read back equal; every boot capture judged by `bootslot` |
+| **`R8b-6`** ten boots read `RLXBOOT-SLOT` and `RLXFW-ID0` by tool | 🟢 met, `B1J`–`B5J`, `A1J`–`A5J` |
+| **`R8b-7`** `cfcensus` and `spec-check` green on the closing tree | 🟢 met 2026-10-08 on this entry's tree: `cfcensus check` 0 findings and `ratchet` at baseline, `spec-check` rc 0 |
+
+### The step list's hazard column, read one at a time
+
+* **`R8b-1`, the delay of two verifies through the flash window, which no desk test measures** —
+  measured: 2.62 s from `RLXBOOT-V1` to `RLXBOOT-BOOT` with two full verifies, 1.38 s with one,
+  0.10 s for two `bad=magic` refusals (`T1a`); `busybox reboot -f` to the mainline prompt about
+  15.6 s (`FW-250`).
+* **`R8b-2`, the write rate, which decides whether a hand can land a pull inside a write** — it
+  decided exactly that: an unpaced slot write takes 10.26–11.24 s over thirteen installs, so the
+  pulls needed `pace=2000`, which stretches a slot write past 74 s — 推 about 82 s to `END`,
+  projected from the progress lines and the pace rule, because no paced slot write ran to its end
+  (`FW-246`).
+* **`R8b-3`, the release recipe moving after these builds** — it moved: `f257a848` takes mainline
+  from `f9adc9e8` to `6a11de02`, and the armed recipe moved from `75cfa588` to `6b1bde59` in the
+  seating. Nothing here was read on `6a11de02`; that image is built and differs only in the id
+  (`FW-254`).
+* **`R8b-4`, an ordering step that needs the vendor kernel after it is gone** — it fired, in a form
+  nobody had written down: `T1a`, the first flash boot of `rlxboot`, needed the vendor's SquashFS
+  in slot A's range, and `W3` removed it. It cost no power action, because the loader stops at its
+  prompt.
+* **`R8b-5`, the erase size (未定, `FW-227`)** — 4,096 bytes (`FW-244`), and the `STOP` rule written
+  before the reading passed on all four terms: `se_bytes=4096`, `clean=1`, `inst_reason OK`, and
+  `se_polls` 8,664 against a ceiling of 25,000.
+* **`R8b-6`, a pull that lands outside the write** — none did: the earliest pull came after `E 02`
+  at 5.36 s, the latest after `P 14` at 74.22 s.
+
+### The questions this gate must be able to answer
+
+Entry 16 left three of the plan's `R8` questions to this gate.
+
+**③ 「你的 `rlxboot` 壞了會怎樣？」** The stock loader's scan passes the torn region and boots the
+rescue copy at `0x020000`, a byte-for-byte copy of `rlxboot` but for its `burnAddr`; `rlxboot`
+prints the candidate the loader accepted, so the hand-over is on the console (`RD05`). ⚠️ The torn
+`rlxboot` was erased, not corrupted with a valid header; a `rlxboot` that is signed and wrong is not
+this drill.
+
+**④ 「寫到一半斷電會怎樣？」** The slot being written fails `rlxboot`'s first check — its header
+page is erased first and programmed last — and the other slot boots: ten pulls, ten boots of the
+other slot. ⚠️ At ten points of paced writes, with the caveat in the weakest-thing paragraph.
+
+**⑤ 「只有一台機器你敢寫 flash？」** Yes, on three conditions this gate kept and measured: the loader
+region is never named by any write path and read equal at five points; every write is a dated yes
+for its exact string, checked by `cardcheck` before power and by the kernel's sha256 at install;
+and the floor under every failure is the loader's own prompt, which this gate reached by ESC on 19
+boots and once, on `T2a`, with no ESC at all.
+
+### What `R8b` did not establish
+
+🔴 **That rlxfw can update itself.** Every write was made by the armed image, RAM-booted through
+the loader's TFTP (`J 80500000`, 20 times) and fed over `nc`; the mainline image that runs from the
+slots has no write path. What is established is a provisioning procedure that needs the console,
+the loader prompt and a host — not an update the device performs. For the same reason nothing the
+running firmware writes persists: `R7`'s config store is still on ramfs, waiting for an MTD backing
+that this gate did not give it.
+
+🔴 **That `v1.0`'s image boots from flash.** The slots hold mainline `f9adc9e8`. The `6a11de02`
+image is built (`a3a75f8c…`, two builds byte-equal) and differs from it in the recipe id alone
+(`FW-254`), but it has not been signed, written or booted: that is the qualification seating's.
+
+🔴 **That a cut at any point of a write is survivable.** Ten points: five in the erase phase, after
+`E 02`, `E 03`, `E 10`, `E 11` and `E 16`, and five in the program phase, after `P 03`, `P 06` twice,
+`P 09` and `P 14`. None inside block 0's erase, none in the last six seconds before the header (推
+the header page at about 80.6 s, after `P 16` and its pause), none during the header page, none
+during read-back, none on an unpaced write — and most of what was cut was the pace's sleep. Every
+torn slot read `bad=magic`.
+
+🔴 **That rollback is refused from flash.** `D3` writes no state block, so the counter at
+`0x3F0000` was never advanced: `ctr=0` in all 17 slot boots. A lower version installed in both
+slots would boot. The monotonicity entries 16 and 18 called asserted and never exercised stays so.
+
+🔴 **That every candidate content-invalid reaches the prompt.** The `C-4` extension — tear `rlxboot`
+and the rescue copy both, then power on — was not run. `T2a` measured the branch it ends in, by
+another route.
+
+🔴 **The last bracket and the expected image.** `F02`, three `FLR`s at `0x000000`, `0x030000` and
+`0x060000`, was not carried into the continuation card and did not run. `map 1 21` and `map 1 31`
+did not run either, so `0x2B0000`–`0x2BFFFF` is not shown unchanged at 4 KiB: group 21 differs as a
+whole because slot B ends at `0x2AFFFF`. And the changed groups were not compared against an image
+built at the desk: each region's own read-back, at the moment it was written, is the evidence for
+its content.
+
+⚠️ **The `cs6c` rule's reach.** It was measured in one flash state — slot A holding a container,
+the vendor rootfs gone — on one loader build; that `cs6c` boots in any other state is 讀
+(`FW-241`'s own caveat).
+
+⚠️ **What ESC does with `cs6c` installed.** Every ESC-streamed reboot after the re-install printed
+`---Escape booting by user` (16 of 16), which no ESC-streamed capture in this repository had done
+before with a bootable `cr6c` first (0 of 238, ten of them at the same 20 ms period); the banner to
+`Jump to image` shortened from 4.97 s (`T1a`) to 2.02 s. `docs/FINDINGS.md`'s reading (the ESC
+poll that sets `0x8040DBA4` sits in the rootfs scan) predicts it (`FW-249`). The prompt was reached
+every time; `C-13`'s sentence that the flag makes the loader declare every image bad does not
+describe a `cs6c` image.
+
+⚠️ **The erase size and the times.** 4,096 rests on `E02`'s upper bound and on `W4b`'s read-back
+over the barrier's pre-erase content as `FW-225` read it in two dumps and `A04` confirmed at 128 KiB
+— arithmetic over two measurements. The times are conversions: one `SE` about 21.5 ms and one page
+program about 0.36 ms from poll counts, and the 200,000-poll ceiling about 0.50 s, all assuming a
+busy poll costs what an idle one does (推); page and block size were not touched (`FW-244`,
+`FW-245`).
+
+⚠️ **Instruments the tree does not hold.** `cell.py`, `stage.sh` and `mkcard2.py` (session tools
+under `$FWRE_WORK/rebuild/s125/`), the `FLR` pre-reads (`$FWRE_WORK/rebuild/bench-only/`), the
+comparison of `L03`–`L10` against the dump, and the clone-only commit `c05e2671` that built
+`6b1bde59`. Two of the session tools were
+wrong during the seating — a short `img_len` read too early (`FW-248`), an unchecked `arm` cell's
+rc (`FW-251`) — and both were stopped by a guard before a byte was written.
+
+⚠️ **One unit, one part (`1C7016`), one loader build, one evening**; the pull timing was a hand on
+a switch after a spoken *now*; no voltage was read, so `P3`'s power tree stays undelivered.
+
+⚠️ **Flash.** 量, counted over the 338 `.meta.json` `sent` fields and the 20 upload records of
+`bench/2026-10-07`: `FLW` 0, `EW` 0, `EB` 0, non-zero `AUTOBURN` 0 — `AUTOBURN 0` was sent 20
+times, once per upload, and `0x8040D4A0` read back `00000000` 20 times before each; `FLR` 4,
+`L07`–`L10`, each through `tools/flrbracket.py run` with a pre-read that differed from flash. The
+driver's write verbs: 33 sent — 20 completed with a whole-region read-back equal, 11 stopped by a
+pull after at least one 64 KiB erase block, 2 refused before any operation (`Z03`, `SHA`, rc −77;
+`BCb`, `UNARMED`, rc −13; `n_writes 0` after each). The bracket's reach: `F03b`'s `map 0` hashed
+4,186,112 bytes — all but `H601`'s 8,192 — and groups 22–31 equal the opening `A04`, which equals
+the 2026-08-16 dump outside group 0's known `FLS-26` units; groups 0–21 changed, exactly the
+groups that hold `0x010000`–`0x2AFFFF`; `X-F-m0f` read group 0's units equal to the opening
+baseline except `0x010000`–`0x01F000`. Power: 25 actions, counted from the captures — 13
+power-ons, each a capture with `Booting...` and no `Reboot Result from Watchdog Timeout!` (`C03`,
+`T1d`, `RD05`, `B1B`–`B5B`, `A1B`–`A5B`), and 12 power-offs, one before each of those but the
+first. What none of it sees: `H601`, never hashed, and two writes that cancel.
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner's own — opening `R8b` on 2026-10-05 with `P3` and `P4b`, each flash write a dated yes
+for its exact string, holding the production key, the power handshake, and the continued
+relaxation of no frozen cards — are not listed.
+
+1. **The barrier erased after slot A's first write** (`D2`), because that write already ends the
+   vendor kernel (`FW-167`), so the erase adds no second point of no return.
+2. **No voltage reading at the seating**, so `P3`'s power tree is recorded as not delivered.
+3. **The payloads delivered over the armed image's `nc` into `/proc/rtl819x-spi-img`** (`D22`)
+   rather than inside its initramfs (`D12`, refuted by `FW-240`); integrity is carried by the
+   install's sha256 against the typed digest, not by the transport.
+4. **Each pull cuts the write that would win if it completed**, and the target slot is rewritten
+   unpaced first, so a cut before the first erase reads as a control — the design an agent
+   corrected in the 124th segment, because the original could not fail.
+5. **`T1` before `W3`**: `rlxboot` booted from flash first while the vendor kernel still could.
+6. **`pace=2000`** from the runsheet's formula once `E02` gave `se_us`, with the owner's yes for the
+   two paced strings given on the day.
+7. **After `T2a`, `cs6c` for `rlxboot` and the rescue copy**, and an install guard that accepts
+   only `cs6c` in those two regions, because a `cr6c` there is now known not to boot once slot A
+   holds a container.
+8. **The armed image rebuilt from a clone-only build commit** (`c05e2671`) rather than the fix
+   committed mid-seating, because CI's `test-spi-install` required `cr6c` until `tools/mkcr6c.py`
+   and the tests moved with it; the repository fix is `f257a848`.
+9. **The `C-4` extension and `F02` left unrun.**
+10. **`v1.0` ships a mainline image rebuilt at `6a11de02`**, qualified on the device at a later
+    seating, rather than the `f9adc9e8` image every reading here is on.
+11. **The four carried-forward rows and the § 17 rows below closed, declined or re-owned** in the
+    closing commit, so that none reads `ORPHAN` on a closed `R8b`.
+
+### The booking: what moved to another gate, and what was declined
+
+**`PROGRESS.md` § Carried forward**, each row rewritten in place and its old text moved verbatim to
+`docs/history/progress-carried-forward.md`:
+
+| row | disposition | why |
+|---|---|---|
+| `C-1` | ✅ | the scan is measured — the lowest valid candidate wins (`T1a`, with `0x060000`'s `cr6c` still valid), a refused one passes the scan on (`RD05`) — and *the A/B layout needs no loader change* holds for `cs6c` only (`FW-241`) |
+| `C-3` | ⊘ 刻意換掉 | which of `burn()`'s callees erases and which programs is a desk reading of `stage2.bin` that nothing rlxfw does depends on: every write is the driver's, `AUTOBURN` is 0 before every upload |
+| `C-4` | ✅ | the refusal half by `RD05`/`RD07a`, the prompt half's branch by `T2a`; the extension's end-to-end trigger declined inside the row with what would reopen it |
+| `C-13` | ✅ | the flag reads `1` only after ESC (`L01`, `T1e`) and `0` after a boot without it (`X-T2-dba4`), and ESC reached the prompt on every ESC-streamed boot of the seating; the mechanism's open part moves to `SPEC.md` `LDR-21`'s § 17 row |
+
+**`SPEC.md` § 17**, the rows entry 18 re-owned to `R8b`: `FW-187` 殘留 and `FW-191` 殘留 settle at
+4,096 (`FW-244`); `FLS-06`–`FLS-08` settles its sector and declines its page and block, which no
+code path uses; `REG-13`'s command-sequence half is answered by 31 writes and `SFDR2` is declined;
+`REG-14` is declined; and `LDR-21`, owned by `C-13`, is re-owned as a standing instruction. The
+drafts are in the closing commit; what each says is the row's, not this entry's.
+
+---
+
+## The operating clause, re-run at twenty entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -3793,7 +4121,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs. Re-run 2026-10-04 with `R9` appended, which adds exactly one pair — **and that pair FIRES on the same thing a third consecutive time**.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs. Re-run 2026-10-04 with `R9` appended, which adds exactly one pair — **and that pair FIRES on the same thing a third consecutive time**. Re-run 2026-10-08 with `R8b` appended, which adds exactly one pair, and that pair does NOT fire — `R8b` closed the thing the three pairs before it fired on, and the one item both entries still carry is a resemblance.)*
 
 | pair | shared? |
 |---|---|
@@ -3815,6 +4143,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R8a` → `R7` 🆕 | **yes — that nothing rlxfw writes survives, because there is no write path and `R8b` owns the half that would give it one.** `R8a` carries *"Nothing in `R8a` writes one byte"* and *"the monotonicity the design rests on is asserted and never exercised"*; `R7` carries *"That the config store survives anything"*, and `notes/config-store.md` § 11 takes it on in writing and names the gate — *"R8 supplies the MTD backing"* — so `R7` built an A/B store with a monotonic `seq`, an erased-value exclusion and a read-back verify **for a medium it never touched**. 🔴 This is **not** the flash boundary the thirteen-entry run declined: that is the § Flash bookkeeping sentence `CLAUDE.md` requires of every entry, while this has a board row of its own and the row is open. ⚠️ Weaker than `P1` → `R6` in that neither entry names the other's gate — both point at a third, `R8` — and `R8b` is already booked behind `R9`, so the firing adds evidence and not an instruction |
 | `R7` → `R8` 🆕 | **yes — the same thing as `R8a` → `R7`: persistence, that nothing rlxfw writes survives because there is no write path, and `R8b` owns the half that would give it one.** `R7` carries *"That the config store survives anything"* and names `R8` in it as the gate that supplies the MTD backing; `R8`'s entry carries persistence and the ten power cuts, moved to `R8b`'s row. ⚠️ The weakest firing in this table: `R8`'s list holds it because the decision that closed `R8` moved it there, so it adds no evidence the seventeen-entry run had not, and its instruction — *that thing is the next gate* — points at a gate booked behind `R9` |
 | `R8` → `R9` 🆕 | **yes — the same thing a third consecutive time: that nothing rlxfw writes survives, because there is no write path, and `R8b` owns the half that would give it one.** `R8` carries *"That anything can be written to flash and read back after a reset"* and *"the monotonicity the design rests on is asserted and never exercised"*; `R9` carries *"That `R8b` is any closer"* — 讀 `MK5` gates `rtl819x-spi-write.o` on `CONFIG_MTD_RTL819X_WRITE` and 量 `R9-5` found the object absent from both staged trees. 🔴 **The clause's instruction is already carried out**: `R8b` is booked as a gate of its own and is the next gate in the owner's serial order, so this firing adds evidence and not an instruction — the third consecutive firing on one subject, which is itself the reading. ⚠️ What it does not establish: a rule that fires more often because the ledger got longer is measuring length, not repetition, and whether the clause should stop counting a subject already booked as a gate is an open question about the clause that this entry does not decide |
+| `R9` → `R8b` 🆕 | **no — `R8b` closed the subject the last three pairs fired on, and a second of `R9`'s residuals with it.** `R9` carries *"That `R8b` is any closer"* and *"That the flash bracket would detect a small write"*; `R8b` wrote a slot, booted it from flash and survived ten cuts (claims ① and ②), and the `cs6c` re-install changed one byte in each of two 64 KiB regions, which the 4 KiB map resolved to exactly those regions' first units — group 0 moved on `0x010000` alone, its other 31 units equal (`X-W2c-m0f` against `X-K2c-m0f`), and in group 1 the rescue region moved on `0x020000` alone (the barrier's sixteen units there moved too, because `W4b` erased them between the two maps) — a known change, which is the sensitivity control `R9` said needed a write. ⚠️ Closed for an image a provisioning boot writes, not for anything the running firmware writes — `R7`'s config store is no nearer, and that is in neither list. Both entries carry a 推 refuted inside the gate that wrote it (`FW-198`; `R8b`'s *"`W3` overwrote the rootfs at `0x130000`"*, refuted by the dump); declined as a resemblance, the ten-entry run's rule. The flash boundary is not counted, the thirteen-entry run's reason |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -4649,6 +4978,53 @@ read only; sha256 `1e81ac1a…`), the seventeen-entry run's three arms pointed a
 all. **No sixth instance**, by construction. ⚠️ The two candidates recorded at seventeen entries
 stay uncounted, and `R8`'s rewritten board row names three properties and no instrument, so it adds
 no third.
+
+### 🆕 At twenty entries the clause does not fire — the gate the last three firings named has closed what they named
+
+**`R9` → `R8b` does not fire.** The subject that fired on `R8a` → `R7`, `R7` → `R8` and `R8` → `R9`
+— *nothing rlxfw writes survives, because there is no write path, and `R8b` owns the half that would
+give it one* — is closed by `R8b`, not carried: an update written to slot A booted through
+`rlxboot` (`T2ra`), and ten pulls inside slot writes each booted the other slot. This file's own
+rule governs — *a residual that a later gate closes is removed from the clause's input by being
+closed, not by being edited out* — so the firing stops because its subject was established.
+⚠️ **Closed for an image written by a provisioning boot, and for nothing the running firmware
+writes.** The mainline image in the slots still has no write path, so `R7`'s *"the config store
+survives anything"* — on ramfs, waiting for an MTD backing — is no nearer, and `R8b`'s own first
+🔴, *that rlxfw can update itself*, is the same wall seen from the other side. Neither is in `R9`'s
+list, so this pair cannot fire on it; the pair after `R8b` can.
+
+🟢 **And `R8b` closed a second `R9` residual without setting out to.** `R9` said a sensitivity
+control for the flash bracket needs a known change, which is a write. The `cs6c` re-install was one:
+`rlxboot` and its rescue copy went from `cr6c` to `cs6c`, one byte each, and the 4 KiB map moved on
+`0x010000` with the other 31 units of group 0 equal, and on `0x020000` with the other fifteen
+units of the rescue region equal (the barrier's units in group 1 also moved, erased by `W4b`
+between the two maps). ⚠️ That shows a one-byte change *inside a rewritten 64 KiB region* is seen;
+a write the driver did not make — `FLS-26`'s class — is the case `R9` worried about, and the map's
+sensitivity to it is the same digest, not a new measurement.
+
+⚠️ **What the pair does not name.** Both entries record a 推 retracted inside its own gate —
+`FW-198` in `R9`, *the rootfs at `0x130000`* in `R8b` — which is a habit of the record, not a thing
+either gate set out to establish. `R8b`'s residuals that are new — an update path in mainline, the
+`v1.0` image from flash, cuts outside the pace, rollback from flash — have no predecessor in `R9`'s
+list, so they wait for the next pair.
+
+### 🆕 The census re-run at twenty entries — unchanged, and it covers the nineteen-entry close, which ran none
+
+量 2026-10-08 with the unchanged thirteen-entry script (`$FWRE_WORK/rebuild/s111/land/gate/census.py`,
+read only; sha256 `1e81ac1a…`), the eighteen-entry run's three arms pointed at this entry's tree
+(`$FWRE_WORK/rebuild/s126/census20.sh`), exit codes read inside one script file:
+
+* **on `PROGRESS.md` alone** it refuses, rc 1, with all eight control gates reading 0, as at
+  eighteen entries;
+* **on a scratch root whose `PROGRESS.md` is the real file followed by all nineteen
+  `docs/history/steps-*.md`**, `R9`'s and `R8b`'s among them, it reproduces **44 clauses across 8
+  gates** and exits 0, and the `D`-row form reads **66 clauses across eleven gates** with every
+  per-gate figure of the eighteen-entry run unchanged;
+* **on the same root with one of `P1`'s `D` rows un-bolded** it exits 1 and names `P1: (3, 4)`.
+
+**79 clauses, unchanged**: neither `R9`'s list nor `R8b`'s carries a `### The DoD, split into what
+can be refuted` header (量, `grep -c`), so the population cannot grow. **No sixth instance**, by
+construction.
 
 ### Carried unchanged from the seven-entry run
 
