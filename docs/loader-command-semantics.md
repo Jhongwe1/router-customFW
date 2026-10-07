@@ -66,7 +66,7 @@ from an artefact that cannot be committed either.
 
 | # | question | owning gate | answer | source |
 |---|---|---|---|---|
-| **a** | Does the loader scan for the image tag, or is the offset hard-coded? | R8 | **It scans.** Six 64 KiB-aligned candidates, `0x010000`–`0x060000` | A, corroborated by B |
+| **a** | Does the loader scan for the image tag, or is the offset hard-coded? | R8 | **It scans.** Six 64 KiB-aligned candidates, `0x010000`–`0x060000`; a `cr6c` hit must also find a rootfs at one of eleven, `0x0E0000`–`0x180000` (`FW-241`) | A, corroborated by B; 量 `bench/2026-10-07` |
 | **b** | What form does `LOADADDR` take, and does it bound-check? | R0 | one hex argument, no bound check, no confirmation | A |
 | **c** | Is TFTP server or client, and what does `AUTOBURN` gate? | R0 | server; `AUTOBURN` is read at exactly one instruction | C, re-run here |
 | **d** | Is there anywhere to put a kernel command line? | R4 | **No — and the question rlxfw actually has is a different one** | A + C |
@@ -106,7 +106,7 @@ buffer and a bank offset, and does three fixed probes followed by a sweep:
 80408144   bne   s0,0x3<<16,check    ; 0x030000 already tried
 8040816c   lui   v0,0x6
 80408170   slt   v0,v0,s0            ; scan while s0 <= 0x060000
-80408188   bne   v1,2,fail           ; only signature "cr6c" counts
+80408188   bne   v1,2,return         ; 1 (cs6c) is returned as found; 2 goes on to the rootfs search
 ```
 
 **Read out of the code:** the kernel candidate set is exactly
@@ -115,9 +115,20 @@ buffer and a bank offset, and does three fixed probes followed by a sweep:
 0x010000   0x020000   0x030000   0x040000   0x050000   0x060000
 ```
 
-and **this unit's kernel sits at `0x060000`, the last one tried.** The rootfs
-locator immediately below does the same over `0x0E0000 · 0x0F0000 · 0x130000`
-then `0x100000 · 0x110000 · 0x120000`.
+and **this unit's kernel sits at `0x060000`, the last one tried.** A hit whose
+signature is `cr6c` (return 2, below) sends the locator on to a rootfs search
+(`0x80408190`–`0x8040821c`): three fixed probes, then a sweep from `0x100000`
+while `s0 <= 0x180000` that skips them — eleven candidates, every one inside
+`R8b`'s slot A, `0x070000`–`0x18FFFF`:
+
+```
+0x0E0000   0x0F0000   0x130000   0x100000   0x110000   0x120000   0x140000   0x150000   0x160000   0x170000   0x180000
+```
+
+🔄 **2026-10-08 (`FW-241`).** This read the sweep's bound as `0x120000`, six
+candidates. The locator returns the last probe's result — 0 when none holds a
+rootfs — and does not resume the kernel scan, so a `cr6c` at `0x010000` with no
+rootfs never reaches `0x020000`: 量 `bench/2026-10-07` `T2a`, `X-T2-dd3c`.
 
 `0x8040DD3C` is written on **every** candidate, so after the scan it holds the
 address that was accepted. **(A)** That makes this whole section falsifiable
@@ -152,11 +163,11 @@ unit's loader** — inferred, but from a structural match rather than a guess.
 
 ### What it means for R8
 
-R8's A/B layout does not need the loader to be taught anything. **Any 64 KiB
-boundary in `0x010000`–`0x060000` is a slot the stock loader will find**, and it
-prefers the lowest. Two images at, say, `0x020000` and `0x060000` give an A/B
-pair in which A wins whenever its checksum is good — the behaviour an A/B scheme
-wants, obtained for free.
+🔄 **2026-10-08.** This said R8's A/B layout needs no loader change: any 64 KiB
+boundary in `0x010000`–`0x060000` is a slot the loader finds, the lowest first.
+That holds for `cs6c` alone — a `cr6c` slot must also find a rootfs (above) —
+and `R8b` does not use the scan as its A/B mechanism: `rlxboot` at `0x010000`
+and its rescue copy at `0x020000`, both `cs6c`, are the candidates that boot.
 
 `PROGRESS.md` **C-1 closes here.**
 
@@ -175,16 +186,11 @@ wants, obtained for free.
 4. sums the RAM copy as 16-bit halfwords and **requires the sum to be zero**.
 
 B names the two signatures: `FW_SIGNATURE = "cs6c"`,
-`FW_SIGNATURE_WITH_ROOT = "cr6c"` (`bootcode/boot/init/rtk.h`). Only `2`
-satisfies the caller, so a firmware without a rootfs section is located and then
-rejected.
+`FW_SIGNATURE_WITH_ROOT = "cr6c"` (`bootcode/boot/init/rtk.h`). 🔄 Either
+satisfies the caller — `doBooting()` boots on any non-zero flag — but a 2 must
+find a rootfs first (above); this said only `2` did (`FW-241`, `LDR-18`).
 
-Step 3 is where **C's `T-09` comes from.** C observed RAM at `0x80500000`
-holding a copy of flash `0x060010` that nothing in that session had put there,
-and inferred that the loader stages the payload before offering the ESC window.
-**That inference now has an instruction behind it:** `jal 0x80404f38` at
-`0x80407E44`, executed during the *check*, because this generation computes the
-checksum over the RAM copy where B computes it over flash.
+Step 3 is where **C's `T-09` comes from.** C observed RAM at `0x80500000` holding a copy of flash `0x060010` that nothing in that session had put there, and inferred that the loader stages the payload before offering the ESC window. **That inference now has an instruction behind it:** `jal 0x80404f38` at `0x80407E44`, executed during the *check*, because this generation computes the checksum over the RAM copy where B computes it over flash.
 
 ### And the image check is located, which closes C-4
 
@@ -204,13 +210,7 @@ checksum over the RAM copy where B computes it over flash.
 80408704   jal   0x80408468         ; goToDownMode()  -- no ESC wait, no message
 ```
 
-**A bad image does not cost the rescue path — it goes straight there, with no
-ESC window and silently.** `docs/loader-flash-write.md` §3 marked this
-*inferred for this unit, confirmed only in a different bootcode generation*. It
-is now read out of this unit's own code. **C-4 no longer needs a bench test to
-establish the structure** — what a bench test would still add is that a
-deliberately corrupted image reaches the prompt in practice, which is a
-different claim and stays worth doing before R8.
+**A bad image does not cost the rescue path — it goes straight there, with no ESC window and silently.** `docs/loader-flash-write.md` §3 marked this *inferred for this unit, confirmed only in a different bootcode generation*. It is now read out of this unit's own code. **C-4 no longer needs a bench test to establish the structure** — what a bench test would still add is that a deliberately corrupted image reaches the prompt in practice, which is a different claim and stays worth doing before R8.
 
 Why the diagnostic strings were missing, which is what made this look
 un-locatable: this build compiles out the *system* image messages and keeps the

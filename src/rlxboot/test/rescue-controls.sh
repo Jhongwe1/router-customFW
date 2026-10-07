@@ -4,26 +4,28 @@
 #
 #   rescue-controls.sh <repo> <imagedir> <workdir>
 #
-# WHY AT THE CLI AT ALL, when `mkcr6c.py --self-test` already covers seventeen
-# cases.  A self-test calls the functions; what a `make` reads is an exit code,
-# and the two are not the same claim.  `R1`/`R2` below drive the real `wrap` and
-# the real `scan` over the real images this build just produced, and `R3`-`R6`
-# feed them fixtures built here so that each control is seen going RED.  A
-# control that only ever passes on the good artefact is not a control.
+# WHY AT THE CLI AT ALL, when `mkcr6c.py --self-test` already covers the
+# producer.  A self-test calls the functions; what a `make` reads is an exit
+# code, and the two are not the same claim.  `R1`/`R2` below drive the real
+# `wrap` and the real `scan` over the real images this build just produced,
+# and `R3`-`R8` feed them fixtures built here so that each control is seen
+# going RED.  A control that only ever passes on the good artefact is not a
+# control.
 #
 # THE TWO PROPERTIES, as predicates:
 #
-#   (1) flash 0x010000 and 0x020000 each hold 4 bytes reading `cr6c` followed by
+#   (1) flash 0x010000 and 0x020000 each hold 4 bytes reading `cs6c` followed by
 #       a header whose `len` payload bytes sum to zero as 16-bit big-endian
-#       halfwords -- so `check_image()` returns 2 and `doBooting()` boots it.
-#       REFUTED BY: either image for which `check_image()` returns other than 2,
-#       or returns 2 with a non-zero sum.
+#       halfwords -- so `check_image()` returns 1 and the loader boots it with
+#       no rootfs search (`FW-241`).  REFUTED BY: either image for which
+#       `check_image()` returns other than 1, or returns 1 with a non-zero sum.
+#       A `cr6c` (2) is a refutation: it boots only while slot A holds a rootfs.
 #
 #   (2) no 64 KiB-aligned offset the loader scans other than those two, and
 #       neither slot base, holds 4 bytes matching any of `check_image()`'s two
 #       signatures or `burn()`'s eight.  REFUTED BY: any such offset at which
 #       `mkfw2.stock_loader_verdict` reports RECOGNISED, or at which
-#       `check_image()` returns 2 with a zero sum.
+#       `check_image()` returns 1 or 2 with a zero sum.
 #
 # Nothing here writes flash and nothing here runs on the device.
 
@@ -33,8 +35,8 @@ IMGDIR=${2:?image dir}
 WD=${3:?work dir}
 PY=${PYTHON:-/usr/bin/python3}
 MKCR6C="$REPO/tools/mkcr6c.py"
-PRIMARY="$IMGDIR/rlxboot.cr6c"
-RESCUE="$IMGDIR/rlxboot-rescue.cr6c"
+PRIMARY="$IMGDIR/rlxboot.cs6c"
+RESCUE="$IMGDIR/rlxboot-rescue.cs6c"
 
 mkdir -p "$WD"
 fails=0
@@ -79,11 +81,11 @@ echo
 echo '--- R3  property 1, RED: the FW-168 signature, cr6b, must be caught ---'
 # 🔴 THE FIXTURE IS THE DEFECT, not an invented one.  量 `FW-168`: `cvimg`'s
 # linux-ro option writes `cr6b`, and that is the signature rlxfw's own
-# `linux.bin` carries today.  One byte of four.
+# `linux.bin` carries today.
 "$PY" - "$RESCUE" "$WD/cr6b.img" <<'EOF'
 import sys
 b = bytearray(open(sys.argv[1], 'rb').read())
-b[3:4] = b'b'                      # 'cr6c' -> 'cr6b'
+b[0:4] = b'cr6b'                   # FW-168's own signature
 open(sys.argv[2], 'wb').write(bytes(b))
 EOF
 if "$PY" "$MKCR6C" scan --place 0x010000="$PRIMARY" \
@@ -126,15 +128,15 @@ echo '--- R5  property 1, RED 3: the producer refuses a destination that must no
 dd if=/dev/zero of="$WD/pay.bin" bs=1 count=4096 2>/dev/null
 ok=0
 for at in 0x030000 0x040000 0x050000 0x060000 0x070000; do
-	if "$PY" "$MKCR6C" wrap --in "$WD/pay.bin" --out "$WD/x.cr6c" \
+	if "$PY" "$MKCR6C" wrap --in "$WD/pay.bin" --out "$WD/x.cs6c" \
 	        --start-addr 0x81800000 --flash-at "$at" >/dev/null 2>&1; then
-		red "wrap PRODUCED a cr6c header for $at, which must not boot"
+		red "wrap PRODUCED a cs6c header for $at, which must not boot"
 	else
 		ok=$((ok + 1))
 	fi
 done
 for at in 0x010000 0x020000; do
-	if "$PY" "$MKCR6C" wrap --in "$WD/pay.bin" --out "$WD/x.cr6c" \
+	if "$PY" "$MKCR6C" wrap --in "$WD/pay.bin" --out "$WD/x.cs6c" \
 	        --start-addr 0x81800000 --flash-at "$at" >/dev/null 2>&1; then
 		ok=$((ok + 1))
 	else
@@ -142,6 +144,28 @@ for at in 0x010000 0x020000; do
 	fi
 done
 note "ok" "wrap refused 5 destinations and produced 2 ($ok of 7 as declared)"
+
+echo
+echo '--- R8  property 1, RED 4: the FW-241 signature, cr6c, must be caught ---'
+# 🔴 THE FIXTURE IS THE BENCH'S DEFECT: the bytes mkcr6c 1.0 wrote and s124
+# installed -- `cr6c`, its sum intact -- which stopped the loader at
+# `<RealTek>` once slot A held a container.  The signature alone is wrong.
+"$PY" - "$PRIMARY" "$WD/cr6c.img" <<'EOF'
+import sys
+b = bytearray(open(sys.argv[1], 'rb').read())
+b[0:4] = b'cr6c'                   # mkcr6c 1.0's signature
+open(sys.argv[2], 'wb').write(bytes(b))
+EOF
+if "$PY" "$MKCR6C" scan --place 0x010000="$WD/cr6c.img" \
+                        --place 0x020000="$RESCUE" \
+                        > "$WD/r8.log" 2>&1; then
+	red "scan ACCEPTED a cr6c image at 0x010000 -- the rootfs search is not modelled"
+	sed 's/^/         /' "$WD/r8.log"
+else
+	note "ok" "scan refuses it, and names the rootfs search:"
+	evidence "$WD/r8.log" 'WRONG +0x010000' "R8"
+	evidence "$WD/r8.log" 'rootfs' "R8 names why"
+fi
 
 # ===================================================================== (2) ===
 echo
@@ -154,10 +178,10 @@ else
 fi
 
 echo
-echo '--- R6  property 2, RED: a stray cr6c at a barrier candidate ---'
+echo '--- R6  property 2, RED: a stray cs6c at a barrier candidate ---'
 # 🔴 `FW-167`'s own hole, as a command.  The obvious layout puts slot A at
 # 0x030000, and then four of the loader's six candidates fall inside it; a
-# payload byte pattern reading `cr6c` at one of them boots a slot with no
+# payload byte pattern reading `cs6c` at one of them boots a slot with no
 # signature check and no anti-rollback counter.
 if "$PY" "$MKCR6C" scan --place 0x010000="$PRIMARY" \
                         --place 0x020000="$RESCUE" \
@@ -180,7 +204,7 @@ if "$PY" "$MKCR6C" scan --place 0x010000="$PRIMARY" \
                         --place 0x020000="$RESCUE" \
                         --place 0x070000="$RESCUE" \
                         > "$WD/r7.log" 2>&1; then
-	red "scan ACCEPTED a slot whose first 4 bytes read cr6c"
+	red "scan ACCEPTED a slot whose first 4 bytes read cs6c"
 	sed 's/^/         /' "$WD/r7.log"
 else
 	note "ok" "scan refuses a recognisable slot although 0x070000 is not scanned:"
@@ -193,8 +217,9 @@ if [ "$fails" -ne 0 ]; then
 	echo "rescue-controls: $fails control(s) FAILED"
 	exit 1
 fi
-echo "rescue-controls: 2 properties, 4 red arms and 3 green arms, all as declared"
-echo "  what this does NOT establish: that either image has ever been loaded or"
-echo "  run.  Every reading here is of bytes on a desk, through a desk"
-echo "  reproduction of check_image() read out of one unit's stage2.bin, and"
-echo "  check_image()'s bank_offset has never been read for this build."
+echo "rescue-controls: 2 properties, 5 red arms and 3 green arms, all as declared"
+echo "  what this does NOT establish: anything on a device by itself.  Every"
+echo "  reading here is of bytes on a desk, through a desk reproduction of"
+echo "  check_image() read out of one unit's stage2.bin.  That unit booted cs6c"
+echo "  images from 0x010000 and 0x020000 on 2026-10-07 (FW-241); another"
+echo "  loader build may differ, and nothing here would notice."

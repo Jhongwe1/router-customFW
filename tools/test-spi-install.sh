@@ -118,12 +118,25 @@ cont("slotA-full.rlxu", stream(1179648 - 160, b"F"), 0x070000, mkfw2.FORM_WHOLE)
 cont("slotB.rlxu", stream(140000, b"B"), 0x190000, mkfw2.FORM_WHOLE)
 cont("slotA-payl.rlxu", stream(140000, b"A"), 0x070000, mkfw2.FORM_PAYLOAD)
 cont("nff.rlxu", stream(140000, b"A"), mkfw2.FLASH_NONE, mkfw2.FORM_NONE)
-for name, at, n in (("rlxboot.cr6c", 0x010000, 30000),
-                    ("rescue.cr6c", 0x020000, 65536 - 18)):
+for name, at, n in (("rlxboot.cs6c", 0x010000, 30000),
+                    ("rescue.cs6c", 0x020000, 65536 - 18)):
     img = mkcr6c.build_image(stream(n, name.encode()), 0x81800000, at)
     mkcr6c.gate_image(img, at)
     open(os.path.join(out, name), "wb").write(img)
     print("  %-16s %8d bytes  burnAddr %08X" % (name, len(img), at))
+    # FW-241's fixture: the same image as mkcr6c 1.0 wrote it, `cr6c`, its sum
+    # intact -- the bytes s124 produced and the guard must now refuse.  The
+    # producer refuses to make it, so it is made here from the producer's own
+    # output, and that refusal is checked too.
+    legacy = mkcr6c.CR6C + img[4:]
+    try:
+        mkcr6c.gate_image(legacy, at)
+        sys.exit("mkcr6c.gate_image accepted a cr6c image for %06X" % at)
+    except ValueError:
+        pass
+    lname = name.replace(".cs6c", ".cr6c")
+    open(os.path.join(out, lname), "wb").write(legacy)
+    print("  %-16s %8d bytes  burnAddr %08X (1.0's signature)" % (lname, len(legacy), at))
 with open(os.path.join(out, "digests"), "w") as fh:
     for name in sorted(os.listdir(out)):
         if name != "digests":
@@ -147,6 +160,13 @@ for s in ("SLOTA", "SLOTB", "PROBE"):
     b0, b1 = v[(s, "BASE")], v[(s, "BASE")] + v[(s, "SIZE")]
     if any(b0 <= c < b1 for c in mkcr6c.scan_candidates()):
         bad.append("%s holds a loader scan candidate" % s)
+# FW-241: why the rlxboot/rescue regions take cs6c and refuse cr6c.  Every
+# rootfs candidate a cr6c header sends the locator to lies inside slot A, so
+# once slot A holds a container none is a rootfs.  If the layout ever moved so
+# that one fell outside, the refusal's stated reason would no longer be true.
+a0, a1 = v[("SLOTA", "BASE")], v[("SLOTA", "BASE")] + v[("SLOTA", "SIZE")]
+if not all(a0 <= c < a1 for c in mkcr6c.rootfs_candidates()):
+    bad.append("a cr6c rootfs candidate lies outside slot A")
 # D19's block: after slot B, ending where the state block (0x3F0000) begins
 p0, p1 = v[("PROBE", "BASE")], v[("PROBE", "BASE")] + v[("PROBE", "SIZE")]
 if not (v[("SLOTB", "BASE")] + v[("SLOTB", "SIZE")] <= p0 and p1 == 0x3F0000):
@@ -251,6 +271,7 @@ mutate B9-stale-clean  glue "$out/gapA.inc" 's/^\t\tp->clean_known = 0;$//'
 mutate H9-size-table   pure "$ihdr" 's/^\t\treturn 4096;$/\t\treturn 32768;/'
 mutate H10-anomaly-raw pure "$ihdr" 's/^\t\treturn 0x1000u;$/\t\treturn 0u;/'
 mutate H11-verdict     pure "$ihdr" 's/if (clean != 1)/if (clean == 0)/'
+mutate H12-cr6c-magic  pure "$ihdr" 's/^#define RLXFW_SPI_INST_CR6C_MAGIC\t0x63733663u/#define RLXFW_SPI_INST_CR6C_MAGIC\t0x63723663u/'
 
 if [ "$rc" -ne 0 ]; then
     echo "test-spi-install: FAILED (see FAIL lines above)" >&2

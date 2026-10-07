@@ -972,7 +972,7 @@ jobs:
 
       # R8b's install path (Gap A): the pure decisions of rtl819x-spi-install.h
       # and the driver's own Gap A block, run on the host against a simulated
-      # NOR; 26 echoed cases (cross-TU prototype checks, expectation flips and
+      # NOR; 28 echoed cases (cross-TU prototype checks, expectation flips and
       # source mutations that must each go red). Needs cc and python3 only.
       - name: test-spi-install
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"

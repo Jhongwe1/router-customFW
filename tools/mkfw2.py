@@ -184,8 +184,9 @@ AUTOEXEC_NAMES = ("nfjrom", "boot.img")
 
 # 讀 `docs/loader-flash-write.md` § 1 and `docs/loader-command-semantics.md`
 # § "the signature test".  `check_image()` takes 'cs6c' (returns 1) and 'cr6c'
-# (returns 2, the only one the caller accepts); `burn()` matches these eight
-# section signatures.  A container must be NONE of them at offset 0.
+# (returns 2, which also needs a rootfs in 0x0E0000-0x180000; the loader boots
+# either, `FW-241`); `burn()` matches these eight section signatures.  A
+# container must be NONE of them at offset 0.
 CHECK_IMAGE_SIGS = (b"cs6c", b"cr6c")
 BURN_SIGS = (b"boot", b"sqsh", b"w6cp", b"jw6c", b"cwmp", b"ksap",
              b"ALL1", b"ALL2")
@@ -458,8 +459,9 @@ def stock_loader_verdict(blob):
     copies a 16-byte header out of the flash window, `memcmp`s the signature
     against 'cs6c' then 'cr6c' -- built as immediates, not stored as strings --
     returns 1 or 2, reads `header.len` bytes into `header.startAddr`, and
-    requires the 16-bit big-endian sum of the RAM copy to be zero.  Only the
-    return value 2 satisfies the caller, so 'cs6c' is located and then rejected.
+    requires the 16-bit big-endian sum of the RAM copy to be zero.  Either
+    return boots; a 2 must also find a rootfs (`FW-241`), so 'recognised' here
+    is the right question for a slot, where any boot is the hazard.
 
     `burn()`'s eight section signatures are checked too, because the burn word
     and a section header are the *other* way the loader acts on a file.

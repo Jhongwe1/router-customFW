@@ -112,7 +112,7 @@ RLXFW_SPI_INST_ASSERT(cap, RLXFW_SPI_INST_IMG_CAP >= RLXFW_SPI_INST_SLOTB_SIZE &
 
 /* What a region holds, which decides what the installer checks in it. */
 enum {
-	RLXFW_SPI_INST_K_CR6C = 1,	/* a cr6c image the stock loader boots */
+	RLXFW_SPI_INST_K_CR6C = 1,	/* a cs6c image the stock loader boots */
 	RLXFW_SPI_INST_K_ERASE,		/* erase only -- D2's barrier */
 	RLXFW_SPI_INST_K_RLXU,		/* a signed format-2 RLXU container */
 	RLXFW_SPI_INST_K_PROBE		/* `eraseprobe` only -- D19 */
@@ -547,12 +547,22 @@ static inline int rlxfw_spi_inst_chk_rlxu(const u8 *img, u32 len, u32 base)
 	return RLXFW_SPI_INST_OK;
 }
 
-/* cr6c, IMG_HEADER_T: signature[4], startAddr, burnAddr, len (FW-12), and
+/* IMG_HEADER_T: signature[4], startAddr, burnAddr, len (FW-12), and
  * tools/mkcr6c.py writes the destination into burnAddr.  The acceptance rule
- * is check_image()'s: signature `cr6c` and a zero 16-bit big-endian sum over
- * the `len` payload bytes (tools/rtkimage.py sum16, C-4).  An odd `len` is
- * refused, as mkcr6c refuses an odd binary. */
-#define RLXFW_SPI_INST_CR6C_MAGIC	0x63723663u	/* "cr6c" */
+ * is check_image()'s: a zero 16-bit big-endian sum over the `len` payload
+ * bytes (tools/rtkimage.py sum16, C-4).  An odd `len` is refused, as mkcr6c
+ * refuses an odd binary.
+ *
+ * The signature is `cs6c`, never `cr6c`.  讀 this unit's stage2.bin: the
+ * image locator (0x80408084) searches for a rootfs only when check_image()
+ * returned 2 (`cr6c`) -- eleven candidates, 0x0E0000-0x180000, every one
+ * inside slot A -- and returns 0 when none holds one; `cs6c` returns 1, skips
+ * that search, and doBooting() (0x80408690) boots on any non-zero flag.  量
+ * 2026-10-07 (bench/2026-10-07 T1a, T2a): a `cr6c` rlxboot booted while the
+ * vendor's squashfs sat at 0x180000 and stopped silently at <RealTek> once
+ * slot A held a container.  So a `cr6c` here is refused: it installs an
+ * image the loader will not start. */
+#define RLXFW_SPI_INST_CR6C_MAGIC	0x63733663u	/* "cs6c" */
 #define RLXFW_SPI_INST_CR6C_HDR_LEN	16u
 #define RLXFW_SPI_INST_CR6C_BURN_OFF	8u
 #define RLXFW_SPI_INST_CR6C_LEN_OFF	12u

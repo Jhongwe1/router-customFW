@@ -188,7 +188,7 @@ static void t_table(void)
 	    REG(I_SLOTA)->base == 0x070000u && REG(I_SLOTA)->size == 1179648u
 	    && REG(I_SLOTB)->base == 0x190000u &&
 	    REG(I_SLOTB)->size == 1179648u);
-	ckb("slots hold RLXU, rlxboot/rescue hold cr6c",
+	ckb("slots hold RLXU, rlxboot/rescue hold a stock-loader image (cs6c)",
 	    REG(I_SLOTA)->kind == RLXFW_SPI_INST_K_RLXU &&
 	    REG(I_SLOTB)->kind == RLXFW_SPI_INST_K_RLXU &&
 	    REG(I_RLXBOOT)->kind == RLXFW_SPI_INST_K_CR6C &&
@@ -484,8 +484,10 @@ static void t_payload(const char *dir)
 	struct blob B = load(dir, "slotB.rlxu");
 	struct blob AP = load(dir, "slotA-payl.rlxu");
 	struct blob NF = load(dir, "nff.rlxu");
-	struct blob R = load(dir, "rlxboot.cr6c");
-	struct blob S = load(dir, "rescue.cr6c");
+	struct blob R = load(dir, "rlxboot.cs6c");
+	struct blob S = load(dir, "rescue.cs6c");
+	struct blob LR = load(dir, "rlxboot.cr6c");
+	struct blob LS = load(dir, "rescue.cr6c");
 
 	ck("producer's slotA container on slotA", pay(&A, A.n, I_SLOTA), OK);
 	ck("producer's full-size slotA container on slotA",
@@ -515,25 +517,32 @@ static void t_payload(const char *dir)
 	ck("slotA container with format 1", pay(&A, A.n, I_SLOTA),
 	   RLXFW_SPI_INST_R_HDR_FORMAT);
 	A.p[5] ^= 3u;
-	ck("FW-168: a container where a cr6c must go (rescue)",
+	ck("FW-168: a container where a cs6c must go (rescue)",
 	   pay(&A, A.n, I_RESCUE), RLXFW_SPI_INST_R_HDR_MAGIC);
-	ck("a cr6c where a container must go (slotA)", pay(&S, S.n, I_SLOTA),
+	ck("a cs6c where a container must go (slotA)", pay(&S, S.n, I_SLOTA),
 	   RLXFW_SPI_INST_R_HDR_MAGIC);
 
-	ck("producer's rlxboot.cr6c on rlxboot", pay(&R, R.n, I_RLXBOOT), OK);
-	ck("producer's rescue.cr6c on rescue (full 64 KiB)",
+	ck("producer's rlxboot.cs6c on rlxboot", pay(&R, R.n, I_RLXBOOT), OK);
+	ck("producer's rescue.cs6c on rescue (full 64 KiB)",
 	   pay(&S, S.n, I_RESCUE), OK);
-	ckb("  ... and rescue.cr6c fills the region", S.n == 65536u);
-	ck("rlxboot.cr6c on rescue (burnAddr)", pay(&R, R.n, I_RESCUE),
+	ckb("  ... and rescue.cs6c fills the region", S.n == 65536u);
+	/* FW-241: the bytes mkcr6c 1.0 wrote -- signature `cr6c`, sum intact --
+	 * boot only while a rootfs sits in slot A, so the guard refuses them by
+	 * the magic alone. */
+	ck("FW-241: rlxboot.cr6c (1.0's signature, sum intact) on rlxboot",
+	   pay(&LR, LR.n, I_RLXBOOT), RLXFW_SPI_INST_R_HDR_MAGIC);
+	ck("FW-241: rescue.cr6c (1.0's signature, sum intact) on rescue",
+	   pay(&LS, LS.n, I_RESCUE), RLXFW_SPI_INST_R_HDR_MAGIC);
+	ck("rlxboot.cs6c on rescue (burnAddr)", pay(&R, R.n, I_RESCUE),
 	   RLXFW_SPI_INST_R_HDR_FLASH_AT);
-	ck("rescue.cr6c on rlxboot (burnAddr)", pay(&S, S.n, I_RLXBOOT),
+	ck("rescue.cs6c on rlxboot (burnAddr)", pay(&S, S.n, I_RLXBOOT),
 	   RLXFW_SPI_INST_R_HDR_FLASH_AT);
-	ck("rlxboot.cr6c less two bytes", pay(&R, R.n - 2u, I_RLXBOOT),
+	ck("rlxboot.cs6c less two bytes", pay(&R, R.n - 2u, I_RLXBOOT),
 	   RLXFW_SPI_INST_R_HDR_LEN);
-	ck("rlxboot.cr6c, 15 bytes", pay(&R, 15u, I_RLXBOOT),
+	ck("rlxboot.cs6c, 15 bytes", pay(&R, 15u, I_RLXBOOT),
 	   RLXFW_SPI_INST_R_HDR_LEN);
 	R.p[100] ^= 0x01u;
-	ck("rlxboot.cr6c with one payload bit flipped (sum16)",
+	ck("rlxboot.cs6c with one payload bit flipped (sum16)",
 	   pay(&R, R.n, I_RLXBOOT), RLXFW_SPI_INST_R_HDR_SUM);
 	R.p[100] ^= 0x01u;
 	ck("payload check on the barrier", pay(&R, R.n, I_BARRIER),
@@ -541,7 +550,7 @@ static void t_payload(const char *dir)
 	ck("payload check on the probe block", pay(&R, R.n, I_PROBE),
 	   RLXFW_SPI_INST_R_PROBE_ONLY);
 	free(A.p); free(AF.p); free(B.p); free(AP.p); free(NF.p); free(R.p);
-	free(S.p);
+	free(S.p); free(LR.p); free(LS.p);
 }
 
 /* --------------------------------------------------- H/I: plan and cuts */
@@ -1156,13 +1165,13 @@ int main(int argc, char **argv)
 	t_payload(dir);
 	A = load(dir, "slotA.rlxu");
 	AF = load(dir, "slotA-full.rlxu");
-	R = load(dir, "rlxboot.cr6c");
-	S = load(dir, "rescue.cr6c");
+	R = load(dir, "rlxboot.cs6c");
+	S = load(dir, "rescue.cs6c");
 	t_plan(A.n);
 	t_cuts(&A, I_SLOTA, "slotA container");
 	t_cuts(&AF, I_SLOTA, "full-size slotA container");
-	t_cuts(&R, I_RLXBOOT, "rlxboot cr6c");
-	t_cuts(&S, I_RESCUE, "rescue cr6c");
+	t_cuts(&R, I_RLXBOOT, "rlxboot cs6c");
+	t_cuts(&S, I_RESCUE, "rescue cs6c");
 	free(A.p); free(AF.p); free(R.p); free(S.p);
 	t_cmp();
 	t_probe();

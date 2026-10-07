@@ -266,9 +266,9 @@ corrupting one byte of `0x010000` would make the loader boot an old slot
 directly: a downgrade with no signal, at almost no cost to an attacker, and the
 anti-rollback bitmap is monotonic but cannot stop a path that never reads it.
 
-`check_image()` at `0x80407D50` takes `cs6c` (returns 1) and `cr6c` (returns 2),
-and only 2 satisfies its caller; it then requires the 16-bit big-endian sum of
-the RAM copy to be zero. `burn()` matches eight section signatures: `boot`,
+`check_image()` at `0x80407D50` takes `cs6c` (returns 1) and `cr6c` (returns 2)
+and requires the 16-bit big-endian sum of the RAM copy to be zero; the loader
+boots either, a 2 only once it finds a rootfs (`FW-241`, § 6). `burn()` matches eight section signatures: `boot`,
 `sqsh`, `w6cp`, `jw6c`, `cwmp`, `ksap`, `ALL1`, `ALL2`. `RLXU` is none of the
 ten.
 
@@ -339,16 +339,30 @@ each slot could grow to 1,835,008 bytes — a payload of 1,834,848, 64.7 % over
 today's image — so the layout is not close to its limit.
 
 **`rlxboot` and `rlxboot-rescue` are the only two regions the stock loader can
-reach, and they must each carry a `cr6c` header on purpose**, because being
+reach, and they must each carry a `cs6c` header on purpose**, because being
 loaded and jumped to by the stock loader is how they run at all. Slots A and B
 are reachable only by `rlxboot`, and that is the whole design: the signature
 check and the anti-rollback counter are on the only path that leads to them.
 
+🔄 **2026-10-08: `cs6c`, not `cr6c` — and this table is why (`FW-241`).** For a
+`cr6c` header the image locator then searches for a rootfs at eleven candidates
+— `0x0E0000`, `0x0F0000`, `0x130000`, then `0x100000` to `0x180000` at the
+`0x10000` step, skipping those three — every one inside slot A, and returns 0
+when none holds one, without trying the next kernel candidate (`LDR-17`). 量 `bench/2026-10-07`: a `cr6c`
+`rlxboot` booted (`T1a`) while the vendor's SquashFS still sat at `0x180000`,
+and once slot A held a container (W3) the loader stopped at `<RealTek>` with
+`0x8040DD3C` reading `05010000` (`T2a`, `X-T2-dd3c`); re-installed as `cs6c`,
+which returns 1 and skips the search, it booted slot A (`T2ra`) and the rescue
+copy took over when it was torn (`RD05`, `RLXBOOT-FROM 05020000`). The two
+images differ from the `cr6c` ones in the second byte only: the sum covers the
+payload, not the header.
+
 **The erased barrier is the part that is easy to get wrong.** The obvious layout
 puts slot A at `0x030000`, and then slot A contains **four** of the loader's six
 scan candidates. Payload bytes are not chosen by this project in a remote-update
-threat model, and the loader needs only four bytes reading `cr6c` at a 64 KiB
-boundary plus a zero 16-bit sum to boot a slot directly, without `rlxboot`. So no
+threat model, and the loader needs only four bytes reading `cs6c` at a 64 KiB
+boundary plus a zero 16-bit sum to boot a slot directly, without `rlxboot` (or
+`cr6c`, while any rootfs candidate holds a rootfs). So no
 slot may contain a scan candidate, the lowest usable slot base is `0x070000`, and
 `0x030000`–`0x06FFFF` is left **erased** — an erased NOR word reads `0xFFFFFFFF`,
 which is neither `cs6c` nor `cr6c`, so an erased barrier is provably unbootable
@@ -356,7 +370,9 @@ rather than merely unlikely to boot. ⚠️ That is a reading of `check_image()`
 acceptance rule, not a measurement: the experiment that settles it is
 `check_image()`'s `bank_offset` argument, which plan § D5 records as never having
 been read for this build. If it is not 0 the whole candidate table shifts and
-this barrier moves with it.
+this barrier moves with it. 🔄 2026-10-08: 量 `bench/2026-10-07`, the candidate
+the loader accepted read `05010000` and `05020000` at `0x8040DD3C`, so
+`bank_offset` is 0 on this unit.
 
 ### What a provisioning write destroys
 

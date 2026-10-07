@@ -749,7 +749,7 @@ static void scenario_refusals(const struct blob *A, const struct blob *B,
 	stage(R, 4096u);
 	rtl819x_spi_wr_do_arm(0x020000u, 0x030000u, 0x010000u);
 	rc = install("rescue", R->hex, "");
-	refused("rlxboot.cr6c typed for rescue", rc,
+	refused("rlxboot.cs6c typed for rescue", rc,
 		RLXFW_SPI_INST_R_HDR_FLASH_AT, -ENOEXEC);
 
 	world(0x1000u);
@@ -924,10 +924,21 @@ static void scenario_late(const struct blob *A)
 	fail_kmalloc_at = -1;
 }
 
-static void scenario_cr6c(const struct blob *R, const struct blob *S)
+static void scenario_cs6c(const struct blob *R, const struct blob *S,
+			  const struct blob *LR)
 {
 	const struct rlxfw_spi_inst_res *r = &rtl819x_spi_inst_st.r;
 	int rc;
+
+	/* FW-241: mkcr6c 1.0's bytes -- `cr6c`, sum intact -- typed with their
+	 * own correct digest for their own region, refused on the magic before
+	 * the first flash op. */
+	world(0x10000u);
+	stage(LR, 4096u);
+	rtl819x_spi_wr_do_arm(0x010000u, 0x020000u, 0x010000u);
+	rc = install("rlxboot", LR->hex, "");
+	refused("FW-241: rlxboot.cr6c (1.0's signature) on rlxboot", rc,
+		RLXFW_SPI_INST_R_HDR_MAGIC, -ENOEXEC);
 
 	world(0x10000u);
 	stage(R, 1000u);
@@ -938,7 +949,7 @@ static void scenario_cr6c(const struct blob *R, const struct blob *S)
 	 * pauses -- after the erase, after the program phase -- and none after
 	 * the header page or in the read-back: 60 s in which a pull leaves
 	 * rlxboot without a valid header. */
-	ckb("rlxboot.cr6c on rlxboot at a 64 KiB grain, pace=30000 -> OK, "
+	ckb("rlxboot.cs6c on rlxboot at a 64 KiB grain, pace=30000 -> OK, "
 	    "two pauses, 60 s",
 	    rc == 0 && r->reason == RLXFW_SPI_INST_OK && r->cmp_ok == 1 &&
 	    region_is(0x010000u, 0x010000u, R) &&
@@ -950,7 +961,7 @@ static void scenario_cr6c(const struct blob *R, const struct blob *S)
 	rtl819x_spi_wr_do_arm(0x020000u, 0x030000u, 0x010000u);
 	rc = install("rescue", S->hex, "");
 	note_reason();
-	ckb("rescue.cr6c (a full 64 KiB) on rescue -> OK",
+	ckb("rescue.cs6c (a full 64 KiB) on rescue -> OK",
 	    rc == 0 && r->cmp_ok == 1 && region_is(0x020000u, 0x010000u, S) &&
 	    outside_untouched(0x020000u, 0x010000u));
 }
@@ -1220,7 +1231,7 @@ static const int glue_only[] = {
 
 int main(int argc, char **argv)
 {
-	struct blob A, B, R, S;
+	struct blob A, B, R, S, LR;
 	int i;
 
 	for (i = 1; i < argc; i++) {
@@ -1240,8 +1251,9 @@ int main(int argc, char **argv)
 	}
 	A = load("slotA.rlxu");
 	B = load("slotB.rlxu");
-	R = load("rlxboot.cr6c");
-	S = load("rescue.cr6c");
+	R = load("rlxboot.cs6c");
+	S = load("rescue.cs6c");
+	LR = load("rlxboot.cr6c");
 	printf("test-spi-install-glue: the driver's Gap A block on a simulated "
 	       "part; slotA.rlxu %u bytes\n", A.n);
 
@@ -1254,7 +1266,7 @@ int main(int argc, char **argv)
 	scenario_cuts(&A, 0x1000u);
 	scenario_cuts(&A, 0x10000u);
 	scenario_late(&A);
-	scenario_cr6c(&R, &S);
+	scenario_cs6c(&R, &S, &LR);
 	scenario_probe_size(0x1000u, 45000ul, 16u);
 	scenario_probe_size(0x8000u, 150000ul, 2u);
 	scenario_probe_size(0x10000u, 300000ul, 1u);
@@ -1271,7 +1283,7 @@ int main(int argc, char **argv)
 		if (seen[i])
 			printf(" %s=%d", rlxfw_spi_inst_reason_name(i), seen[i]);
 	printf("\n");
-	free(A.p); free(B.p); free(R.p); free(S.p);
+	free(A.p); free(B.p); free(R.p); free(S.p); free(LR.p);
 	if (nfail) {
 		printf("test-spi-install-glue: %d FAILURE(S) of %d\n", nfail,
 		       ncase);

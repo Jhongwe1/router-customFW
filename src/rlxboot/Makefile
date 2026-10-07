@@ -364,7 +364,9 @@ endif
 # two regions the stock loader can reach, so each MUST carry a header
 # `check_image()` accepts -- being scanned and jumped to by the stock loader is
 # how either of them runs at all, and 量 `FW-168` says rlxfw's pipeline writes
-# `cr6b`, which it does not accept.  Every other candidate the loader scans
+# `cr6b`, which it does not accept.  The header is `cs6c`: 量 `FW-241`, a `cr6c`
+# makes the loader look for a rootfs inside slot A first, and it stopped at
+# `<RealTek>` once slot A held a container.  Every other candidate the loader scans
 # (`0x030000`..`0x060000`, the erased barrier) and both slots MUST NOT carry one,
 # because that path goes through neither the Ed25519 check nor the anti-rollback
 # counter.  `tools/mkcr6c.py` is the one producer of the first property and the
@@ -381,7 +383,9 @@ endif
 # during the scan, so a broken `0x010000` is copied to `0x81800000` before
 # `0x020000` is tried; two images of equal length make that overwrite total
 # instead of leaving a tail of the broken one above the rescue.  ⚠️ 推, not 量:
-# nothing has run either image from flash.
+# 量 2026-10-07 the rescue booted with `0x010000` erased (`RD05`; `RD07` read
+# `FFFFFFFF`), which fails the signature before any copy -- the copy-then-reject
+# case this paragraph is about, a matching signature with a bad sum, never ran.
 #
 # NO SOURCE FILE CHANGES FOR THE RESCUE, and that is a decision rather than
 # laziness.  `BUILD_ID` is the digest of every source that reaches the image and
@@ -392,8 +396,8 @@ endif
 PRIMARY_AT ?= 0x010000
 RESCUE_AT  ?= 0x020000
 MKCR6C     := $(REPO)/tools/mkcr6c.py
-PRIMARY_IMG := $(OUT)/rlxboot.cr6c
-RESCUE_IMG  := $(OUT)/rlxboot-rescue.cr6c
+PRIMARY_IMG := $(OUT)/rlxboot.cs6c
+RESCUE_IMG  := $(OUT)/rlxboot-rescue.cs6c
 
 # SLOT= is optional and the scan says so either way: with one, the slot arm of
 # property (2) is exercised on a real container; without one, only the six
@@ -437,7 +441,7 @@ rescue: $(RESCUE_IMG)
 	@printf 'mkfw2         %s\n' \
 	    'build --payload <this> --flash-at $(RESCUE_AT) -- see rescue-publish'
 
-# The pair of controls, each shown BOTH ways: the producer's own 17 cases, then
+# The pair of controls, each shown BOTH ways: the producer's own cases, then
 # the two red arms driven through the CLI so that a `wrap` which emitted an
 # unbootable image, and a `scan` which passed a layout with a stray header, each
 # exit non-zero where it is read rather than inside a self-test.
