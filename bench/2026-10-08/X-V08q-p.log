@@ -1,0 +1,13 @@
+$ ping -c 3 -W 2 10.1.1.1
+PING 10.1.1.1 (10.1.1.1) 56(84) bytes of data.
+From 10.1.1.2 icmp_seq=1 Destination Host Unreachable
+From 10.1.1.2 icmp_seq=2 Destination Host Unreachable
+From 10.1.1.2 icmp_seq=3 Destination Host Unreachable
+
+--- 10.1.1.1 ping statistics ---
+3 packets transmitted, 0 received, +3 errors, 100% packet loss, time 2034ms
+pipe 3
+rc=1
+$ ip neigh show 10.1.1.1
+10.1.1.1 dev enxfc19286184c9 FAILED 
+rc=0

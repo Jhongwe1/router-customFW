@@ -1,0 +1,9 @@
+sendimg: /tmp/tmpacmp674f/payload.bin has sha256 c956c535453518866215604efa35da225f6951a5569f231f889c341874377c2e, not the 0000000000000000000000000000000000000000000000000000000000000000 this send was declared for: nothing was sent
+  ok     S1   a send delivers every byte, in order                 300001 sent, 300001 received
+  ok     S2   the digest it prints is the file's                   c956c53545351886
+  ok     S3   a wrong --sha256 is refused before connecting        rc=3
+  ok     K1   refuse_args permits a well-formed send (file absent) ok
+  ok     K2   refuse_args refuses a digest that is not 64 hex      REFUSED --sha256 wants 64 hex digits, got '000000000000000000000000000000000000000000000000000000000000000'
+  ok     K3   refuse_args refuses a --to with no port              REFUSED --to wants HOST:PORT, got '10.1.1.1'
+  ok     K4   the parser refuses an abbreviated option             REFUSED usage: the following arguments are required: --to
+  7 passed, 0 failed

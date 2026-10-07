@@ -1,0 +1,55 @@
+  ok    S1   every literal this parser keys on is a string in main.c/slots.c
+  ok    S2   REASONS is container.c's reason_names[], in order
+  ok    S3   the slot layout and the dot step are rlxboot.h/slots.h's
+  ok    S4   the kernel prints ID0 as rlxfw_markx("ID0") in UPPER-case hex
+  ok    S5   the dot rule (n // 65536) reproduces slots.c's recorded host output
+  ok    P1   both ok, B higher -> B: PASS
+  ok    P2   A torn (magic), B ok -> B: PASS
+  ok    P3   B torn (digest), A ok -> A: PASS
+  ok    P4   A v3 over B v2 -> A: PASS
+  ok    P5   a tie boots A (D4): PASS
+  ok    P6   neither verifies -> HALT, no id needed: PASS
+  ok    P7   CR CR LF line endings read as CRLF: PASS
+  ok    P8   `bad` with no reason matches any refusal: PASS
+  ok    P9   a previous image's id before the banner is ignored: PASS
+  ok    M1   the wrong slot: FAIL
+  ok    M2   the wrong version: FAIL
+  ok    M3   a torn slot expected ok: FAIL
+  ok    M4   the wrong refusal reason: FAIL
+  ok    M5   the manifest's id one digit off: FAIL
+  ok    M6   a HALT expected to boot B: FAIL
+  ok    M7   a choice against D4 (B is higher, SLOT A): FAIL
+  ok    M8   a dev-key rlxboot without --allow-dev-key: FAIL
+  ok    M9   HALT reasons that are not the verdicts': FAIL
+  ok    M10  slot A read from the wrong flash offset: FAIL
+  ok    M11  a copy one dot short (stopped or lost bytes): FAIL
+  ok    M12  an ok verdict whose VER line says another version: FAIL
+  ok    M13  a slot chosen and no BOOT line: FAIL
+  ok    M14  B's lines before A's: FAIL
+  ok    R1   no rlxboot banner (a vendor boot): not 'no slot': REFUSED
+  ok    R2   two banners: REFUSED
+  ok    R3   a slot chosen and no id after the boot: REFUSED
+  ok    R4   two ids after the boot: REFUSED
+  ok    R5   a banner with no KEY line (rlxboot before 94d97924): REFUSED
+  ok    R6   the capture ends before the choice: REFUSED
+  ok    R7   a file that is not an rlxfw-build-manifest: REFUSED
+  ok    R7b  a manifest with no recipe_id row: REFUSED
+  ok    R8   HALT expected with a manifest: REFUSED
+  ok    R9   the only id is BEFORE the banner (the trap a first-id reader passes): REFUSED
+  ok    R10  an expectation that is not ok/ok:N/bad/bad:R: REFUSED
+  ok    R11  a BOOT=ram rlxboot: REFUSED
+  ok    R12  a slot expected and no manifest: REFUSED
+  ok    R13  a reason rlxboot cannot print: REFUSED
+  ok    R14  an unreadable capture: rc 3, not a traceback
+  ok    F1   FROM 05010000 expected as 0x5010000 (normalised): PASS
+  ok    F2   FROM 05010000 expected 05020000 (the rescue's word): FAIL
+  ok    F3   an expectation and NO FROM line: REFUSED, not FAIL
+  ok    F4   a malformed --expect-from: REFUSED
+  ok    F5   two FROM lines after one banner: REFUSED
+  ok    F6   a FROM line and no expectation: judged as before, PASS
+  ok    K1   refuse_args permits a well-formed judge line whose files do not exist yet
+  ok    K2   refuse_args refuses an unknown slot
+  ok    K3   refuse_args refuses a malformed --expect-from
+  ok    K4   refuse_args refuses a slot expectation with no build manifest
+  ok    K5   the parser refuses an abbreviated option
+bootslot 1.1 self-test: 54 passed, 0 failed

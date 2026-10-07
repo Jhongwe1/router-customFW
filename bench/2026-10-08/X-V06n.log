@@ -1,0 +1,12 @@
+$ sudo -n ip neigh flush dev enxfc19286184c9
+rc=0
+$ ping -c 2 -W 2 10.1.1.1
+PING 10.1.1.1 (10.1.1.1) 56(84) bytes of data.
+
+--- 10.1.1.1 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1004ms
+
+rc=1
+$ ip neigh show 10.1.1.1
+10.1.1.1 dev enxfc19286184c9 INCOMPLETE 
+rc=0
