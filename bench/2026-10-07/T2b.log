@@ -1,0 +1,1 @@
+RESULT: REFUSED -- no `RLXBOOT-V1 build=` line: this capture never reached rlxboot, so it says nothing about which slot booted

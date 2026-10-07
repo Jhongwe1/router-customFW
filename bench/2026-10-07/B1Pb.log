@@ -1,0 +1,6 @@
+echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 pace=2000 > /proc/rtl819x-spi
+RLXFW-SI-GO install slotB len=1109152 pace=2000
+RLXFW-SI E 00 610 paced=2000
+RLXFW-SI E 01 3000 paced=2000
+RLXFW-SI E 02 5380 paced=2000
+RLXFW-SI E 03 7750 paced=2000

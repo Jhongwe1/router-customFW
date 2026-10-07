@@ -1,0 +1,3 @@
+echo arm 0x70000 0x190000 0x120000 > /procR/rLtXlF81W9-x-SsWp-iA
+RM=00120000
+# 

@@ -1,0 +1,26 @@
+  $FWRE_WORK/rebuild/bench-only/r8b-2026-10-07/FB-pL07.log     777 bytes
+  $FWRE_WORK/rebuild/bench-only/r8b-2026-10-07/FB-pL07.timing  6.086119 s, stop: --seconds 6.0 elapsed
+  $FWRE_WORK/rebuild/bench-only/r8b-2026-10-07/FB-pL07.meta.json
+  bench/2026-10-07/FB-flrL07.log     104 bytes
+  bench/2026-10-07/FB-flrL07.timing  5.076795 s, stop: --seconds 5.0 elapsed
+  bench/2026-10-07/FB-flrL07.meta.json
+  bench/2026-10-07/FB-yesL07.log     35 bytes
+  bench/2026-10-07/FB-yesL07.timing  6.070737 s, stop: --seconds 6.0 elapsed
+  bench/2026-10-07/FB-yesL07.meta.json
+  bench/2026-10-07/FB-rdL07.log     777 bytes
+  bench/2026-10-07/FB-rdL07.timing  6.061624 s, stop: --seconds 6.0 elapsed
+  bench/2026-10-07/FB-rdL07.meta.json
+  $ /usr/bin/python3 <repo>/tools/console-capture.py capture --port /dev/ttyUSB0 --out $FWRE_WORK/rebuild/bench-only/r8b-2026-10-07/FB-pL07 --send 'DW 80D00000 64' --seconds 6
+  pre-read written to $FWRE_WORK/rebuild/bench-only/r8b-2026-10-07/FB-pL07.log (the negative control: it must DIFFER from the expectation, or the FLR proves nothing)
+  $ /usr/bin/python3 <repo>/tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-10-07/FB-flrL07 --send 'FLR 80D00000 030000 100' --seconds 5
+FLR 80D00000 030000 100
+Flash read from 00030000 to 80D00000 with 00000100 bytes	?
+(Y)es , (N)o ? --> 
+  PROCEED: the loader echoed from 00030000 to 80D00000 with 00000100 bytes, the confirm prompt is present and <RealTek> is not
+  $ /usr/bin/python3 <repo>/tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-10-07/FB-yesL07 --send Y --seconds 6
+Y
+Flash Read Successed!
+<RealTek>
+  SUCCEEDED: 'Flash Read Successed!' and the loader is back at '<RealTek>'
+  $ /usr/bin/python3 <repo>/tools/console-capture.py capture --port /dev/ttyUSB0 --out bench/2026-10-07/FB-rdL07 --send 'DW 80D00000 64' --seconds 6
+  read-back written to bench/2026-10-07/FB-rdL07.log

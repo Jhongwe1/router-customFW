@@ -1,0 +1,14 @@
+bootslot 1.1: bench/2026-10-07/T1a.log (rlxboot build 127a71cf, banner line 17)
+check from       pass the loader's word at 0x8040DD3C read 05010000, want 05010000
+check key        pass prod 4a6eda72...
+check order      pass READ/VERDICT sequence READ A VERDICT A READ B VERDICT B
+check read A     pass flash=00070000 buf=81000000 (layout wants 00070000 81000000)
+check copy A     pass n=160 with 0 dot(s), a finished copy prints 0
+check verdict A  pass want bad:magic, got bad magic
+check read B     pass flash=00190000 buf=81200000 (layout wants 00190000 81200000)
+check copy B     pass n=160 with 0 dot(s), a finished copy prints 0
+check verdict B  pass want bad:magic, got bad magic
+check D4         pass rlxboot chose HALT, its own verdicts imply HALT
+check halt       pass HALT A=magic B=magic against verdicts A=magic B=magic
+check slot       pass want HALT, got HALT
+RESULT: PASS

@@ -1,0 +1,2 @@
+busybox nc -l -p 5000 </dev/null >/proc/rtl819x-spi-img &
+# 

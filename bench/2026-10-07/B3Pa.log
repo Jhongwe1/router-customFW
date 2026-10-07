@@ -1,0 +1,3 @@
+echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spiR
+LXFW-SW-ARM=00120000
+# 

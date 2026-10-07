@@ -1,0 +1,10 @@
+echo install rlxboot sha=14cebbf5ffa54fd8ede54064569a022341a6d495e5d77c7d4a61823b0835484a > /proc/Rrtl8L1X9FxW--spSiI
+-GO install rlxboot len=18642 pace=0
+RLXFW-SI E 00 380
+RLXFW-SI P 00 430
+RLXFW-SI H 00 440
+RLXFW-SI V 00 500
+RLXFW-SI-END OK rc=0 cmp=1 ms=510 pace=0
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+# 

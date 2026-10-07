@@ -1,0 +1,10 @@
+echo install rlxboot sha=e2ae18f3d3884a4db350bb0b8d343b34e79a6a80ddac63720718f483e36f065f > /proc/rtl819x-spi
+RLXFW-SI-GO install rlxboot len=18642 pace=0
+RLXFW-SI E 00 380
+RLXFW-SI P 00 430
+RLXFW-SI H 00 430
+RLXFW-SI V 00 500
+RLXFW-SI-END OK rc=0 cmp=1 ms=500 pace=0
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+# 

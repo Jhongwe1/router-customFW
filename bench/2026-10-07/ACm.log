@@ -1,0 +1,3 @@
+echo arm 0x70000 0x190000 0x120000 > /RprLocX/rFtWl-8S1W9-xA-sRpiM
+=00120000
+# 

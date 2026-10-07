@@ -1,0 +1,15 @@
+bootslot 1.1: bench/2026-10-07/B2B.log (rlxboot build 127a71cf, banner line 13)
+check key        pass prod 4a6eda72...
+check order      pass READ/VERDICT sequence READ A VERDICT A READ B VERDICT B
+check read A     pass flash=00070000 buf=81000000 (layout wants 00070000 81000000)
+check copy A     pass n=1109152 with 16 dot(s), a finished copy prints 16
+check stages A   pass an ok verdict needs HDR/SIG/DIGEST ok and one `VER cur=1 ... ok` (got ['RLXBOOT-HDR ok', 'RLXBOOT-SIG ok', 'RLXBOOT-DIGEST ok', 'RLXBOOT-VER cur=1 ctr=0 ok'])
+check verdict A  pass want ok:1, got ok 1
+check read B     pass flash=00190000 buf=81200000 (layout wants 00190000 81200000)
+check copy B     pass n=160 with 0 dot(s), a finished copy prints 0
+check verdict B  pass want bad, got bad magic
+check D4         pass rlxboot chose A, its own verdicts imply A
+check boot       pass load=80500000 entry=80500000
+check id         pass board printed F9ADC9E8, the build manifest says f9adc9e8
+check slot       pass want A, got A
+RESULT: PASS

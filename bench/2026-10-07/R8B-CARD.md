@@ -183,7 +183,7 @@ CAP --out bench/2026-10-07/B1Ss2 --send 'busybox nc -l -p 5000 </dev/null >/proc
 HOST bench/2026-10-07/B1Ss3 :: /usr/bin/python3 tools/sendimg.py send --to 10.1.1.1:5000 --src 10.1.1.2 --file /home/key/fwre-work/rebuild/s124/p/run/final/signed/Q.rlxu --sha256 9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00
 CAP --out bench/2026-10-07/B1Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/B1Pa --send 'echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# B1Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/B1Pb --send 'echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/B1B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/B1J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/B1B.log --expect-slot A --expect-a ok:1 --expect-b bad --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/B2R --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -195,7 +195,7 @@ CAP --out bench/2026-10-07/B2Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --secon
 CAP --out bench/2026-10-07/B2Ra --send 'echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/B2Rb --send 'echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 30 --seconds 900
 CAP --out bench/2026-10-07/B2Pa --send 'echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# B2Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/B2Pb --send 'echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/B2B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/B2J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/B2B.log --expect-slot A --expect-a ok:1 --expect-b bad --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/B3R --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -207,7 +207,7 @@ CAP --out bench/2026-10-07/B3Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --secon
 CAP --out bench/2026-10-07/B3Ra --send 'echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/B3Rb --send 'echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 30 --seconds 900
 CAP --out bench/2026-10-07/B3Pa --send 'echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# B3Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/B3Pb --send 'echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/B3B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/B3J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/B3B.log --expect-slot A --expect-a ok:1 --expect-b bad --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/B4R --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -219,7 +219,7 @@ CAP --out bench/2026-10-07/B4Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --secon
 CAP --out bench/2026-10-07/B4Ra --send 'echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/B4Rb --send 'echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 30 --seconds 900
 CAP --out bench/2026-10-07/B4Pa --send 'echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# B4Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/B4Pb --send 'echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/B4B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/B4J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/B4B.log --expect-slot A --expect-a ok:1 --expect-b bad --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/B5R --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -231,7 +231,7 @@ CAP --out bench/2026-10-07/B5Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --secon
 CAP --out bench/2026-10-07/B5Ra --send 'echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/B5Rb --send 'echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 30 --seconds 900
 CAP --out bench/2026-10-07/B5Pa --send 'echo arm 0x190000 0x2b0000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# B5Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/B5Pb --send 'echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/B5B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/B5J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/B5B.log --expect-slot A --expect-a ok:1 --expect-b bad --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/BCR --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -253,7 +253,7 @@ CAP --out bench/2026-10-07/A1Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --secon
 CAP --out bench/2026-10-07/A1Ra --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/A1Rb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 30 --seconds 900
 CAP --out bench/2026-10-07/A1Pa --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# A1Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/A1Pb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/A1B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/A1J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/A1B.log --expect-slot B --expect-a bad --expect-b ok:2 --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/A2R --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -265,7 +265,7 @@ CAP --out bench/2026-10-07/A2Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --secon
 CAP --out bench/2026-10-07/A2Ra --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/A2Rb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 30 --seconds 900
 CAP --out bench/2026-10-07/A2Pa --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# A2Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/A2Pb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/A2B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/A2J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/A2B.log --expect-slot B --expect-a bad --expect-b ok:2 --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/A3R --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -277,7 +277,7 @@ CAP --out bench/2026-10-07/A3Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --secon
 CAP --out bench/2026-10-07/A3Ra --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/A3Rb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 30 --seconds 900
 CAP --out bench/2026-10-07/A3Pa --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# A3Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/A3Pb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/A3B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/A3J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/A3B.log --expect-slot B --expect-a bad --expect-b ok:2 --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/A4R --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -289,7 +289,7 @@ CAP --out bench/2026-10-07/A4Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --secon
 CAP --out bench/2026-10-07/A4Ra --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/A4Rb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 30 --seconds 900
 CAP --out bench/2026-10-07/A4Pa --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# A4Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/A4Pb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/A4B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/A4J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/A4B.log --expect-slot B --expect-a bad --expect-b ok:2 --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/A5R --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -301,7 +301,7 @@ CAP --out bench/2026-10-07/A5Ss4 --send 'cat /proc/rtl819x-spi' --idle 3 --secon
 CAP --out bench/2026-10-07/A5Ra --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
 CAP --out bench/2026-10-07/A5Rb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 30 --seconds 900
 CAP --out bench/2026-10-07/A5Pa --send 'echo arm 0x70000 0x190000 0x120000 > /proc/rtl819x-spi' --idle 3 --seconds 20
-# A5Pb: the paced install waits for E03's pace (mkcard.py --pace N)
+CAP --out bench/2026-10-07/A5Pb --send 'echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df pace=2000 > /proc/rtl819x-spi' --until 'RLXFW-SI-END' --idle 32 --seconds 1200
 CAP --out bench/2026-10-07/A5B --until 'job control turned off[^#]{1,2}# |refuse-action halt' --seconds 180
 HOST bench/2026-10-07/A5J :: /usr/bin/python3 tools/bootslot.py judge bench/2026-10-07/A5B.log --expect-slot B --expect-a bad --expect-b ok:2 --build-manifest /home/key/fwre-work/rebuild/s124/p/run/final/out/mainline-f9adc9e8.kbuild-manifest
 CAP --out bench/2026-10-07/ACR --send 'busybox reboot -f' --esc-after 30 --until '<RealTek>' --seconds 60
@@ -337,7 +337,7 @@ HOST bench/2026-10-07/F05b :: /usr/bin/python3 tools/bootslot.py judge bench/202
 ## The image each cell runs on
 
 ```cardimage
-armed	A02 A03 A03c A04a A04b A04c A04d A05 Z01s1 Z01s2 Z01s4 Z02 Z03 Z04 E01 E02 E03 W1s1 W1s2 W1s4 W1a W1b W2s1 W2s2 W2s4 W2a W2b T1a W3s1 W3s2 W3s4 W3a W3b W4a W4b T2a W5s1 W5s2 W5s4 W5a W5b T3a RD02s1 RD02s2 RD02s4 RD02a RD03 RD08s1 RD08s2 RD08s4 RD08a RD08b RD09 B1Ss1 B1Ss2 B1Ss4 B1Pa B2Ss1 B2Ss2 B2Ss4 B2Ra B2Rb B2Pa B3Ss1 B3Ss2 B3Ss4 B3Ra B3Rb B3Pa B4Ss1 B4Ss2 B4Ss4 B4Ra B4Rb B4Pa B5Ss1 B5Ss2 B5Ss4 B5Ra B5Rb B5Pa BCSs1 BCSs2 BCSs4 BCa BCb BCc A1Ss1 A1Ss2 A1Ss4 A1Ra A1Rb A1Pa A2Ss1 A2Ss2 A2Ss4 A2Ra A2Rb A2Pa A3Ss1 A3Ss2 A3Ss4 A3Ra A3Rb A3Pa A4Ss1 A4Ss2 A4Ss4 A4Ra A4Rb A4Pa A5Ss1 A5Ss2 A5Ss4 A5Ra A5Rb A5Pa ACSs1 ACSs2 ACSs4 ACa ACb ACc F03a F03b F04 F05
+armed	A02 A03 A03c A04a A04b A04c A04d A05 Z01s1 Z01s2 Z01s4 Z02 Z03 Z04 E01 E02 E03 W1s1 W1s2 W1s4 W1a W1b W2s1 W2s2 W2s4 W2a W2b T1a W3s1 W3s2 W3s4 W3a W3b W4a W4b T2a W5s1 W5s2 W5s4 W5a W5b T3a RD02s1 RD02s2 RD02s4 RD02a RD03 RD08s1 RD08s2 RD08s4 RD08a RD08b RD09 B1Ss1 B1Ss2 B1Ss4 B1Pa B1Pb B2Ss1 B2Ss2 B2Ss4 B2Ra B2Rb B2Pa B2Pb B3Ss1 B3Ss2 B3Ss4 B3Ra B3Rb B3Pa B3Pb B4Ss1 B4Ss2 B4Ss4 B4Ra B4Rb B4Pa B4Pb B5Ss1 B5Ss2 B5Ss4 B5Ra B5Rb B5Pa B5Pb BCSs1 BCSs2 BCSs4 BCa BCb BCc A1Ss1 A1Ss2 A1Ss4 A1Ra A1Rb A1Pa A1Pb A2Ss1 A2Ss2 A2Ss4 A2Ra A2Rb A2Pa A2Pb A3Ss1 A3Ss2 A3Ss4 A3Ra A3Rb A3Pa A3Pb A4Ss1 A4Ss2 A4Ss4 A4Ra A4Rb A4Pa A4Pb A5Ss1 A5Ss2 A5Ss4 A5Ra A5Rb A5Pa A5Pb ACSs1 ACSs2 ACSs4 ACa ACb ACc F03a F03b F04 F05
 ```
 
 ## The owner's dated yes, one row per flash-writing payload
@@ -351,6 +351,8 @@ armed	A02 A03 A03c A04a A04b A04c A04d A05 Z01s1 Z01s2 Z01s4 Z02 Z03 Z04 E01 E02
 2026-10-05	echo erase barrier > /proc/rtl819x-spi
 2026-10-05	echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 > /proc/rtl819x-spi
 2026-10-05	echo install rlxboot sha=e2ae18f3d3884a4db350bb0b8d343b34e79a6a80ddac63720718f483e36f065f pace=30000 > /proc/rtl819x-spi
+2026-10-07	echo install slotB sha=9578da72a29871f2f443b02e226d72590f03229cf53503e02a47fa9166622a00 pace=2000 > /proc/rtl819x-spi
 2026-10-05	echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df > /proc/rtl819x-spi
+2026-10-07	echo install slotA sha=5a38d96922ec89136ed88e56205b045521e85772308431539ce18f8d093564df pace=2000 > /proc/rtl819x-spi
 ```
 

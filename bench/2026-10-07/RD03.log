@@ -1,0 +1,3 @@
+echo install rlxboot sha=14cebbf5ffa54fd8ede54064569a022341a6d495e5d77c7d4a61823b0835484a pace=30000 > /proc/rtl819x-RspLiXF
+W-SI-GO install rlxboot len=18642 pace=30000
+RLXFW-SI E 00 370 paced=30000

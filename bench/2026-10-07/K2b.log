@@ -1,0 +1,10 @@
+echo install rescue sha=0c9db2ec1f57ce6bdcc7c518e2a1fbfb6516131229934c1ef38f7a55101a56bb > /proc/rtl819x-spi
+RLXFW-SI-GO install rescue len=18642 pace=0
+RLXFW-SI E 00 360
+RLXFW-SI P 00 410
+RLXFW-SI H 00 410
+RLXFW-SI V 00 480
+RLXFW-SI-END OK rc=0 cmp=1 ms=480 pace=0
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+# 

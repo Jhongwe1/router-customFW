@@ -1,0 +1,49 @@
+{
+  "tool_version": "1.5",
+  "port": "/dev/ttyUSB0",
+  "baud": 38400,
+  "started_wallclock": "2026-10-07T22:29:26+0800",
+  "clock": "CLOCK_MONOTONIC_RAW",
+  "t0_raw": 5299.471691175,
+  "t0_real": 1791383366.2581258,
+  "mono_at_t0": 5163.257639669,
+  "boot_id": "334f6d62-fc0e-4d7e-af3a-84186d87a60d",
+  "clocksource": "tsc",
+  "esc_seconds": 0.0,
+  "esc_after_seconds": 30.0,
+  "esc_period_requested_s": 0.02,
+  "esc": {
+    "esc_after": {
+      "requested_period_s": 0.02,
+      "writes": 49,
+      "window_s": 1.027199,
+      "achieved_period_s": 0.020963,
+      "ended_on_until": true
+    }
+  },
+  "cr": {
+    "esc_after": {
+      "written": true,
+      "prompt_seen": true,
+      "waited_s": 0.051623,
+      "log_offset": 316,
+      "settle_budget_s": 2.0
+    }
+  },
+  "cr_settle_s": 2.0,
+  "seconds": 60.0,
+  "idle": 0.0,
+  "until": "<RealTek>",
+  "until_offset": 291,
+  "sent": "busybox reboot -f",
+  "sent_hex": "62757379626f78207265626f6f74202d660d",
+  "sent_s": 0.011364,
+  "stop_reason": "--until matched at offset 291",
+  "bytes": 347,
+  "duration_s": 1.257607,
+  "end_raw": 5300.729298093,
+  "end_real": 1791383367.4739723,
+  "mono_at_end": 5164.473488463,
+  "clocksource_end": "tsc",
+  "resolution_note": "timestamps are per read() from userspace; the floor is the USB-serial latency timer (1-16 ms typical, unmeasured on this host), not the 260 us character time at 38400"
+}

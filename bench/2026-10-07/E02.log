@@ -1,0 +1,9 @@
+echo eraseprobe > /proc/rtl819x-spi
+RLXFW-SI-GO eraseprobe probe len=0 pace=0
+RLXFW-SI-PROBE se_bytes=4096 m=EII polls=8664 ticks=2
+RLXFW-SI E 00 560
+RLXFW-SI V 00 620
+RLXFW-SI-END OK rc=0 cmp=0 ms=630 pace=0
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+# 

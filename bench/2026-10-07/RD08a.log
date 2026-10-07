@@ -1,0 +1,3 @@
+echo arm 0x10000 0x20000 0x10000 > /prRoc/LrtXl8F19Wx--spSiW
+-ARM=00010000
+# 

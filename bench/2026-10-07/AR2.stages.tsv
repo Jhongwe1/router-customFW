@@ -1,0 +1,19 @@
+# looprun 1.3 stage times (LOOP-3): one row per stage per round, and round 0 is S2/S3, which run once.
+# start_raw/end_raw: absolute CLOCK_MONOTONIC_RAW, the clock console-capture 1.5 stamps on (1.2 wrote start_mono/end_mono, CLOCK_MONOTONIC: CLK-38).
+# seconds = end_raw - start_raw.  rc is the command's exit status, empty for the in-process S5c, S8 and S9 and for a skipped stage.  result is ok, FAIL and the ids of the assertions that failed, or skipped.
+# cell=AR2 attempt=1 iterations=1 skip=S2,S3,S4 boot-until='job control turned off[^#]{1,2}# |Booting[.][.][.]|---RealTek' boot-seconds=45 dwell-seconds=5
+# clock=CLOCK_MONOTONIC_RAW boot_id=334f6d62-fc0e-4d7e-af3a-84186d87a60d clocksource=tsc start_raw=2436.358030 mono_at_start=2386.482577 start_real=1791380503.222565
+round	stage	name	kind	start_raw	end_raw	seconds	rc	result
+0	S2	build	desk					skipped
+0	S3	assemble	desk					skipped
+1	S4	reset	bench					skipped
+1	S5	rescue	bench	2436.372334	2436.627158	0.254824	0	ok
+1	S5b	burnflag	bench	2436.633073	2438.839213	2.206141	0	ok
+1	S5c	hostlink	bench	2438.848572	2439.892867	1.044295		ok
+1	S6	upload	bench	2439.902904	2441.754997	1.852093	0	ok
+1	S6b	staged	bench	2441.758653	2443.976195	2.217542	0	ok
+1	S7	boot	bench	2443.984278	2489.142199	45.157921	0	ok
+1	S8	assert	desk	2489.152249	2489.152281	0.000031		ok
+1	S9	dwell	bench	2489.155588	2494.143408	4.987820		ok
+# end: end_raw=2494.153979 mono_at_end=2442.830162 end_real=1791380561.226046 clocksource_end=tsc
+# status: closed -- 1 of 1 round(s), every assertion held

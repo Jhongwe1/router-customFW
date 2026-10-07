@@ -1,0 +1,3 @@
+echo arm 0x20000 0x30000 0xR1L0X00F0W >- /SpWr-oAcR/rMt=l8109x-0spi01
+0000
+# 

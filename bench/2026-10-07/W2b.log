@@ -1,0 +1,10 @@
+echo install rescue sha=074fac679a2c231f3b13c04ea14bacb542d640aa232218fc61bdb4244e8be728 > /proc/rRtLlX81F9x-sWp-i
+SI-GO install rescue len=18642 pace=0
+RLXFW-SI E 00 380
+RLXFW-SI P 00 430
+RLXFW-SI H 00 440
+RLXFW-SI V 00 500
+RLXFW-SI-END OK rc=0 cmp=1 ms=510 pace=0
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+# 
