@@ -1626,6 +1626,22 @@ tests under `src/`, which no CI step runs (讀), so `FW-184`'s regression test,
   or in the `FW-184` runs. No flash map was taken in them, so they carry no bracket of their own; the
   `FLR` bracket stays at 1,024 of 4,194,304 bytes, 0.0244 %.
 
+## 🔴 Booted from flash, rlxfw receives no Ethernet frame — 2026-10-08 (the one hundred and twenty-seventh segment)
+
+量 2026-10-08: the `v1.0` candidate `a3a75f8c…` (recipe `6a11de02`), booted from slot B through
+`rlxboot` after a watchdog reset and after a cold power-on, brings `rlx0` up with `10.1.1.1` and
+counts no frame in or out while the host pings; booted from RAM through the loader's prompt, the
+same image answers (`SPEC.md` `NET-171`, `notes/switch-driver.md` § 20). The device's normal boot
+is from flash, so **an rlxfw image installed in a slot has no Ethernet**: it is reachable through
+the console only, or by booting it from RAM through the loader's TFTP path.
+
+推 The cause: rlxfw's switch setup leaves the VLAN group to the loader
+(`notes/switch-driver.md` § 16.8), and the loader configures the switch only when it enters its
+prompt (`LDR-46`). **`v1.0` is not tagged with this.** The owner decided on 2026-10-08 to fix it
+first, as gate `R6c` (`PROGRESS.md`), and to qualify the rebuilt image on the device again. This
+entry closes when an image booted from flash pings both ways after a watchdog reset and after a
+cold power-on, and a RAM boot through the prompt still does.
+
 ## Closed since `v0.2` was tagged
 
 **Kept rather than deleted, so this file can be read against the copy at the `v0.2` tag.**

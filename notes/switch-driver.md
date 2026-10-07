@@ -4259,3 +4259,65 @@ the owner's, and this is the measurement it did not have.
 * **The `rlxfw-marks verify` reading of § 19.7 bounds one declaration**, this one, with 12 marks
   and one absent witness. It does not establish that the map is never a discriminator for some
   other declaration.
+
+---
+
+## 20. 🆕 2026-10-08 (127th segment): booted from flash, the switch is in its reset state and `rlx0` receives nothing
+
+**The finding.** 量 The release image (`RLXFW-ID0=6A11DE02`), booted from flash through
+`rlxboot` — the stock loader autobooting, no ESC — brings `rlx0` up with `10.1.1.1` and
+receives no frame. Across a three-packet host ping, `rlx0`'s RX and TX stay 0 in `ifconfig`
+and in `/proc/net/dev`, and the host's neighbour entry goes `INCOMPLETE` → `FAILED`
+(`bench/2026-10-08/X-V06q-*` after a watchdog reset, `X-V08q-*` after a cold power-on).
+`/proc/rtl819x-nic` reads `n_rx 0`, `n_irq 0`, `engine_on 1` and `now_icr C4000000`
+(`X-V08r-nic`): the CPU port is armed and nothing reaches it. The same image booted from RAM
+through the loader's prompt answers the host's ping 2 of 2 (`X-V02n`).
+
+**Which variable it follows.** 量, one or two boots per cell:
+
+| | the loader enters its prompt (ESC); the image from RAM | the loader autoboots; the image from flash |
+|---|---|---|
+| warm: a watchdog reset, `Reboot Result from Watchdog Timeout!` printed | answers — `V02` then `X-V02n`; `V04` then `X-V04n` and S's 1,109,152 bytes over TCP | deaf — `V06` then `X-V06q` |
+| cold: that line absent | answers — `bench/2026-10-07/C03`, then `sendimg` over TCP | deaf — `V08` then `X-V08q` |
+
+It follows the loader's path, not the reset. `notes/nic-driver.md` § 6's wedge, which a cold
+power-on cleared, is not this one. 量 Nor was the board being reset while deaf: `X-V08u`
+read an uptime of 950.27 s, sixteen minutes after `V08`.
+
+**The register difference.** 量 `X-V08r-sw` (autoboot, cold) against
+`bench/2026-10-04/PER-SW` (a RAM boot through the prompt), 37 rows each, 10 differ:
+
+| register | autoboot (live / boot latch) | RAM boot through the prompt |
+|---|---|---|
+| `SSIR` | `00000001` / `00000000` | `00000001` / `00000001` |
+| `MACCR` | `80420186` | `804A0185` |
+| `MDCIOCR` | `00000000` | `96181441` |
+| `MEMCR` | `00007F00` | `00007F7F` |
+| `FFCR` | `00000000` | `00000003` |
+| `PVCR0`–`PVCR3` | `00010001` | `00080008` |
+| `SWTAA` | `00000000` | `BB060100` |
+
+The autoboot's values are the reset values § 16.8 lists for state R — PVID 1 under `VCR0`
+`1FF`, `TRXRDY` 0 at the latch, `MACCR`, `FFCR` — and `SWTAA` 0 says the table-access
+address has not been written since reset.
+
+**Why, from two sources.** 量 above, and 讀 `SPEC.md` `LDR-46`: the loader prints
+`P0phymode=01, embedded phy` and `---Ethernet init Okay!` only on the path that enters its
+prompt. 讀 § 16.8: the mainline (`SWCORE=n`) leaves the VLAN group — the table, `PVCR0`–`4`,
+`VCR0`, `PBVCR0`, the netif table and `PLITIMR` — loader-inherited. The case itself was
+recorded as open: § 17.4 and § 17.10 list the VLAN group *on a boot path on which the loader
+has not brought its network up (autoboot from flash), which `R9`'s zero-write rule keeps
+unreachable* among what 1.5 and arm I do not establish. `R8b` made that path reachable, and
+nothing re-opened the item: none of `R8b`'s flash boots read the network (each ping in
+`bench/2026-10-07` follows a RAM boot). 推 So rlxfw's Ethernet works only
+when the loader has configured the switch, which it does only on its prompt path: booted from
+flash, a frame from port 3 meets PVID 1 under ingress filtering with no VLAN entry and never
+reaches the CPU port.
+
+**What this does not establish.** Which writes are sufficient: § 16.8 says the group is taken
+over as a unit, never partially, and that is untested from this state. That `rlxboot` leaves
+the switch untouched: its 37 registers read state R, but the ASIC tables are not among them.
+Any flash-path value outside the 37 registers: the tables, `QNUMCR`, the PHY registers and
+`LEDCREG` were not read. Whether frames reach port 3 at all: no MIB counter was read.
+Anything about the vendor's firmware, whose own driver configures the switch at boot. The
+takeover is `R6c`'s (`PROGRESS.md`).

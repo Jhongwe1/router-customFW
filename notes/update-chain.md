@@ -678,3 +678,38 @@ bricking precondition, not its closure.
 including `H601`'s, and hashed all but those 8,192. Read into memory and hashed
 into a digest are different things, and only the second is what the guard
 controls.
+
+---
+
+## 9. 🆕 2026-10-08 (127th segment): `v1.0`'s release image through the update path
+
+The candidate `v1.0` image — `mainline-6a11de02.img`, sha256 `a3a75f8c…`, 1,108,992 bytes,
+built twice byte-equal from `f257a848` (`FW-254`) — was taken through the product's own
+update path on one seating, `bench/2026-10-08/V10-CARD.md`, with one flash write.
+
+* **Container S.** Version 4, slot B at `0x190000`, form whole, recipe `6a11de02`, signed
+  with the owner's production key (`4a6eda72…3096e`): 1,109,152 bytes, sha256 `3f728d56…`.
+  The owner signed it through `plan/s127/sign-S.bat`, which checks the payload's digest and
+  the seed's public key before signing and refuses an existing output; 量 its four guards
+  were shown refusing and, with the development seed, permitting, before the real run. 量
+  `build-v10.sh verify` on the host: the header as declared; `mkfw2 verify` accepts S for
+  slot B and rejects it for slot A; the install path's `instcheck` reads OK for slot B and
+  `HDR_FLASH_AT` for slot A; `rlxboot`'s slot logic built for the host boots B with R in A
+  and S in B, and halts with S in A (`flash_match`) and with the development key (`sig`).
+* **From RAM, no write.** 量 `V02`: `looprun --image-sha256 a3a75f8c…`, eight assertions
+  held, `A3` the board printed `6a11de02`, the id the build computed.
+* **The install.** 量 `V05b`, the armed image `6b1bde59` from RAM, under the owner's yes of
+  2026-10-08: `inst_reason OK`, 288 sector erases and 4,333 page programs (`n_writes
+  4621`), 1,179,648 bytes erased and 1,109,152 programmed, read back over 1,179,648 bytes
+  with `inst_cmp_diff 0`, in 11,340 ms. `FW-248` once more: the first `img_len` read
+  970,989 bytes, the second, seven seconds later, 1,109,152.
+* **The boots.** 量 `rlxboot` booted S after a watchdog reset (`V06`; `bootslot` `V07`
+  PASS) and from a cold power-on (`V08`; `V09` PASS): both slots verified, A at version 3
+  and B at version 4, B chosen, `RLXFW-ID0=6A11DE02`. Every boot read `ctr=0`: the install
+  path writes no state (讀 `config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h`:
+  *"D3: R8b writes no state, so no region may reach it"*), so S was accepted against a
+  counter of 0, and so would P, Q or R be.
+
+**What this does not establish.** That the image has a network from flash: it has none
+(`notes/switch-driver.md` § 20, `SPEC.md` `NET-171`), which is why `v1.0` waits on `R6c`.
+More than one cold boot. Anything under load.

@@ -984,7 +984,7 @@ and the other two now point at it.
 | `v0.4` | `R1-pub` + `P1` |
 | `v0.5` | `R6` + `P2` |
 | `v0.6` | `R7` |
-| `v1.0` | `R8` + `R8b` + `R9` + `P3` + `P4b` |
+| `v1.0` | `R6c` + `R8` + `R8b` + `R9` + `P3` + `P4b` |
 
 ⚠️ **These are the gates a version is *defined* by, not everything that landed
 in it.** `v0.1` was never tagged, so the `v0.2` release spans `v0.0` → `v0.2`

@@ -14,7 +14,7 @@ follows it.
 
 **Which records carry which digest.** `P4b`'s closing records — its
 `docs/GATE-RESULTS.md` entry and its row on the board in `PROGRESS.md` — are
-part of the release commit, because `v1.0` is tagged once all five of its gates
+part of the release commit, because `v1.0` is tagged once all six of its gates
 are `✓`. So they can name the image by sha256 and never the archive's sha256:
 the archive is built from that commit and contains them (B2). Every asset's
 sha256, the archive's included, is in the release notes (B6), and the published

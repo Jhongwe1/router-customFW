@@ -34682,3 +34682,29 @@ J = 12:52:06.4，`boa` 在 **J+32.7 s** 起來。
 **不建立什麼。** `6a11de02` 沒有在任何地方跑過，容器 S 還沒簽；`P3` 與 `P4b` 這一段沒動；`LA-1` 的改歸屬（決定：常設指示「任何一段接上邏輯分析儀的上機」，第一階先）還沒寫進 repo；`census` 對 `f257a848` 的結論在寫這一則時還沒出來，`a0740a2f` 與本則的 CI 也還沒跑完。
 
 **下一段。** 擁有者簽 S → `build-v10.sh v10 verify` → 驗證上機的卡片（一次寫入、擁有者有日期的 yes）→ 上機 → `P3`（`docs/bringup.md` § 12／§ 14／§ 16 收進 `R8b` 的讀數、`LA-1` 改歸屬、entry 21）→ `P4b` release-ready → `v1.0` 的 tag 與上傳是擁有者的對外動作。交接在 `plan/handoff-s127.md`。
+
+## 2026-10-08 — 第一百二十七段（02:05 開場，上機 02:36–03:02，收工約 04:00；**兩次電源動作**（冷開機的關與開），**一次 flash 寫入**（`V05b`，擁有者 2026-10-08 有日期的 yes），零次 `FLW`／`EW`／`EB`／非零 `AUTOBURN`／`FLR`）：`v1.0` 的候選映像走過產品自己的更新路徑，從 slot B 熱開機與冷開機都開起來 —— 但從 flash 開機它收不到任何乙太網路封包；擁有者決定先修再發 `v1.0`，開 `R6c`
+
+**開場量測。** HEAD `8fc3df24`、樹乾淨、`LOG.md` 最後一則是第一百二十六段、study 最新 `20261008-study.md`，與交接相符。CI：`f257a848` 的 run `37658883017` success；`8fc3df24` 的 run `37663012049`（也涵蓋 `a0740a2f`，兩者一起推）開場時還在跑，02:43 讀到 completed success。WSL 不是冷啟動（開機 4.9 h、keeper PID 386、CP2102 `1-1` 與 GbE `3-4` 仍 attach），不必重起。擁有者離開 auto mode。
+
+**簽 S。** 擁有者要求協助。寫 `plan/s127/sign-S.bat`（`plan/s124/sign-PQR.bat` 的形狀，加三件：拒絕已存在的輸出 —— `mkfw2 build` 會直接 `os.replace`；簽之前以程式比對 payload 的 sha256；以程式比對種子推出的公鑰）。先用同一支檔案的四個變體證明守門兩面都成立，四個都不讀真種子、不寫真的 `S.rlxu`：payload 期望值錯一位 → 停在第 3 步；第 4 步改用開發種子 → 停在第 4 步；輸出已存在 → 停在第 2 步、檔案不動；整支改用開發種子 → 簽成。擁有者核准後執行：公鑰 `4a6eda72…3096e`、payload `a3a75f8c…`、容器 S `3f728d56a12544d5e37f8a22c3bdd23f98afe6c0c81187e0d06053ebff608d2b`、1,109,152 位元組。`build-v10.sh v10 verify`：manifest 56 列 0 不同；`mkfw2` slot B 收、slot A 拒；`instcheck` slot B OK、slot A `HDR_FLASH_AT`；host 版 slotcheck V1–V4 照預期。
+
+**卡片。** `bench/2026-10-08/V10-CARD.md`，手寫（放寬流程：不凍結、不寫預測）。我決定在寫入之前先從 RAM 零寫入開一次發行映像本身：`docs/release-process.md` B1 的檢查方式就是 `looprun --image-sha256`，而且若 RAM 開不起來，寫入之前就知道。`cardcheck commands` 負控制：沒有 owner-yes 列時拒絕 `V05b`（rc 1）；擁有者說 yes、加列之後 rc 0。擁有者同意加冷開機（Phase 4），握手：先講、等回覆、開窗、`.timing` 存在才請擁有者插電。卡片 02:35:59 定稿，早於第一份擷取（02:36:38）。
+
+**上機。** 板子從第一百二十五段一直開著（`P05` uptime 10,825 s）。pre-flight（板子停在 slot A 的 shell，卡片寫明）0 B、3.082 s、三個產物。
+- `V01` ESC → `<RealTek>`；`V02` 發行映像從 RAM：8 項斷言、`A3` `6a11de02`；`X-V02n` ping 2/2。
+- `V03`、`V04` armed `6b1bde59` 從 RAM：8 項斷言。⚠️ `X-V04n` 的 MAC 檢查分不出 armed 與 mainline（兩者都是 `02:52:4c:58:46:57`，第一百二十五段的 `phase9.sh` 也一樣）；分辨兩者的是 `V04` 的 `A3`。
+- `V05` 暫存 S：`X-V05w1` `img_len` 970,989、`X-V05w2` 1,109,152（`FW-248` 再一次）；arm；`V05b`：`inst_reason OK`、288 SE、4,333 PP、`inst_cmp_diff 0`、11,340 ms（`FW-255`）。
+- `V06` `busybox reboot -f`、不送 ESC：`rlxboot` 驗 A（v3）與 B（v4）、選 B、`RLXFW-ID0=6A11DE02`；`V07` PASS。
+- **但 `X-V06n` ping 0/2。** 50 s 後 `X-V06n2` 仍不通；`X-V06q`：`rlx0` UP、`10.1.1.1`，主機 ping 三次前後 RX 0、TX 0，ARP `FAILED`。
+- Phase 4：擁有者關電、回報 → `PF2` 0 B、3.077 s → 300 s 窗（02:45:51）、`.timing` 存在後請擁有者插電 → `V08` 31.2 s 到提示字元、沒有 watchdog 判別線，`V09` PASS；`X-V08n`、`X-V08q` 一樣不通。`X-V08r`：交換器 37 列暫存器對 `bench/2026-10-04/PER-SW` 有 10 列不同，自動開機那一邊是重設值；`/proc/rtl819x-nic` `n_rx 0`、`n_irq 0`（`NET-171`）。
+
+**擁有者問：是不是 watchdog 的問題。** 排成 2×2（loader 進提示字元／自動開機 × watchdog 重設／冷開機）：提示字元那一欄熱冷都通（`V02`、`V04`；第一百二十五段 `C03` 之後 `sendimg`），自動開機那一欄熱冷都不通（`V06`、`V08`）—— 跟著 loader 的路，不跟著重設；`X-V08u` uptime 950.27 s，不通的十六分鐘沒有被重設。原因兩個來源一致（機制推）：`LDR-46`（loader 只在提示字元那條路做網路初始化）與 `notes/switch-driver.md` § 16.8（mainline 把 VLAN 那一組留給 loader）。🔴 **而這條路早就被記成待解**：`notes/switch-driver.md` § 17.4、§ 17.10 把「loader 沒把網路帶起來的開機路（從 flash 自動開機）上的 VLAN 那一組」列為沒有建立，理由是 `R9` 的零寫入規則讓它不可達；`R8b` 讓它可達之後，沒有人把這一項重新打開，`R8b` 的 flash 開機也沒有一次量網路（查過 `bench/2026-10-07` 每一份 ping：全部接在 looprun 的 RAM 開機之後）。我第一版草稿寫「兩半各自記過、沒人放在一起」，是 `R6c-2` 的代理讀到 § 17.4、§ 17.10 才更正。
+
+**決定。** 擁有者選「先修網路再發 `v1.0`」：開 `R6c`（步驟表在 `PROGRESS.md` 檔尾），`v1.0` 的閘變成 `R6c` + `R8` + `R8b` + `R9` + `P3` + `P4b`（`README.md`、`docs/release-process.md`、`P3` 列跟著改）。`P4b` 等它；`P3` 自己關。兩支只讀的研究代理寫在 `$FWRE_WORK/rebuild/s127/r6c1/`、`r6c2/`：兩支都回報了（主線只讀了它們的回報，報告內容下一段核）。`R6c-1`（`r6c1/LOADER-SWITCH-INIT.md`，229 行）：控制都過（`stage2.bin` sha256 `f88869d1…`、`ComSrlCmd_RDID` 在 `0x8040591C`）；手上沒有一棵樹建得出這顆 loader，bootcode 只當結構，8196E 的部分以核心的 `rtl865x_asicL2.c` 當第二來源；提示字元路徑的寫入解釋了全部 10 列差異（VLAN slot 8 = `00807E3F`：埠 0–5 是成員且不帶標籤，CPU 埠不是成員；netif slot 0 VID 8；兩筆送往 CPU 的靜態 L2 項）；呼叫圖顯示每一個寫交換器的函式只經 `goToDownMode` 可達 —— 自動開機時 stage 2 不寫任何交換器暫存器；`---Ethernet init Okay!` 不論成敗都印；`notes/switch-driver.md` § 8.9 的兩筆寫入在 `BOND_8196ES` 分支（`REG-30` 排除），而且漏了產生 `MACCR` 的那一筆。一個儀器發現：Grep 工具（ripgrep）跳過含 NUL 的擷取，找到 2 份含 `Ethernet init Okay`，`grep -a` 找到 360 份。`R6c-2`（`r6c2/TAKEOVER-DESIGN.md`，312 行）：交換器驅動加 `vlan`／`vlan reset` 兩個 verb，由 PID 1 在 `init` 與 `start` 之間寫，寫 loader 的值、清掉 netif 表；VID 8／埠遮罩／PVID 8 只有 loader 一個來源，8d 的裁決 3 正是因此沒接手，要擁有者重新裁決；它建議第一格是唯讀的：flash 開機狀態下讀埠 3 的 MIB、夾一次 ping。兩支都更正了我的 brief：loader 在任何停進提示字元的路徑都做網路初始化（`goToDownMode` 有一個不需要 ESC 的呼叫者，`C-4` 的 `T2a` 就是）；§ 17.4、§ 17.10 早把這條路列成待解。
+
+**提交。** 擷取與卡片 `ec3d163c`（`flashwin scan --sweep bench/2026-10-08` 111 檔、113 個探針 CLEAN、rc 0；`capdate` rc 0；`bench/README.md` 補一列，最後一欄照規則只放卡片標題）。推之前 `desk-sweep --only` 跑讀 `bench/` 的十步加三個 self-test：`desk-sweep run --only` 跑了 13 步、13 步綠、0 個意外，source 沒有移動（複製 249 s、驗證 137 s、跑 2,024 s，其中 `cardcheck` 突變套件 1,565 s）；`bootbytes` K1 201 份開機擷取、K2 每一份的常數都有宣告。紀錄：`NET-171`、`FW-255`（`notes/switch-driver.md` § 20、`notes/update-chain.md` § 9）、`docs/KNOWN-ISSUES.md` 2026-10-08、`PROGRESS.md`（§ Now、`R6c` 列、步驟表）。
+
+**做錯的事。** PowerShell 把 `\$?` 換成自己的 `$?`，印出 `rc=True`（反引號才是它的跳脫字元），`$(pgrep …)` 也被它搶走 —— 兩次都改用腳本檔；草稿把 D3 引成 `update-chain.md` § 6，提交前 grep 發現該檔沒有 D3，改引寫入路徑標頭的註解；草稿把交換器的差異寫成「7 個」—— `PVCR0`–`3` 是四列，實際 10 列（引用局部視圖，代理的報告用「10」才抓到）；以及上面「沒人放在一起」那一句。
+
+**不建立什麼。** `R6c` 的修法有效（還沒寫）；哪些暫存器或表格足夠；`rlxboot` 沒動交換器的表格（37 個暫存器裡沒有表格）；一次以上的冷開機；`6a11de02` 在負載下的行為。
