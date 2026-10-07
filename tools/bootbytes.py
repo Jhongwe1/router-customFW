@@ -107,9 +107,28 @@ the echo is the tty rendering an input byte, and that ESCs arriving before
 per raw 0x1b, so like `varwidth_excess` it is a term and not a tolerance.  量
 2026-10-02: no other capture the gate accepts holds a single `^[` or 0x1b (174
 of 176), so the term is 0 wherever it did not exist before and every earlier
-verdict stands.  K8 is its control.  ⚠️ What it does not model: a boot in which
-no ESC is echoed before the CR would lack `sh: : not found`, 17 bytes (推,
-never captured).
+verdict stands.  K8 is its control.
+
+ASH'S REPLY TO THAT INPUT
+-------------------------
+🔄 2026-10-08.  This section ended on a 推: *a boot in which no ESC is echoed
+before the CR would lack `sh: : not found`, 17 bytes, never captured*.  It was
+captured -- R8b's armed provisioning image booted twenty times on 2026-10-07
+with the same userspace as R7 and no console input -- and it is **21** bytes,
+not 17, which turned CI red on `3e01e0a9` (K2: an undeclared 2008).  量 from
+the bytes, echoed ESCs taken out: `R78-boot.log` ends `# ` + `\\r\\n` + `sh: :
+not found\\r\\n` + `# `, `A1A-boot.log` ends at the first `# `.  The 推 counted
+ash's line and missed the CR the tool sent, which the tty echoes as `\\r\\n`,
+and the second prompt ash prints after its reply.  As byte multisets the two
+remainders differ in exactly those 21 bytes and nothing else.
+
+`reply_excess` counts that reply in the capture itself -- `len(REPLY)` for each
+occurrence once the echoed ESCs are out -- so the R7 userspace is one declared
+constant, 2008, with or without the tool's input.  K8's fixture already ended
+in the reply; K8 now also requires the full and the cut shapes to normalise to
+one value, and K9 is the term's control on the real corpus.  ⚠️ What it does
+not model: a CR sent with no ESC before it would produce a bare prompt and no
+`sh:` line (推, never captured), and would read 4 above.
 
 WHICH FILES ARE BOOT CAPTURES
 -----------------------------
@@ -262,21 +281,31 @@ DECLARED_CONSTS = {
          "rtl819x-switch 1.5's RLXFW-SW-INIT= line parses as a mark.  量 2 "
          "captures, 2026-09-28 (bench/2026-09-28b/I1Q-boot.log after a cold "
          "power-on, I4Q-boot.log after busybox reboot -f), 1,830 B each",
-    2029: "quiet console, SWCORE=n, with R7's compiled /init, its four "
-          "daemons and the bench shell -- recipe bf182de2 (`r78a`) and its "
-          "rebuild 0e45c61d.  量 2 captures, 2026-09-30 "
-          "(bench/2026-09-30/R78-boot.log, R79-boot.log), 2647 and 2746 "
-          "before `echo_excess`.  2029 = 246 + 296 + 197 + 1290: the loader's "
-          "and the vendor kernel's lines, the same 246 bytes as the 339 and "
-          "407 captures; /init's first eight lines (the rung-1 line, "
-          "`compiled PID 1 (R7)`, six `mounted`; 讀 src/init/main.c and "
-          "mounts.c); the ten kernel marks RLXFW-SW-UNLOCK to RLXFW-N-NDOPEN, "
-          "which interleave with those eight lines character by character so "
-          "that none parses -- an exact interleaving on both captures; and "
-          "the remaining /init, brokerd, httpd, dnsfwd, udhcpd and ash lines, "
-          "`sh: : not found` included.  A boot in which any of the ten parses "
-          "on its own line reads less, undeclared",
+    2008: "quiet console, SWCORE=n, with R7's compiled /init, its four "
+          "daemons and the bench shell -- recipe bf182de2 (`r78a`), its "
+          "rebuild 0e45c61d, and R8b's armed provisioning images 75cfa588 "
+          "and 6b1bde59, whose userspace is the same.  2008 = 246 + 296 + "
+          "197 + 1269: the loader's and the vendor kernel's lines, the same "
+          "246 bytes as the 339 and 407 captures; /init's first eight lines "
+          "(the rung-1 line, `compiled PID 1 (R7)`, six `mounted`; 讀 "
+          "src/init/main.c and mounts.c); the ten kernel marks "
+          "RLXFW-SW-UNLOCK to RLXFW-N-NDOPEN, which interleave with those "
+          "eight lines character by character so that none parses -- an "
+          "exact interleaving on every capture; and the remaining /init, "
+          "brokerd, httpd, dnsfwd, udhcpd and ash lines up to the first "
+          "prompt.  A boot in which any of the ten parses on its own line "
+          "reads less, undeclared.  🔄 Declared as 2029 from 2026-09-30 "
+          "(bench/2026-09-30/R78-boot.log, R79-boot.log, 2647 and 2746 "
+          "before `echo_excess`) until 2026-10-08, when the twenty armed "
+          "boots of bench/2026-10-07, which carry no console input, read "
+          "2008: 2029 held ash's 21-byte reply to the capture tool's input, "
+          "now `reply_excess` (K9)",
 }
+
+#: Ash's reply to the capture tool's input, as the capture reads once the
+#: echoed ESCs are taken out: the tool's CR echoed, `sh: <the ESCs>: not
+#: found`, and the prompt ash prints after it.  See ASH'S REPLY TO THAT INPUT.
+REPLY = b"\r\nsh: : not found\r\n# "
 
 #: The population floor.  A sweep that finds three captures and agrees with
 #: itself proves nothing.
@@ -342,10 +371,20 @@ def echo_excess(blob):
     return 2 * blob.count(ECHO_CARET) + blob.count(ECHO_RAW)
 
 
+def reply_excess(blob):
+    """-> the bytes this capture spends on ash's reply to the capture tool's
+    input: `len(REPLY)` for each occurrence of `REPLY` once the echoed ESCs
+    are taken out.  Counted in this capture, like `echo_excess`, and not a
+    tolerance; see ASH'S REPLY TO THAT INPUT, and K8 and K9 for its controls."""
+    bare = blob.replace(ECHO_CARET, b"").replace(ECHO_RAW, b"")
+    return len(REPLY) * bare.count(REPLY)
+
+
 def normalised_const(blob, marks):
-    """`raw_const` with the vendor's variable-width field and the echoed
-    input taken out."""
-    return raw_const(blob, marks) - varwidth_excess(blob) - echo_excess(blob)
+    """`raw_const` with the vendor's variable-width field, the echoed input
+    and ash's reply to it taken out."""
+    return (raw_const(blob, marks) - varwidth_excess(blob) - echo_excess(blob)
+            - reply_excess(blob))
 
 
 def without(term, blob, marks):
@@ -515,6 +554,8 @@ def echo_control():
         shutil.rmtree(tmp, ignore_errors=True)
     raw = {os.path.basename(p): without(echo_excess, b, m) for p, b, m in acc}
     norm = {os.path.basename(p): normalised_const(b, m) for p, b, m in acc}
+    replyless = {os.path.basename(p): without(reply_excess, b, m)
+                 for p, b, m in acc}
     if sorted(norm) != sorted(files):
         return False, "the gate accepted %s of the five" % sorted(norm)
 
@@ -534,7 +575,17 @@ def echo_control():
              and norm["cut-hi-boot.log"] == norm["cut-lo-boot.log"]),
             ("one ordinary byte: +1 with it",
              norm["one-byte-boot.log"] - norm["full-hi-boot.log"] == 1),
-            ("halves differ only in echo", one_var)]
+            ("halves differ only in echo", one_var),
+            # 🔄 2026-10-08: the full shape carries ash's reply and the cut
+            # one does not, so with the reply term the two are one value and
+            # without it they are len(REPLY) apart -- the term is the reply.
+            ("full vs cut: +0 with the reply term, +%d without it"
+             % len(REPLY),
+             norm["full-lo-boot.log"] == norm["cut-lo-boot.log"]
+             and norm["full-hi-boot.log"] == norm["cut-hi-boot.log"]
+             and replyless["full-lo-boot.log"] - norm["full-lo-boot.log"]
+             == len(REPLY)
+             and replyless["cut-lo-boot.log"] == norm["cut-lo-boot.log"])]
     bad = [w for w, good in want if not good]
     if bad:
         return False, ("%s -- without the term %s, with it %s"
@@ -695,7 +746,7 @@ def check():
     # is independent of the term: the two captures carrying echo are two
     # images, one capture each, so K7's per-image test has nothing to compare.
     # The corpus half is K2's and K6's -- R78 and R79 must both land on the
-    # declared 2029, and 2029 must be reached.
+    # declared 2008, and 2008 must be reached -- and K9's, below.
     good, detail = echo_control()
     print("  %s  %-10s %s" % ("ok  " if good else "FAIL", "K8",
                               "the echo term removes exactly the echo on a "
@@ -713,6 +764,37 @@ def check():
               % (os.path.relpath(path, ROOT), blob.count(ECHO_CARET),
                  echo_excess(blob), without(echo_excess, blob, ms),
                  normalised_const(blob, ms)))
+
+    # K9: the reply term on SILICON, which K8's fixture cannot be.  The
+    # partition is the PRESENCE of the reply in the capture's bytes -- never
+    # the constant it lands on.  Three things must hold: some capture carries
+    # the reply (or the term has never met one); for each, the term removes
+    # exactly len(REPLY) (it is the reply and nothing else); and each lands,
+    # with the term, on a constant some reply-FREE capture reaches directly --
+    # the same console configuration measured without the tool's input, which
+    # is the evidence that the reply is the whole difference.  量 2026-10-08:
+    # the five R7 captures with echoed input and the twenty armed boots of
+    # bench/2026-10-07 without it.
+    replied = [(p, b, m) for p, b, m in accepted if reply_excess(b)]
+    free = {normalised_const(b, m) for p, b, m in accepted
+            if not reply_excess(b)}
+    exact = all(without(reply_excess, b, m) - normalised_const(b, m)
+                == len(REPLY) * b.replace(ECHO_CARET, b"").replace(
+                    ECHO_RAW, b"").count(REPLY) for _p, b, m in replied)
+    shared = sorted({normalised_const(b, m) for _p, b, m in replied})
+    good = bool(replied) and exact and set(shared) <= free
+    detail = ("%d capture(s) carry the reply; WITHOUT the term they give %s, "
+              "WITH it %s, reached by reply-free captures: %s"
+              % (len(replied),
+                 sorted({without(reply_excess, b, m) for _p, b, m in replied}),
+                 shared, sorted(set(shared) & free)))
+    print("  %s  %-10s %s" % ("ok  " if good else "FAIL", "K9",
+                              "the reply term is load-bearing and exact on "
+                              "the corpus: %s" % detail
+                              if good else
+                              "the reply term is NOT shown on the corpus: %s"
+                              % detail))
+    ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
 
     # Observation, deliberately carrying NO assertion.  What the gate rejected
     # in the real corpus is worth reading -- it is how a mis-named capture
@@ -776,7 +858,7 @@ def predict():
 
 
 def main(argv):
-    print("bootbytes 1.4  --  boot capture length, derived not copied")
+    print("bootbytes 1.5  --  boot capture length, derived not copied")
     if len(argv) > 1 and argv[1] == "predict":
         return predict()
     return check()
