@@ -230,7 +230,7 @@ IDLE_UNDER_SLEEP_EXEMPT = {
     # repaired -- `check-predictions` reads its mtime -- so it is excused BY
     # NAME, as `FLR_LEGACY_CARDS` excuses its two.
     "bench/2026-09-10/PREDICTIONS-B18-block17.md",
-}
+}   # and card B52's four, added below cards_numbers() on 2026-10-08: see there
 
 _IDLE_RE = __import__("re").compile(r"--idle\s+([0-9.]+)")
 _SLEEP_RE = __import__("re").compile(r"\bsleep\s+([0-9]+)")
@@ -238,15 +238,15 @@ _OUT_RE = __import__("re").compile(r"--out\s+(\S+)")
 
 
 def idle_under_sleep(text):
-    """-> [(cell, longest sleep, idle)] for every capture line that would stop
-    before its own payload speaks.
+    """-> [(cell, longest sleep, idle)] for every line with a `--send` that
+    would stop before its own payload speaks -- a `CAP` line too (2026-10-08).
 
     A line with no `--idle`, or no `sleep` in its `--send`, is not a finding:
     `--seconds` alone is a hard duration and cannot stop early.
     """
     out = []
     for line in text.split("\n"):
-        if "console-capture" not in line or "--send" not in line:
+        if "--send" not in line:     # CAP lines too: the 2026-10-08 note below
             continue
         mi = _IDLE_RE.search(line)
         if not mi:
@@ -651,6 +651,49 @@ def cards_numbers(card_rel, report=print):
             bad += 1
     report(f"  {len(rows) - bad} of {len(rows)} re-derived")
     return bad
+
+
+# --------------------------------------------------------------------------
+# the `--idle` guard and a card's `CAP` macro -- 2026-10-08
+#
+# ⚠️ This belongs beside IDLE_UNDER_SLEEP_EXEMPT and sits here, below line
+# 560, for the reason the FW-113 note below gives; the three edits above that
+# wire it in are line-for-line.
+#
+# 🔴 THE GUARD READ ONLY LINES THAT SPELL OUT `console-capture`, AND A CELL
+# TYPED THROUGH A CARD'S `CAP` MACRO NEVER DOES.  A card defines `CAP` as
+# `/usr/bin/python3 tools/console-capture.py capture --port /dev/ttyUSB0`
+# (tools/cardrun.py's grammar) and writes `CAP --out <prefix> --send '...'
+# --idle N ...`.  量 2026-10-08: 57 bench .md files carry such cells, and of
+# the 260 corpus lines with a --send, an --idle and a sleep in the payload,
+# idle_under_sleep() read 38.  The other 222 are CAP lines -- 218 at a line
+# start, 3 inside a wrapper's double-quoted argument, 1 in prose backticks --
+# so no CAP cell had ever been read by this guard.
+#
+# The fix reads the population sends_with_cells() reads -- every line SEND_RE
+# finds a --send on, whatever program the line names -- which is what every
+# other --send rule of `commands` reads already (FLR, FW-113, HW-1, R8b D8
+# and D22, glued_sends()).  Expanding the card's macros through
+# cardrun.expand() and keeping the literal test was measured too: the same
+# findings on the same corpus, but cardrun refuses card B41's CAP, whose body
+# is wrapped across two lines, so its seven CAP lines would have stayed out
+# of reach.  量: no macro body in the corpus carries --idle or --send, so not
+# expanding one hides nothing today.
+#
+# 量 2026-10-08, before the change, over every bench .md with a --send and
+# every PREDICTIONS-*.md (123 files): 4 new findings, all on one FROZEN card
+# (255af14b), and all four are this guard's own false positive.  Card B52's
+# D3-UR1-Q, D3-UR2-Q, D3-UR3-Q and D3-LUR1-Q send `cd /tmp && sleep 20 &&
+# busybox cp /proc/net/udp ... && sleep 12 && busybox cp ... &` under
+# `--idle 3`: the trailing `&` runs the whole list, its sleeps included, in
+# the background, so the shell's prompt is all the payload says.  量 each
+# capture stopped `--idle 3.0 with no bytes` at 3.11-3.13 s holding 106-108
+# bytes, the echo and the prompt -- what the card meant.  The guard does not
+# read `&`; teaching it to is a different change and is not made here.  So
+# the card is excused BY NAME; A75 pins its four cells exactly, and goes red
+# the day the guard stops flagging one of them or flags a fifth; and B11
+# sweeps the list both ways.
+IDLE_UNDER_SLEEP_EXEMPT.add("bench/2026-09-27b/PREDICTIONS-B52-block50.md")
 
 
 # --------------------------------------------------------------------------
@@ -2251,6 +2294,72 @@ def run_controls():
     noisy = [q for q in quiet if idle_under_sleep(q)]
     row("A24", "and a cell that is FINE is not touched by it",
         not noisy, f"{len(noisy)} of 3 flagged" + (f": {noisy}" if noisy else ""))
+
+    # ----------------------------------------------------------------- A73-A75
+    # 🔴 2026-10-08: the guard read only lines that spell out `console-capture`
+    # (the note below cards_numbers()), so a cell typed through a card's `CAP`
+    # macro was never read.  Nor were A24's three lines, which do not spell it
+    # either: 量 with the comparison made a blanket (`max(sl) >= 0`), HEAD's
+    # A24 stayed green, `0 of 3 flagged` -- it could not fail.  A22-A24's
+    # shape again, on a card that defines `CAP` as cards do: it fires (A73),
+    # it is silent on cells that are fine (A74), and the one FROZEN card it
+    # now flags is excused by name, cell for cell (A75).  A73 and A74 go
+    # through `commands` too, because a guard can be right and unwired.  A73's
+    # three lines are the three forms the corpus writes a CAP cell in: a
+    # fenced line, a table cell, a wrapper's double-quoted argument.
+    capdef = ("`CAP` = `/usr/bin/python3 tools/console-capture.py capture "
+              "--port /dev/ttyUSB0 --baud 38400`\n\n")
+    capbad = (capdef + "```\n"
+              "CAP --out bench/x/C2-A --send 'sleep 15 ; cat /proc/uptime' "
+              "--idle 4 --seconds 40\n```\n\n"
+              "| **C2-B** | `CAP --out bench/x/C2-B --send 'sleep 6 ; cat "
+              "/proc/uptime' --idle 6 --seconds 20` |\n\n"
+              "  && bash x.sh --x C2-C \"CAP --out bench/x/C2-C --send 'sleep 9 "
+              "; cat /proc/uptime' --idle 3 --seconds 20\" \\\n")
+    # A74's first line is R6C-4's own I07 under another --out: `sleep 15`
+    # under `--idle 20`, the one CAP line of the three 2026-10-08 cards that
+    # carries a sleep and an --idle.
+    capok = (capdef + "```\n"
+             "CAP --out bench/x/C3-A --send 'sleep 15 ; cat /proc/rtl819x-spi' "
+             "--idle 20 --seconds 45\n"
+             "CAP --out bench/x/C3-B --send 'sleep 15 ; cat /proc/uptime' "
+             "--seconds 40\n"
+             "CAP --out bench/x/C3-C --send 'cat /proc/uptime' --idle 3 "
+             "--seconds 15\n```\n")
+
+    def cap_card(body):
+        """-> (`commands`' count, its FAIL lines) for `body` read as a card."""
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "cap.md")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write(body)
+            said = []
+            n = cards_commands(os.path.relpath(p, ROOT), report=said.append)
+        return n, [x for x in said if x.startswith("  FAIL")]
+
+    want73 = [("C2-A", 15, 4.0), ("C2-B", 6, 6.0), ("C2-C", 9, 3.0)]
+    hits = idle_under_sleep(capbad)
+    n73, f73 = cap_card(capbad)
+    row("A73", "a CAP cell whose --idle is under its sleep is REPORTED",
+        hits == want73 and n73 == 3
+        and [x.split()[1] for x in f73] == ["C2-A:", "C2-B:", "C2-C:"],
+        f"{len(hits)} of 3 hit(s), `commands` {n73} bad: "
+        + (", ".join(c for c, _s, _i in hits) or "-"))
+
+    n74, f74 = cap_card(capok)
+    row("A74", "and a CAP cell that is FINE is not touched by it",
+        not idle_under_sleep(capok) and n74 == 0,
+        f"{len(idle_under_sleep(capok))} of 3 flagged; `commands` {n74} bad"
+        + (f": {f74[0].strip()[:40]}" if f74 else ""))
+
+    b52 = "bench/2026-09-27b/PREDICTIONS-B52-block50.md"
+    want75 = [(c, 20, 3.0) for c in ("D3-UR1-Q", "D3-UR2-Q", "D3-UR3-Q",
+                                     "D3-LUR1-Q")]
+    got75 = idle_under_sleep(_read(b52).decode("utf-8", "replace"))
+    row("A75", "and B52's four backgrounded sleeps are excused by name",
+        b52 in IDLE_UNDER_SLEEP_EXEMPT and got75 == want75,
+        f"exempt={b52 in IDLE_UNDER_SLEEP_EXEMPT}, {len(got75)} cell(s): "
+        + (", ".join(c for c, _s, _i in got75) or "-"))
 
     # ----------------------------------------------------------------- A25
     # `CARD-4`.  The measured builtin table is load-bearing, so it gets a

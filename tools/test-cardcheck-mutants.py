@@ -565,6 +565,29 @@ MUT = [
     ("M86 the applet population floor removed                (kills A68)",
      '        if len(kinds["applet"]) < APPLET_FLOOR:',
      '        if False:'),
+
+    # ------------------------------------------ the `--idle` guard, 2026-10-08
+    # It read only lines that spell out `console-capture`, so no cell typed
+    # through a card's `CAP` macro was ever read -- and until today the guard
+    # had no mutant at all.  One per property the fix claims: CAP lines are
+    # read (M91 restores the literal test, the blind spot itself), the FROZEN
+    # card that reading flags is excused by name (M92), and the guard is no
+    # blanket (M93) -- which A24 could not show before: its own three lines
+    # do not spell `console-capture` either, and 量 HEAD's A24 stayed green
+    # under exactly M93.
+    ("M91 the --idle guard blind to CAP lines again          (kills A73, A75, B11)",
+     '        if "--send" not in line:     # CAP lines too: the 2026-10-08 note '
+     'below',
+     '        if "console-capture" not in line or "--send" not in line:'),
+
+    ("M92 B52, which the guard flags, dropped from the list  (kills B11, A75)",
+     'IDLE_UNDER_SLEEP_EXEMPT.add("bench/2026-09-27b/PREDICTIONS-B52-block50.md")',
+     'IDLE_UNDER_SLEEP_EXEMPT.add("bench/2026-09-27b/PREDICTIONS-B52-block50.md'
+     '-NOTHING")'),
+
+    ("M93 every sleep under any --idle reported (a blanket)  (kills A24, A74)",
+     '        if max(sl) >= idle:',
+     '        if max(sl) >= 0:'),
 ]
 
 
