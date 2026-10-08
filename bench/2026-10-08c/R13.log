@@ -1,0 +1,109 @@
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+        100570    2183      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+       1212724    2212      0       0       0       0 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enxfc19286184c9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+20:48:31.619136 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 0, length 64
+20:48:31.619332 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 0, length 64
+20:48:32.622066 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 1, length 64
+20:48:32.622079 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 1, length 64
+20:48:35.709414 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 2, length 64
+20:48:35.709431 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 2, length 64
+20:48:36.731186 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 3, length 64
+20:48:36.731201 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 3, length 64
+20:48:37.753227 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 4, length 64
+20:48:37.753322 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 4, length 64
+20:48:38.775406 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 5, length 64
+20:48:38.775420 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 5, length 64
+20:48:39.786306 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 6, length 64
+20:48:39.786323 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 6, length 64
+20:48:40.743770 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 7, length 64
+20:48:40.743786 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 7, length 64
+20:48:41.701015 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 8, length 64
+20:48:41.701050 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 8, length 64
+20:48:42.649167 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 9, length 64
+20:48:42.649183 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 9, length 64
+20:48:43.588801 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 10, length 64
+20:48:43.588817 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 10, length 64
+20:48:44.527767 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 11, length 64
+20:48:44.527843 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 11, length 64
+20:48:45.466488 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 12, length 64
+20:48:45.466503 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 12, length 64
+20:48:46.405715 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 13, length 64
+20:48:46.405744 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 13, length 64
+20:48:47.344531 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 14, length 64
+20:48:47.344544 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 14, length 64
+20:48:48.283810 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 15, length 64
+20:48:48.283838 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 15, length 64
+20:48:49.168486 ARP, Request who-has 10.1.1.2 tell 10.1.1.1, length 46
+20:48:49.168493 ARP, Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+20:48:49.222820 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 16, length 64
+20:48:49.222838 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 16, length 64
+20:48:50.161769 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 17, length 64
+20:48:50.161797 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 17, length 64
+20:48:51.071416 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 18, length 64
+20:48:51.071443 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 18, length 64
+20:48:51.616328 ARP, Request who-has 10.1.1.1 tell 10.1.1.2, length 28
+20:48:51.619457 ARP, Reply 10.1.1.1 is-at 02:52:4c:58:46:57, length 46
+20:48:51.979925 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 19, length 64
+20:48:51.979948 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 19, length 64
+20:48:52.889244 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 20, length 64
+20:48:52.889271 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 20, length 64
+20:48:53.797729 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 21, length 64
+20:48:53.797743 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 21, length 64
+20:48:54.706556 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 22, length 64
+20:48:54.706570 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 22, length 64
+20:48:55.615830 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 23, length 64
+20:48:55.615842 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 23, length 64
+20:48:56.524908 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 24, length 64
+20:48:56.524919 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 24, length 64
+20:48:57.433912 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 25, length 64
+20:48:57.433938 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 25, length 64
+20:48:58.351126 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 26, length 64
+20:48:58.351152 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 26, length 64
+20:48:59.308617 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 27, length 64
+20:48:59.308645 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 27, length 64
+20:49:00.265835 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 28, length 64
+20:49:00.265860 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 28, length 64
+20:49:01.223101 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 29, length 64
+20:49:01.223120 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 29, length 64
+20:49:02.180810 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 30, length 64
+20:49:02.180828 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 30, length 64
+20:49:03.138385 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 31, length 64
+20:49:03.138414 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 31, length 64
+20:49:04.095814 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 32, length 64
+20:49:04.095842 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 32, length 64
+20:49:05.052816 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 33, length 64
+20:49:05.052829 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 33, length 64
+20:49:06.010409 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 34, length 64
+20:49:06.010435 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 34, length 64
+  bench/2026-10-08c/R14.log     1935 bytes
+  bench/2026-10-08c/R14.timing  35.068614 s, stop: --seconds 35.0 elapsed
+  bench/2026-10-08c/R14.meta.json
+cap_rc=0
+20:49:07.007640 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 35, length 64
+20:49:07.007653 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 35, length 64
+20:49:10.036722 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 36, length 64
+20:49:10.036738 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 36, length 64
+20:49:11.044168 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 37, length 64
+20:49:11.044181 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 37, length 64
+20:49:12.051814 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 38, length 64
+20:49:12.051827 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 38, length 64
+20:49:13.059172 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 39, length 64
+20:49:13.059191 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 39, length 64
+10.1.1.1 dev enxfc19286184c9 lladdr 02:52:4c:58:46:57 REACHABLE 
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+        104022    2225      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+       1216728    2254      0       0       0       0 
+20:49:14.032005 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 41, seq 40, length 64
+20:49:14.032019 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 41, seq 40, length 64
+
+86 packets captured
+86 packets received by filter
+0 packets dropped by kernel

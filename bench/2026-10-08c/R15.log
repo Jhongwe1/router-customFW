@@ -1,0 +1,21 @@
+echo mib | cat > /proc/rtl819x-view ; cat /proc/rtl819x-view
+64 bytes from 10.1.1.2: seq=40 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=41 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=42 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=43 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=44 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=45 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=46 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=47 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=48 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=49 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=50 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=51 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=52 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=53 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=54 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=55 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=56 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=57 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=58 ttl=64 time=10.000 ms
+64 bytes from 10.1.1.2: seq=59 ttl=64 time=10.000 ms

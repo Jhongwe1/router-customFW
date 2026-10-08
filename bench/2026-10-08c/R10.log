@@ -1,0 +1,41 @@
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+        100142    2177      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+       1212248    2206      0       0       0       0 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enxfc19286184c9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+PING 10.1.1.1 (10.1.1.1) 56(84) bytes of data.
+64 bytes from 10.1.1.1: icmp_seq=1 ttl=64 time=2.45 ms
+20:48:13.429004 ARP, Request who-has 10.1.1.1 tell 10.1.1.2, length 28
+20:48:13.430333 ARP, Reply 10.1.1.1 is-at 02:52:4c:58:46:57, length 46
+20:48:13.430339 IP 10.1.1.2 > 10.1.1.1: ICMP echo request, id 7999, seq 1, length 64
+20:48:13.431444 IP 10.1.1.1 > 10.1.1.2: ICMP echo reply, id 7999, seq 1, length 64
+64 bytes from 10.1.1.1: icmp_seq=2 ttl=64 time=3.20 ms
+20:48:14.429213 IP 10.1.1.2 > 10.1.1.1: ICMP echo request, id 7999, seq 2, length 64
+20:48:14.432372 IP 10.1.1.1 > 10.1.1.2: ICMP echo reply, id 7999, seq 2, length 64
+64 bytes from 10.1.1.1: icmp_seq=3 ttl=64 time=2.91 ms
+20:48:15.429512 IP 10.1.1.2 > 10.1.1.1: ICMP echo request, id 7999, seq 3, length 64
+20:48:15.432391 IP 10.1.1.1 > 10.1.1.2: ICMP echo reply, id 7999, seq 3, length 64
+64 bytes from 10.1.1.1: icmp_seq=4 ttl=64 time=1.55 ms
+
+--- 10.1.1.1 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3287ms
+rtt min/avg/max/mdev = 1.547/2.525/3.196/0.623 ms
+ping_rc=0
+20:48:16.429458 IP 10.1.1.2 > 10.1.1.1: ICMP echo request, id 7999, seq 4, length 64
+20:48:16.430986 IP 10.1.1.1 > 10.1.1.2: ICMP echo reply, id 7999, seq 4, length 64
+20:48:17.984881 ARP, Request who-has 10.1.1.2 tell 10.1.1.1, length 46
+20:48:17.984895 ARP, Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+10.1.1.1 dev enxfc19286184c9 lladdr 02:52:4c:58:46:57 REACHABLE 
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+        100570    2183      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+       1212724    2212      0       0       0       0 
+
+12 packets captured
+12 packets received by filter
+0 packets dropped by kernel

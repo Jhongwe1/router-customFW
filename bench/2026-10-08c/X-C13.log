@@ -1,0 +1,31 @@
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+        234214    4858      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+       3621894    5495      0       0       0       0 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enxfc19286184c9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+21:58:54.941702 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 40, seq 0, length 64
+21:58:54.941714 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 40, seq 0, length 64
+21:58:55.892389 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 40, seq 1, length 64
+21:58:55.892425 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 40, seq 1, length 64
+21:58:56.840510 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 40, seq 2, length 64
+21:58:56.840531 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 40, seq 2, length 64
+21:58:57.788301 IP 10.1.1.1 > 10.1.1.2: ICMP echo request, id 40, seq 3, length 64
+21:58:57.788327 IP 10.1.1.2 > 10.1.1.1: ICMP echo reply, id 40, seq 3, length 64
+  bench/2026-10-08c/X-C14.log     366 bytes
+  bench/2026-10-08c/X-C14.timing  3.163438 s, stop: --until matched at offset 354
+  bench/2026-10-08c/X-C14.meta.json
+cap_rc=0
+10.1.1.1 dev enxfc19286184c9 lladdr 02:52:4c:58:46:57 REACHABLE 
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+        234550    4862      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+       3622286    5499      0       0       0       0 
+
+8 packets captured
+8 packets received by filter
+0 packets dropped by kernel

@@ -1,0 +1,17 @@
+bootslot 1.1: bench/2026-10-08c/W01.log (rlxboot build 127a71cf, banner line 17)
+check from       pass the loader's word at 0x8040DD3C read 05010000, want 05010000
+check key        pass prod 4a6eda72...
+check order      pass READ/VERDICT sequence READ A VERDICT A READ B VERDICT B
+check read A     pass flash=00070000 buf=81000000 (layout wants 00070000 81000000)
+check copy A     pass n=1110176 with 16 dot(s), a finished copy prints 16
+check stages A   pass an ok verdict needs HDR/SIG/DIGEST ok and one `VER cur=5 ... ok` (got ['RLXBOOT-HDR ok', 'RLXBOOT-SIG ok', 'RLXBOOT-DIGEST ok', 'RLXBOOT-VER cur=5 ctr=0 ok'])
+check verdict A  pass want ok:5, got ok 5
+check read B     pass flash=00190000 buf=81200000 (layout wants 00190000 81200000)
+check copy B     pass n=1109152 with 16 dot(s), a finished copy prints 16
+check stages B   pass an ok verdict needs HDR/SIG/DIGEST ok and one `VER cur=4 ... ok` (got ['RLXBOOT-HDR ok', 'RLXBOOT-SIG ok', 'RLXBOOT-DIGEST ok', 'RLXBOOT-VER cur=4 ctr=0 ok'])
+check verdict B  pass want ok:4, got ok 4
+check D4         pass rlxboot chose A, its own verdicts imply A
+check boot       pass load=80500000 entry=80500000
+check id         pass board printed 9BB2BEC7, the build manifest says 9bb2bec7
+check slot       pass want A, got A
+RESULT: PASS
