@@ -4489,20 +4489,65 @@ row, which now leaves the binary's size to `docs/sbom.md`. The header's item 2 (
 
 * That the take-over brings `rlx0` up on a flash boot: nothing of 1.6 has run on the device.
   `R6c-4`'s seating is the test, and 2026-10-08's flash boots without the verb (`X-V06q`,
-  `X-V08q`, seating A) are its control.
+  `X-V08q`, seating A) are its control. 🔄 § 21.6: it does, warm and cold.
 * That the RAM path still pings with netif slot 0 cleared: the loader's group minus that entry has
   not been measured on any path, and `R6c-4` tests it before any flash write. `NET-169` makes it
   plausible — on that path `rlx0`'s own address is in no table, so its unicast reaches the CPU by
   `FFCR`'s unknown-unicast trap and not through the netif entry — but that mechanism is itself 推
   on one source. The ruling's fallback, netif slot 0 with `rlx0`'s own address, is not written.
+  🔄 § 21.6: the RAM path pings both ways with it cleared, through that trap.
 * How `SWTCR0` reads while `STOP_TLU` is set, whether the engine copies all eight `TCR` words or
   three and five, how many polls a command takes, and what `SWTASR` reports after a force: the
-  harness scripts each, and the silicon has answered none.
+  harness scripts each, and the silicon has answered none. 🔄 § 21.6: it has answered all but
+  the `TCR` count.
 * What the switch does with a frame that arrives while `STOP_TLU` holds the lookups: on the RAM
   path the loader has already set `TRXRDY` when `vlan` runs.
 * The state after a watchdog reset on the flash path (seating A's boot was cold), and any value
   outside the group: `MACCR` (the one configuration word where F differs from both working
-  states), `QNUMCR`'s CPU field, the PHY patch, `LEDCREG`.
+  states), `QNUMCR`'s CPU field, the PHY patch, `LEDCREG`. 🔄 § 21.6: the warm state equals
+  the cold one.
 * That the harness catches an error it shares with the driver: its engine follows the same two
   vendor readings the driver does.
 * Anything under load, with a second port, or on the vendor's firmware.
+
+### 21.6 Seating R6c-4: the take-over on the device (`bench/2026-10-08c`, `NET-173`)
+
+量 2026-10-08, the 129th segment: `bench/2026-10-08c/R6C-4-CARD.md` and its `CORRECTIONS-R6C-4.md`.
+One flash write (`I10`, T into slot A under the owner's dated yes) and two power actions (the cold
+boot's off and on). The release image `9bb2bec7` ran on all three paths; the armed image `8dce09c5`
+only staged and installed T.
+
+| | RAM path, through the prompt (`R03`) | warm flash boot (`W03`) | cold flash boot (`C03`) |
+|---|---|---|---|
+| `vlan` | rc 0, `vw 0000 nw 01 rw 00` | rc 0, `vw 0100 nw 00 rw 1F` | as warm |
+| `n_writes` (predicted) | 18 (18) | 23 (23) | 23 (23) |
+| `n_reads` at the first read | 128 = 126 + `sta` 1 + `spin` 1 | 133 = 131 + 1 + 1 | 133 |
+| `tlu`, `swtasr`, `final`, `ld`, `to`, `rb` | `000C0000`, 0, 0, 784, 0, 0 | as RAM | as RAM |
+| `SWTAA` live / latch | `BB040000` / `BB060100` | `BB060100` / 0 | as warm |
+| tables after | VLAN slot 8 `00807E3F`, the rest and netif empty | as RAM | as RAM |
+| `QNUMCR` | `00001249` | `00041249` | `00041249` |
+| host → board | 4 of 4 | 4 of 4 | 4 of 4 |
+| board → host | 225 of 225 (unbounded, `CORRECTIONS` C1) | 4 of 4 | 4 of 4 |
+
+* Every field of the `vlan` line read as `R6c-4`'s card predicted from the code, on all three
+  paths; `ld 784` says every double read agreed at once, and `tlu 000C0000` that bit 18 read back
+  set after (2), which the code records and does not require.
+* The warm flash boot's latches equal the cold boot's and seating A's: a watchdog reset clears the
+  ASIC tables with the registers (`vw 0100`). The review's third alternative -- registers reset,
+  tables kept, `n_writes` 11 -- did not happen.
+* With netif slot 0 cleared, the RAM path still receives: across the host's ping, port 3's in
+  columns and the CPU port's out columns moved together column for column and the discard
+  columns stayed 0 (`R09` → `R11`, and `X-R15` after the board's 225). That is `FFCR`'s
+  unknown-unicast trap carrying `rlx0`'s unicast, `NET-169`'s mechanism, measured for the first
+  time. Ruling O1's fallback, netif slot 0 with `rlx0`'s address, is not needed.
+* Booted from flash, rlxfw receives (`NET-171` reversed for 1.6): `rlx0`'s RX went 0 → 6 → 10 on
+  each flash boot, and port 3's discards stayed 0 where seating A counted every frame.
+* The install: 4,625 operations (288 sector erases, 4,337 page programs), slot A's 1,179,648 bytes
+  read back with no difference; `rlxboot` then chose A (`ok:5`) over B (`ok:4`) on both flash
+  boots, and `bootslot judge` passed both.
+
+**What `R6c-4` does not establish.** How many `TCR` words the engine copies (equal read-backs say
+only that the slot reads back as stored); what happens to a frame that arrives while `STOP_TLU`
+holds the lookups on the RAM path; which part of the written group is necessary; `MACCR`'s and
+`QNUMCR`'s part (they differ between the paths, and both paths work); more than one warm and one
+cold boot; load, a second port, the vendor's firmware.

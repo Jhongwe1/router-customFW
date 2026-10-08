@@ -211,7 +211,7 @@ agree: name the tool that could be lying and the second source that settles it.
   on 0–50 ms, or ~150 ms after an `--esc-after` match; gate on no byte past it.
 - `cardcheck` refuses any command not in the image's measured command table
   (`config/image-commands.tsv`): there is no `dd` and no `md5sum`. This image's
-  `ping` ignores `-c`.
+  `ping` runs until interrupted unless given `-c 4` (`NET-26`).
 - Captures are CRLF: strip `\r` before comparing a parsed field. Gate on a `/proc`
   field, never a console mark — marks interleave with ash's echo (`FW-47`), and a
   refused write is echoed minus its last character (`FW-41`). Route a refused

@@ -421,7 +421,7 @@ The echoed command line is intact in every capture, so the shell received what
 was typed; the spaced and attached option forms behave the same; and invoking
 `busybox ping` directly rather than through the symlink behaves the same.
 
-**量: this image's `ping` ignores `-c` and always sends exactly four packets.**
+**量: this image's `ping` ignores `-c` and always sends exactly four packets.** 🔄 2026-10-08: true of the vendor busybox it was measured on, not of rlxfw's own build (`prebuilt:busybox/busybox`, 447,684 bytes in `9bb2bec7`'s build manifest): without `-c` it pings until interrupted (量 `bench/2026-10-08c` `R14`, 225 packets until `X-R14i`'s Ctrl-C), and `-c 4` sends four (`X-W14`, `X-C14`); other counts are unmeasured (`SPEC.md` `NET-26`).
 
 ⚠️ **What it does and does not do to the record.** It invalidates nothing —
 four replies is four replies, and `R3`'s D5 got what it needed. What it removes
