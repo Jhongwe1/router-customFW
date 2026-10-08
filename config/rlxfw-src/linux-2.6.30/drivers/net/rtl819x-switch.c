@@ -90,11 +90,11 @@
  * 2. It writes NOTHING at boot.  Every write is behind a verb AND behind an
  *    explicit runtime unlock, so a boot of this image is read-only by
  *    construction and `n_writes` reads 0 on a capture that proves it.
- * 3. It does not write the VLAN TABLE.  The table is reached indirectly
- *    through the TACI block (`SWTACR`/`SWTAA`/`TCR7`), which is a protocol
- *    and not a register write.  推 that `En1QtagVIDignore` makes the table
- *    irrelevant for a dumb switch; that 推 is untested and the table is left
- *    alone until it is.
+ * 3. It writes a table in one verb only: 1.6's `vlan` (R6c, at the end of
+ *    this file) writes the VLAN and netif tables through the TACI block
+ *    (`SWTACR`/`SWTAA`/`TCR0`-`TCR7`), a protocol and not a register write.
+ *    `dumb` leaves every table alone: 推 that `En1QtagVIDignore` makes the
+ *    table irrelevant for a dumb switch, and that 推 is still untested.
  * 4. It says nothing about whether the silicon agrees with the header.  This
  *    project has one measured counter-example already: the header names
  *    `PCRP5` at `0xBB804118` and the die reads `00000000` where every
@@ -115,7 +115,7 @@
 #include <asm/addrspace.h>
 #include <asm/uaccess.h>
 
-#define RTL819X_SW_VERSION	"rtl819x-switch 1.5"
+#define RTL819X_SW_VERSION	"rtl819x-switch 1.6"
 
 /* 0xBB800000 through KSEG1.  讀 `rtl865xc_asicregs.h:147,171`:
  * `REAL_SWCORE_BASE 0xBB800000`, and `SWCORE_BASE` takes it in every build
@@ -1764,24 +1764,24 @@ static int rtl819x_sw_v14_lines(char *page)
  * it), so 1.4's worst case of 2,483 of 4,096 becomes 2,591, and the
  * table's budget (3,600) still never ends the page.
  *
- * WHAT A STANDARD BOOT NOW DOES (推, from the code; arm I reads it).  On
- * SWCORE=n /init's `init` reads PCRP0-PCRP4, stores five words and reads
- * them back: `n_writes` after the boot goes from 1 (`start`'s store; 量
- * `n_writes 1` on standard-/init boots, e.g. bench/2026-09-26b/X-SW1.log)
- * to 6, `n_reads` gains 10, and the boot capture gains one mark line,
- * RLXFW-SW-INIT=00001F1F -- 24 bytes in tools/bootbytes.py's model
- * (17 + 7), if it does not interleave with /init's own output as SW-UNLOCK's
- * does.  On SWCORE=y: no store, 5 reads, RLXFW-SW-INIT=0000001F.  The quiet
- * /init types none of this.
+ * WHAT `init` ADDS TO A STANDARD BOOT.  On SWCORE=n /init's `init` reads
+ * PCRP0-PCRP4, stores five words and reads them back, so `n_writes` after
+ * the boot went from 1 (`start`'s store; 量 bench/2026-09-26b/X-SW1.log)
+ * to 6 (量 bench/2026-10-04/PER-SW.log, a RAM boot) and `n_reads` gained
+ * 10.  Since R6c /init types 1.6's `vlan` after `init`, which adds its own
+ * stores and reads (its block counts them).  The boot gains one mark line,
+ * RLXFW-SW-INIT=00001F1F, 24 bytes in tools/bootbytes.py's model (17 + 7),
+ * if it does not interleave with /init's own output as SW-UNLOCK's does.
+ * On SWCORE=y: no store, 5 reads, RLXFW-SW-INIT=0000001F.
  *
- * WHAT IT DOES NOT DO.  Write any other switch register or any table: the
- * VLAN group, EEE and QNUMCR's CPU field stay as they were before /init --
- * the loader's on SWCORE=n, the vendor's probe's on SWCORE=y
- * (notes/switch-driver.md section 16.8 lists them).  Undo itself (nothing
- * here clears the bit; `J` does).  Run at subsys_initcall.  The guard does
- * not stop the NIC, does not wait for it, and covers neither `start`,
- * `dumb` nor `restore`.  Nor does any of this say that five bits set bring
- * the LAN up on a boot arm II did not run: that is arm I's to read.
+ * WHAT IT DOES NOT DO.  Write any other switch register or any table: `init`
+ * leaves the VLAN group, EEE and QNUMCR's CPU field as it found them (the
+ * list is notes/switch-driver.md section 16.8's), and the VLAN group is
+ * 1.6's `vlan`'s to write.  Undo itself (nothing here clears the bit; `J`
+ * does).  Run at subsys_initcall.  The guard does not stop the NIC, does not
+ * wait for it, and covers neither `start`, `dumb` nor `restore`.  Nor does
+ * any of this say that five bits set bring the LAN up on a boot arm II did
+ * not run: that is arm I's to read.  The quiet /init types none of this.
  */
 #define RTL819X_CPUICR_PHYS		0x18010000	/* B :491-:492 */
 #define RTL819X_CPUICR_TXCMD		(1u << 31)	/* B :527 */
@@ -1842,24 +1842,576 @@ static int rtl819x_sw_v15_init(void)
 	rlxfw_markx("SW-INIT", (stored << 8) | on);	/* SW-PHYIF's packing */
 	return rc;
 }
-
+static int rtl819x_sw_v16_write(const char *buf, unsigned long count); /* 1.6 */
 /* From 1.4's handler, for every write none of 1.4's forms took. */
 static int rtl819x_sw_v15_write(const char *buf, unsigned long count)
 {
 	int rc;
 
 	if (strcmp(buf, "init"))
-		return -EINVAL;
+		return rtl819x_sw_v16_write(buf, count);	/* 1.6 */
 	rc = rtl819x_sw_v15_init();
 	return rc ? rc : (int)count;
 }
-
+static int rtl819x_sw_v16_lines(char *page, int len);	/* 1.6, below */
 static int rtl819x_sw_v15_lines(char *page)
 {
-	return sprintf(page, "init calls %lu ok %lu refused %lu rc %d "
-		       "stored %02X on %02X reset_busy %lu\n",
+	return rtl819x_sw_v16_lines(page, sprintf(page, "init calls %lu ok %lu "
+		       "refused %lu rc %d stored %02X on %02X reset_busy %lu\n",
 		       rtl819x_sw_init_n, rtl819x_sw_init_n_ok,
 		       rtl819x_sw_init_n_refused, rtl819x_sw_init_rc,
-		       (unsigned int)rtl819x_sw_init_st,
-		       (unsigned int)rtl819x_sw_init_on, rtl819x_sw_rst_n_busy);
+		       (unsigned)rtl819x_sw_init_st,
+		       (unsigned)rtl819x_sw_init_on, rtl819x_sw_rst_n_busy));
+}
+
+/* ========================================================================
+ * 1.6 (R6c): `vlan`, THE VLAN GROUP WRITTEN FROM THIS DRIVER -- THE
+ * LOADER'S ONE-VLAN LAYOUT, SO THAT A FLASH BOOT HAS WHAT A RAM BOOT HAS.
+ *
+ * Appended, as 1.2 to 1.5 were.  Above this block the version string, 1.5's
+ * two ends -- its handler's `return -EINVAL` and its page line's `return` --
+ * and the comments this block made false (the header's item 3 and 1.5's
+ * last two paragraphs) changed in place, and two lines that were blank hold
+ * two prototypes, so no line above moves (FW-110).
+ *
+ * WHY.  Booted from flash, rlxfw receives no Ethernet frame (SPEC.md
+ * NET-171): the stock loader configures the switch only on its prompt path,
+ * and a SWCORE=n image left the VLAN group to it.  量 bench/2026-10-08b, a
+ * flash boot read and not written: the VLAN, netif and L2 tables empty
+ * (A05-A07); PVCR0-3 00010001, PVID 1 on every port, under VCR0's ingress
+ * filtering (000001FF) with no VLAN 1 entry (A02); port 3's
+ * dot1dTpPortInDiscards counting every frame from the host, while the frames
+ * the CPU sends reach the wire.  On every RAM boot through the prompt the
+ * group is the loader's: VLAN slot 8 00807E3F, netif slot 0 valid with VID
+ * 8, PVCR0-3 00080008, FFCR 3 (bench/2026-09-28/M2-VV.log and M2-VN.log,
+ * bench/2026-10-04/PER-SW.log).
+ *
+ * THE VALUES are the owner's ruling O1 of 2026-10-08, which supersedes 8d's
+ * ruling 3 (the group inherited as a unit, no take-over).  Three sources for
+ * what is stored: 讀 the loader's own stores (stage2.bin: PVCR0-3 <- 00080008
+ * at 0x80403920-0x80403944; VLAN 8 with member = untag = 63 at
+ * 0x804029E4-0x804029F4; FFCR <- 3 at 0x804039F0-0x804039FC); 讀 Bb, the
+ * vendor bootcode (swCore.c "Set PVID of all ports to 8"; ethInt_865x.c VLAN
+ * 8 with ALL_PORT_MASK as member and untag; FFCR = EN_UNUNICAST_TOCPU |
+ * EN_UNMCAST_TOCPU); 量 every RAM boot above.  The draft datasheet has no
+ * VLAN, ALE or table section.
+ *   VLAN slot 8           00807E3F and seven zero words: VID 8, fid 0, member
+ *                         = untag = ports 0-5 (B rtl865x_asicCom.h:230-242,
+ *                         the 8196E arm)
+ *   the other 15 VLAN     eight zero words each (for netif the RAM-path
+ *   slots, netif 0-7      regression decides; its fallback is netif slot 0
+ *                         with rlx0's own address)
+ *   PVCR0-PVCR3           00080008: PVID 8, priority 0, on both ports of
+ *                         each word (B rtl865xc_asicregs.h:2392-2428)
+ *   FFCR                  00000003: EnUnkUC2CPU | EnUnkMC2CPU (B :1666-1667)
+ * VERIFIED, NEVER STORED: PVCR4 00000001, VCR0 000001FF, PBVCR0 00000000 and
+ * PLITIMR 07FAC688 -- equal on both measured paths (A02 and A08 above;
+ * PER-SW, and bench/2026-09-28/M2-VP3.log for PLITIMR) and stored by neither
+ * the loader nor the bootcode, so their one source is 量.  A mismatch refuses
+ * the verb before any table is read: the group is determined as a unit or
+ * not touched.  Never touched: MACCR, MEMCR, the PHY patch, QNUMCR, LEDCREG,
+ * the L2 table.
+ *
+ * THE ORDER.  The lock; the four verified words, all four read before any is
+ * judged; every target read before any store -- VLAN slots 0-15 and netif
+ * slots 0-7 through the table window, PVCR0-3 and FFCR through rtl819x_sw_rd;
+ * then a store only where what was read differs from the target: VLAN slots
+ * ascending, netif slots ascending, PVCR0..3, FFCR last.  The first failure
+ * ends the verb and the page says where.  Then THE RE-READ, below.  On the
+ * RAM path that is one table write (netif slot 0), the one variable the
+ * regression tests; on the flash path VLAN slot 8 and five registers.  A
+ * second `vlan` stores nothing.
+ *
+ * ONE TABLE WRITE, for a slot whose eight words differ, IRQs off from (1) to
+ * (10) (UP, PREEMPT_NONE: 1.2's #error).  讀 x2: B, the staged tree's
+ * 96E/rtl865x_asicBasic.S (_rtl8651_forceAddAsicEntry :961-1024, its forward
+ * routine :654-697), and Bb's rtl8196x/swTable.c (swTable_forceAddEntry
+ * :76-98, tableAccessForeword :137-156).  Neither bounds a wait; every bound
+ * here is rlxfw's, RTL819X_VLAN_BOUND polls with udelay(1) between them.
+ *   (1)  SWTACR (0xBB804D00) bit 0 polled until clear; still set at the
+ *        bound: -EBUSY, nothing stored for this slot.  rlxfw's step, so that
+ *        a busy engine refuses before STOP_TLU is touched.
+ *   (2)  SWTCR0 (0xBB804418) |= STOP_TLU (bit 18, B :1572), read back, and
+ *        the word kept (`tlu`).  No reading of SWTCR0 while STOP_TLU is set
+ *        exists, so whether bit 18 reads back set is recorded and never
+ *        required: a refusal on it would refuse every slot on a die where it
+ *        does not read back.
+ *   (3)  STOP_TLU_STA (bit 19, "(RO)", B :1571) polled until set.  It reads
+ *        1 in every state measured on this die, so the polls are counted
+ *        (`sta`), not trusted; still clear at the bound: -ETIMEDOUT.
+ *   (4)  SWTACR bit 0 polled again, where both vendor readings poll it (B
+ *        :654-661, Bb :142): -EBUSY at the bound.
+ *   (5)  TCR7 down to TCR0 (0xBB804D3C-0xBB804D20) <- the entry, all eight
+ *        words, the unused ones zero: Bb stores all eight for every table,
+ *        TCR7 first (:145-152), as the loader does (A 0x804049E0-
+ *        0x80404A5C); B stores the type's size, 3 words for VLAN and 5 for
+ *        netif, TCR0 first.
+ *   (6)  SWTAA (0xBB804D08) <- 0xBB000000 + (type << 16) + (slot << 5), type
+ *        6 VLAN or 4 netif (B :37-39, :151; the enum in rtl865x_asicBasic.h).
+ *   (7)  SWTACR <- 9, ACTION_START | CMD_FORCE (B :211, :215): the vendor's
+ *        VLAN and netif setters and its table clear all force-add
+ *        (rtl865x_asicCom.c:121, :553, :1124); Bb's creates use ADD.
+ *   (8)  SWTACR bit 0 polled until clear (`spin`): -ETIMEDOUT at the bound.
+ *   (9)  On EVERY exit after (2)'s store: SWTCR0 &= ~STOP_TLU, read back,
+ *        and bit 18 must read clear -- a STOP_TLU left set stops every
+ *        lookup -- or -EIO, whatever ended the steps before it.
+ *   (10) SWTASR (0xBB804D04) read once (7) was stored, OR-ed into `swtasr`:
+ *        Bb asserts on bit 0 after a force (:92-96) and B does not read it
+ *        after one, so it is recorded and not a refusal.
+ *   (11) With IRQs back on, the slot's eight words read back through the
+ *        window (THE TABLE READ) and compared with the eight stored: -EIO
+ *        on any difference.
+ * IRQs stay off for at most four bounds of polls, (1), (3), (4) and (8):
+ * about 40 ms nominal, reached only by an engine that does not answer
+ * (tools/mdiocheck.py K51 measures one bound in a section).  On the flash
+ * path the writes come before `start` sets TRXRDY (S0' SSIR 00000000, 量
+ * bench/2026-10-08/X-V08r-sw.log); on the RAM path the loader left it set
+ * (PER-SW), so frames may arrive while STOP_TLU holds the lookups, and what
+ * the switch does with them then has not been measured.
+ * A register (PVCR0-3, FFCR): one store, read back, -EIO unless it reads the
+ * target.  Every 0xBB80xxxx store goes through rtl819x_sw_wr, the one guarded
+ * write path (`n_writes`); every 0xBB80xxxx load through rtl819x_sw_rd
+ * (`n_reads`); every table-window load through rtl819x_vlan_ld (`ld`).
+ *
+ * THE TABLE READ is rtl819x-view's (its THE TABLE READ): SWTACR polled until
+ * idle (-EBUSY at the bound, nothing loaded), then up to ten times the slot's
+ * eight words twice, compared, equal ending it.  Where the vendor's reader
+ * keeps the second buffer after ten unequal tries, this returns -EIO: a slot
+ * whose content is not known is neither written over nor passed.
+ *
+ * THE RE-READ.  After the last store, or at once when none was needed, every
+ * VLAN and netif slot, PVCR0-3, FFCR and the four verified words are read
+ * again and compared with their targets as a unit: -EIO if any differs, with
+ * `final` the number that do and `at` the first.  A slot's own read-back
+ * reads the address it wrote; this sees a store that also landed in another
+ * slot, and a register that moved after its own read-back.
+ *
+ * THE VERB, on /proc/rtl819x-switch.  1.5 hands this block every write none
+ * of its forms took; anything else is -EINVAL, as before.
+ *   vlan     the switch's own unlock (`unlock i-mean-it`), tested before any
+ *            access: locked, -EPERM, counted in `refused`.  On SWCORE=y the
+ *            vendor's driver owns the tables: rc 0, nothing read or stored,
+ *            and the line says `vendor`.  Otherwise THE ORDER above.
+ *
+ * THE PAGE.  One line, after 1.5's and so before the register table, whose
+ * last line stays the page's last line:
+ *   vlan calls C ok K refused R rc D at A step S vw VVVV nw NN rw RR vm M
+ *     vr PVCR4 VCR0 PBVCR0 PLITIMR tlu T sta N spin N swtasr X final F
+ *     ld N to N rb N
+ * C, K and R: every `vlan`, those that returned 0, those the lock refused.
+ * The fields from rc to final are the last call's, cleared as it starts: D
+ * its rc (1: never called); A the item it stopped at, -1 for none -- 0-15
+ * VLAN slots, 16-23 netif slots 0-7, 24-27 PVCR0-3, 28 FFCR, 29-32 PVCR4,
+ * VCR0, PBVCR0, PLITIMR; S the step: 0 the item's first read, 1-11 a table
+ * write's steps above, 12 a register's store and read-back, 13 THE RE-READ;
+ * vw, nw and rw the VLAN slots, netif slots and registers (bit 4 FFCR) it
+ * stored and read back; vm the verified words that mismatched, as bits 0-3
+ * in that order, and vr the four words read; tlu SWTCR0 as (2) of its last
+ * table write read it back; sta and spin the polls of (3) and (8); swtasr
+ * the OR of (10); final -1 unless THE RE-READ finished, else the items that
+ * differed.  ld counts every table-window load, to the calls that ended
+ * -ETIMEDOUT and rb those that ended -EIO.  Cached values: a `cat` reads no
+ * register for it.  Walked from the format, every field at its widest (a
+ * 32-bit %lu 10 digits, %d 11, a u8 3 digits or 2 hex, a u16 4 hex): 279
+ * bytes (tools/mdiocheck.py K57 measures it), so 1.5's worst case of 2,591
+ * of 4,096 becomes 2,870, and the table's budget (3,600) still never ends
+ * the page.  That chain counts 1.0's `unlocked`, `slotN_full` and flag
+ * digits and 1.2's `lde0` at their 0/1 and two-digit widths; at their types'
+ * widest they add 172, and the page is 3,042.  The SWCORE=y line is shorter.
+ *
+ * WHAT A STANDARD BOOT DOES (推, from the code; the bench reads it).  /init
+ * types `vlan` between `init` and `start`.  On the flash path: one table
+ * write (12 stores) and five register stores, so `n_writes` after the boot
+ * goes from 6 to 23; on the RAM path one table write, 6 to 18.  `n_reads`
+ * gains 80 + k on the flash path and 75 + k on the RAM path, k the polls of
+ * (8), and `ld` 784, when every double read agrees at once.  No mark, so the
+ * boot capture does not change: a line printed here would land inside
+ * /init's own output, where tools/bootbytes.py's compiled-PID-1 row counts
+ * the kernel's marks as non-mark bytes, and only a capture could re-admit a
+ * new one.  On SWCORE=y nothing is read; the quiet /init types none of this.
+ *
+ * WHAT IT DOES NOT DO.  Touch the L2 table, any other table or any register
+ * outside the five; undo itself (no `vlan reset`: the flash boots without
+ * the verb are the control); run at subsys_initcall.  Nor does any of this
+ * say that a flash boot now receives frames, or that a group with every
+ * netif slot empty forwards to the CPU port: on the flash path this builds
+ * the RAM path's group minus netif slot 0, a state no path has been measured
+ * to ping in, and that is the bench's to read.
+ */
+#define RTL819X_VLAN_SWTCR0	0x4418		/* B :1486 */
+#define RTL819X_VLAN_STOP_TLU	(1u << 18)	/* B :1572 */
+#define RTL819X_VLAN_TLU_STA	(1u << 19)	/* B :1571, (RO) */
+#define RTL819X_VLAN_SWTACR	0x4D00		/* B :196 */
+#define RTL819X_VLAN_SWTASR	0x4D04		/* B :197 */
+#define RTL819X_VLAN_SWTAA	0x4D08		/* B :198 */
+#define RTL819X_VLAN_TCR0	0x4D20		/* B :199; TCRn + 4n, :206 */
+#define RTL819X_VLAN_ACTION	(1u << 0)	/* ACTION_START, B :211 */
+#define RTL819X_VLAN_FORCE	(1u << 3)	/* CMD_FORCE, B :215 */
+#define RTL819X_VLAN_TBL	0xBB000000u	/* REAL_SWTBL_BASE, B :151 */
+#define RTL819X_VLAN_T_NETIF	4u		/* TYPE_NETINTERFACE_TABLE */
+#define RTL819X_VLAN_T_VLAN	6u		/* TYPE_VLAN_TABLE */
+#define RTL819X_VLAN_NV		16	/* slots, rtl865x_asicCom.h:13-14 */
+#define RTL819X_VLAN_NN		8	/* netif slots, rtl865x_asicCom.h:19 */
+#define RTL819X_VLAN_NSLOT	(RTL819X_VLAN_NV + RTL819X_VLAN_NN)
+#define RTL819X_VLAN_NW		8	/* words a slot: the 32-byte stride */
+#define RTL819X_VLAN_NREG	5	/* PVCR0-3, FFCR */
+#define RTL819X_VLAN_NVER	4	/* PVCR4, VCR0, PBVCR0, PLITIMR */
+#define RTL819X_VLAN_VER0	(RTL819X_VLAN_NSLOT + RTL819X_VLAN_NREG)
+#define RTL819X_VLAN_BOUND	10000u	/* polls, udelay(1) apart */
+#define RTL819X_VLAN_TRIES	10	/* double reads, view's li $16,10 */
+#define RTL819X_VLAN_SLOT	8	/* the one VLAN entry, VID 8 */
+#define RTL819X_VLAN_ENTRY	0x00807E3Fu
+
+static unsigned long rtl819x_vlan_n, rtl819x_vlan_n_ok, rtl819x_vlan_n_refused;
+static int rtl819x_vlan_rc = RTL819X_PHYIF_UNTRIED;	/* 1: never called */
+
+#ifndef CONFIG_RTL_819X_SWCORE
+/* PVCR0-PVCR3 (B :2301-:2304) and FFCR (B :1490), and their targets. */
+static const u16 rtl819x_vlan_roff[RTL819X_VLAN_NREG] = {
+	0x4A08, 0x4A0C, 0x4A10, 0x4A14, 0x4428
+};
+static const u32 rtl819x_vlan_rval[RTL819X_VLAN_NREG] = {
+	0x00080008u, 0x00080008u, 0x00080008u, 0x00080008u, 0x00000003u
+};
+/* PVCR4 (B :2305), VCR0 (:2299), PBVCR0 (:2306) and PLITIMR (:1488), and the
+ * words both measured paths read. */
+static const u16 rtl819x_vlan_voff[RTL819X_VLAN_NVER] = {
+	0x4A18, 0x4A00, 0x4A1C, 0x4420
+};
+static const u32 rtl819x_vlan_vval[RTL819X_VLAN_NVER] = {
+	0x00000001u, 0x000001FFu, 0x00000000u, 0x07FAC688u
+};
+
+static unsigned long rtl819x_vlan_n_ld, rtl819x_vlan_n_to, rtl819x_vlan_n_rb;
+/* The last call's, cleared as it starts. */
+static int rtl819x_vlan_at = -1, rtl819x_vlan_final = -1;
+static u8 rtl819x_vlan_step, rtl819x_vlan_nw, rtl819x_vlan_rw, rtl819x_vlan_vm;
+static u16 rtl819x_vlan_vw;
+static u32 rtl819x_vlan_vr[RTL819X_VLAN_NVER];
+static u32 rtl819x_vlan_tlu, rtl819x_vlan_asr;
+static unsigned long rtl819x_vlan_sta, rtl819x_vlan_spin;
+/* What the call read of every slot before its first store. */
+static u32 rtl819x_vlan_cur[RTL819X_VLAN_NSLOT][RTL819X_VLAN_NW];
+
+/* THE ONLY TABLE-WINDOW LOAD IN THIS FILE, so `ld` counts loads and not
+ * callers who remembered to (rtl819x-view.c's pattern).  The window is never
+ * stored to: a table changes only through the TACI block. */
+static inline u32 rtl819x_vlan_ld(u32 a)
+{
+	rtl819x_vlan_n_ld++;
+	return __raw_readl((void __iomem *)(unsigned long)a);
+}
+
+/* Item i's slot address: VLAN slot i below 16, netif slot i - 16 above. */
+static u32 rtl819x_vlan_addr(unsigned int i)
+{
+	if (i < RTL819X_VLAN_NV)
+		return RTL819X_VLAN_TBL + (RTL819X_VLAN_T_VLAN << 16) +
+		       (i << 5);
+	return RTL819X_VLAN_TBL + (RTL819X_VLAN_T_NETIF << 16) +
+	       ((i - RTL819X_VLAN_NV) << 5);
+}
+
+/* Item i's target: eight zero words, VLAN slot 8's first word apart. */
+static void rtl819x_vlan_want(unsigned int i, u32 *w)
+{
+	unsigned int k;
+
+	for (k = 0; k < RTL819X_VLAN_NW; k++)
+		w[k] = 0;
+	if (i == RTL819X_VLAN_SLOT)
+		w[0] = RTL819X_VLAN_ENTRY;
+}
+
+/* SWTACR bit 0 polled until clear: 0, or -EBUSY at the bound. */
+static int rtl819x_vlan_idle(void)
+{
+	unsigned int n;
+
+	for (n = 0; rtl819x_sw_rd(RTL819X_VLAN_SWTACR) & RTL819X_VLAN_ACTION;
+	     n++) {
+		if (n >= RTL819X_VLAN_BOUND)
+			return -EBUSY;
+		udelay(1);
+	}
+	return 0;
+}
+
+/* THE TABLE READ of item i into w: 0, -EBUSY, or -EIO after ten unequal
+ * double reads. */
+static int rtl819x_vlan_read(unsigned int i, u32 *w)
+{
+	u32 a = rtl819x_vlan_addr(i), b[RTL819X_VLAN_NW];
+	unsigned int k, tries;
+
+	if (rtl819x_vlan_idle())
+		return -EBUSY;
+	for (tries = 1; ; tries++) {
+		for (k = 0; k < RTL819X_VLAN_NW; k++)
+			b[k] = rtl819x_vlan_ld(a + 4u * k);
+		for (k = 0; k < RTL819X_VLAN_NW; k++)
+			w[k] = rtl819x_vlan_ld(a + 4u * k);
+		if (!memcmp(b, w, sizeof(b)))
+			return 0;
+		if (tries >= RTL819X_VLAN_TRIES)
+			return -EIO;
+	}
+}
+
+/* ONE TABLE WRITE, (1)-(11) above, of w to item i.  `step` is left at the
+ * step that ended it. */
+static int rtl819x_vlan_write(unsigned int i, const u32 *w)
+{
+	unsigned long flags;
+	u32 v, rb[RTL819X_VLAN_NW];
+	unsigned int k, n;
+	int rc, issued = 0;
+
+	local_irq_save(flags);
+	rtl819x_vlan_step = 1;
+	rc = rtl819x_vlan_idle();
+	if (rc)
+		goto out;			/* nothing stored */
+	rtl819x_vlan_step = 2;
+	v = rtl819x_sw_rd(RTL819X_VLAN_SWTCR0);
+	rc = rtl819x_sw_wr(RTL819X_VLAN_SWTCR0, v | RTL819X_VLAN_STOP_TLU);
+	if (rc)
+		goto out;		/* not stored: nothing to undo */
+	rtl819x_vlan_tlu = rtl819x_sw_rd(RTL819X_VLAN_SWTCR0);	/* recorded */
+	rtl819x_vlan_step = 3;
+	for (n = 0; ; n++) {
+		rtl819x_vlan_sta++;
+		if (rtl819x_sw_rd(RTL819X_VLAN_SWTCR0) & RTL819X_VLAN_TLU_STA)
+			break;
+		if (n >= RTL819X_VLAN_BOUND) {
+			rc = -ETIMEDOUT;
+			goto undo;
+		}
+		udelay(1);
+	}
+	rtl819x_vlan_step = 4;
+	rc = rtl819x_vlan_idle();
+	if (rc)
+		goto undo;
+	rtl819x_vlan_step = 5;
+	for (k = RTL819X_VLAN_NW; k-- > 0; ) {
+		rc = rtl819x_sw_wr(RTL819X_VLAN_TCR0 + 4 * k, w[k]);
+		if (rc)
+			goto undo;
+	}
+	rtl819x_vlan_step = 6;
+	rc = rtl819x_sw_wr(RTL819X_VLAN_SWTAA, rtl819x_vlan_addr(i));
+	if (rc)
+		goto undo;
+	rtl819x_vlan_step = 7;
+	rc = rtl819x_sw_wr(RTL819X_VLAN_SWTACR,
+			   RTL819X_VLAN_ACTION | RTL819X_VLAN_FORCE);
+	if (rc)
+		goto undo;
+	issued = 1;
+	rtl819x_vlan_step = 8;
+	for (n = 0; ; n++) {
+		rtl819x_vlan_spin++;
+		if (!(rtl819x_sw_rd(RTL819X_VLAN_SWTACR) & RTL819X_VLAN_ACTION))
+			break;
+		if (n >= RTL819X_VLAN_BOUND) {
+			rc = -ETIMEDOUT;
+			break;
+		}
+		udelay(1);
+	}
+undo:
+	v = rtl819x_sw_rd(RTL819X_VLAN_SWTCR0);
+	if (rtl819x_sw_wr(RTL819X_VLAN_SWTCR0, v & ~RTL819X_VLAN_STOP_TLU) ||
+	    (rtl819x_sw_rd(RTL819X_VLAN_SWTCR0) & RTL819X_VLAN_STOP_TLU)) {
+		rtl819x_vlan_step = 9;
+		rc = -EIO;
+	}
+	if (issued)
+		rtl819x_vlan_asr |= rtl819x_sw_rd(RTL819X_VLAN_SWTASR);
+out:
+	local_irq_restore(flags);
+	if (rc)
+		return rc;
+	rtl819x_vlan_step = 11;
+	rc = rtl819x_vlan_read(i, rb);
+	if (!rc && memcmp(rb, w, sizeof(rb)))
+		rc = -EIO;
+	return rc;
+}
+
+/* Register r (0-3 PVCR0-3, 4 FFCR): one store, read back. */
+static int rtl819x_vlan_reg(unsigned int r)
+{
+	int rc;
+
+	rtl819x_vlan_step = 12;
+	rc = rtl819x_sw_wr(rtl819x_vlan_roff[r], rtl819x_vlan_rval[r]);
+	if (rc)
+		return rc;
+	if (rtl819x_sw_rd(rtl819x_vlan_roff[r]) != rtl819x_vlan_rval[r])
+		return -EIO;
+	return 0;
+}
+
+/* THE RE-READ: 0; -EIO with `final` the items unequal and `at` the first;
+ * or the rc of a slot read that could not finish. */
+static int rtl819x_vlan_reread(void)
+{
+	u32 w[RTL819X_VLAN_NW], t[RTL819X_VLAN_NW];
+	unsigned int i;
+	int n = 0, rc;
+
+	rtl819x_vlan_step = 13;
+	for (i = 0; i < RTL819X_VLAN_NSLOT; i++) {
+		rc = rtl819x_vlan_read(i, w);
+		if (rc) {
+			rtl819x_vlan_at = (int)i;
+			return rc;
+		}
+		rtl819x_vlan_want(i, t);
+		if (memcmp(w, t, sizeof(w)) && !n++)
+			rtl819x_vlan_at = (int)i;
+	}
+	for (i = 0; i < RTL819X_VLAN_NREG; i++)
+		if (rtl819x_sw_rd(rtl819x_vlan_roff[i]) !=
+		    rtl819x_vlan_rval[i] && !n++)
+			rtl819x_vlan_at = RTL819X_VLAN_NSLOT + (int)i;
+	for (i = 0; i < RTL819X_VLAN_NVER; i++)
+		if (rtl819x_sw_rd(rtl819x_vlan_voff[i]) !=
+		    rtl819x_vlan_vval[i] && !n++)
+			rtl819x_vlan_at = RTL819X_VLAN_VER0 + (int)i;
+	rtl819x_vlan_final = n;
+	return n ? -EIO : 0;
+}
+
+/* THE ORDER, for an unlocked call. */
+static int rtl819x_vlan_take(void)
+{
+	u32 w[RTL819X_VLAN_NW], reg[RTL819X_VLAN_NREG];
+	unsigned int i;
+	int rc;
+
+	for (i = 0; i < RTL819X_VLAN_NVER; i++) {
+		rtl819x_vlan_vr[i] = rtl819x_sw_rd(rtl819x_vlan_voff[i]);
+		if (rtl819x_vlan_vr[i] != rtl819x_vlan_vval[i])
+			rtl819x_vlan_vm |= 1u << i;
+	}
+	if (rtl819x_vlan_vm)
+		return -EPROTO;		/* no table read, nothing stored */
+	for (i = 0; i < RTL819X_VLAN_NSLOT; i++) {
+		rtl819x_vlan_at = (int)i;
+		rc = rtl819x_vlan_read(i, rtl819x_vlan_cur[i]);
+		if (rc)
+			return rc;	/* step 0, nothing stored */
+	}
+	rtl819x_vlan_at = -1;
+	for (i = 0; i < RTL819X_VLAN_NREG; i++)
+		reg[i] = rtl819x_sw_rd(rtl819x_vlan_roff[i]);
+	for (i = 0; i < RTL819X_VLAN_NSLOT; i++) {
+		rtl819x_vlan_want(i, w);
+		if (!memcmp(rtl819x_vlan_cur[i], w, sizeof(w)))
+			continue;		/* equal: not stored */
+		rtl819x_vlan_at = (int)i;
+		rc = rtl819x_vlan_write(i, w);
+		if (rc)
+			return rc;
+		if (i < RTL819X_VLAN_NV)
+			rtl819x_vlan_vw |= 1u << i;
+		else
+			rtl819x_vlan_nw |= 1u << (i - RTL819X_VLAN_NV);
+	}
+	for (i = 0; i < RTL819X_VLAN_NREG; i++) {
+		if (reg[i] == rtl819x_vlan_rval[i])
+			continue;
+		rtl819x_vlan_at = RTL819X_VLAN_NSLOT + (int)i;
+		rc = rtl819x_vlan_reg(i);
+		if (rc)
+			return rc;
+		rtl819x_vlan_rw |= 1u << i;
+	}
+	rtl819x_vlan_at = -1;
+	rc = rtl819x_vlan_reread();
+	if (rc)
+		return rc;
+	rtl819x_vlan_step = 0;
+	return 0;
+}
+
+/* The last call's fields, cleared as a call starts, so the line shows this
+ * call's results and no earlier call's. */
+static void rtl819x_vlan_clear(void)
+{
+	unsigned int i;
+
+	rtl819x_vlan_at = rtl819x_vlan_final = -1;
+	rtl819x_vlan_step = rtl819x_vlan_nw = rtl819x_vlan_rw = 0;
+	rtl819x_vlan_vm = 0;
+	rtl819x_vlan_vw = 0;
+	for (i = 0; i < RTL819X_VLAN_NVER; i++)
+		rtl819x_vlan_vr[i] = 0;
+	rtl819x_vlan_tlu = rtl819x_vlan_asr = 0;
+	rtl819x_vlan_sta = rtl819x_vlan_spin = 0;
+}
+#endif /* !CONFIG_RTL_819X_SWCORE */
+
+/* From 1.5's handler, for every write none of 1.5's forms took. */
+static int rtl819x_sw_v16_write(const char *buf, unsigned long count)
+{
+	int rc;
+
+	if (strcmp(buf, "vlan"))
+		return -EINVAL;
+	rtl819x_vlan_n++;
+#ifndef CONFIG_RTL_819X_SWCORE
+	rtl819x_vlan_clear();
+#endif
+	if (!rtl819x_sw_unlocked) {	/* before any access: nothing is read */
+		rtl819x_vlan_n_refused++;
+		rtl819x_vlan_rc = -EPERM;
+		return -EPERM;
+	}
+#ifdef CONFIG_RTL_819X_SWCORE
+	rc = 0;		/* the vendor's tables: nothing read or stored */
+#else
+	rc = rtl819x_vlan_take();
+	if (rc == -ETIMEDOUT)
+		rtl819x_vlan_n_to++;
+	else if (rc == -EIO)
+		rtl819x_vlan_n_rb++;
+#endif
+	if (!rc)
+		rtl819x_vlan_n_ok++;
+	rtl819x_vlan_rc = rc;
+	return rc ? rc : (int)count;
+}
+
+/* After 1.5's line: `len` is what 1.5 printed at `page`. */
+static int rtl819x_sw_v16_lines(char *page, int len)
+{
+#ifdef CONFIG_RTL_819X_SWCORE
+	return len + sprintf(page + len,
+			     "vlan vendor calls %lu ok %lu refused %lu rc %d\n",
+			     rtl819x_vlan_n, rtl819x_vlan_n_ok,
+			     rtl819x_vlan_n_refused, rtl819x_vlan_rc);
+#else
+	return len + sprintf(page + len, "vlan calls %lu ok %lu refused %lu "
+			     "rc %d at %d step %u vw %04X nw %02X rw %02X "
+			     "vm %X vr %08X %08X %08X %08X tlu %08X sta %lu "
+			     "spin %lu swtasr %08X final %d ld %lu to %lu "
+			     "rb %lu\n",
+			     rtl819x_vlan_n, rtl819x_vlan_n_ok,
+			     rtl819x_vlan_n_refused, rtl819x_vlan_rc,
+			     rtl819x_vlan_at, (unsigned int)rtl819x_vlan_step,
+			     (unsigned int)rtl819x_vlan_vw,
+			     (unsigned int)rtl819x_vlan_nw,
+			     (unsigned int)rtl819x_vlan_rw,
+			     (unsigned int)rtl819x_vlan_vm, rtl819x_vlan_vr[0],
+			     rtl819x_vlan_vr[1], rtl819x_vlan_vr[2],
+			     rtl819x_vlan_vr[3], rtl819x_vlan_tlu,
+			     rtl819x_vlan_sta, rtl819x_vlan_spin,
+			     rtl819x_vlan_asr, rtl819x_vlan_final,
+			     rtl819x_vlan_n_ld, rtl819x_vlan_n_to,
+			     rtl819x_vlan_n_rb);
+#endif
 }

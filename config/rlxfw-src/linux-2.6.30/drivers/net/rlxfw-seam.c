@@ -69,9 +69,9 @@
  * ======================================================================
  *
  * 1. It does not configure the switch.  Every switch register the vendor's
- *    probe wrote is left as the loader left it, `PCRP0`-`PCRP4` with
- *    `EnablePHYIf` clear among them (`notes/switch-driver.md` § 8.3); 8d's
- *    take-over list is where that changes.
+ *    probe wrote is left here as the loader left it.  rtl819x-switch's verbs,
+ *    which /init types, take some over: 1.5's `init` sets `EnablePHYIf`
+ *    (`notes/switch-driver.md` § 8.3); 1.6's `vlan` writes the VLAN group.
  * 2. It does not check `REVR`.  The vendor's `bsp_swcore_init()` returns
  *    non-zero for an unrecognised chip, and `bsp_setup()` then halts; this
  *    board's `REVR` is `8196E001` (量, `SPEC.md` `REG-29`) and `RLXFW-B07`

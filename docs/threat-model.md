@@ -121,9 +121,9 @@ power-on and after a warm reboot with no command typed.
   device readings above come from `FW-175`, `FW-176`,
   `notes/userspace-integration.md` and `docs/GATE-RESULTS.md` entry 17.
 * **Nothing about the switch's own forwarding.** 讀 `notes/switch-driver.md`
-  § 17: the VLAN group, the unknown-unicast and multicast traps, EEE and the CPU
-  queue count are the **loader's**, inherited rather than written. A LAN peer's
-  reach through the switch is therefore the loader's policy and not rlxfw's.
+  § 21: `vlan` writes the loader's VLAN group and `FFCR`'s two traps, as the
+  owner ruled (`SPEC.md` `NET-173`); EEE and the CPU queue count stay as
+  booted. A LAN peer's reach through the switch is that layout's policy.
 
 ## 3. `T2` — LAN peer with valid credentials
 

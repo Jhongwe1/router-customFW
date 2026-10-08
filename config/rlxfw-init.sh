@@ -37,6 +37,14 @@ echo unlock i-mean-it > /proc/rtl819x-switch
 # set; with the core in, the vendor's probe has set it before this line
 # and `init` stores nothing.
 echo init > /proc/rtl819x-switch
+# `vlan` (R6c, rtl819x-switch 1.6) is not one of them either: it writes the
+# loader's one-VLAN layout -- VLAN 8 on ports 0-5, PVID 8, unknown unicast and
+# multicast trapped to the CPU, every netif slot empty -- where the switch
+# does not already hold it.  Booted from flash, the loader never wrote it and
+# rlx0 received nothing (SPEC.md NET-171); booted through the loader's
+# prompt, only netif slot 0 differs.  With the vendor's switch core in, the
+# vendor owns the tables and `vlan` stores nothing.
+echo vlan > /proc/rtl819x-switch
 echo start > /proc/rtl819x-switch
 echo unlock > /proc/rtl819x-nic
 echo netdev on > /proc/rtl819x-nic

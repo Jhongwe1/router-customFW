@@ -57,7 +57,7 @@
 #endif
 
 /*
- * 1 = write the five /proc verbs that `config/rlxfw-init.sh` writes before its
+ * 1 = write the six /proc verbs that `config/rlxfw-init.sh` writes before its
  * `ifconfig`, in the same order (switch core first: B43's control shows rlx0
  * carries nothing without it).  0 = write nothing to any /proc node and open no
  * interface, which is what `config/rlxfw-init-quiet.sh` is for -- R6b's NET-25

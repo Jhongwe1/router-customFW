@@ -132,14 +132,14 @@
  * 2. It writes NOTHING at boot.  Every hardware write is behind a verb AND
  *    behind a runtime unlock, so `n_writes` reading 0 on a boot capture is a
  *    measurement and not a promise.
- * 3. It does not configure the switch core.  It does not have to: 讀
+ * 3. It does not configure the switch core; others set its traps.  讀
  *    `rtl865x_asicL2.c:4694,4703`, the vendor's PROBE already sets
- *    `SWTCR0 |= NAPTF2CPU` and `FFCR |= EN_UNMCAST_TOCPU`, so broadcast and
- *    multicast are already trapped to the CPU port on any boot of this
- *    image.  ⚠️ Note the asymmetry the same read found: unknown UNICAST is
- *    explicitly NOT trapped (`FFCR &= ~EN_UNUNICAST_TOCPU`).  A driver that
- *    expects to receive arbitrary unicast before R6-4 binds a MAC address
- *    would be expecting something this configuration does not do.
+ *    `SWTCR0 |= NAPTF2CPU` and `FFCR |= EN_UNMCAST_TOCPU` on SWCORE=y, and
+ *    leaves unknown UNICAST untrapped (`FFCR &= ~EN_UNUNICAST_TOCPU`).  On
+ *    SWCORE=n no probe runs: rtl819x-switch 1.6's `vlan`, which /init
+ *    types, sets FFCR to 3 (EnUnkUC2CPU | EnUnkMC2CPU), so unknown unicast
+ *    is trapped there too.  A driver that expects arbitrary unicast before
+ *    R6-4 binds a MAC address depends on which image it runs in.
  * 4. It does not copy `swNic_receive`'s checksum test.  讀
  *    `rtl865xc_swNic.c:604`: the vendor DROPS any frame whose `ph_flags`
  *    lacks BOTH `CSUM_IP_OK` and `CSUM_TCPUDP_OK`.

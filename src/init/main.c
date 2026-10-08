@@ -542,9 +542,8 @@ static void do_mounts(int *degraded)
 	}
 }
 
-/* The five verbs `config/rlxfw-init.sh` writes, in its order: the switch core
- * first, because B43's control shows rlx0 carries nothing without it.  Each is
- * a literal to a literal path; a failure is printed and the next still runs. */
+/* config/rlxfw-init.sh's six verbs in its order, the switch core first (B43:
+ * rlx0 carries nothing without it); a failed one prints and the next runs. */
 struct procverb {
 	const char *path;
 	const char *data;
@@ -554,6 +553,7 @@ struct procverb {
 static const struct procverb lan_verbs[] = {
 	{ "/proc/rtl819x-switch", "unlock i-mean-it\n" },
 	{ "/proc/rtl819x-switch", "init\n" },
+	{ "/proc/rtl819x-switch", "vlan\n" },
 	{ "/proc/rtl819x-switch", "start\n" },
 	{ "/proc/rtl819x-nic", "unlock\n" },
 	{ "/proc/rtl819x-nic", "netdev on\n" }

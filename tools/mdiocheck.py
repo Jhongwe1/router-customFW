@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""mdiocheck -- rtl819x-switch 1.3's MDIO block, 1.4's `phyif` block and 1.5's
-`init` verb and `reset` guard, compiled and driven on the host.
+"""mdiocheck -- rtl819x-switch 1.3's MDIO block, 1.4's `phyif` block, 1.5's
+`init` verb and `reset` guard and 1.6's `vlan` verb, compiled and driven on
+the host.
 
 WHAT IT CHECKS, AND WHY IT CAN
 ------------------------------
@@ -10,8 +11,11 @@ ops, `probe`, `scan`, `pread`, `bound`, the gate, and /proc/rtl819x-mdio.
 `EnablePHYIf` set in PCRP0-PCRP4, behind its own token.  `R6b-8` 8d appended
 a third (1.5): `init`, 1.4's port loop under the switch's own unlock, and the
 guard that refuses `reset full`/`reset vendor` while CPUICR has TXCMD or
-RXCMD set.  This tool cuts all three out of the driver UNCHANGED (from the
-1.3 banner to the end of the file) and
+RXCMD set.  `R6c` appended a fourth (1.6): `vlan`, which writes the VLAN
+group -- VLAN slot 8, every other VLAN and netif slot empty, PVCR0-3 and
+FFCR -- through the TACI block, after verifying four words it never writes.
+This tool cuts all four out of the driver UNCHANGED (from the 1.3 banner to
+the end of the file) and
 compiles them with the host's gcc in the kernel's dialect
 (`-std=gnu89 -Werror`) inside a generated harness that supplies, in place of
 the kernel:
@@ -42,7 +46,23 @@ the kernel:
     handler's `reset` branch as the driver writes it above the cut, and a
     stub for rtl819x_sw_do_reset -- also above the cut -- that records each
     call and its recipe (`X`) and returns a scripted rc.  Any store the
-    guard made would be a `W` in the log or a harness exit.
+    guard made would be a `W` in the log or a harness exit;
+  * for 1.6: the nine ALE and VLAN registers it reads or stores, the TACI
+    block (SWTACR, SWTASR, SWTAA, TCR0-7) as an engine -- a command runs for
+    a scripted number of SWTACR loads, or never, then copies TCR0..TCR7 to
+    the slot SWTAA names -- SWTCR0 with bit 19 reading 1 and bit 18 read/
+    write (or scripted not to set, or not to clear), and the VLAN and netif
+    tables behind the window at 0xBB000000, each window load logged (`T`).
+    The default is the flash path (量 bench/2026-10-08b); the RAM path's
+    group carries a SYNTHETIC netif slot 0.  A protocol slip -- a command
+    other than 9, one started with STOP_TLU clear, a TACI store or a
+    STOP_TLU clear while one runs, an SWTAA outside both tables, a store to
+    a verified word -- is counted for the cases to assert, and faults are
+    scripted: busy, stuck, STOP_TLU_STA never set, a corrupted or doubled
+    copy, a register that does not stick, a torn window read.  The block is
+    also compiled a second time with -DCONFIG_RTL_819X_SWCORE.  The access
+    log holds 65,536 entries and the harness EXITS 8 when it is full, so an
+    overflow fails every case of that run rather than truncating a dump.
 
 Cases (each prints one `  ok`/`  FAIL` line with exactly two leading spaces):
 
@@ -143,8 +163,48 @@ Cases (each prints one `  ok`/`  FAIL` line with exactly two leading spaces):
        then rtl819x_sw_do_reset with the verb's recipe, its rc returned
   K46  the `init` line at its widest against the block comment's figures,
        and the page's running total through 1.2, 1.4 and 1.5
+  1.6, `vlan` (1.5's handler falls through to 1.6):
+  K47  the switch locked: -EPERM, counted, no access at all -- also with
+       the phyif class token unlocked; a refusal after a call that stored
+       shows none of that call's fields
+  K48  the flash path: every access in order (the four verified words, all
+       24 slots and PVCR0-3/FFCR read before any store, VLAN slot 8's table
+       write step by step, PVCR0-3 and FFCR stored and read back, the
+       re-read); steps (1)-(10) alone with IRQs off, in one section; 17
+       stores, 81 reads, 784 window loads; the end state is the RAM path's
+       group minus netif slot 0; one command, 9, under STOP_TLU
+  K49  the RAM path: netif slot 0 cleared, 12 stores, nothing else stored
+  K50  each verified word wrong in turn: -EPROTO after the four loads and
+       nothing else, `vm` and `vr` naming it
+  K51  a command that never completes: -ETIMEDOUT at (8) after 10,001
+       polls, STOP_TLU cleared and read back, SWTASR read, nothing after
+  K52  STOP_TLU_STA never set: -ETIMEDOUT at (3), STOP_TLU cleared and read
+       back, no TCR, SWTAA or SWTACR store
+  K53  a copy that differs from the entry: -EIO at (11), after the undo
+  K54  bit 18 that does not clear: -EIO at (9), and the verb stops
+  K55  a second `vlan`: no store, the re-read equal
+  K56  -DCONFIG_RTL_819X_SWCORE: refused while locked, rc 0 unlocked, no
+       access either way, the `vendor` line
+  K57  the `vlan` line at its widest against the block comment's figures,
+       and the page's running total through 1.6
+  K58  a copy that also lands in the next slot: each slot's own read-back
+       passes and the re-read refuses (-EIO, `final` 1, `at` 9)
+  K59  bit 18 that does not read back set: recorded in `tlu`, not refused
+  K60  the engine busy at (1): -EBUSY and nothing stored
+  K61  the engine busy at the first read: -EBUSY, no window load, no store
+  K62  a register store that does not stick: -EIO at (12), and the
+       registers after it are not stored
+  K63  slots that differ past their first word are written (all eight
+       words compared)
+  K64  SWTASR bit 0 set: recorded in `swtasr`, not refused
+  K65  a torn window read is read again; ten torn reads are -EIO with
+       nothing stored
+  K66  a command busy for three polls: four polls, the same result, and no
+       protocol slip
+  K67  the engine busy at (4), once STOP_TLU is set: -EBUSY, STOP_TLU
+       cleared and read back in the same IRQs-off section, no other store
 
-M0..M49 then mutate a COPY of the block, one defect each, and require the case
+M0..M82 then mutate a COPY of the block, one defect each, and require the case
 named for it to go red.  M0 is the unmutated copy through the same path: if it
 is not green, no kill is counted.  A mutant whose anchor does not occur
 exactly once, that does not compile, or whose named case stays green is a
@@ -166,7 +226,12 @@ it sticks, whether the link follows -- is the bench's.  For 1.5: the
 is a stub, and CPUICR is a variable -- nothing here says what a reset does
 to a running DMA engine, or whether the NIC re-arms between the guard's
 load and the reset; and /init's `init` is config/rlxfw-init.sh's, which
-this tool does not read.
+this tool does not read.  For 1.6: the engine is a model of the two vendor
+readings the block itself was written from, so a protocol they both get
+wrong passes here; whether this die takes eight TCRs or the type's size,
+whether bit 18 reads back, how long a command takes and what a group with
+every netif slot empty forwards are the bench's.  A mutant that removes a
+bound is not run: it would hang the harness rather than turn a case red.
 
 Needs gcc and nothing else: no toolchain, no $FWRE_WORK, no device.
     mdiocheck.py [--source PATH] [--keep DIR] [--no-mutants]
@@ -366,6 +431,227 @@ static void phy_init_model(void)
 	for (r = 0; r < 16; r++)
 		post_next[r] = -1;
 }
+/* 1.6: the ALE and VLAN registers `vlan` reads or stores, the TACI block and
+ * the VLAN (type 6, 16 slots at 0xBB060000) and netif (type 4, 8 slots at
+ * 0xBB040000) tables, 32 bytes a slot.  The registers are reached only
+ * through the switch's two paths (transcribed below), the tables only
+ * through the block's window load (fake_readl).  The default is the flash
+ * path, 量 bench/2026-10-08b (A02, A05, A06, A08); `set vgstate 1` loads the
+ * RAM path's group (量 bench/2026-09-28/M2-VV, bench/2026-10-04/PER-SW)
+ * with a SYNTHETIC netif slot 0 -- valid, VID 8, MTU 1500, macMask 7,
+ * address 02:00:00:00:00:01, locally administered and no unit's: the
+ * loader's own words carry this unit's address and are not copied here.
+ * SWTCR0 bit 19 reads 1 (量: every reading on record) and ignores stores;
+ * bit 18 is read/write, or scripted not to set or not to clear.  SWTACR
+ * reads the stored command while one runs and 0 once it is done (量 PER-SW:
+ * 0 after the loader's table writes).  A command is done after `vgbusy`
+ * more SWTACR loads, or never (`vgstuck`), and then copies TCR0..TCR7 to
+ * the slot SWTAA names (`vgcorrupt` XORs word 0; `vgghost` copies to a
+ * second slot too).  Counted for the cases: a command that is not 9, one
+ * started with STOP_TLU clear (`nostop`), a TACI store or a STOP_TLU clear
+ * while one runs (`viol`), an SWTAA outside both tables (`badaa`), and any
+ * store to a verified word or to SWTASR (`illegal`, not applied). */
+static u32 vg_swtcr0, vg_plitimr = 0x07FAC688u, vg_ffcr, vg_vcr0 = 0x1FFu;
+static u32 vg_pbvcr0, vg_swtacr, vg_swtasr, vg_swtaa, vg_tcr[8];
+static u32 vg_pvcr[5] = { 0x00010001u, 0x00010001u, 0x00010001u,
+			  0x00010001u, 0x00000001u };
+static u32 vg_vlan[16][8], vg_netif[8][8];
+static int vg_sta = 1, vg_nostick18, vg_noclear18, vg_stuck, vg_ghost;
+static int vg_running, vg_nostick_off = -1;
+static long vg_busy, vg_left, vg_busy_from = -1, vg_busy_n, vg_nld, vg_tear;
+static u32 vg_tearx, vg_corrupt;
+static int vg_starts, vg_viol, vg_nostop, vg_badaa, vg_badcmd, vg_illegal;
+static int vg_winld;
+
+static void vg_state(int ram)
+{
+	int i, k;
+
+	vg_swtcr0 = 0;
+	vg_plitimr = 0x07FAC688u;
+	vg_vcr0 = 0x1FFu;
+	vg_pbvcr0 = vg_swtacr = vg_swtasr = vg_swtaa = 0;
+	for (k = 0; k < 8; k++)
+		vg_tcr[k] = 0;
+	for (i = 0; i < 16; i++)
+		for (k = 0; k < 8; k++)
+			vg_vlan[i][k] = 0;
+	for (i = 0; i < 8; i++)
+		for (k = 0; k < 8; k++)
+			vg_netif[i][k] = 0;
+	for (i = 0; i < 4; i++)
+		vg_pvcr[i] = ram ? 0x00080008u : 0x00010001u;
+	vg_pvcr[4] = 1;
+	vg_ffcr = ram ? 3u : 0u;
+	if (ram) {
+		vg_vlan[8][0] = 0x00807E3Fu;
+		vg_netif[0][0] = 0x00002011u;	/* SYNTHETIC: see above */
+		vg_netif[0][1] = 0x00400000u;
+		vg_netif[0][2] = 0x9C000000u;
+		vg_netif[0][3] = 0x000000BBu;
+	}
+}
+static void vg_copy(u32 a, int d)
+{
+	unsigned int t = (a >> 16) & 0xFFu;
+	int s = (int)((a & 0xFFFFu) >> 5), k;
+	u32 *dst;
+
+	if ((a & 0xFF000000u) != 0xBB000000u || (a & 0x1Fu) ||
+	    !((t == 6 && s < 16) || (t == 4 && s < 8))) {
+		vg_badaa++;
+		return;
+	}
+	s += d;
+	if ((t == 6 && s >= 16) || (t == 4 && s >= 8))
+		return;			/* a second slot past the end: none */
+	dst = t == 6 ? vg_vlan[s] : vg_netif[s];
+	for (k = 0; k < 8; k++)
+		dst[k] = vg_tcr[k];
+	if (!d)
+		dst[0] ^= vg_corrupt;
+}
+static u32 vg_swtacr_ld(void)
+{
+	long i = vg_nld++;
+
+	if (vg_busy_from >= 0 && i >= vg_busy_from &&
+	    i < vg_busy_from + vg_busy_n)
+		return vg_swtacr | 1u;
+	if (vg_running && !vg_stuck) {
+		if (vg_left > 0) {
+			vg_left--;
+		} else {
+			vg_running = 0;
+			vg_swtacr = 0;
+			vg_copy(vg_swtaa, 0);
+			if (vg_ghost)
+				vg_copy(vg_swtaa, vg_ghost);
+		}
+	}
+	return vg_swtacr;
+}
+/* 1, and the word, if `off` is one of 1.6's registers. */
+static int vg_rd(unsigned int off, u32 *v)
+{
+	switch (off) {
+	case 0x4418:
+		*v = (vg_swtcr0 & ~(1u << 19)) | (vg_sta ? 1u << 19 : 0);
+		return 1;
+	case 0x4420:
+		*v = vg_plitimr;
+		return 1;
+	case 0x4428:
+		*v = vg_ffcr;
+		return 1;
+	case 0x4A00:
+		*v = vg_vcr0;
+		return 1;
+	case 0x4A1C:
+		*v = vg_pbvcr0;
+		return 1;
+	case 0x4D00:
+		*v = vg_swtacr_ld();
+		return 1;
+	case 0x4D04:
+		*v = vg_swtasr;
+		return 1;
+	case 0x4D08:
+		*v = vg_swtaa;
+		return 1;
+	}
+	if (off >= 0x4A08 && off <= 0x4A18 && !(off & 3)) {
+		*v = vg_pvcr[(off - 0x4A08) / 4];
+		return 1;
+	}
+	if (off >= 0x4D20 && off <= 0x4D3C && !(off & 3)) {
+		*v = vg_tcr[(off - 0x4D20) / 4];
+		return 1;
+	}
+	return 0;
+}
+/* 1 if `off` is one of 1.6's registers, which the store then reaches. */
+static int vg_wr(unsigned int off, u32 v)
+{
+	u32 b18;
+
+	switch (off) {
+	case 0x4418:
+		b18 = v & (1u << 18);
+		if (b18 && vg_nostick18)
+			b18 = 0;
+		if (!b18 && vg_noclear18 && (vg_swtcr0 & (1u << 18)))
+			b18 = 1u << 18;
+		if (!b18 && (vg_swtcr0 & (1u << 18)) && vg_running)
+			vg_viol++;
+		vg_swtcr0 = (v & ~(3u << 18)) | b18;
+		return 1;
+	case 0x4428:
+		if ((int)off != vg_nostick_off)
+			vg_ffcr = v;
+		return 1;
+	case 0x4D00:
+		if (vg_running)
+			vg_viol++;
+		vg_swtacr = v;
+		if (v & 1u) {
+			vg_starts++;
+			if (v != 9u)
+				vg_badcmd++;
+			if (!(vg_swtcr0 & (1u << 18)))
+				vg_nostop++;
+			vg_running = 1;
+			vg_left = vg_busy;
+		}
+		return 1;
+	case 0x4D08:
+		if (vg_running)
+			vg_viol++;
+		vg_swtaa = v;
+		return 1;
+	case 0x4A00:
+	case 0x4A18:
+	case 0x4A1C:
+	case 0x4420:
+	case 0x4D04:
+		vg_illegal++;		/* never stored by design: not applied */
+		return 1;
+	}
+	if (off >= 0x4A08 && off <= 0x4A14 && !(off & 3)) {
+		if ((int)off != vg_nostick_off)
+			vg_pvcr[(off - 0x4A08) / 4] = v;
+		return 1;
+	}
+	if (off >= 0x4D20 && off <= 0x4D3C && !(off & 3)) {
+		if (vg_running)
+			vg_viol++;
+		vg_tcr[(off - 0x4D20) / 4] = v;
+		return 1;
+	}
+	return 0;
+}
+/* A script's direct setting of a register's model, for a start state. */
+static void vg_set(unsigned int off, u32 v)
+{
+	if (off == 0x4418)
+		vg_swtcr0 = v;
+	else if (off == 0x4420)
+		vg_plitimr = v;
+	else if (off == 0x4428)
+		vg_ffcr = v;
+	else if (off == 0x4A00)
+		vg_vcr0 = v;
+	else if (off == 0x4A1C)
+		vg_pbvcr0 = v;
+	else if (off == 0x4D04)
+		vg_swtasr = v;
+	else if (off >= 0x4A08 && off <= 0x4A18 && !(off & 3))
+		vg_pvcr[(off - 0x4A08) / 4] = v;
+	else {
+		printf("HARNESS vgreg: no register %04X in the model\n", off);
+		exit(3);
+	}
+}
 /* 1.5: CPUICR, 0xB8010000, reached only by a direct KSEG1 load.  Every
  * load goes into the PCRP access log as `C`, so its order against the
  * switch's reads and stores is visible. */
@@ -378,6 +664,26 @@ static u32 fake_readl(unsigned int off)
 		cpuicr_rd++;
 		pacc_log('C', off, cpuicr);
 		return cpuicr;
+	}
+	if ((off >= 0xBB060000u && off < 0xBB060200u) ||
+	    (off >= 0xBB040000u && off < 0xBB040100u)) {
+		u32 v;
+
+		if (off & 3u) {
+			fprintf(stderr, "harness: unaligned table load %08X\n",
+				off);
+			exit(9);
+		}
+		v = off >= 0xBB060000u ?
+		    vg_vlan[(off - 0xBB060000u) >> 5][(off >> 2) & 7u] :
+		    vg_netif[(off - 0xBB040000u) >> 5][(off >> 2) & 7u];
+		if (vg_tear > 0) {
+			vg_tear--;
+			v ^= ++vg_tearx;
+		}
+		vg_winld++;
+		pacc_log('T', off, v);
+		return v;
 	}
 	if (off != 0x4008) {
 		fprintf(stderr, "harness: read of %04X\n", off);
@@ -455,30 +761,41 @@ static int sw_rd_calls;		/* every call of the switch's read path */
 static int rtl819x_sw_unlocked;
 static unsigned long sw_n_writes, sw_n_refused;
 struct pa { char k; unsigned int off; u32 v; int irq; int sec; };
-static struct pa pacc[512];
+/* 1.6: one `vlan` makes about 900 accesses, and a scripted bound about
+ * 10,000 more.  A full log EXITS rather than drop entries, so an overflow
+ * fails the run's every case instead of passing with a truncated dump. */
+#define PACC_MAX 65536
+static struct pa pacc[PACC_MAX];
 static int n_pacc, n_pacc_dumped;
 
 static void pacc_log(char k, unsigned int off, u32 v)
 {
-	if (n_pacc < 512) {
-		pacc[n_pacc].k = k;
-		pacc[n_pacc].off = off;
-		pacc[n_pacc].v = v;
-		pacc[n_pacc].irq = irq_depth > 0;
-		pacc[n_pacc].sec = irq_sections;
+	if (n_pacc >= PACC_MAX) {
+		fprintf(stderr, "harness: the access log is full (%d)\n", n_pacc);
+		exit(8);
 	}
+	pacc[n_pacc].k = k;
+	pacc[n_pacc].off = off;
+	pacc[n_pacc].v = v;
+	pacc[n_pacc].irq = irq_depth > 0;
+	pacc[n_pacc].sec = irq_sections;
 	n_pacc++;
 }
 
 static UNUSED u32 rtl819x_sw_rd(unsigned int off)
 {
+	u32 v;
+
 	sw_rd_calls++;
 	if (off >= 0x4104 && off <= 0x4124 && !(off & 3)) {
-		u32 v = pcrp[(off - 0x4104) / 4];
-
+		v = pcrp[(off - 0x4104) / 4];
 		pcrp_rd++;
 		if (irq_depth)
 			pcrp_rd_insec++;
+		pacc_log('R', off, v);
+		return v;
+	}
+	if (vg_rd(off, &v)) {		/* 1.6's registers */
 		pacc_log('R', off, v);
 		return v;
 	}
@@ -493,8 +810,9 @@ static UNUSED u32 rtl819x_sw_rd(unsigned int off)
 }
 
 /* The switch's one guarded write path, as rtl819x-switch.c:287 writes it:
- * refused, counted, while the switch is locked.  A store anywhere but
- * PCRP0-PCRP4 is counted as illegal and not applied. */
+ * refused, counted, while the switch is locked.  1.6's registers go to its
+ * model; a store anywhere else but PCRP0-PCRP4 is counted as illegal and
+ * not applied. */
 static UNUSED int rtl819x_sw_wr(unsigned int off, u32 v)
 {
 	unsigned int p;
@@ -504,10 +822,12 @@ static UNUSED int rtl819x_sw_wr(unsigned int off, u32 v)
 		return -EPERM;
 	}
 	pacc_log('W', off, v);
+	sw_n_writes++;
+	if (vg_wr(off, v))		/* 1.6's registers */
+		return 0;
 	pcrp_wr++;
 	if (irq_depth)
 		pcrp_wr_insec++;
-	sw_n_writes++;
 	if (off < 0x4104 || off > 0x4114 || (off & 3)) {
 		pcrp_illegal++;
 		return 0;
@@ -755,6 +1075,59 @@ static void set_widest15(void)
 	rtl819x_sw_init_st = rtl819x_sw_init_on = 255;
 }
 
+/* 1.6's line with every field at its widest (32-bit longs, as the target) */
+static void set_widest16(void)
+{
+	rtl819x_vlan_n = rtl819x_vlan_n_ok = 0xFFFFFFFFUL;
+	rtl819x_vlan_n_refused = 0xFFFFFFFFUL;
+	rtl819x_vlan_rc = INT_MIN;
+#ifndef CONFIG_RTL_819X_SWCORE
+	{
+		int i;
+
+		rtl819x_vlan_n_ld = rtl819x_vlan_n_to = 0xFFFFFFFFUL;
+		rtl819x_vlan_n_rb = 0xFFFFFFFFUL;
+		rtl819x_vlan_sta = rtl819x_vlan_spin = 0xFFFFFFFFUL;
+		rtl819x_vlan_at = rtl819x_vlan_final = INT_MIN;
+		rtl819x_vlan_step = rtl819x_vlan_nw = 255;
+		rtl819x_vlan_rw = rtl819x_vlan_vm = 255;
+		rtl819x_vlan_vw = 0xFFFF;
+		for (i = 0; i < 4; i++)
+			rtl819x_vlan_vr[i] = 0xFFFFFFFFu;
+		rtl819x_vlan_tlu = rtl819x_vlan_asr = 0xFFFFFFFFu;
+	}
+#endif
+}
+
+/* 1.6's model: the registers as a load would read them, the counters, and
+ * every slot that is not eight zero words. */
+static void vg_stat(void)
+{
+	int i, k, z;
+
+	printf("VSTAT swtcr0=%08X ffcr=%08X pvcr=%08X,%08X,%08X,%08X,%08X "
+	       "vcr0=%08X pbvcr0=%08X plitimr=%08X swtacr=%08X starts=%d "
+	       "viol=%d nostop=%d badaa=%d badcmd=%d illegal=%d winld=%d\n",
+	       (vg_swtcr0 & ~(1u << 19)) | (vg_sta ? 1u << 19 : 0), vg_ffcr,
+	       vg_pvcr[0], vg_pvcr[1], vg_pvcr[2], vg_pvcr[3], vg_pvcr[4],
+	       vg_vcr0, vg_pbvcr0, vg_plitimr, vg_swtacr, vg_starts, vg_viol,
+	       vg_nostop, vg_badaa, vg_badcmd, vg_illegal, vg_winld);
+	for (i = 0; i < 24; i++) {
+		u32 *w = i < 16 ? vg_vlan[i] : vg_netif[i - 16];
+
+		for (z = 1, k = 0; k < 8; k++)
+			if (w[k])
+				z = 0;
+		if (z)
+			continue;
+		printf("VT %c %d", i < 16 ? 'v' : 'n', i < 16 ? i : i - 16);
+		for (k = 0; k < 8; k++)
+			printf(" %08X", w[k]);
+		printf("\n");
+	}
+	printf("VT-END\n");
+}
+
 static void pstat_line(void)
 {
 	printf("PSTAT rd=%d rd_insec=%d wr=%d wr_insec=%d illegal=%d "
@@ -791,7 +1164,7 @@ int main(void)
 	static char page[3 * PAGE_SZ];
 	char line[512], buf[512];
 	int rc, i;
-	long a, b, c;
+	long a, b, c, d;
 
 	phy_init_model();
 	printf("ERRNO EPERM=%d EIO=%d EAGAIN=%d ENOMEM=%d EFAULT=%d EBUSY=%d "
@@ -869,7 +1242,7 @@ int main(void)
 			page[rc < 0 ? 0 : rc] = '\0';
 			printf("LINES-BEGIN\n%sLINES-END len=%d\n", page, rc);
 		} else if (!strcmp(line, "pacc")) {
-			for (i = n_pacc_dumped; i < n_pacc && i < 512; i++)
+			for (i = n_pacc_dumped; i < n_pacc; i++)
 				printf("PA %c %04X %08X irq %d sec %d\n",
 				       pacc[i].k, pacc[i].off, pacc[i].v,
 				       pacc[i].irq, pacc[i].sec);
@@ -899,6 +1272,49 @@ int main(void)
 			printf("OP x %s -> %d\n", b, rc);
 		} else if (!strcmp(line, "widest15")) {
 			set_widest15();
+		/* 1.6: every op is `set vg...`, so no older op's sscanf
+		 * prefix can take one (`set nostick` would read
+		 * `set nostick18 1` as port 18) */
+		} else if (sscanf(line, "set vgstate %ld", &a) == 1) {
+			vg_state((int)a);
+		} else if (sscanf(line, "set vgregnostick %lx", &a) == 1) {
+			vg_nostick_off = (int)a;
+		} else if (sscanf(line, "set vgreg %lx %li", &a, &b) == 2) {
+			vg_set((unsigned int)a, (u32)b);
+		} else if (sscanf(line, "set vgtbl %ld %ld %ld %li", &a, &b, &c,
+				  &d) == 4) {
+			if (a == 6 && b >= 0 && b < 16 && c >= 0 && c < 8)
+				vg_vlan[b][c] = (u32)d;
+			else if (a == 4 && b >= 0 && b < 8 && c >= 0 && c < 8)
+				vg_netif[b][c] = (u32)d;
+			else {
+				printf("HARNESS vgtbl: no slot %ld/%ld/%ld\n", a,
+				       b, c);
+				return 3;
+			}
+		} else if (sscanf(line, "set vgsta %ld", &a) == 1) {
+			vg_sta = (int)a;
+		} else if (sscanf(line, "set vgnostick18 %ld", &a) == 1) {
+			vg_nostick18 = (int)a;
+		} else if (sscanf(line, "set vgnoclear18 %ld", &a) == 1) {
+			vg_noclear18 = (int)a;
+		} else if (sscanf(line, "set vgbusyat %ld %ld", &a, &b) == 2) {
+			vg_busy_from = a;
+			vg_busy_n = b;
+		} else if (sscanf(line, "set vgbusy %ld", &a) == 1) {
+			vg_busy = a;
+		} else if (sscanf(line, "set vgstuck %ld", &a) == 1) {
+			vg_stuck = (int)a;
+		} else if (sscanf(line, "set vgghost %ld", &a) == 1) {
+			vg_ghost = (int)a;
+		} else if (sscanf(line, "set vgcorrupt %li", &a) == 1) {
+			vg_corrupt = (u32)a;
+		} else if (sscanf(line, "set vgtear %ld", &a) == 1) {
+			vg_tear = a;
+		} else if (!strcmp(line, "vstat")) {
+			vg_stat();
+		} else if (!strcmp(line, "widest16")) {
+			set_widest16();
 		} else {
 			printf("HARNESS unknown op: %s\n", line);
 			return 3;
@@ -941,10 +1357,11 @@ class Run:
         self.err = p.stderr
         self.ops, self.pages, self.stats, self.stores = [], [], [], []
         self.lines14, self.pacc, self.pstats = [], [], []
+        self.vstats, self.vtables = [], []
         self.errno = {}
         self.bound = None
         cur = cur14 = None
-        st, pa = [], []
+        st, pa, vt = [], [], {}
         for ln in p.stdout.split("\n"):
             if cur is not None:
                 m = re.match(r"PAGE-END len=(-?\d+) eof=(\d+)$", ln)
@@ -977,6 +1394,18 @@ class Run:
                     k, _, v = kv.partition("=")
                     d[k] = v
                 self.pstats.append(d)
+            elif ln.startswith("VSTAT "):
+                d = {}
+                for kv in ln[6:].split(" "):
+                    k, _, v = kv.partition("=")
+                    d[k] = v
+                self.vstats.append(d)
+            elif ln.startswith("VT "):
+                f = ln.split()
+                vt[(f[1], int(f[2]))] = [int(x, 16) for x in f[3:11]]
+            elif ln == "VT-END":
+                self.vtables.append(vt)
+                vt = {}
             elif ln == "PAGE-BEGIN":
                 cur = []
             elif ln.startswith("OP "):
@@ -1026,6 +1455,12 @@ class Run:
     def pst(self, i, k):
         return self.pstats[i][k] if i < len(self.pstats) else None
 
+    def vst(self, i, k):
+        return self.vstats[i].get(k) if i < len(self.vstats) else None
+
+    def vtab(self, i):
+        return self.vtables[i] if i < len(self.vtables) else None
+
 
 def rd(a, r):
     return (a << 24) | (r << 16)
@@ -1041,7 +1476,7 @@ PAGE1 = 0x8000		# the fake's page-1 marker bit
 
 
 def boot_page(bound=10000):
-    lines = ["version rtl819x-switch 1.5", "unlocked 0", "bus 0 reg_rc 1",
+    lines = ["version rtl819x-switch 1.6", "unlocked 0", "bus 0 reg_rc 1",
              "bound %d" % bound, "mdio_rd 0", "mdio_wr 0",
              "mdio_to 0 busy 0 retry 0", "refused 0 wr_refused 0 again 0",
              "spin 0 0 0", "hi_or 00000000", "dirty 0", "scanned 00000000 j 0"]
@@ -1069,8 +1504,9 @@ def comment_irq_bound(block):
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
-def cases(exe, block, version):
-    """Yield (name, ok, detail) for K1..K22 (K0 is the compile)."""
+def cases(exe, block, version, exe_y=None):
+    """Yield (name, ok, detail) for K1..K67 (K0 is the compile); `exe_y` is
+    the block compiled with -DCONFIG_RTL_819X_SWCORE, for K56 and K57."""
     B = 10000
     dmax_seen = []
 
@@ -1081,7 +1517,7 @@ def cases(exe, block, version):
 
     # K1 boot
     r = track(Run(exe, ["init", "r", "stat"]))
-    ok = (r.rc == 0 and r.op(0) == 0 and version == "rtl819x-switch 1.5"
+    ok = (r.rc == 0 and r.op(0) == 0 and version == "rtl819x-switch 1.6"
           and r.pages[0][0] == boot_page() and r.stat(0, "nstores") == "0"
           and r.stat(0, "pde") == "1")
     yield "K1", ok, "boot page %s" % ("exact" if ok else repr(r.pages[:1])[:300])
@@ -1398,6 +1834,10 @@ def cases(exe, block, version):
     for item in cases14(exe, block):
         yield item
 
+    # ---------------------------------------- 1.6: `vlan`
+    for item in cases16(exe, exe_y, block):
+        yield item
+
 
 # 1.4 (R6b-10).  The PCRP model's default is the post-`J` state (量 C9-SW0).
 POSTJ = [0x007F0038, 0x047F0038, 0x087F0038, 0x0C7F0038, 0x107F0038]
@@ -1408,11 +1848,12 @@ INIT_BOOT = "calls 0 ok 0 refused 0 rc 1 stored 00 on 00 reset_busy 0"
 
 
 def lines14_boot():
-    """1.4's six boot lines, then the one 1.5 hooks after them."""
+    """1.4's six boot lines, then the one 1.5 hooks after them and the one
+    1.6 hooks after that."""
     return ("phyif unlocked 0 ok 0 stored 0 already 0 refused 0 idfail 0 "
             "rbfail 0\n" + "".join("phyif%d pre 00000000 rb 00000000 rc 1 st 0\n"
                                    % n for n in range(5))
-            + "init " + INIT_BOOT + "\n")
+            + "init " + INIT_BOOT + "\n" + "vlan " + vg_fields() + "\n")
 
 
 def rwr(n, pre, rb=None, sec=None):
@@ -1888,9 +2329,9 @@ def cases15(exe, block):
     text, n = r.lines14[0] if r.lines14 else ("", -1)
     ls = text.split("\n")[:-1]
     n14 = sum(len(x) + 1 for x in ls[:6])
-    w15 = len(ls[6]) + 1 if len(ls) == 7 else -1
+    w15 = len(ls[6]) + 1 if len(ls) == 8 else -1     # 1.6's line is the 8th
     fig = comment_figures15(block)
-    ok = (r.rc == 0 and len(ls) == 7 and n == len(text)
+    ok = (r.rc == 0 and len(ls) == 8 and n == len(text)
           and ls[6].startswith("init calls 4294967295 ok 4294967295 ")
           and fig is not None
           and fig[1] == fig[0] + n14 and fig[2] == w15
@@ -1899,7 +2340,538 @@ def cases15(exe, block):
     yield "K46", ok, "comment %s, measured 1.4 %d and 1.5 %d" % (fig, n14, w15)
 
 
-def build(block, version, work, tag):
+# 1.6 (R6c).  The model's two paths: the flash path (the default, 量
+# bench/2026-10-08b) and the RAM path (`set vgstate 1`, its netif slot 0
+# SYNTHETIC).  Item i is VLAN slot i below 16 and netif slot i - 16 above,
+# the block's numbering.
+VG_VER = [(0x4A18, 0x00000001), (0x4A00, 0x000001FF), (0x4A1C, 0x00000000),
+          (0x4420, 0x07FAC688)]
+VG_VR = tuple(v for _, v in VG_VER)
+VG_REG = [0x4A08, 0x4A0C, 0x4A10, 0x4A14, 0x4428]
+VG_RVAL = [0x00080008] * 4 + [0x00000003]
+VG_FREG = [0x00010001] * 4 + [0x00000000]
+ENTRY8 = [0x00807E3F] + [0] * 7
+ZERO8 = [0] * 8
+SYN0 = [0x00002011, 0x00400000, 0x9C000000, 0x000000BB, 0, 0, 0, 0]
+STA, B18 = 1 << 19, 1 << 18
+VLAN = "v vlan"
+NVLAN = len("vlan\n")
+SWCORE_Y = ["-DCONFIG_RTL_819X_SWCORE=1"]
+
+
+def vg_fields(**kw):
+    """1.6's line after `vlan `, from its fields; the defaults are a boot's."""
+    f = dict(calls=0, ok=0, refused=0, rc=1, at=-1, step=0, vw=0, nw=0, rw=0,
+             vm=0, vr=(0, 0, 0, 0), tlu=0, sta=0, spin=0, swtasr=0, final=-1,
+             ld=0, to=0, rb=0)
+    f.update(kw)
+    return ("calls %(calls)d ok %(ok)d refused %(refused)d rc %(rc)d "
+            "at %(at)d step %(step)d vw %(vw)04X nw %(nw)02X rw %(rw)02X "
+            "vm %(vm)X " % f + "vr %08X %08X %08X %08X " % tuple(f["vr"])
+            + "tlu %(tlu)08X sta %(sta)d spin %(spin)d swtasr %(swtasr)08X "
+            "final %(final)d ld %(ld)d to %(to)d rb %(rb)d" % f)
+
+
+def vg_addr(i):
+    return 0xBB060000 + 32 * i if i < 16 else 0xBB040000 + 32 * (i - 16)
+
+
+def vg_want(i):
+    return ENTRY8 if i == 8 else ZERO8
+
+
+def vg_start(ram):
+    """item -> the eight words the model starts with."""
+    cur = {i: ZERO8 for i in range(24)}
+    if ram:
+        cur[8], cur[16] = ENTRY8, SYN0
+    return cur
+
+
+def vg_read(i, words):
+    """THE TABLE READ of item i agreeing at once: the idle poll, 8 + 8."""
+    a = vg_addr(i)
+    return ([("R", 0x4D00, 0)]
+            + [("T", a + 4 * k, words[k]) for k in range(8)] * 2)
+
+
+def vg_write(i, words, polls=1, sticks=True, asr=0):
+    """ONE TABLE WRITE's (1)-(10) on the model, the IRQs-off part, written
+    from the block comment's steps: SWTCR0's read/write bits 0 and bit 19
+    read set, bit 18 setting unless `sticks` is false, the command done on
+    the `polls`-th load of (8), SWTASR reading `asr`.  (11) is
+    vg_read(i, words), after it."""
+    s18 = B18 if sticks else 0
+    return ([("R", 0x4D00, 0),                                    # (1)
+             ("R", 0x4418, STA), ("W", 0x4418, STA | B18),        # (2)
+             ("R", 0x4418, STA | s18),
+             ("R", 0x4418, STA | s18),                            # (3)
+             ("R", 0x4D00, 0)]                                    # (4)
+            + [("W", 0x4D20 + 4 * k, words[k]) for k in range(7, -1, -1)]
+            + [("W", 0x4D08, vg_addr(i)), ("W", 0x4D00, 9)]       # (6) (7)
+            + [("R", 0x4D00, 9)] * (polls - 1) + [("R", 0x4D00, 0)]
+            + [("R", 0x4418, STA | s18), ("W", 0x4418, STA),      # (9)
+               ("R", 0x4418, STA), ("R", 0x4D04, asr)])           # (10)
+
+
+def vg_head(cur, regs):
+    """A call's accesses before its first store: the verified words, every
+    slot, PVCR0-3 and FFCR."""
+    seq = [("R", o, v) for o, v in VG_VER]
+    for i in range(24):
+        seq += vg_read(i, cur[i])
+    return seq + [("R", VG_REG[r], regs[r]) for r in range(5)]
+
+
+def vg_tail():
+    """THE RE-READ of a group that equals its targets."""
+    seq = []
+    for i in range(24):
+        seq += vg_read(i, vg_want(i))
+    return (seq + [("R", VG_REG[r], VG_RVAL[r]) for r in range(5)]
+            + [("R", o, v) for o, v in VG_VER])
+
+
+def vg_full(cur, regs, writes, regw, **kw):
+    """Every access of a call that runs to its end, and its IRQs-off groups:
+    table writes of the items `writes` (kw to vg_write), then register
+    stores of the indexes `regw`, then THE RE-READ."""
+    seq, groups = vg_head(cur, regs), []
+    for i in writes:
+        g = vg_write(i, vg_want(i), **kw)
+        groups.append(g)
+        seq += g + vg_read(i, vg_want(i))
+    for r in regw:
+        seq += [("W", VG_REG[r], VG_RVAL[r]), ("R", VG_REG[r], VG_RVAL[r])]
+    return seq + vg_tail(), groups
+
+
+def vg_irq(run, i, groups):
+    """Dump i's IRQs-off accesses are exactly `groups`, in order, each in a
+    section of its own."""
+    if i >= len(run.pacc):
+        return False
+    on = [x for x in run.pacc[i] if x[3] == 1]
+    if [x[:3] for x in on] != [a for g in groups for a in g]:
+        return False
+    k, secs = 0, []
+    for g in groups:
+        s = {x[4] for x in on[k:k + len(g)]}
+        k += len(g)
+        if len(s) != 1:
+            return False
+        secs.append(s.pop())
+    return len(set(secs)) == len(secs)
+
+
+def vg_line(run, i):
+    """The rest of 1.6's line in the i-th render."""
+    return run.line14(i, "vlan")
+
+
+def vg_end(run, i, regs=VG_RVAL, tab=None):
+    """VSTAT i: PVCR0-3 and FFCR `regs`, the verified words as measured, no
+    protocol slip but `nostop` (asked where it matters), and the tables:
+    by default VLAN slot 8 alone, the RAM path's group minus netif slot 0."""
+    tab = {("v", 8): ENTRY8} if tab is None else tab
+    return (run.vst(i, "pvcr") == ",".join("%08X" % v
+                                           for v in list(regs[:4]) + [1])
+            and run.vst(i, "ffcr") == "%08X" % regs[4]
+            and run.vst(i, "vcr0") == "000001FF"
+            and run.vst(i, "pbvcr0") == "00000000"
+            and run.vst(i, "plitimr") == "07FAC688"
+            and all(run.vst(i, k) == "0"
+                    for k in ("viol", "badaa", "badcmd", "illegal"))
+            and run.vtab(i) == tab)
+
+
+def first_diff(got, want):
+    """Where two access lists part, for a case's detail."""
+    if got is None:
+        return "no dump"
+    for k, (a, b) in enumerate(zip(got, want)):
+        if a != b:
+            return "#%d %s %04X %08X, want %s %04X %08X" % ((k,) + a + b)
+    return ("none" if len(got) == len(want)
+            else "lengths %d, want %d" % (len(got), len(want)))
+
+
+def comment_figures16(block):
+    """(1.6's line, the case that measures it, 1.5's total, 1.6's total,
+    the recount's addition, the recounted page) as 1.6's comment states
+    them, or None."""
+    body = " ".join(re.sub(r"^\s*/?\*+/?\s?", "", ln).strip()
+                    for ln in block.split("\n"))
+    m = re.search(r"(\d+) bytes \(tools/mdiocheck\.py K(\d+) measures it\), "
+                  r"so 1\.5's worst case of ([\d,]+) of 4,096 becomes "
+                  r"([\d,]+)", body)
+    m2 = re.search(r"at their types' widest they add (\d+), and the page is "
+                   r"([\d,]+)", body)
+    if not (m and m2):
+        return None
+    return tuple(int(g.replace(",", "")) for g in m.groups() + m2.groups())
+
+
+def cases16(exe, exe_y, block):
+    """Yield (name, ok, detail) for K47..K67: 1.6's `vlan`."""
+    eperm, eproto, eio = -ERRNO["EPERM"], -ERRNO["EPROTO"], -ERRNO["EIO"]
+    ebusy, etime = -ERRNO["EBUSY"], -ERRNO["ETIMEDOUT"]
+    F, L = vg_start(0), vg_start(1)
+    std = dict(calls=1, ok=1, rc=0, vw=0x100, rw=0x1F, vr=VG_VR,
+               tlu=STA | B18, sta=1, spin=1, final=0, ld=784)
+
+    # K47 the switch locked: refused before any access, counted -- and the
+    # phyif class token does not open it; a refusal after a call that stored
+    # shows that call's fields no more (only the counters and `ld` carry)
+    r = Run(exe, [VLAN, "l", "pacc", "pstat", "vstat", PHYUNLOCK, VLAN, "l",
+                  "pacc", "pstat", "vstat", SWUNLOCK, VLAN, "set swunlock 0",
+                  VLAN, "l"])
+    ok = (r.rc == 0
+          and [x[1] for x in r.ops] == [eperm, len("unlock phyif-i-mean-it\n"),
+                                        eperm, NVLAN, eperm]
+          and vg_line(r, 0) == vg_fields(calls=1, refused=1, rc=eperm)
+          and vg_line(r, 1) == vg_fields(calls=2, refused=2, rc=eperm)
+          and acc(r, 0) == [] and acc(r, 1) == []
+          and r.pst(1, "swrd") == "0" and r.pst(1, "sw_refused") == "0"
+          and r.pst(1, "sw_writes") == "0" and r.vst(1, "winld") == "0"
+          and vg_line(r, 2) == vg_fields(calls=4, ok=1, refused=3, rc=eperm,
+                                         ld=784))
+    yield "K47", ok, "ops %s, lines %s | %s" % ([x[1] for x in r.ops],
+                                                vg_line(r, 1), vg_line(r, 2))
+
+    # K48 the flash path, access by access: nothing stored before every
+    # target is read; VLAN slot 8's (1)-(10) alone with IRQs off; the end
+    # state is the RAM path's group minus netif slot 0
+    r = Run(exe, [SWUNLOCK, VLAN, "pacc", "l", "pstat", "vstat", "stat"])
+    want, groups = vg_full(F, VG_FREG, [8], range(5))
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == NVLAN and got == want
+          and vg_irq(r, 0, groups) and vg_line(r, 0) == vg_fields(**std)
+          and r.pst(0, "sw_writes") == "17" and r.pst(0, "swrd") == "81"
+          and r.pst(0, "illegal") == "0" and r.pst(0, "imbalance") == "0"
+          and r.pst(0, "depth") == "0" and r.stat(0, "psrp_bad") == "0"
+          and r.vst(0, "winld") == "784" and r.vst(0, "starts") == "1"
+          and r.vst(0, "nostop") == "0" and r.vst(0, "swtcr0") == "00080000"
+          and vg_end(r, 0))
+    yield "K48", ok, "rc %s, %d accesses, first difference %s" % (
+        r.op(0) if r.ops else "-", len(got or []), first_diff(got, want))
+
+    # K49 the RAM path: netif slot 0 alone
+    r = Run(exe, [SWUNLOCK, "set vgstate 1", VLAN, "pacc", "l", "pstat",
+                  "vstat"])
+    want, groups = vg_full(L, VG_RVAL, [16], [])
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == NVLAN and got == want
+          and vg_irq(r, 0, groups)
+          and vg_line(r, 0) == vg_fields(**dict(std, vw=0, nw=0x01, rw=0))
+          and r.pst(0, "sw_writes") == "12" and r.pst(0, "swrd") == "76"
+          and r.vst(0, "winld") == "784" and r.vst(0, "starts") == "1"
+          and r.vst(0, "swtcr0") == "00080000" and vg_end(r, 0))
+    yield "K49", ok, "rc %s, %d accesses, first difference %s" % (
+        r.op(0) if r.ops else "-", len(got or []), first_diff(got, want))
+
+    # K50 each verified word wrong in turn: refused after the four loads,
+    # with no table load and no store
+    bad = [0x00000002, 0x000001FE, 0x00000001, 0x07FAC689]
+    oks = []
+    for k, (off, _) in enumerate(VG_VER):
+        r = Run(exe, [SWUNLOCK, "set vgreg %04X 0x%08X" % (off, bad[k]), VLAN,
+                      "pacc", "l", "pstat", "vstat"])
+        vr = list(VG_VR)
+        vr[k] = bad[k]
+        oks.append(r.rc == 0 and r.op(0) == eproto
+                   and acc(r, 0) == [("R", o, bad[k] if o == off else v)
+                                     for o, v in VG_VER]
+                   and vg_line(r, 0) == vg_fields(calls=1, rc=eproto,
+                                                  vm=1 << k, vr=tuple(vr))
+                   and r.pst(0, "sw_writes") == "0"
+                   and r.vst(0, "winld") == "0")
+    yield "K50", len(oks) == 4 and all(oks), "PVCR4 VCR0 PBVCR0 PLITIMR %s" % oks
+
+    # K51 a command that never completes: (8) gives up at the bound, and the
+    # undo still runs, inside the same IRQs-off section
+    r = Run(exe, [SWUNLOCK, "set vgstuck 1", VLAN, "pacc", "l", "pstat",
+                  "vstat", "stat"])
+    g = vg_write(8, ENTRY8)
+    g = (g[:g.index(("W", 0x4D00, 9)) + 1] + [("R", 0x4D00, 9)] * 10001
+         + [("R", 0x4418, STA | B18), ("W", 0x4418, STA), ("R", 0x4418, STA),
+            ("R", 0x4D04, 0)])
+    want = vg_head(F, VG_FREG) + g
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == etime and got == want and vg_irq(r, 0, [g])
+          and vg_line(r, 0) == vg_fields(calls=1, rc=etime, at=8, step=8,
+                                         vr=VG_VR, tlu=STA | B18, sta=1,
+                                         spin=10001, ld=384, to=1)
+          and r.vst(0, "swtcr0") == "00080000" and r.vtab(0) == {}
+          and r.pst(0, "sw_writes") == "12" and r.stat(0, "dmax") == "10000")
+    yield "K51", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K52 STOP_TLU_STA never set: (3) gives up, and the undo runs
+    r = Run(exe, [SWUNLOCK, "set vgsta 0", VLAN, "pacc", "l", "pstat",
+                  "vstat"])
+    g = ([("R", 0x4D00, 0), ("R", 0x4418, 0), ("W", 0x4418, B18),
+          ("R", 0x4418, B18)] + [("R", 0x4418, B18)] * 10001
+         + [("R", 0x4418, B18), ("W", 0x4418, 0), ("R", 0x4418, 0)])
+    want = vg_head(F, VG_FREG) + g
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == etime and got == want and vg_irq(r, 0, [g])
+          and vg_line(r, 0) == vg_fields(calls=1, rc=etime, at=8, step=3,
+                                         vr=VG_VR, tlu=B18, sta=10001,
+                                         ld=384, to=1)
+          and r.vst(0, "swtcr0") == "00000000" and r.vst(0, "starts") == "0"
+          and r.vtab(0) == {} and r.pst(0, "sw_writes") == "2")
+    yield "K52", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K53 the engine stores a different word 0: the read-back refuses, the
+    # undo already made, and nothing after it
+    r = Run(exe, [SWUNLOCK, "set vgcorrupt 1", VLAN, "pacc", "l", "pstat",
+                  "vstat"])
+    bad8 = [0x00807E3E] + [0] * 7
+    g = vg_write(8, ENTRY8)
+    want = vg_head(F, VG_FREG) + g + vg_read(8, bad8)
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == eio and got == want and vg_irq(r, 0, [g])
+          and vg_line(r, 0) == vg_fields(calls=1, rc=eio, at=8, step=11,
+                                         vr=VG_VR, tlu=STA | B18, sta=1,
+                                         spin=1, ld=400, rb=1)
+          and r.vst(0, "swtcr0") == "00080000"
+          and r.vtab(0) == {("v", 8): bad8} and r.pst(0, "sw_writes") == "12"
+          and vg_end(r, 0, regs=VG_FREG, tab={("v", 8): bad8}))
+    yield "K53", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K54 bit 18 does not clear: -EIO at (9), SWTASR still read, the verb
+    # stops there
+    r = Run(exe, [SWUNLOCK, "set vgnoclear18 1", VLAN, "pacc", "l", "pstat",
+                  "vstat"])
+    g = vg_write(8, ENTRY8)
+    g[-2] = ("R", 0x4418, STA | B18)        # the undo's read-back: still set
+    want = vg_head(F, VG_FREG) + g
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == eio and got == want and vg_irq(r, 0, [g])
+          and vg_line(r, 0) == vg_fields(calls=1, rc=eio, at=8, step=9,
+                                         vr=VG_VR, tlu=STA | B18, sta=1,
+                                         spin=1, ld=384, rb=1)
+          and r.vst(0, "swtcr0") == "000C0000" and r.pst(0, "sw_writes") == "12"
+          and vg_end(r, 0, regs=VG_FREG))
+    yield "K54", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K55 a second `vlan` on the same boot: every read again, no store --
+    # so no read-back either: 768 window loads after the first call's 784
+    r = Run(exe, [SWUNLOCK, VLAN, "pacc", VLAN, "pacc", "l", "pstat",
+                  "vstat"])
+    cur = dict(F)
+    cur[8] = ENTRY8
+    want = vg_head(cur, VG_RVAL) + vg_tail()
+    got = acc(r, 1)
+    ok = (r.rc == 0 and [x[1] for x in r.ops] == [NVLAN, NVLAN]
+          and got == want
+          and vg_line(r, 0) == vg_fields(calls=2, ok=2, rc=0, vr=VG_VR,
+                                         final=0, ld=784 + 768)
+          and r.pst(0, "sw_writes") == "17" and r.pst(0, "swrd") == "147"
+          and vg_end(r, 0))
+    yield "K55", ok, "rcs %s, %d accesses, first difference %s" % (
+        [x[1] for x in r.ops], len(got or []), first_diff(got, want))
+
+    # K56 -DCONFIG_RTL_819X_SWCORE: the vendor's tables, no access at all
+    if exe_y is None:
+        yield "K56", False, "no SWCORE=y build"
+    else:
+        r = Run(exe_y, ["l", VLAN, SWUNLOCK, VLAN, "pacc", "l", "pstat",
+                        "vstat"])
+        ok = (r.rc == 0 and [x[1] for x in r.ops] == [eperm, NVLAN]
+              and vg_line(r, 0) == "vendor calls 0 ok 0 refused 0 rc 1"
+              and vg_line(r, 1) == "vendor calls 2 ok 1 refused 1 rc 0"
+              and acc(r, 0) == [] and r.pst(0, "swrd") == "0"
+              and r.pst(0, "sw_writes") == "0" and r.vst(0, "winld") == "0"
+              and r.vst(0, "starts") == "0")
+        yield "K56", ok, "rcs %s, line %s" % ([x[1] for x in r.ops],
+                                             vg_line(r, 1))
+
+    # K57 the `vlan` line at its widest against the block comment, and the
+    # page's running total: 1.5's total + the measured line = 1.6's, under
+    # the table's budget (3,600) and the page (4,096) -- also as recounted
+    r = Run(exe, ["widest14", "widest15", "widest16", "l"])
+    text, n = r.lines14[0] if r.lines14 else ("", -1)
+    ls = text.split("\n")[:-1]
+    w16 = len(ls[7]) + 1 if len(ls) == 8 else -1
+    f15, f16 = comment_figures15(block), comment_figures16(block)
+    wy = -1
+    if exe_y is not None:
+        ry = Run(exe_y, ["widest16", "l"])
+        ty = ry.lines14[0][0].split("\n")[:-1] if ry.lines14 else []
+        wy = len(ty[7]) + 1 if len(ty) == 8 else -1
+    ok = (r.rc == 0 and len(ls) == 8 and n == len(text)
+          and ls[7].startswith("vlan calls 4294967295 ok 4294967295 ")
+          and f15 is not None and f16 is not None
+          and f16[:4] == (w16, 57, f15[4], f15[4] + w16)
+          and f16[5] == f16[3] + f16[4]
+          and f16[3] <= 3600 and f16[5] <= 3600 and f16[5] <= PAGE
+          and 0 < wy < w16)
+    yield "K57", ok, "comment %s, measured %d (SWCORE=y %d)" % (f16, w16, wy)
+
+    # K58 THE RE-READ: the engine also copies the entry into the next slot;
+    # slot 8's own read-back passes and only the re-read can see slot 9
+    r = Run(exe, [SWUNLOCK, "set vgghost 1", VLAN, "l", "pstat", "vstat"])
+    ok = (r.rc == 0 and r.op(0) == eio
+          and vg_line(r, 0) == vg_fields(**dict(std, ok=0, rc=eio, at=9,
+                                                step=13, final=1, rb=1))
+          and r.pst(0, "sw_writes") == "17"
+          and vg_end(r, 0, tab={("v", 8): ENTRY8, ("v", 9): ENTRY8}))
+    yield "K58", ok, "rc %s, line %s" % (r.op(0) if r.ops else "-",
+                                         vg_line(r, 0))
+
+    # K59 bit 18 does not read back set: recorded in `tlu`, not refused
+    r = Run(exe, [SWUNLOCK, "set vgnostick18 1", VLAN, "pacc", "l", "pstat",
+                  "vstat"])
+    want, groups = vg_full(F, VG_FREG, [8], range(5), sticks=False)
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == NVLAN and got == want
+          and vg_irq(r, 0, groups)
+          and vg_line(r, 0) == vg_fields(**dict(std, tlu=STA))
+          and r.pst(0, "sw_writes") == "17" and r.vst(0, "nostop") == "1"
+          and vg_end(r, 0))
+    yield "K59", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K60 the engine busy at (1): -EBUSY with nothing stored
+    r = Run(exe, [SWUNLOCK, "set vgbusyat 24 10001", VLAN, "pacc", "l",
+                  "pstat", "vstat"])
+    g = [("R", 0x4D00, 1)] * 10001
+    want = vg_head(F, VG_FREG) + g
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == ebusy and got == want and vg_irq(r, 0, [g])
+          and vg_line(r, 0) == vg_fields(calls=1, rc=ebusy, at=8, step=1,
+                                         vr=VG_VR, ld=384)
+          and r.pst(0, "sw_writes") == "0" and r.vst(0, "starts") == "0"
+          and r.vtab(0) == {})
+    yield "K60", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K61 the engine busy at the first read: -EBUSY, no window load, no store
+    r = Run(exe, [SWUNLOCK, "set vgbusyat 0 10001", VLAN, "pacc", "l",
+                  "pstat", "vstat"])
+    want = [("R", o, v) for o, v in VG_VER] + [("R", 0x4D00, 1)] * 10001
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == ebusy and got == want and vg_irq(r, 0, [])
+          and vg_line(r, 0) == vg_fields(calls=1, rc=ebusy, at=0, step=0,
+                                         vr=VG_VR)
+          and r.pst(0, "sw_writes") == "0" and r.vst(0, "winld") == "0")
+    yield "K61", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K62 PVCR2's store does not stick: -EIO at its read-back, PVCR3 and FFCR
+    # never stored
+    r = Run(exe, [SWUNLOCK, "set vgregnostick 4A10", VLAN, "pacc", "l",
+                  "pstat", "vstat"])
+    g = vg_write(8, ENTRY8)
+    want = (vg_head(F, VG_FREG) + g + vg_read(8, ENTRY8)
+            + [("W", 0x4A08, 0x00080008), ("R", 0x4A08, 0x00080008),
+               ("W", 0x4A0C, 0x00080008), ("R", 0x4A0C, 0x00080008),
+               ("W", 0x4A10, 0x00080008), ("R", 0x4A10, 0x00010001)])
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == eio and got == want
+          and vg_line(r, 0) == vg_fields(calls=1, rc=eio, at=26, step=12,
+                                         vw=0x100, rw=0x03, vr=VG_VR,
+                                         tlu=STA | B18, sta=1, spin=1,
+                                         ld=400, rb=1)
+          and r.pst(0, "sw_writes") == "15"
+          and vg_end(r, 0, regs=[0x00080008, 0x00080008, 0x00010001,
+                                 0x00010001, 0]))
+    yield "K62", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K63 slots that differ past their first word: VLAN slot 3 in word 5,
+    # netif slot 6 in word 7 -- all eight words are compared
+    r = Run(exe, [SWUNLOCK, "set vgtbl 6 3 5 0x00000400",
+                  "set vgtbl 4 6 7 0x00000001", VLAN, "pacc", "l", "pstat",
+                  "vstat"])
+    cur = dict(F)
+    cur[3] = [0, 0, 0, 0, 0, 0x400, 0, 0]
+    cur[22] = [0] * 7 + [1]
+    want, groups = vg_full(cur, VG_FREG, [3, 8, 22], range(5))
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == NVLAN and got == want
+          and vg_irq(r, 0, groups)
+          and vg_line(r, 0) == vg_fields(**dict(std, vw=0x108, nw=0x40, sta=3,
+                                                spin=3, ld=816))
+          and r.pst(0, "sw_writes") == "41" and vg_end(r, 0))
+    yield "K63", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K64 SWTASR bit 0 set after the command: recorded, not refused
+    r = Run(exe, [SWUNLOCK, "set vgreg 4D04 0x00000001", VLAN, "pacc", "l",
+                  "pstat", "vstat"])
+    want, groups = vg_full(F, VG_FREG, [8], range(5), asr=1)
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == NVLAN and got == want
+          and vg_line(r, 0) == vg_fields(**dict(std, swtasr=1))
+          and vg_end(r, 0))
+    yield "K64", ok, "rc %s, line %s" % (r.op(0) if r.ops else "-",
+                                         vg_line(r, 0))
+
+    # K65 a torn window read: one torn load is read again; ten torn double
+    # reads end the call at that slot's first read, with nothing stored
+    r = Run(exe, [SWUNLOCK, "set vgtear 1", VLAN, "pacc", "l",
+                  "set vgtear 100000", VLAN, "pacc", "l", "pstat"])
+    a0 = vg_addr(0)
+    want1, _ = vg_full(F, VG_FREG, [8], range(5))
+    torn = ([("R", 0x4D00, 0), ("T", a0, 1)]
+            + [("T", a0 + 4 * k, 0) for k in range(1, 8)]
+            + [("T", a0 + 4 * k, 0) for k in range(8)] * 3)
+    want1 = want1[:4] + torn + want1[4 + 17:]
+    want2 = ([("R", o, v) for o, v in VG_VER] + [("R", 0x4D00, 0)]
+             + [("T", a0 + 4 * (k % 8), 2 + k) for k in range(160)])
+    ok = (r.rc == 0 and [x[1] for x in r.ops] == [NVLAN, eio]
+          and acc(r, 0) == want1 and acc(r, 1) == want2
+          and vg_line(r, 0) == vg_fields(**dict(std, ld=800))
+          and vg_line(r, 1) == vg_fields(calls=2, ok=1, rc=eio, at=0, step=0,
+                                         vr=VG_VR, ld=960, rb=1)
+          and r.pst(0, "sw_writes") == "17")
+    yield "K65", ok, "rcs %s, line %s, first differences %s / %s" % (
+        [x[1] for x in r.ops], vg_line(r, 1), first_diff(acc(r, 0), want1),
+        first_diff(acc(r, 1), want2))
+
+    # K66 a command busy for three polls: (8) polls four times, nothing is
+    # stored or cleared while it runs, the result is the same
+    r = Run(exe, [SWUNLOCK, "set vgbusy 3", VLAN, "pacc", "l", "pstat",
+                  "vstat"])
+    want, groups = vg_full(F, VG_FREG, [8], range(5), polls=4)
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == NVLAN and got == want
+          and vg_irq(r, 0, groups)
+          and vg_line(r, 0) == vg_fields(**dict(std, spin=4))
+          and r.vst(0, "nostop") == "0" and vg_end(r, 0))
+    yield "K66", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+    # K67 the engine busy at (4), once STOP_TLU is set: -EBUSY, and the
+    # undo still runs, inside the same IRQs-off section
+    r = Run(exe, [SWUNLOCK, "set vgbusyat 25 10001", VLAN, "pacc", "l",
+                  "pstat", "vstat"])
+    g = ([("R", 0x4D00, 0),                                   # (1)
+          ("R", 0x4418, STA), ("W", 0x4418, STA | B18),       # (2)
+          ("R", 0x4418, STA | B18),
+          ("R", 0x4418, STA | B18)]                           # (3)
+         + [("R", 0x4D00, 1)] * 10001                         # (4)
+         + [("R", 0x4418, STA | B18), ("W", 0x4418, STA),    # (9)
+            ("R", 0x4418, STA)])
+    want = vg_head(F, VG_FREG) + g
+    got = acc(r, 0)
+    ok = (r.rc == 0 and r.op(0) == ebusy and got == want and vg_irq(r, 0, [g])
+          and vg_line(r, 0) == vg_fields(calls=1, rc=ebusy, at=8, step=4,
+                                         vr=VG_VR, tlu=STA | B18, sta=1,
+                                         ld=384)
+          and r.vst(0, "swtcr0") == "00080000" and r.vst(0, "starts") == "0"
+          and r.vtab(0) == {} and r.pst(0, "sw_writes") == "2")
+    yield "K67", ok, "rc %s, line %s, first difference %s" % (
+        r.op(0) if r.ops else "-", vg_line(r, 0), first_diff(got, want))
+
+
+def build(block, version, work, tag, defines=()):
     """Compile the harness around `block`; (exe or None, compiler output)."""
     d = os.path.join(work, tag)
     inc = os.path.join(d, "include", "linux")
@@ -1918,17 +2890,23 @@ def build(block, version, work, tag):
     with open(hpath, "w", encoding="utf-8") as fh:
         fh.write(h)
     exe = os.path.join(d, "harness")
-    p = subprocess.run(["gcc"] + CFLAGS + ["-I", os.path.join(d, "include"),
-                                           "-o", exe, hpath],
+    p = subprocess.run(["gcc"] + CFLAGS + list(defines)
+                       + ["-I", os.path.join(d, "include"), "-o", exe, hpath],
                        capture_output=True, text=True)
     return (exe if p.returncode == 0 else None), p.stdout + p.stderr
 
 
 def evaluate(block, version, work, tag):
+    """Every case over `block`, compiled twice (1.6's SWCORE=y arm is K56's
+    and K57's), or (None, why) when either compile fails."""
     exe, out = build(block, version, work, tag)
     if exe is None:
         return None, out
-    return {name: (ok, det) for name, ok, det in cases(exe, block, version)}, ""
+    exe_y, out = build(block, version, work, tag + "y", SWCORE_Y)
+    if exe_y is None:
+        return None, out
+    return {name: (ok, det)
+            for name, ok, det in cases(exe, block, version, exe_y)}, ""
 
 
 # Each mutant: (id, what it breaks, the case that must go red, old, new).
@@ -2079,6 +3057,140 @@ MUTANTS = [
     ("M49", "a refused init is not counted", "K37",
      "\t\trtl819x_sw_init_n_refused++;\n\t\trtl819x_sw_init_rc = -EPERM;",
      "\t\trtl819x_sw_init_rc = -EPERM;"),
+    # 1.6 (R6c): `vlan`.  No mutant removes a bound: it would hang the
+    # harness rather than turn a case red.
+    ("M50", "vlan without the lock check", "K47",
+     "\tif (!rtl819x_sw_unlocked) {\t/* before any access: nothing is read */",
+     "\tif (0) {"),
+    ("M51", "a refused vlan is not counted", "K47",
+     "\t\trtl819x_vlan_n_refused++;\n\t\trtl819x_vlan_rc = -EPERM;",
+     "\t\trtl819x_vlan_rc = -EPERM;"),
+    ("M52", "TCR0 stored first, TCR7 last", "K48",
+     "\tfor (k = RTL819X_VLAN_NW; k-- > 0; ) {",
+     "\tfor (k = 0; k < RTL819X_VLAN_NW; k++) {"),
+    ("M53", "the command is ADD (3), not force (9)", "K48",
+     "\t\t\t   RTL819X_VLAN_ACTION | RTL819X_VLAN_FORCE);",
+     "\t\t\t   RTL819X_VLAN_ACTION | (1u << 1));"),
+    ("M54", "the registers stored last to first, FFCR first", "K48",
+     "\tfor (i = 0; i < RTL819X_VLAN_NREG; i++) {\n"
+     "\t\tif (reg[i] == rtl819x_vlan_rval[i])",
+     "\tfor (i = RTL819X_VLAN_NREG; i-- > 0; ) {\n"
+     "\t\tif (reg[i] == rtl819x_vlan_rval[i])"),
+    ("M55", "STOP_TLU never set", "K48",
+     "\trc = rtl819x_sw_wr(RTL819X_VLAN_SWTCR0, v | RTL819X_VLAN_STOP_TLU);",
+     "\trc = rtl819x_sw_wr(RTL819X_VLAN_SWTCR0, v);"),
+    ("M56", "a slot equal to its target is written anyway", "K49",
+     "\t\tif (!memcmp(rtl819x_vlan_cur[i], w, sizeof(w)))\n"
+     "\t\t\tcontinue;\t\t/* equal: not stored */",
+     "\t\t(void)rtl819x_vlan_cur;"),
+    ("M57", "PLITIMR is not verified", "K50",
+     "\t\tif (rtl819x_vlan_vr[i] != rtl819x_vlan_vval[i])",
+     "\t\tif (rtl819x_vlan_vr[i] != rtl819x_vlan_vval[i] && i != 3)"),
+    ("M58", "a verified word refused only after the tables are read", "K50",
+     "\tif (rtl819x_vlan_vm)\n\t\treturn -EPROTO;\t\t/* no table read, nothing stored */\n"
+     "\tfor (i = 0; i < RTL819X_VLAN_NSLOT; i++) {\n"
+     "\t\trtl819x_vlan_at = (int)i;\n"
+     "\t\trc = rtl819x_vlan_read(i, rtl819x_vlan_cur[i]);\n"
+     "\t\tif (rc)\n\t\t\treturn rc;\t/* step 0, nothing stored */\n\t}\n",
+     "\tfor (i = 0; i < RTL819X_VLAN_NSLOT; i++) {\n"
+     "\t\trtl819x_vlan_at = (int)i;\n"
+     "\t\trc = rtl819x_vlan_read(i, rtl819x_vlan_cur[i]);\n"
+     "\t\tif (rc)\n\t\t\treturn rc;\n\t}\n"
+     "\tif (rtl819x_vlan_vm)\n\t\treturn -EPROTO;\n"),
+    ("M59", "no undo after (8) gives up", "K51",
+     "\t\t\trc = -ETIMEDOUT;\n\t\t\tbreak;",
+     "\t\t\trc = -ETIMEDOUT;\n\t\t\tgoto out;"),
+    ("M60", "no undo after (3) gives up", "K52",
+     "\t\t\trc = -ETIMEDOUT;\n\t\t\tgoto undo;",
+     "\t\t\trc = -ETIMEDOUT;\n\t\t\tgoto out;"),
+    ("M61", "the slot's read-back is not compared", "K53",
+     "\tif (!rc && memcmp(rb, w, sizeof(rb)))\n\t\trc = -EIO;",
+     "\tif (0)\n\t\trc = -EIO;"),
+    ("M62", "the undo's read-back is not checked", "K54",
+     "\tif (rtl819x_sw_wr(RTL819X_VLAN_SWTCR0, v & ~RTL819X_VLAN_STOP_TLU) ||\n"
+     "\t    (rtl819x_sw_rd(RTL819X_VLAN_SWTCR0) & RTL819X_VLAN_STOP_TLU)) {",
+     "\tif (rtl819x_sw_wr(RTL819X_VLAN_SWTCR0, v & ~RTL819X_VLAN_STOP_TLU)) {"),
+    ("M63", "VLAN slot 8 written whether or not it differs", "K55",
+     "\t\tif (!memcmp(rtl819x_vlan_cur[i], w, sizeof(w)))\n"
+     "\t\t\tcontinue;\t\t/* equal: not stored */",
+     "\t\tif (!memcmp(rtl819x_vlan_cur[i], w, sizeof(w)) &&\n"
+     "\t\t    i != RTL819X_VLAN_SLOT)\n\t\t\tcontinue;"),
+    ("M64", "the SWCORE=y arm reads a register", "K56",
+     "\trc = 0;\t\t/* the vendor's tables: nothing read or stored */",
+     "\trc = (int)(rtl819x_sw_rd(0x4A08) & 0u);"),
+    ("M65", "the line prints vw in eight digits", "K57",
+     "\"rc %d at %d step %u vw %04X nw %02X rw %02X \"",
+     "\"rc %d at %d step %u vw %08X nw %02X rw %02X \""),
+    ("M66", "THE RE-READ is skipped", "K58",
+     "\trtl819x_vlan_at = -1;\n\trc = rtl819x_vlan_reread();",
+     "\trtl819x_vlan_at = -1;\n\trc = 0;\n\t(void)rtl819x_vlan_reread;"),
+    ("M67", "a bit 18 that does not read back refuses", "K59",
+     "\trtl819x_vlan_tlu = rtl819x_sw_rd(RTL819X_VLAN_SWTCR0);\t/* recorded */",
+     "\trtl819x_vlan_tlu = rtl819x_sw_rd(RTL819X_VLAN_SWTCR0);\n"
+     "\tif (!(rtl819x_vlan_tlu & RTL819X_VLAN_STOP_TLU)) {\n"
+     "\t\trc = -EIO;\n\t\tgoto undo;\n\t}"),
+    ("M68", "(1)'s idle poll removed", "K60",
+     "\trtl819x_vlan_step = 1;\n\trc = rtl819x_vlan_idle();\n\tif (rc)\n"
+     "\t\tgoto out;\t\t\t/* nothing stored */",
+     "\trtl819x_vlan_step = 1;\n\trc = 0;"),
+    ("M69", "the table read's idle poll removed", "K61",
+     "\tif (rtl819x_vlan_idle())\n\t\treturn -EBUSY;\n\tfor (tries = 1; ; tries++) {",
+     "\tfor (tries = 1; ; tries++) {"),
+    ("M70", "a register's read-back is not compared", "K62",
+     "\tif (rtl819x_sw_rd(rtl819x_vlan_roff[r]) != rtl819x_vlan_rval[r])\n"
+     "\t\treturn -EIO;",
+     "\t(void)rtl819x_sw_rd(rtl819x_vlan_roff[r]);"),
+    ("M71", "a slot compared on its first word only", "K63",
+     "\t\tif (!memcmp(rtl819x_vlan_cur[i], w, sizeof(w)))\n"
+     "\t\t\tcontinue;\t\t/* equal: not stored */",
+     "\t\tif (rtl819x_vlan_cur[i][0] == w[0])\n\t\t\tcontinue;"),
+    ("M72", "SWTASR bit 0 refuses", "K64",
+     "\tif (issued)\n\t\trtl819x_vlan_asr |= rtl819x_sw_rd(RTL819X_VLAN_SWTASR);",
+     "\tif (issued) {\n\t\trtl819x_vlan_asr |= rtl819x_sw_rd(RTL819X_VLAN_SWTASR);\n"
+     "\t\tif (rtl819x_vlan_asr & 1u)\n\t\t\trc = -EIO;\n\t}"),
+    ("M73", "ten unequal double reads keep the second buffer", "K65",
+     "\t\tif (tries >= RTL819X_VLAN_TRIES)\n\t\t\treturn -EIO;",
+     "\t\tif (tries >= RTL819X_VLAN_TRIES)\n\t\t\treturn 0;"),
+    ("M74", "(8) polls once and goes on", "K66",
+     "\t\trtl819x_vlan_spin++;\n"
+     "\t\tif (!(rtl819x_sw_rd(RTL819X_VLAN_SWTACR) & RTL819X_VLAN_ACTION))\n"
+     "\t\t\tbreak;",
+     "\t\trtl819x_vlan_spin++;\n\t\t(void)rtl819x_sw_rd(RTL819X_VLAN_SWTACR);\n"
+     "\t\tbreak;"),
+    ("M75", "the write and its read-back address slot + 1", "K48",
+     "\tlocal_irq_save(flags);\n\trtl819x_vlan_step = 1;",
+     "\ti++;\n\tlocal_irq_save(flags);\n\trtl819x_vlan_step = 1;"),
+    # M76-M81 each change what one case alone can see: the accesses of
+    # every other case stay as they were
+    ("M76", "a refused call keeps the last call's fields", "K47",
+     "\trtl819x_vlan_n++;\n#ifndef CONFIG_RTL_819X_SWCORE\n"
+     "\trtl819x_vlan_clear();\n#endif\n"
+     "\tif (!rtl819x_sw_unlocked) {\t/* before any access: nothing is read */\n"
+     "\t\trtl819x_vlan_n_refused++;\n\t\trtl819x_vlan_rc = -EPERM;\n"
+     "\t\treturn -EPERM;\n\t}\n",
+     "\trtl819x_vlan_n++;\n\tif (!rtl819x_sw_unlocked) {\n"
+     "\t\trtl819x_vlan_n_refused++;\n\t\trtl819x_vlan_rc = -EPERM;\n"
+     "\t\treturn -EPERM;\n\t}\n#ifndef CONFIG_RTL_819X_SWCORE\n"
+     "\trtl819x_vlan_clear();\n#endif\n"),
+    ("M77", "a failed undo does not end the verb", "K54",
+     "\t\trtl819x_vlan_step = 9;\n\t\trc = -EIO;",
+     "\t\trtl819x_vlan_step = 9;"),
+    ("M78", "the comment's line figure is a byte short", "K57",
+     "): 279\n * bytes (tools/mdiocheck.py K57",
+     "): 278\n * bytes (tools/mdiocheck.py K57"),
+    ("M79", "THE RE-READ compares VLAN slots 0-8 only", "K58",
+     "\t\tif (memcmp(w, t, sizeof(w)) && !n++)",
+     "\t\tif (i <= RTL819X_VLAN_SLOT && memcmp(w, t, sizeof(w)) && !n++)"),
+    ("M80", "(1)'s busy answer ignored", "K60",
+     "\trtl819x_vlan_step = 1;\n\trc = rtl819x_vlan_idle();\n\tif (rc)\n"
+     "\t\tgoto out;\t\t\t/* nothing stored */",
+     "\trtl819x_vlan_step = 1;\n\t(void)rtl819x_vlan_idle();\n\trc = 0;"),
+    ("M81", "the table read's busy answer ignored", "K61",
+     "\tif (rtl819x_vlan_idle())\n\t\treturn -EBUSY;\n\tfor (tries = 1; ; tries++) {",
+     "\t(void)rtl819x_vlan_idle();\n\tfor (tries = 1; ; tries++) {"),
+    ("M82", "(4)'s busy answer skips the undo", "K67",
+     "\trtl819x_vlan_step = 4;\n\trc = rtl819x_vlan_idle();\n\tif (rc)\n\t\tgoto undo;",
+     "\trtl819x_vlan_step = 4;\n\trc = rtl819x_vlan_idle();\n\tif (rc)\n\t\tgoto out;"),
 ]
 
 
@@ -2095,7 +3207,7 @@ def main():
     block, version = extract(open(a.source, encoding="utf-8").read())
     work = a.keep or tempfile.mkdtemp(prefix="mdiocheck-")
     os.makedirs(work, exist_ok=True)
-    print("mdiocheck 1.2")
+    print("mdiocheck 1.3")
     print("  source  %s  (block %d lines, version %r)"
           % (a.source, block.count("\n"), version))
     try:
@@ -2104,15 +3216,23 @@ def main():
             print("  FAIL K0  the block does not compile in the harness:")
             print(out)
             return 1
+        exe_y, out = build(block, version, work, "M0y", SWCORE_Y)
+        if exe_y is None:
+            print("  FAIL K0  the block does not compile with %s:"
+                  % " ".join(SWCORE_Y))
+            print(out)
+            return 1
         probe = Run(exe, [])
         eok = probe.errno == ERRNO and probe.bound == 10000
-        print("  %s K0  compiles with %s; errno %s; bound %s"
+        print("  %s K0  compiles with %s, and again with %s; errno %s; "
+              "bound %s"
               % ("ok  " if eok else "FAIL", " ".join(CFLAGS),
+                 " ".join(SWCORE_Y),
                  "= arch/rlx's" if probe.errno == ERRNO else probe.errno,
                  probe.bound))
         fails = 0 if eok else 1
         results = {}
-        for name, ok, det in cases(exe, block, version):
+        for name, ok, det in cases(exe, block, version, exe_y):
             results[name] = ok
             print("  %s %-4s %s" % ("ok  " if ok else "FAIL", name, det))
             fails += 0 if ok else 1

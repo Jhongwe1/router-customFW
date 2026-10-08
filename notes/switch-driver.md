@@ -351,7 +351,7 @@ verb and the read is the measurement rather than a courtesy.
    16-entry CAM with its own `vid` field at `0xBB060000 + idx*32`, reached
    through the TACI block, which is a protocol and not a register write. 推
    that `En1QtagVIDignore` makes the table irrelevant to a dumb switch; that
-   推 is untested and the table is left alone until it is.
+   推 is untested and the table is left alone until it is. 🔄 1.6's `vlan` writes it (§ 21.4).
 4. 🔴 It cannot promise that a single read of a switch **table** is
    trustworthy. 讀 `96E/rtl865x_asicBasic.S:1043-1211`: the vendor's own
    `_rtl8651_readAsicEntry` reads a table entry **twice into two buffers,
@@ -4412,3 +4412,97 @@ admitted as the two sources, A as a third.
 
 § 16.8's rule — the group as a unit, never partially — stands. § 17.1's ruling 3 carries a pointer
 here.
+
+### 21.4 The code: `rtl819x-switch` 1.6's `vlan` (`R6c-3`, `NET-173`)
+
+讀 A block appended to `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-switch.c` as 1.6
+(ruling E1). 1.5's handler hands it every write none of 1.5's forms took. PID 1 types `vlan`
+between `init` and `start` (`src/init/main.c`'s `lan_verbs[]`; `config/rlxfw-init.sh` at the same
+place), and a failure is printed and `start` still runs. The driver still writes nothing at boot
+on its own, and the quiet `/init` types none of this. The block comment holds every step with its
+source; in short:
+
+* **The order.** The switch's own lock, tested before any access (`-EPERM`). On `SWCORE=y`, rc 0
+  and nothing read. The four verified words, all read before any is judged (`-EPROTO`, nothing
+  else read). Every target read before any store: VLAN slots 0–15 and netif slots 0–7 through
+  the table window with `rtl819x-view`'s double read (`-EIO` after ten unequal tries), then
+  `PVCR0`–`3` and `FFCR`. A store only where what was read differs from the target — VLAN slots
+  ascending, netif slots ascending, `PVCR0`..`3`, `FFCR` — each read back. Then the whole group,
+  the four verified words included, read again as a unit (`-EIO`, with `final` and `at`).
+* **One table write** (ruling E2), IRQs off for (1)–(10): (1) `SWTACR` bit 0 idle, rlxfw's own
+  step; (2) `SWTCR0 |= STOP_TLU`, read back into `tlu` and not required; (3) bit 19 polled;
+  (4) idle again; (5) `TCR7`…`TCR0`, all eight words; (6) `SWTAA`; (7) `SWTACR = 9`; (8) polled
+  done; (9) on every exit after (2)'s store, bit 18 cleared and read back clear, or `-EIO`;
+  (10) `SWTASR` recorded. (11), with IRQs on: the slot's eight words read back and compared.
+  Every poll is bounded at 10,000 with `udelay(1)` between them: 推 at most about 40 ms with IRQs
+  off, and only on an engine that never answers. The order has two sources, A's table write
+  (`LDR-47`) and Bb's `swTable_forceAddEntry` (`swTable.c:76`–`:98`, `:137`–`:156`). The
+  command, 9 (force) where the loader uses 3 (add), is B's: `rtl865x_asicCom.c:121`, `:553` and
+  `:1124` — the VLAN setter, the netif setter and the table clear — each call
+  `_rtl8651_forceAddAsicEntry`, and the VLAN setter indexes by VID, so VID 8 is slot 8.
+* **What a standard boot stores** (推, from the code; `R6c-4` reads it). Booted from flash: VLAN
+  slot 8 (12 stores), `PVCR0`–`3` and `FFCR` (5), so `n_writes` after the boot goes from 6 to 23.
+  Booted through the prompt: netif slot 0 alone (12), 6 to 18. `n_reads` gains 80 + k and 75 + k,
+  k the polls of (8), and `ld` reads 784 on either. No mark, so the boot capture does not change.
+  The page gains one line of at most 279 bytes: its worst case goes from 2,591 to 2,870 of 4,096
+  (3,042 with every narrow field at its type's widest), under the table's budget of 3,600.
+
+**The review** (2026-10-08, the 129th segment; the code is the 128th segment's implementation
+agent's). 讀 The main session read the block line by line and checked every address, bit and
+enumerator against B (`rtl865xc_asicregs.h`, the TACI, ALE and VLAN definitions and the `PVCR`
+fields; `rtl865x_asicCom.h`'s table sizes, 16 VLAN slots on the 8196E and 8 netif; the table
+enum in `rtl865x_asicBasic.h`, netif 4 and VLAN 6) and against this driver's own register table;
+`00807E3F` against B's VLAN entry (`rtl865x_asicCom.h:230`–`:242`): VID 8, fid 0, member and
+untag ports 0–5, no extension port; the step order against Bb and `LDR-47`; that `rtl819x_sw_wr`
+refuses before its store, so a store that failed needs no undo; the format's 22 conversions
+against its 22 arguments, and the 279 bytes field by field. FW-110 by its own diff: the first
+1,865 lines differ in 30, in nine blocks, each N-for-N; `src/init/main.c` loses a comment line
+at 545–547 and gains the `vlan` row at 556, so nothing below 556 moves; of 1,174 line citations
+by these files' names, only `rtl819x-switch.c:93`–`:97` changed — the header's item 3, rewritten
+in place.
+
+**The harness** (`tools/mdiocheck.py`, 98 → 152 run). 讀 It cuts the block unchanged and drives
+it over a TACI engine model: a command busy for N `SWTACR` loads or never done, then copied to the
+slot `SWTAA` names, the copy corrupted or doubled on demand; `SWTCR0` with bit 19 reading 1 and
+bit 18 read/write, or scripted not to set or not to clear; the nine ALE and VLAN registers; the
+VLAN and netif tables behind the window; seating A's state and a synthetic netif slot 0 as the
+flash and RAM paths; a second compile with `-DCONFIG_RTL_819X_SWCORE`. K47–K67 (21 cases),
+M50–M82 (33 mutants). On the host, the main session ran twelve mutants of its own, outside the
+repository (`$FWRE_WORK/rebuild/s129/mut.py`), with the unmutated copy green as their control.
+Ten were killed. One — (4)'s busy answer skipping the undo, the exit that would leave
+`STOP_TLU` set and so stop every lookup — passed all 68 of the agent's cases. One was the main
+session's own error (it did not compile) and counts for nothing. K67 (the engine busy at (4)
+once `STOP_TLU` is set: `-EBUSY`, bit 18 cleared and read back in the same IRQs-off section, two
+stores) and M82 close the gap; M82 turns K67 alone red. Re-run by the main session on `2009c4eb`
+plus the patch, each rc 0: `mdiocheck` 152 run, 0 failed, 82 of 82 mutants killed by the case
+named for them; `mkinitramfs` (47) and its mutants (29), `sh -n` on the init script, `bootbytes`
+(9), `nic15check` (50), `mfginject` (36, 1 skip), `appletcensus` (11 and 19), `srcarchive` (40),
+`ci-census` (30), the config gates (72), `src/init`'s tests and mutants, the file modes (5).
+
+**Also changed, in place** (讀): `rtl819x-switch.c`'s header item 3 and 1.5's last two
+paragraphs; `rtl819x-nic.c`'s item 3 (on `SWCORE=n` no probe sets `FFCR`, `vlan` does);
+`rlxfw-seam.c`'s item 1; `src/init/init.h`'s count of verbs; `config/rlxfw-initramfs.tsv`'s `/init`
+row, which now leaves the binary's size to `docs/sbom.md`. The header's item 2 (`n_writes` reads
+0 on a boot capture) was already untrue of a standard `/init` before 1.6 and is left as it was.
+
+### 21.5 What `R6c-3` does not establish
+
+* That the take-over brings `rlx0` up on a flash boot: nothing of 1.6 has run on the device.
+  `R6c-4`'s seating is the test, and 2026-10-08's flash boots without the verb (`X-V06q`,
+  `X-V08q`, seating A) are its control.
+* That the RAM path still pings with netif slot 0 cleared: the loader's group minus that entry has
+  not been measured on any path, and `R6c-4` tests it before any flash write. `NET-169` makes it
+  plausible — on that path `rlx0`'s own address is in no table, so its unicast reaches the CPU by
+  `FFCR`'s unknown-unicast trap and not through the netif entry — but that mechanism is itself 推
+  on one source. The ruling's fallback, netif slot 0 with `rlx0`'s own address, is not written.
+* How `SWTCR0` reads while `STOP_TLU` is set, whether the engine copies all eight `TCR` words or
+  three and five, how many polls a command takes, and what `SWTASR` reports after a force: the
+  harness scripts each, and the silicon has answered none.
+* What the switch does with a frame that arrives while `STOP_TLU` holds the lookups: on the RAM
+  path the loader has already set `TRXRDY` when `vlan` runs.
+* The state after a watchdog reset on the flash path (seating A's boot was cold), and any value
+  outside the group: `MACCR` (the one configuration word where F differs from both working
+  states), `QNUMCR`'s CPU field, the PHY patch, `LEDCREG`.
+* That the harness catches an error it shares with the driver: its engine follows the same two
+  vendor readings the driver does.
+* Anything under load, with a second port, or on the vendor's firmware.

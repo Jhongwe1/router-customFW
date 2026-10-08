@@ -1587,20 +1587,20 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/linkprobecheck.py 2>&1 | tee ci-out/linkprobecheck.out; exit "${PIPESTATUS[0]}"
 
-      # mdiocheck (R6b-7) cuts rtl819x-switch 1.3's MDIO block, 1.4's phyif
-      # block and 1.5's init and reset guard out of config/rlxfw-src/linux-2.6.30/
-      # drivers/net/rtl819x-switch.c, UNCHANGED, and compiles them with the HOST
-      # gcc (-std=gnu89 -Werror) against a scripted MDIO controller, phylib's
-      # register, scan and read path from the staged 2.6.30 tree, a PCRP model
-      # and a CPUICR word reached through the switch's own paths, the kernel's
-      # simple_strtoul and this arch's errno values, with IRQs-off sections,
-      # udelay and the mutex counted. K0-K46 and K14b: every verb refused and
-      # permitted beside its twin, the exact MDCIOCR words and PCRP accesses,
-      # the reset guard refusing and permitting, a pread's six stores and a
-      # phyif port's three accesses each in ONE IRQs-off section, the bound's
-      # positive control, the pages at their widest. M0 runs the unmutated cut;
-      # M1-M49 must each turn the case they name red. Without gcc it REFUSES
-      # (exit 3). It cannot see the silicon; its fakes share the driver's sources.
+      # mdiocheck (R6b-7) cuts rtl819x-switch 1.3's MDIO block, 1.4's phyif,
+      # 1.5's init and reset guard and 1.6's vlan out of config/rlxfw-src/
+      # linux-2.6.30/drivers/net/rtl819x-switch.c, UNCHANGED, and compiles them
+      # with the HOST gcc (-std=gnu89 -Werror), twice for 1.6's SWCORE=y arm,
+      # against a scripted MDIO controller, phylib's path from the staged tree,
+      # a PCRP model, a CPUICR word, a TACI engine with the VLAN and netif
+      # tables behind it, the kernel's simple_strtoul and this arch's errno
+      # values, with IRQs-off sections, udelay and the mutex counted. K0-K67
+      # and K14b: every verb refused and permitted beside its twin, the exact
+      # MDCIOCR words, PCRP and TACI accesses, the reset guard, each section
+      # that must hold IRQs off, the bounds' positive controls, the pages at
+      # their widest. M0 runs the unmutated cut; M1-M82 must each turn the case
+      # they name red. Without gcc it REFUSES (exit 3). It cannot see the
+      # silicon; its fakes share the driver's sources.
       - name: mdiocheck
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/mdiocheck.py 2>&1 | tee ci-out/mdiocheck.out; exit "${PIPESTATUS[0]}"
