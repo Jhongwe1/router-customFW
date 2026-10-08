@@ -550,12 +550,12 @@ displacement — 48 sites, 13 distinct addresses, **all in `0xBB804xxx`**. **(A.
 
 | address | **B** calls it | in **D**? | loader's use **(A)** |
 |---|---|---|---|
-| `0xBB804000` | `MACCR` | Table 57 lists the block, not this offset | `\|= 0x1000` once |
+| `0xBB804000` | `MACCR` | Table 57 lists the block, not this offset | ~~`\|= 0x1000` once~~ 🔄 2026-10-08: `(v & 0xFFF3FFF0) \| 0x00080005` at `0x804033E0` (B `rtl865x_asicL2.c:4205`; `SPEC.md` `NET-28`); the two `\|= 0x1000` sites, `0x804035E8` and `0x804038EC`, do not run here (the 2026-10-08 section) |
 | `0xBB804004` | `MDCIOCR` | **Table 58** | section 1 |
 | `0xBB804008` | `MDCIOSR` | **Table 59** | section 1 |
 | `0xBB804100` | `PITCR` | **Table 63** | `\|= 0x1`, twice |
-| `0xBB804104` | `PCRP0` | **Table 64** | read-modify-write, 5 sites |
-| `0xBB80414C` | `P0GMIICR` | **absent** | 5 sites |
+| `0xBB804104` | `PCRP0` | **Table 64** | read-modify-write, ~~5 sites~~ 🔄 2026-10-08: 10 store sites, two of them the `PCRP0`–`4` loops and one `J`'s; on this unit's prompt path the `EnForceMode` loops, `&= ~0x8` and `\|= 0x9` run, and `J` clears bit 0 |
+| `0xBB80414C` | `P0GMIICR` | **absent** | ~~5 sites~~ 🔄 2026-10-08: eleven store sites, all in the two arms that do not run here; never written on this unit (`SPEC.md` `NET-28`) |
 | `0xBB804234` | ~~**absent**~~ `MEMCR` (`:1438`; 🔄 named 2026-09-17, `SPEC.md` `NET-29`) | **absent** | 1 site — **undetermined** |
 | `0xBB804418` | `SWTCR0` | absent | 8 sites |
 | `0xBB804428` | `FFCR` | absent | 1 site |
@@ -624,10 +624,10 @@ without checking that the code writing that field had run. `PITCR = 0` is
 
 ### `PCRP0` is configured; `PCRP1`–`PCRP4` are not
 
-The only per-port configuration register the loader writes is `PCRP0`. **(A.)**
+~~The only per-port configuration register the loader writes is `PCRP0`.~~ 🔄 2026-10-08: it writes `PCRP0`–`PCRP4`, and the forced setting described next is in an arm that does not run here (`SPEC.md` `REG-30`). **(A.)**
 It sets `EnForceMode`, `ForceLink` and a forced speed/duplex —
 `(PCRP0 & 0xFF83FFFF) | 0x028C0000` on one branch and `| 0x02940000` on another,
-selected by a strap read from `0xB800000C & 0xF` compared against 13.
+selected by the strap at `0xB8000008` bits 28:27, inside the arm that `0xB800000C & 0xF` compared against 13 gates.
 
 🔴 **~~No loop over `PCRP1`…`PCRP4` exists in the image.~~
 REFUTED 2026-09-14 — desk, zero power, and it was found by chasing the
@@ -1305,3 +1305,152 @@ displacement, would be invisible to it, and either would refute the 推.
 ⚠️ And `PITCR` is the standing warning against reading a write as a value:
 `0x80403904` does `PITCR |= 1` and `PITCR` reads `00000000` at the prompt and
 under Linux both.
+
+## 🆕 2026-10-08 (128th segment, desk) — the Ethernet init, write by write, and the boot path that skips it
+
+讀 unless marked. **A** is `stage2.bin` (`sha256 f88869d1…c9c1b4ee`) disassembled at
+`0x80400000`; 讀 the control is `ComSrlCmd_RDID` at `0x8040591C`, instruction for instruction as
+`docs/loader-flash-write.md` quotes it. **Bb** is the vendor bootcode
+(`saturn49-wecb/rtl819x/bootcode/boot/`; 讀 the `wecb-vz-gpl` copy is identical in `rtl8196x/`,
+`include/` and `init/ethInt_865x.c`, so the two are one vote), built for 8196C and 8198 only
+(`def-rtl8196c-config`, three `def-rtl8198*-config`). **Bk** is the `CONFIG_RTL_8196E` arm of the
+vendor's Linux switch driver, `rtl819x-toolchain/…/drivers/net/rtl819x/AsicDriver/`. 讀 no held tree
+builds this loader: its `P0phymode=%02x, %s phy` format is in neither bootcode tree. A disassembly is
+not one of the two sources a value needs before it enters code, so **nothing below is admitted for
+rlxfw on A alone**; the rows say what this loader does.
+
+### The path that runs it, and the one that does not
+
+讀 A: the init is `eth_startup` (`0x804028B4`), called only by `goToDownMode` (`0x80408468`), which
+is called only at `0x804086E8` and `0x80408704`, both in the boot dispatcher `0x80408690` (Bb
+`init/utility.c:1939`–`:1975`, `doBooting`). 讀 the dispatcher's argument is the flash scan's result
+(`0x8040825C` → `0x80408084`; Bb `init/main.c:67`–`:73`). 讀 a non-zero result runs the ESC check
+(`0x804086B0`): ESC on the console, or the reset button on GPIO A5 (`0x80408DE4`), prints
+`---Escape booting by user` and reaches `0x804086E8`; otherwise `0x804084B8` jumps to the image and
+the switch is never addressed. 讀 a zero result reaches `0x80408704` with no line printed.
+
+讀 A and Bb (`utility.c:143`, `:205`, `:275`, `:866`): the scan returns zero when no probed offset
+holds a `cs6c` or `cr6c` header, and for `cr6c` a `sqsh`/`hsqs` rootfs, whose checksum is zero —
+**and also once ESC or the button has been seen during the scan itself**: its checksum loops call
+the ESC check (`0x80407E94`, `0x80407FF8`), which sets the flag at `0x8040DBA4`, and both checkers
+return zero at their first test while it is set (`0x80407D98`, `0x80407F48`). 量 Of the 361
+committed captures that hold both of the init's lines (`*.log` under `bench/` and
+`upstream/dumps/`, read with `grep -a`), 342 carry no `---Escape booting by user` line, so they
+entered through `0x80408704`; 19 carry it (`0x804086E8`): one on `2026-09-06` (`SQ-A`), sixteen on
+`2026-10-07` and two on `2026-10-08`. 推 With the vendor image in flash the tool's ESC was caught
+inside the rootfs checksum on all but one boot (`SQ-A`), and since `R8b`'s flash writes it is
+caught by the dispatcher; 讀 the vendor image booted without ESC in the same weeks (`LDR-46`), so a
+failed scan does not explain those boots. Either way the init runs only on a boot that ESC, the
+button or an unbootable flash has diverted, and never on an autoboot.
+
+讀 `---Ethernet init Okay!` is printed unconditionally once `eth_startup` returns
+(`0x80408478`–`0x80408480`; Bb `utility.c:1716`, `:1728`): it is not a success flag. 量 None of the
+361 captures holds any of the init's failure strings (control: all five are in `stage2.bin`).
+
+### The writes, in program order
+
+量 columns: `PER-SW` is `bench/2026-10-04/PER-SW` (a prompt-path boot, the latch column unless
+marked), `X-V08r` is `bench/2026-10-08/X-V08r-sw` (an autoboot); both are read with CR stripped.
+**nd** marks a reading that is the same on the autoboot, where the loader writes nothing (below), so
+it is consistent with the write and is not evidence of it.
+
+| # | write | address | value | A | B | 量 | verdict |
+|---|---|---|---|---|---|---|---|
+| 1 | switch-core clock/reset, `SYS_CLK_MAG` bit 11 | `0xB8000010` | `&= ~0x800`; busy loop 5000; `\|= 0x800`; busy loop 1000 | `0x80402F4C`, `0x80402F64` (called `0x8040343C`) | Bb `swCore.c:211`–`:214`, Bk `rtl865x_asicCom.c:2020`–`:2022`: the 8198 rev-B arms. Bk's 8196E arm (`:2005`–`:2015`) adds `SIRR \|= FULL_RST` and a `CM_PROTECT` bracket; names `rtl865xc_asicregs.h:3523`–`:3525` | none | A + Bb + Bk on the 8198 form; A is not Bk's 8196E arm |
+| 2 | `EnForceMode` (bit 25) set on `PCRP0`–`4`, then cleared | `0xBB804104`–`4114` | `\|= 1<<25` … `&= ~(1<<25)` | loops `0x804032DC`–`0x804032FC`, `0x804033F4`–`0x80403414` | Bk `rtl865x_asicL2.c:4173`–`:4174`, `:4207`–`:4208` | bit 25 = 0, `PER-SW:40`–`:44`, nd | A + Bk |
+| 3 | PHY patch, PHYs 0–4 | MDIO | page 1 r16 `(x & 0x1FFF) \| 0xC000`; `REVR == 0x8196E000` ? p0 r24 `&= 0x7FFF` : p0 r22 `(x & 0xFF8F) \| 0x40`, p0 r21 `(x & 0xFF00) \| 0xC2`, p1 r19 `&= 0xFFFE`, p0 r22 `&= 0xFFF7` | `0x80403144` from `0x80403318`, `…348`, `…368`, `…384`, `…39C`, `…3B4`; test `0x80403320`–`0x80403330` | Bk `:4177`–`:4195`; Bk's IOT block (`:4198`–`:4201`, p0 r26 bit 14, r17 bits 11:8) has no counterpart in A | `REVR` `8196E001` (`REG-29`) takes the second arm; `NET-160`'s R column becomes its L column by exactly this arithmetic (r21 `02C5`→`02C2`, r22 `5B8F`→`5BC7`; r26 `4000` and r17 `1F10` untouched); page 1 r16 `D100`, r19 `7380` (`NET-148`) | A + Bk + 量 |
+| 4 | `MACCR` | `0xBB804000` | `(v & 0xFFF3FFF0) \| 0x00080005`: `SELIPG_11`, `CF_RXIPG` 5 | `0x804033BC`–`0x804033E0` | Bk `:4205`; fields `rtl865xc_asicregs.h:1034`, `:1037`, `:1044`; Bb `swCore.c:984` (8196C arm) sets bits 3:0 only | `804A0185` (`PER-SW:36`); autoboot `80420186` | A + Bk + 量 |
+| 5 | `MEMCR` | `0xBB804234` | `= 0`, then `= 0x7F` | `0x80403450`, `0x80403458` | none: Bk names it (`rtl865xc_asicregs.h:1438`, `NET-29`) and no file of the driver writes it; Bb lacks the name | `00007F7F` (`PER-SW:53`); autoboot `00007F00` | A + 量 only |
+| 6 | multicast table, slots 0–63, all-zero, `CMD_ADD` | `0xBB030000` + 32·i | zero entries | `0x80403460` → `0x80402EB0` → `0x80404710` | Bb `swCore.c:1048` | not read | A + Bb |
+| 7 | netif table, slots 0–7, all-zero, `CMD_ADD` | `0xBB040000` + 32·i | zero entries | `0x8040346C` | Bb `:1049`; Bb also clears ten tables that A does not (`:1045`–`:1047`, `:1050`–`:1056`) | not read | A + Bb |
+| 8 | `PIN_MUX_SEL2` | `0xB8000044` | `= 0` | `0x80403474`–`0x8040347C` | Bb `:1153` (8198 arm) | 0 (`NET-160` L) | A + Bb + 量 |
+| 9 | `MacSwReset` (bit 3) cleared on `PCRP0`–`4` | `0xBB804104`–`4114` | `&= ~0x8` | `0x80403480`–`0x804034E0` | Bk `:5009`–`:5013` | — (set again by rows 10–11) | A + Bk |
+| 10 | `PCRP1`–`4` | `0xBB804108`–`4114` | `\|= (n<<26) \| EnablePHYIf \| MacSwReset` = `0x04000009` … `0x10000009` | `0x804034E4`–`0x80403530` | Bk `:5016`–`:5019` (Bk also writes `PCRP0` at `:5015` and `:5045`–`:5046`; same end value). Bb `swCore.c:1140`–`:1150` also clears bit 22 and sets `AcptMaxLen_16K` | bit 22 = 1, bits 2:1 = 0 (`PER-SW:41`–`:44`), nd: Bb's 8196C sequence did not run, and A's write is not shown | A + Bk |
+| 11 | `PCRP0`, the embedded arm | `0xBB804104` | `\|= 0x9` | `0x80403560`–`0x80403574` | Bk `:5078`–`:5081` | none: `PER-SW:40`'s live `007F0039` is rlxfw's `phyif` (`PER-SW:13`), its latch `007F0038` is after `J`, and the autoboot reads the same pair | A + Bk |
+| 12 | **not run here**: the `P0phymode != 1` arm and the `BOND_8196ES` arm | — | `PCRP0 \|= 0x18002009`; PHY 6 r4 (first arm); forced 100 or 1000 on `PCRP0`; `MACCR \|= 0x1000` (`0x804035E8`, `0x804038EC`); `P0GMIICR` mode and `\|= 0x40` (eleven sites); `PITCR \|= 1` (`0x8040371C`, `0x80403904`) | arms `0x80403580`–`0x80403734` (unreachable: `P0phymode` is the literal 1 at `0x80403534`) and `0x80403754`–`0x8040391C`, behind `(REG32(0xB800000C) & 0xF) == 13` at `0x80403738`–`0x8040374C` | Bk `:5073`–`:5075`, `:5082`–`:5150`; `BOND_OPTION`, `BOND_ID_MASK`, `BOND_8196ES` (`0xD`), `BOND_8196E` (`0xF`) `rtl865xc_asicregs.h:3528`–`:3533` | the nibble is `F` (`REG-30`); `PITCR` 0, `P0GMIICR` `00037D00`, `MACCR` bit 12 = 0 (`PER-SW:39`, `:52`, `:36`), nd; `NET-28` predicted the `P0GMIICR` skip | not executed (A + Bk + 量) |
+| 13 | `PVCR0`–`3` | `0xBB804A08`–`4A14` | `0x00080008` | `0x80403920`–`0x80403944` | Bb `swCore.c:1237`–`:1241` | `00080008` ×4 (`PER-SW:62`–`:65`); autoboot `00010001` | A + Bb + 量 |
+| 14 | `MSCR` | `0xBB804410` | `1` (`EN_L2`) | `0x80403948`–`0x80403950` | Bb `:1246`; Bk `rtl865xc_asicregs.h:1560` | 1 (`PER-SW:56`), nd: the reset value (`NET-168`) | A + Bb |
+| 15 | `QNUMCR` | `0xBB804754` | `0x1249` | `0x80403954`–`0x8040395C` | Bb `:1247`; Bk `:1959`–`:1991` | `00001249` (`NET-160` L) | A + Bb + 量 |
+| 16 | `SSIR` `TRXRDY` | `0xBB804204` | `\|= 1` | `0x80403960`–`0x80403970` | Bb `:1250`; Bk `:1435`, `:1444` | latch 1 (`PER-SW:35`); autoboot latch 0 | A + Bb + 量 |
+| 17 | `PIN_MUX_SEL` | `0xB8000040` | `&= ~0x8F18` | `0x80403974`–`0x8040398C` | Bk `:4568` (the arm without `CONFIG_RTK_VOIP_BOARD`) | 6 (`NET-160` L), its low bits set at `0x804083C4` on both paths | A + Bk |
+| 18 | `PIN_MUX_SEL2` | `0xB8000044` | `&= ~0x3B6DB` (0 already, row 8) | `0x80403990`–`0x804039A4` | Bk `:4569` | 0 (`NET-160` L) | A + Bk |
+| 19 | `LEDCREG` | `0xBB804300` | `0x00200000` | `0x804039A8`–`0x804039B0` | Bk `:4571`; Bb writes another value and a `PORT5_PHY_CONTROL` entry (`swCore.c:1274`–`:1295`), A neither | `00200000` (`NET-160` L) | A + Bk + 量 |
+| 20 | restart autonegotiation, PHYs 0–5 | MDIO r0 | `\|= 0x0200` | loop `0x804039B4`–`0x804039CC` → `0x8040303C` | Bb `swCore.c:1301`–`:1310`, over `MAX_PORT_NUMBER` ports: 6, or 5 when `RTL8196B` is set (`asicregs.h:46`–`:49`), as `def-rtl8196c-config` sets it | not read; PHY 5 does not answer (`NET-08`) | A + Bb (8198 builds) |
+| 21 | L2 static entry for `eth0_mac`, column 0 | `0xBB000000` + 32·(row<<2) | `CMD_FORCE`, TCR0–TCR1 only: word 0 octets 1–4, word 1 `0x021E0700 \| octet 0` | `0x804039D8` → `0x80402D44` → `0x80402C44` | Bb `swCore.c:155`–`:185`, `:1347`; fields Bb `swCore.h:326`–`:376` = Bk `rtl865x_asicL2.h:140`–`:157` | slot 600 (row 150): the address and every field A writes, `agingTime` 1 or 3 (`NET-169`) | A + Bb + 量 |
+| 22 | L2 static entry for `eth0_mac_httpd`, column 1 | `0xBB000020` | the all-zero address | `0x804039E8` | Bb `:1348` | slot 1 holds it (`NET-169`) | A + Bb + 量 |
+| 23 | `FFCR` | `0xBB804428` | `3` (`EnUnkUC2CPU \| EnUnkMC2CPU`) | `0x804039F0`–`0x804039FC` | Bb `:1351`; Bk `:1666`–`:1669` | `00000003` (`PER-SW:59`); autoboot 0 | A + Bb + 量 |
+| 24 | CPU rings: `CPUTPDCR0`–`3`, `CPURPDCR0`–`5`, `CPURMDCR0` | `0xB8010020`, `24`, `60`, `64`; `0xB8010004`–`1C` | ring addresses; four TX rings `{4,2,2,2}` (`0x8040AB44`), RX `{4,0,0,0,0,0}` | `0x80404440`–`0x80404474`, `0x8040464C`–`0x804046B0` | Bb `swNic_poll.c:631`–`:632`, `:683`–`:690` (two TX rings, `{4,2}` at `ethInt_865x.c:301`); Bk names `CPUTPDCR2`/`3` (`rtl865xc_asicregs.h:508`–`:509`) | the loader's ring addresses (`NET-160` L) | A + Bb, A + Bk for TX 2–3 |
+| 25 | `CPUICR` | `0xB8010000` | `0xC4000000` | `0x804046B4`–`0x804046B8` | Bb `swNic_poll.c:710` | `C4000000` (`NET-160` L) | A + Bb + 量 |
+| 26 | `CPUIIMR` | `0xB8010028` | `0x7F8` | `0x804046BC`–`0x804046C4` | Bb `:714`; Bk `:590`, `:598` | `000007F8` (`NET-160` L) | A + Bb + 量 |
+| 27 | `MDCIOCR`: write PHY 22, reg 24, `0x1441` | `0xBB804004` | `0x96181441` | `0x804046C8`–`0x804046D8` | Bb `swNic_poll.c:717` | `96181441` (`PER-SW:37`) unless an MDIO command was typed (`NET-149`); autoboot 0 | A + Bb + 量 |
+| 28 | netif slot 0 | `0xBB040000` | `CMD_ADD`, all eight TCR words; refused with 17 if `valid` is set | `0x804029BC` → `0x80404ADC` | Bb `ethInt_865x.c:314`–`:327`, `vlanTable.c:201`–`:253`; struct Bb `vlanTable.h:120`–`:149` = Bk `rtl865x_asicCom.h:171`–`:191` | valid, VID 8, words 2–7 `9C000000 000000BB 0 0 0 0` (`NET-164`) | A + Bb + 量 |
+| 29 | VLAN slot 8 | `0xBB060100` | `CMD_ADD`, all eight words; word 0 `0x00807E3F` | `0x804029F4` → `0x80404CDC` | Bk `rtl865x_asicCom.h:233`–`:242`; Bb `ethInt_865x.c:349`–`:353`, `vlanTable.c:258`–`:291`, whose struct (`vlanTable.h:97`) leaves bits 31:20 at 0 | `00807E3F`, words 1–7 zero (`NET-164`); `SWTAA` `BB060100` (`PER-SW:69`), autoboot 0 | A + Bk + 量 |
+| 30 | `IRR1` | `0xB800300C` | `\|= 0x30000000` | `0x80402A1C`–`0x80402A2C` | Bb `ethInt_865x.c:363` | not read | A + Bb |
+
+讀 Around these rows: every table write brackets itself with `SWTCR0 |= EN_STOP_TLU` (bit 18),
+a poll of `STOP_TLU_READY` (bit 19), the command to `SWTACR` (`3` add, `9` force) and a poll of bit 0,
+then `SWTCR0 &= ~EN_STOP_TLU` (Bb `swTable.c:26`–`:37`, `swCore.c:129`–`:142`; names Bk
+`rtl865xc_asicregs.h:209`–`:217`); every MDIO read sets `GIMR` bit 8 (§ 2); and `eth_startup` ends
+by enabling IRQ 15 in `GIMR` through `request_irq` (`0x80400998`; Bb `ethInt_865x.c:365`). 量 `SWTCR0`
+reads `00080000` on both paths (`PER-SW:57`). 讀 Off the init, two more writers touch the same
+blocks: the NIC's interrupt handler (`0x804023B0` → `0x80403AB8`, `CPUIIMR`/`CPUIISR`) and transmit
+path (`0x80403CF0`, `CPUICR`), and the TFTP completion handler, which clears `SYS_CLK_MAG` bit 11 at
+`0x80401B24` before jumping to a received `nfjrom` or `boot.img`.
+
+### The table path, and which size table counts
+
+讀 A: the netif and VLAN writes go through `0x80404710` → `0x804049A0`, which stores all eight TCR
+words, `TCR7` first, then `SWTAA`, then `SWTACR = 3`; no size table is consulted. 量 `NET-164`'s
+reads hold exactly those eight words for both entries. 讀 The size table at `0x8040D714` is read at
+one site (`0x80402BC4`), on the force-add path that only the two L2 entries take, so only its index
+0 (2 words) is ever used. 讀 Its fifteen values are Bb `swCore.c:76`–`:90`, whose comments label
+index 4 `PROTOCOL_TRAP` and 5 `VLAN` — an older order than the enum both trees define
+(`NETINTERFACE` 4, `VLAN` 6: Bb `asicregs.h:60`–`:77`, Bk `rtl865x_asicBasic.h:27`–`:44`); the word
+after them, `0x8040D750`, is the RX mbuf-ring pointer (`0x80404124`), not a sixteenth entry. 讀 The
+array Bk builds for `CONFIG_RTL_8196E` (`Makefile:34`–`:35`, `:58`;
+`96E/rtl865x_asicBasic.S:184`–`:200`) gives netif 5 words and VLAN 3. 推 The two arrays disagree at
+index 4 (1 against 5), and the loader is not affected: it never force-adds a netif or VLAN entry.
+
+### `eth0_mac`
+
+讀 A and Bb (`ethInt_865x.c:143`–`:279`): `getmacandip`, the first call in `eth_startup`, reads a
+6-byte header at flash `0xC000`; only when its first byte is `0x36` and the blob behind it checksums
+to zero does it go on, and then it may copy an address read from flash `0x6000` onward — the `H601`
+range — into `eth0_mac` or `eth0_mac_httpd` (`0x80402438`, which also requires a first byte `0x68`),
+or store into `eth0_mac` a literal equal to its `.data` default. 推 On this unit it stops at the
+first test: `0xC000` holds the `COMPCS` region (`upstream/writeup/08-compcs.md`), whose first byte is
+`C`. 量 The netif entry and the L2 entry in slot 600 hold the `.data` default at `0x8040D6D0` bit for
+bit (`NET-164`, `NET-169`; compared by script, not printed). 讀 The one other writer is `IPCONFIG`
+(`0x80409378`), which stores the typed address's four octets into `eth0_mac` bytes 1–4
+(`0x80409450`–`0x8040945C`) after the switch tables were written — 量 the reason `NET-169`'s slot 600
+shares octets 0 and 5 with the address the loader answers ARP with and differs in octets 1–4.
+
+### On autoboot: no write to the switch, its tables or the CPU interface
+
+讀, a census by a different method from § 7's: function extents from each entry's own control flow;
+entries from `jal` targets, address-taken code and code pointers in data; register values tracked
+per function, including "a page plus an unknown offset"; every store classified by address. 讀 Its
+controls: sixteen known stores found with the right class; the 48 `lui …,0xbb80` of `NET-21`, three
+`0xbb00` and five `0xb801` all inside analysed functions; the two `SWTAA` stores are the only places
+a switch-range address is stored as data. 讀 With `goToDownMode` removed, no function reachable from
+the reset entry stores to `0xBB80xxxx`, `0xBB0xxxxx` or `0xB801xxxx`; the indirect calls left on that
+path are the flash-ops table, the kernel jump and the timer's interrupt handler, and none of their
+closures stores there. 量 This matches `NET-171`'s autoboot page: the fifteen non-link words that
+`FULL_RST` moves (`NET-168`) read their post-reset values. 讀 System words written on autoboot are
+`PIN_MUX_SEL` (`0x804083C4`) and `IRR1 = 0x00050004` (`0x80408F90`, the timer); `SYS_CLK_MAG` is
+written only on a bond nibble of 13 (`0x804067A0`).
+
+### What this does not establish
+
+Stage 1, which is not in `stage2.bin`; whether it touches the switch on either path. The autoboot
+values of every word off the 37-word page — the tables, `TCR0`–`6`, `QNUMCR`, `LEDCREG`, the PHY
+registers, the `PIN_MUX` pair — none of which has been read on an autoboot. Which of the missing
+writes stops reception. What `MEMCR`'s two bytes mean, and whether `CF_RXIPG` 5, below the header's
+stated minimum of 6, matters. The census's blind spots: code reached only from an exception vector
+other than the interrupt dispatcher, a code pointer written at run time other than the flash-ops and
+interrupt tables, and a store through a pointer loaded from memory. That the `H601` header would fail
+`0x80402438`'s test: it is not read, by rule. Why the entry path changed between `2026-10-04` and
+`2026-10-07` (推, the flash contents). How many TCR words a `CMD_FORCE` netif write needs on this
+silicon. Rows 13, 23 and 29 enter rlxfw's code by the owner's ruling of 2026-10-08, on Bb and 量
+with A as a third (`notes/switch-driver.md` § 21); row 28's entry does not — rlxfw clears the netif
+table — and no other row does.

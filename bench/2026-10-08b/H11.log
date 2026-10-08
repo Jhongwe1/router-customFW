@@ -1,0 +1,31 @@
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+             0       0      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+           936      12      0       0       0       0 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enxfc19286184c9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+11:57:43.748593 ARP, Request who-has 10.1.1.1 tell 10.1.1.2, length 28
+11:57:44.762749 ARP, Request who-has 10.1.1.1 tell 10.1.1.2, length 28
+11:57:45.786725 ARP, Request who-has 10.1.1.1 tell 10.1.1.2, length 28
+PING 10.1.1.1 (10.1.1.1) 56(84) bytes of data.
+From 10.1.1.2 icmp_seq=1 Destination Host Unreachable
+From 10.1.1.2 icmp_seq=2 Destination Host Unreachable
+From 10.1.1.2 icmp_seq=3 Destination Host Unreachable
+
+--- 10.1.1.1 ping statistics ---
+3 packets transmitted, 0 received, +3 errors, 100% packet loss, time 2038ms
+pipe 3
+ping_rc=1
+10.1.1.1 dev enxfc19286184c9 FAILED 
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+             0       0      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+          1062      15      0       0       0       0 
+
+3 packets captured
+3 packets received by filter
+0 packets dropped by kernel

@@ -1,0 +1,35 @@
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+             0       0      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+          1062      15      0       0       0       0 
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on enxfc19286184c9, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+11:58:25.240177 ARP, Request who-has 10.1.1.2 tell 10.1.1.1, length 46
+11:58:25.240205 ARP, Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+11:58:26.240127 ARP, Request who-has 10.1.1.2 tell 10.1.1.1, length 46
+11:58:26.240141 ARP, Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+11:58:27.240179 ARP, Request who-has 10.1.1.2 tell 10.1.1.1, length 46
+11:58:27.240192 ARP, Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+11:58:28.270202 ARP, Request who-has 10.1.1.2 tell 10.1.1.1, length 46
+11:58:28.270216 ARP, Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+11:58:29.270180 ARP, Request who-has 10.1.1.2 tell 10.1.1.1, length 46
+11:58:29.270194 ARP, Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+11:58:30.270142 ARP, Request who-has 10.1.1.2 tell 10.1.1.1, length 46
+11:58:30.270160 ARP, Reply 10.1.1.2 is-at fc:19:28:61:84:c9, length 28
+  bench/2026-10-08b/A14.log     160 bytes
+  bench/2026-10-08b/A14.timing  13.160721 s, stop: --until matched at offset 145
+  bench/2026-10-08b/A14.meta.json
+cap_rc=0
+10.1.1.1 dev enxfc19286184c9 lladdr 02:52:4c:58:46:57 STALE 
+3: enxfc19286184c9: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN mode DEFAULT group default qlen 1000
+    link/ether fc:19:28:61:84:c9 brd ff:ff:ff:ff:ff:ff
+    RX:  bytes packets errors dropped  missed   mcast           
+           276       6      0       0       0       0 
+    TX:  bytes packets errors dropped carrier collsns           
+          1314      21      0       0       0       0 
+
+12 packets captured
+12 packets received by filter
+0 packets dropped by kernel

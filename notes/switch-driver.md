@@ -607,15 +607,15 @@ and the one that moves is a link-status latch moving because the gate worked.
 
 ## 8.9 What the loader itself writes to this block
 
-讀, the same census as § 8.6, on the boot-path routine at `0x804038DC`–
+讀, the same census as § 8.6, on the ~~boot-path~~ prompt-path routine (🔄 2026-10-08: part of `swCore_init`, which an autoboot never runs, `SPEC.md` `NET-171`; the range starts inside the `BOND_8196ES` arm) at `0x804038DC`–
 `0x804039B0`. It is listed here because § 1's table asserted the opposite for
 one of its three registers:
 
 | site | write | reads back at the prompt? |
 |---|---|---|
-| `0x804038EC` | `MACCR (0x4000) \|= 0x1000` | — |
-| `0x80403904` | `PITCR (0x4100) \|= 0x1` | 🔴 **no** — `PITCR` reads `00000000` in both states; `docs/loader-phy-and-switch.md` already owns that |
-| `0x80403918` | `P0GMIICR (0x414C) \|= 0x40` | — |
+| `0x804038EC` | `MACCR (0x4000) \|= 0x1000` | 🔄 2026-10-08: not run — the `BOND_8196ES` arm (`SPEC.md` `REG-30`); bit 12 reads 0. The `MACCR` write that runs is `0x804033E0`, `(v & 0xFFF3FFF0) \| 0x00080005`, giving `804A0185` (`NET-28`) |
+| `0x80403904` | `PITCR (0x4100) \|= 0x1` | 🔴 **no** — 🔄 2026-10-08: not run, the same arm; `PITCR` reads `00000000` in both states; `docs/loader-phy-and-switch.md` already owns that |
+| `0x80403918` | `P0GMIICR (0x414C) \|= 0x40` | 🔄 2026-10-08: not run — the same arm; `P0GMIICR` reads `00037D00`, bit 6 = 0 (`NET-28`) |
 | `0x8040392C`–`0x80403944` | `PVCR0`–`PVCR3` = `0x00080008` | 🟢 **yes**, 量 `X4`/`X5` — all four read `00080008` |
 | `0x80403950` | **`MSCR (0x4410) = 0x00000001`** | 🟢 **yes**, 量 `X3-L4410` |
 | `0x8040395C` | **`QNUMCR (0x4754) = 0x00001249`** | never read on this die; the name 讀 ×1, B `drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h:1850` (superseded: *unnamed in every source here*, 2026-09-19 — `LOG.md` 2026-09-26) |
@@ -3250,7 +3250,7 @@ session's rulings on 8d (`$FWRE_WORK/rebuild/s116/RULINGS-8d.md`, not in this re
 * **What it writes** (ruling 2): `EnablePHYIf` on `PCRP0`–`4`, through 1.4's `rtl819x_phyif_port()`,
   and nothing else. No reset: § 16.3's R is not the loader's state, and a reset would leave about
   ten register groups to take over (§ 16.8).
-* **The VLAN group is inherited as a unit** (ruling 3) — the table, `PVCR0`–`4`, `VCR0`, `PBVCR0`,
+* ~~**The VLAN group is inherited as a unit** (ruling 3)~~ 🔄 superseded 2026-10-08 by the owner's ruling, § 21.3 — the table, `PVCR0`–`4`, `VCR0`, `PBVCR0`,
   the netif table and `PLITIMR`, none written. Arm II pinged both ways on exactly that state plus
   `EnablePHYIf` (`NET-164`); S0′'s 37 words were equal on 13 boots of the catch → upload → `J` path
   (§ 16.1), while the tables were read on one (`M2-VV`, `M2-VN`). A take-over would need a table
@@ -3326,7 +3326,7 @@ store and `RLXFW-SW-INIT=0000001F`.
   were compiled by a whole-driver host build, and by the target's compiler only when an image is
   built.
 * Anything about the VLAN group on a boot path on which the loader has not brought its network up
-  (autoboot from flash), which `R9`'s zero-write rule keeps unreachable.
+  (autoboot from flash), which `R9`'s zero-write rule keeps unreachable. 🔄 `R8b` made it reachable; measured in § 20 and § 21.1.
 
 ## 17.5 rtl819x-view 1.1: tbl l2 and 13 more words
 
@@ -3794,7 +3794,7 @@ as in § 17.6.
   bit the CPU NIC is stays open. Why the loader's ARP address is in neither table.
 * Anything about a boot path on which the loader has not brought its network up (autoboot from
   flash, which `R9`'s zero-write rule keeps unreachable): the VLAN group, the L2 entries and `FFCR`
-  are the loader's.
+  are the loader's. 🔄 `R8b` made it reachable; measured in § 20 and § 21.1.
 * The tables, the MIB, `CPUICR` and the PHY registers after `reset full`, and whether `FULL_RST`
   alone empties the tables as `reset vendor` did; what the 650-ms clock gate does to words off the
   switch page.
@@ -4316,8 +4316,99 @@ reaches the CPU port.
 
 **What this does not establish.** Which writes are sufficient: § 16.8 says the group is taken
 over as a unit, never partially, and that is untested from this state. That `rlxboot` leaves
-the switch untouched: its 37 registers read state R, but the ASIC tables are not among them.
+the switch untouched: its 37 registers read state R, but the ASIC tables are not among them (🔄 § 21.1: they read empty).
 Any flash-path value outside the 37 registers: the tables, `QNUMCR`, the PHY registers and
-`LEDCREG` were not read. Whether frames reach port 3 at all: no MIB counter was read.
+`LEDCREG` were not read (🔄 § 21.1 read the tables, `QNUMCR` and the ALE run). Whether frames reach port 3 at all: no MIB counter was read (🔄 § 21.1: they do, and the switch discards every one).
 Anything about the vendor's firmware, whose own driver configures the switch at boot. The
 takeover is `R6c`'s (`PROGRESS.md`).
+
+## 21. 🆕 2026-10-08 (128th segment, `R6c`): the flash-booted switch read, the loader's writes checked, and the take-over's write set
+
+`R6c-1` and `R6c-2` at the desk, and seating A (`bench/2026-10-08b/R6C-A-CARD.md`), a read-only
+census of the flash-booted state that `R6c-2`'s design asked for before any code. The rulings are
+`$FWRE_WORK/rebuild/s128/RULINGS-R6c.md` (not in this repository): the owner's O1 and O2, and the
+main session's E1–E4. Marks: 量 a capture, 讀 code or a document, 推 inferred.
+
+### 21.1 Seating A: every frame from the host dies in the switch (`NET-172`)
+
+**The boot, identified.** 量 The board ran S (`6a11de02`), booted from slot B by `rlxboot` after
+`bench/2026-10-08/V08`'s cold power-on and judged by `V09`. `A01` read an uptime of 32,997.09 s at
+11:56:10; `X-V08u` read 950.27 s at 03:02:03, which predicts 32,997.3 s, so it is the same boot.
+`A17` closes the bracket: 161.98 s of uptime across 162 s of wall clock. Read only: no power
+action, no loader, zero `FLW`, `EW`, `EB`, `AUTOBURN` and `FLR`, and no PHY read.
+
+**The tables.** 量 VLAN 16 slots, netif 8, L2 1,024: every word zero (`A05`–`A07`). With `SWTAA`
+0 and the 37 words at their post-reset values (§ 20), nothing has written a table since reset —
+not the loader (`LDR-47`), not `rlxboot`.
+
+**Words read on this path for the first time.** 量 The ALE run `0xBB804400`–`4434` (`A08`):
+`MSCR` 1, `SWTCR0` `00080000`, `SWTCR1` `00000200`, `PLITIMR` `07FAC688` — the value after
+`reset full` (`bench/2026-09-28b/I7-SW1`), so the take-over's check of it passes — and `FFCR` 0;
+the other nine words 0. `QNUMCR` `00041249` (`A09`): the CPU port's field (bits 20:18) is 1, as in
+V and R (§ 16.4), where the loader's path leaves `00001249`. 讀 B documents 1–6 as the field's
+valid values (`rtl865xc_asicregs.h:1956`–`:2004`), so the loader's 0 is the one outside them.
+
+**Since power-on.** 量 `A10`, a minute after `A01`'s 32,997 s of uptime: port 3 had received 1,579 frames
+(232,571 octets; 1,133 multicast, 446 broadcast, no unicast) and had counted every one of them in
+`dot1dTpPortInDiscards` and in `etherStatsDropEvents` (`0x62B` each). Ports 0–2, 4, 5 and the CPU
+port read zero in every column, and port 3's out columns zero.
+
+**Host → board.** 量 `H11`'s `tcpdump` shows the host sending three ARP requests. Across them
+(`A10` → `A12`) port 3 counts 3 broadcast frames of 64 octets (`ifInOctets` +192), and 3 more in
+each discard column; the CPU port's counters, `rlx0`'s RX and `n_irq` do not move (`A13`). That is
+the card's (a): the frames enter the switch and the switch discards them before the CPU port, by
+its own counters. The MIB does not clear on read: `A12` is `A10` plus the delta.
+
+**Board → host.** 量 The board's `ping -c 4` sent six ARP requests (`A16`: `n_xmit` 6, `rlx0` TX
+6 frames, 360 bytes, `n_irq` 6). Port 3 counts 6 broadcast frames out (`ifOutOctets` +384), and the
+host's `tcpdump` shows all six and its six replies (`H14`). The replies entered port 3 as unicast
+and were discarded: +6 in each discard column (`A12` → `A15`). The CPU port counts its six frames in
+column 17, `dot3StatsFCSErrors` — § 8.15's artefact. That is (d): a frame the CPU sends reaches the
+wire with no VLAN entry and PVID 1, so the take-over is for receiving.
+
+**The link.** 量 The host's adapter reports 100 Mb/s, half duplex. `PSRP3` reads `000010F9` on both
+paths (§ 20); `A02`'s `000011F9` carries bit 8, a latched link event (`NET-126`), consistent
+with the host adapter's detach and re-attach before the census; `A02` differs from `X-V08r-sw` in
+nothing else but `n_reads` and `jiffies`.
+
+**What seating A does not establish.** Which rule discards — ingress filtering, or the lookup of a
+VID with no entry — since both are "no VLAN 1"; that the take-over delivers to `rlx0`; the state
+after a watchdog reset (this boot is cold); the PHY registers; whether `QNUMCR`'s CPU field
+matters, should the take-over deliver to the CPU port and `rlx0` still count nothing.
+
+### 21.2 What the loader writes, and that an autoboot writes none of it (`LDR-47`)
+
+讀 `docs/loader-phy-and-switch.md`'s 2026-10-08 section owns it: the init's 30 writes in program
+order, each with A (`stage2.bin`) and a second source (Bb or Bk); its table protocol; and two
+censuses by different methods that agree an autoboot stores nothing to the switch, its tables or
+the CPU interface. Three of its readings bear on this file. § 8.9's `MACCR |= 0x1000`,
+`PITCR |= 0x1` and `P0GMIICR |= 0x40` sit in the `BOND_8196ES` arm and do not run here, and the
+`MACCR` write that does run is `0x804033E0`'s (§ 8.9 is corrected in place). The loader writes its
+VLAN and netif entries with all eight TCR words and `SWTACR = 3`, consulting no size table, where
+the vendor kernel's setters force-add (`9`) three or five words. And the init has two entries —
+the ESC line's, and a flash scan that returned zero, which ESC during the scan also causes — and
+neither is an autoboot.
+
+### 21.3 The owner's ruling: the loader's layout, taken over as a unit (8d ruling 3 superseded)
+
+The owner, 2026-10-08 (`RULINGS-R6c.md` O1). 8d ruling 3 is superseded: its own reopening
+condition is met (`X-V08r-sw`, `PVCR0`–`3` `00010001`), and its premise — that the one-VLAN layout
+has one source — no longer holds. 讀 A, the loader's own stores; 讀 Bb, the bootcode ("Set PVID of
+all ports to 8", VLAN 8 with `ALL_PORT_MASK` member and untag, `FFCR`'s two traps); 量 every RAM boot
+through the prompt. D has no VLAN, ALE or table section (讀 `pdftotext -layout`; the controls `PCRP`
+and `MDIO` are found 8 and 38 times, `VLAN`, `PVCR` and `FFCR` none). SDK (Bb) and devmem (量) are
+admitted as the two sources, A as a third.
+
+* **Written**: VLAN slot 8 ← `00807E3F 0 0 0 0 0 0 0`, the other fifteen ← zero; netif slots 0–7 ←
+  zero (the RAM path's regression decides; the fallback is netif slot 0 with `rlx0`'s own address);
+  `PVCR0`–`3` ← `00080008`; `FFCR` ← 3.
+* **Verified, never written** — their only source is 量, equal on both paths and written by neither
+  the loader nor the bootcode: `PVCR4` 1, `VCR0` `1FF`, `PBVCR0` 0, `PLITIMR` `07FAC688`. A mismatch
+  refuses with nothing written, so the group is determined as a unit or left alone.
+* **Not touched**: `MACCR`, `MEMCR`, the PHY patch, `QNUMCR`, `LEDCREG`. 量 `MACCR` is then the one
+  configuration word of the 37 where the flash path differs from both working states (L = V =
+  `804A0185`, F = R = `80420186`, § 16.2), and under F's value seating A saw port 3 receive 1,588
+  frames with no FCS or symbol error.
+
+§ 16.8's rule — the group as a unit, never partially — stands. § 17.1's ruling 3 carries a pointer
+here.

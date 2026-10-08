@@ -1,0 +1,9 @@
+echo tbl l2 | cat > /proc/rtl819x-view ; cat /proc/rtl819x-view
+version rtl819x-view 1.1
+admit 311
+last l2 j 3273550 rc 0
+n_mib 0 n_tbl 3 n_peek 0 refused 0 busy 0 ld 17816
+ref 00000000 none
+tbl l2 base BB000000 slots 1024 words 8 polls 1024 read 1024 nz 0 shown 0 mis 0
+jiffies 3273551
+# 
