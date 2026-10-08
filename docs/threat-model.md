@@ -165,9 +165,10 @@ interface up**.
 equivalent sentence names the LAN address — so whether `httpd` takes the
 wildcard or the LAN address is the whole of this position's open value.
 `SPEC.md` `FW-177` 殘留 ③ is one read of `bind` in `src/httpd/serve.c` and
-settles it at the desk; the host probe from the WAN side is `P3`'s, deliberately
-not `R9`'s, because a WAN arm would add an uncontrolled variable to the one
-vendor seating this gate can afford.
+settles it at the desk; the host probe from the WAN side was given to `P3`,
+deliberately not to `R9`, because a WAN arm would add an uncontrolled variable to
+the one vendor seating that gate could afford. 🔄 2026-10-08: `P3` closed without
+it, and `SPEC.md` `FW-177` 殘留 names who holds it now.
 
 ⚠️ So this file **cannot** say rlxfw's WAN exposure is smaller than the
 vendor's. It can say the vendor's WAN reachability for one service class was

@@ -477,9 +477,9 @@ pin against ground, thirty seconds* — and its recorded reopen condition is
 **"`P3` wants the power tree written as 量, or a seating that is already powered
 does it in passing, with the owner's nod"**. This section does not reopen it: it
 is written as 讀 and 推 with one clip-side 量, which is what the evidence
-supports. 🔴 **The plan's 實測 for this section is not delivered**: the owner
-decided on 2026-10-05 that `R8b`'s seating takes no multimeter readings, and the
-multimeter work touches pins on the only powered board, so it needed that word.
+supports. 🔴 **The plan's 實測 for this section is not delivered**: under the owner's
+delegation of 2026-10-05 the main session ruled that `R8b`'s seating takes no multimeter
+readings (entry 20, ruling 2), and touching pins on the only powered board needs the owner's word.
 This is recorded here rather than hidden behind the numbers that do exist.
 
 ⚠️ `MEM-09` 讀: the power-on strapping pins are the DRAM pins — `MA[10:8]` at
@@ -918,9 +918,17 @@ the offsets — but not for the erase geometry.** 量 2026-10-04 under Linux
 4 MiB; `/proc/partitions` agrees at 1216 / 2880 / 4096 KiB. 🔴 **All three report
 `erasesize 00001000`, and that is a software constant, not a chip
 measurement** — the kernel's chip table has no `1c7016` entry, so 4 KiB is the
-**fallback** sector size (`FLS-23`). **The erase block being 4,096 or 65,536
-bytes is 未定** (`FW-187` 殘留, `FW-191` 殘留, gate `R8b`), and `FW-191`'s
-identification of the part did not settle it.
+**fallback** sector size (`FLS-23`). 🔄 **2026-10-07 (`R8b`): one sector erase
+clears 4,096 bytes on this part, so the fallback is the part's own size**
+(`FW-244`, which settles `FW-187` 殘留 and `FW-191` 殘留). 量 the upper bound: `E02`
+marked three pages of the erased region at `0x3E0000`, issued one `SE` at
+`+0x0000`, and read that mark erased and the ones at `+0x1000` and `+0x8000`
+intact (`m=EII`). 量 the lower bound: `W4b`'s 64 `SE`s at a 4,096-byte stride read
+`0x030000`–`0x06FFFF` back as all `0xFF` where 883 of its bytes were `0xFF` before,
+which no sector smaller than 4,083 bytes could do — and for a power-of-two sector
+that is 4,096. ⚠️ The lower bound is two measurements and arithmetic, and the page
+and block sizes were not established: no block erase (`0xD8`) was issued, and the
+page is bounded only from below, at 256 bytes (`FW-244`, `FW-246`).
 
 ⚠️ **The vendor's layout and the kernel's MTD view must not be merged.** The
 vendor `cr6c` extent `0x060000`–`0x151011` **crosses** the `mtd0`/`mtd1`
@@ -961,6 +969,19 @@ changed twice**, and both rejections are the useful part.
 (0.195 %) proven different and 8,192 B (0.195 %) undetermined** — the last being
 `H601`, skipped by rule. *Proven the same* is a digest match: it cannot see two
 writes that cancel, and no whole-part `FLR` re-read was run.
+
+🔄 **Since 2026-10-07 the live part carries rlxfw's layout, not the dump's**
+(`FW-167`; `notes/update-chain.md` § 6). `rlxboot` is at `0x010000` and its rescue
+copy at `0x020000`, each in a 64 KiB region behind a `cs6c` header (`FW-241`);
+`0x030000`–`0x06FFFF` is erased (`W4b`, the read-back `FW-244` rests on); slot A is
+`0x070000`–`0x18FFFF` and slot B `0x190000`–`0x2AFFFF`, each for a signed container
+that only `rlxboot` reads (§ 12.1). So § 11.2's `w6cg` and vendor-kernel rows are
+gone from the part, and 630,849 bytes of the SquashFS remain above slot B with no
+kernel to reach them. 量 at `R8b`'s close (`docs/GATE-RESULTS.md` entry 20, its
+flash paragraph): `F03b`'s `map 0` read groups 22–31 equal to the seating's opening
+map, which equals the 2026-08-16 dump outside `FLS-26`'s two units, and groups 0–21
+changed — exactly the groups that hold `0x010000`–`0x2AFFFF`. ⚠️ Which container a
+slot holds now is the device's state, and `PROGRESS.md` owns it.
 
 ⚠️ **No row here states a physical address.** Everything is KSEG0, KSEG1 or a
 flash offset. The physical numbers this project has are elsewhere: the kernel's
@@ -1003,10 +1024,10 @@ repository: `LDR-02` puts `stage2.bin`'s load base at `0x80400000` while
 | 0 | reset / stage 1 | runs from the reset vector `0xBFC00000`; prints **`Booting...`**; then its copy loop at `0xBFC001D0`–`0xBFC001EC` moves flash `0x0004F0`–`0x0056AB` — **20,924 bytes, 5,231 iterations** — one word at a time into RAM, every instruction and every source word an **uncached KSEG1 read of memory-mapped SPI NOR**. That copy is the dominant term of the ≈350 ms | loader | `CLK-15`, `MAP-13` |
 | 1 | stage 2 — the `<RealTek>` loader | `stage2.bin`, 56,592 bytes, `sha256 f88869d1…c9c1b4ee`, load base `0x80400000`. Prints `chipName:` … `ramSize: 32M`, then the banner | loader | `LDR-02`, `MAP-14` |
 | 2 | reset-cause line | immediately **after** `ramSize: 32M`: **`Reboot Result from Watchdog Timeout!`** on a warm reset, **a single space** on a cold power-on | loader | `CLK-13` |
-| 3 | image location | **it scans**: flash `0x010000`, `0x020000`, `0x030000` fixed, then `[0x030000, 0x060000]` in `0x10000` steps skipping those three — six kernel candidates, and **this unit's kernel is at `0x060000`, the last one tried** | loader | `LDR-17` |
+| 3 | image location | **it scans**: flash `0x010000`, `0x020000`, `0x030000` fixed, then `[0x030000, 0x060000]` in `0x10000` steps skipping those three — six kernel candidates; **on the vendor's layout this unit's kernel was at `0x060000`, the last one tried**, and since `R8b` the first holds `rlxboot` (below) | loader | `LDR-17` |
 | 4 | image check | `check_image()` at `0x80407D50`: signature `cs6c` → 1, `cr6c` → 2, then a 16-bit halfword sum over the **RAM copy** which must be zero; either boots, a 2 only after finding a rootfs at one of eleven candidates `0x0E0000`–`0x180000` (🔄 2026-10-08: this cell said only `2` satisfied the caller; 量 `bench/2026-10-07` refuted it) | loader | `LDR-18`, `FW-241` |
-| 5 | staging | `check_image()` itself copies flash `0x060010` to `0x80500000` **before the ESC window and before any `FLR`**, the destination read out of the flash header (`jal 0x80404f38` at `0x80407E44`) | loader | `LDR-22`, `MAP-15` |
-| 6 | ESC window | `doBooting()` at `0x80408690` calls `user_interrupt(0x3B023380)`. On ESC: prints `---Escape booting by user`, sets `GIMR0 = 0`, enters the `<RealTek>` prompt. Without ESC: `goToLocalStartMode()` and `Jump to image start=0x80500000...` | loader | `LDR-15`, `LDR-20` |
+| 5 | staging | on the vendor's layout, `check_image()` itself copies flash `0x060010` to `0x80500000` **before the ESC window and before any `FLR`**, the destination read out of the flash header (`jal 0x80404f38` at `0x80407E44`); `rlxboot`'s header names `0x81800000` (below) | loader | `LDR-22`, `MAP-15` |
+| 6 | ESC window | `doBooting()` at `0x80408690` calls `user_interrupt(0x3B023380)`. On ESC: prints `---Escape booting by user`, sets `GIMR0 = 0`, enters the `<RealTek>` prompt. Without ESC: `goToLocalStartMode()` and `Jump to image start=0x80500000...` on the vendor's layout, `0x81800000` for `rlxboot` (below) | loader | `LDR-15`, `LDR-20` |
 | 7 | kernel self-decompress | the `rtkload` stub: `decompressing kernel:` → `done decompressing kernel.`, then `start address: 0x…` | decompress | `docs/boot-time-table.md` § 2, `FLM-10` |
 | 8 | kernel init | the three interrupt domains come up in `rlx_cpu_irq_init`, `rlx_vec_irq_init`, `bsp_ictl_irq_init`; `bsp_timer_init` reprogrammes `CDBR` and `TC0DATA` **before** `rtl819x_timer_init`, so § 8's Linux column is the vendor's doing | Linux | `IRQ-05`, `REG-05`, `REG-11`, `docs/interrupt-map.md` § 3.5 |
 | 9a | userspace, the vendor's image | BusyBox `init` → `rcS`, and 讀 `FW-04`: the compiled-in command line is `console=ttyS0,38400 root=/dev/mtdblock1` with **no `init=`**, and the string `Kernel command line` is absent so the boot log never prints it | Linux | `FW-04` |
@@ -1016,6 +1037,33 @@ repository: `LDR-02` puts `stage2.bin`'s load base at `0x80400000` while
 because plain `reboot` signals PID 1, **which on the vendor image is a shell
 script**.
 
+🆕 **2026-10-07 (`R8b`): from flash the loader now starts `rlxboot`, and `rlxboot`
+chooses the image.** 量 `bench/2026-10-07` (`FW-241`, `FW-242`), on the layout of
+§ 11.4. The scan's first candidate, `0x010000`, holds `rlxboot` (build `127a71cf`)
+behind a `cs6c` header, for which `check_image()` returns 1 without the rootfs
+search a `cr6c` hit triggers (§ 14.6 ①); stage 6 then prints
+`Jump to image start=0x81800000...`, the header's own `startAddr` (`T2ra`, `RD05`;
+`RD07b` read the rescue copy's header as `63733663 81800000 00020000 000048C2`).
+`rlxboot` prints the candidate the loader accepted — `RLXBOOT-FROM 05010000`, or
+`05020000` when the rescue copy at `0x020000` runs. 讀 `notes/rlxboot.md` D4 and
+D21, and 量 in that order on the die: it copies slot A (`0x070000`) and slot B
+(`0x190000`) through the flash window, each into a buffer of its own, and verifies
+each copy where it sits — header, Ed25519 signature, SHA-256 digest, and version
+against the anti-rollback counter (`RLXBOOT-HDR`, `RLXBOOT-SIG`, `RLXBOOT-DIGEST`,
+`RLXBOOT-VER`). The counter's source is the bitmap at `0x3F0000` by construction,
+and that it is read from there is 推: an erased region and an undecoded window both
+read `ctr=0` (D21). The valid slot with the higher version boots from its own
+buffer (`RLXBOOT-SLOT`, then `RLXBOOT-BOOT load=80500000 entry=80500000`) — a tie
+boots A by D4, never exercised on the die — so stages 7–9b follow with rlxfw's
+image; with neither slot valid it prints both reasons and halts
+(`RLXBOOT-HALT A=magic B=magic`, `T1a`). One slot's verify costs about 1.3 s
+(§ 12.2). When `rlxboot` itself is torn, the loader's own scan moves past it to the
+rescue copy (`RD05`, the power-on after `RD03`'s cut; `RD07a` then read `0x010000`
+as `FFFFFFFF`). ⚠️ The design is `notes/rlxboot.md`'s; the die showed it on the 17
+slot boots of `FW-242` and `FW-243`, every one of which read `ctr=0` because nothing
+writes the counter, and none of which read the network; booted this way, `v1.0`'s
+image received no frame on `rlx0` at its qualification seating (`NET-171`, § 14.6 ②).
+
 ### 12.2 The timings, with their state, class and population
 
 | quantity | value | state / class | owner |
@@ -1024,7 +1072,9 @@ script**.
 | cold-only silence **before** `Booting...` | 0.349 / 0.340 s (n=2), from the CP2102's framing artifact byte — the moment the line is driven. **A warm reset has neither the artifact byte nor the gap** (0.001 / 0.010 s) | loader, cold | `CLK-14` |
 | reset → first console byte | **2.07 ms** exact (`D1`, `J BFC00000`, same capture); then n=27 at **1.7–2.8 ms, mean 2.4 ms** | loader, warm | `CLK-14` |
 | power-on → a typable `<RealTek>` prompt | 🔄 **2.095–2.315 s (n=15, range 0.220 s, largest gap 0.075 s)**, measured from `Booting` | loader, cold | `CLK-18` |
-| the ESC window | **~4.886 s** banner → `Jump to image start`; ⚠️ **not reconciled** with this repo's own 5.036 s warm / 5.210 s cold (n=1 each) or the RAW-clock 5.2388 / 5.2378 (n=1 each) | loader | `LDR-15`, `docs/boot-time-table.md` § 2 |
+| the ESC window | **~4.886 s** banner → `Jump to image start`; ⚠️ **not reconciled** with this repo's own 5.036 s warm / 5.210 s cold (n=1 each) or the RAW-clock 5.2388 / 5.2378 (n=1 each). 🔄 All of those are the vendor's `cr6c` layout: with `rlxboot` as `cs6c` the same interval is **2.018–2.019 s** (n=6), against 4.968 s on `T1a`, a `cr6c` with the vendor rootfs still present | loader | `LDR-15`, `docs/boot-time-table.md` § 2, `FW-249` |
+| `rlxboot`'s verify, `RLXBOOT-V1` → `RLXBOOT-BOOT` | **2.623–2.624 s** with both slots verified (n=6) · **1.382–1.384 s** with one verified and the other refused at `bad=magic` (n=3) · 0.096 s to the second of two `bad=magic` refusals (`T1a`) — about 1.3 s a slot, console output included | `rlxboot`, warm and cold (`RD05`, `B1B` and `A1B` are power-ons) | `FW-250` |
+| `busybox reboot -f` → rlxfw's prompt, booted from flash | about **15.6 s** (`F05`, n=1) | warm | `FW-250` |
 | kernel decompress | vendor 1.0601 s · rlxfw quiet 1.2180 s · rlxfw loud 1.2481 s (medians, RAW clock) | decompress | `docs/boot-time-table.md` § 2 |
 | kernel entry → userinit | vendor 7.0980 s · rlxfw quiet 9.4455 s · rlxfw loud 11.1556 s (cold medians) | Linux | `docs/boot-time-table.md` § 2 |
 | userinit → ready | vendor **18.68 s** (`boa: starting server`) · rlxfw **0.1166 s** (first shell prompt) | userspace | `docs/boot-time-table.md` §§ 2, 5 |
@@ -1081,7 +1131,12 @@ re-read the prompt. ⚠️ And `docs/loader-command-semantics.md` § a's 推 tha
 *the ESC window is the one in `doBooting` and nowhere earlier* is **contradicted
 by two 量**: `B5` found `gCHKKEY_HIT` = 1 with ESC streamed from before power-on,
 and `A2` saw no `---Escape booting by user`. **§ a was not amended**, so a reader
-of that section needs this paragraph.
+of that section needs this paragraph. 🔄 **2026-10-07 (`FW-249`): § a's 推 fits a
+`cs6c` image, and those two 量 are the vendor's `cr6c` layout.** 讀 the ESC poll that
+sets `0x8040DBA4` runs inside the rootfs scan, which only a `cr6c` hit reaches; 量
+with `rlxboot` as `cs6c`, 16 of 16 ESC-streamed reboots printed
+`---Escape booting by user`, `doBooting()`'s non-zero branch, where 0 of 238 had
+before.
 
 🔴 **② A bad image goes straight to a rescue prompt, silently.** `LDR-20`,
 `doBooting()` at `0x80408690`: flag 0 sets `GIMR0 = 0` and calls
@@ -1092,8 +1147,17 @@ of that section needs this paragraph.
 `rootfs checksum error at %X!` (`0x8040AF50`) and `burn()`'s
 `imgage checksum error at %X!` (`0x8040A7C7`). ⚠️ `LDR-19`'s own prose says
 *two* rootfs sentences; **its owner file lists one, and the owner wins**.
-⚠️ **And a corrupted image actually reaching the prompt has never been measured
-on the device** — it is 讀 only, and the test is a precondition of `R8b`.
+🔄 **2026-10-07 (`R8b`; `C-4` closed): both halves happened on the device.** 量 The
+refusal: `RD05`, the power-on after `RD03`'s cut had erased `rlxboot`, passed that
+candidate and started the rescue copy (`RLXBOOT-FROM 05020000`). The prompt: `T2a`,
+a `busybox reboot -f` with no ESC once slot A held a container, printed the banner,
+`P0phymode=01, embedded phy`, `---Ethernet init Okay!` and `<RealTek>` 0.34 s
+later, with no `Jump to image` and no `---Escape booting by user`, and `0x8040DBA4`
+read `00000000` (`X-T2-dba4`): `doBooting()`'s zero branch, as silent as `LDR-20`
+reads it. ⚠️ `T2a`'s zero came from the rootfs search behind a `cr6c` hit
+(§ 14.6 ①), not from a scan that found every candidate content-invalid; the run that
+would show that — `rlxboot` and its rescue copy both torn — was declined, and
+`C-4`'s row in `PROGRESS.md` says what would reopen it.
 
 🔴 **③ `check_image()` stages the kernel before any `FLR`, and it does it again
 after a warm reset.** `LDR-22`: the copy runs inside the check, at
@@ -1131,11 +1195,17 @@ stage-1 UART setting is 讀 ×2 and 量 once at the loader prompt — `LCR` read
 it *not stable*. `FW-04` is single-source (C) and describes the **vendor**
 kernel, not rlxfw's.
 
-⚠️ **Stage 9b is two boots from RAM on one day** — `r78a`, `RLXFW-ID0`
-`BF182DE2`, then its rebuild, `0E45C61D` — and no rlxfw userspace has started
-from flash. The privilege separation's refusal half was never returned on the
-board: the only peers in those captures are in the authorisation table, so a
-refusal rests on the host's matrix (`docs/GATE-RESULTS.md` entry 17, claim ②).
+⚠️ **Stage 9b's reading is two boots from RAM on one day** — `r78a`, `RLXFW-ID0`
+`BF182DE2`, then its rebuild, `0E45C61D`. 🔄 量 Since 2026-10-07 rlxfw's userspace
+has also started from flash: `/init` printed `rlxfw: lan up, rlx0 10.1.1.1/24` from
+slot A on `f9adc9e8` (`bench/2026-10-07` `T2ra`, `F05`) and from slot B on
+`6a11de02` after a watchdog reset and after a cold power-on (`bench/2026-10-08`
+`V06`, `V08`; `FW-255`), the prompt about 15.6 s after `busybox reboot -f`
+(§ 12.2) — and on the two of those boots that tried the network, `rlx0` received
+no frame (`NET-171`, § 14.6 ②). The privilege separation's refusal half was never
+returned on the board: the only peers in stage 9b's captures are in the
+authorisation table, so a refusal rests on the host's matrix
+(`docs/GATE-RESULTS.md` entry 17, claim ②).
 
 ---
 
@@ -1482,7 +1552,17 @@ and *time* — the whole vendor HTTP episode finished inside the post-boot
 threshold (`docs/GATE-RESULTS.md` entry 19, claim ③). `FW-196`,
 `docs/threat-model.md`.
 
-### 14.6 What § 14 does not establish
+### 14.6 The boot from flash: the loader's rootfs rule, and a VLAN group nobody configures
+
+Both rows are about the boot the device makes by itself once `R8b` had put
+`rlxboot` and two slots in flash (§ 11.4, § 12.1), and a seating found each.
+
+| # | the trap | how it was hit | how it was worked around | V | owner |
+|---:|---|---|---|:-:|---|
+| ① | 🔴 **Behind a `cr6c` header the stock loader also wants a rootfs, and it looks only inside slot A.** For `cr6c` `check_image()` returns 2, and the locator then tries eleven rootfs candidates — `0x0E0000`, `0x0F0000` and `0x130000`, then `0x100000` to `0x180000` at the `0x10000` step, skipping those three — every one inside slot A (`0x070000`–`0x18FFFF`). Finding none, it returns 0 without trying the next kernel candidate, and `doBooting()` drops to the prompt silently (`LDR-17`, `LDR-20`). So a `cr6c` stage at `0x010000` boots only while something in slot A reads as a rootfs | 量 2026-10-07, by `R8b` failing once. `rlxboot`, first installed as `cr6c`, booted (`T1a`) while the vendor's SquashFS still sat at `0x180000`; after slot A's first write (`W3`), `T2a` — `busybox reboot -f`, no ESC — printed only the loader's lines and `<RealTek>` in 180 s, and `X-T2-dd3c` read `0x8040DD3C` as `05010000`: the loader had accepted `0x010000` and never tried `0x020000` (§ 12.3 ②). 讀 `stage2.bin`, disassembled twice, the second time with `ComSrlCmd_RDID`'s instructions as the control. ⚠️ What the rootfs check accepts was not read, so which candidate passed on `T1a` is 推 (`0x180000`, the only SquashFS) | **`cs6c`**, for which `check_image()` returns 1 and skips the search; the halfword sum still has to be zero, and it covers the payload and not the header, so the two images differ in the signature's second byte. 量 re-installed as `cs6c` (`K1b`, `K2b`), `rlxboot` booted slot A (`T2ra`) and its rescue copy took over when `rlxboot` was torn (`RD05`). The install path now accepts only `cs6c` in those two regions, and `tools/mkcr6c.py` 2.0 emits it (`f257a848`). ⚠️ One side effect: ESC is caught in `doBooting()`'s window rather than in the rootfs scan, and banner → `Jump` falls from 4.97 s to 2.02 s (`FW-249`, § 12.2) | 量 + 讀 | `FW-241`, `notes/update-chain.md` § 6 |
+| ② | 🔴 **Booted from flash, rlxfw's Ethernet receives nothing, because only the loader's prompt path configures the switch.** The loader brings its network up — `P0phymode=01, embedded phy`, `---Ethernet init Okay!` — only on the path that enters its prompt (`LDR-46`; `T2a`, which reached the prompt with no ESC, printed both lines too), and the mainline (`SWCORE=n`) leaves the switch's VLAN group to the loader (`notes/switch-driver.md` § 16.8). On an autoboot nothing writes that group, and it stays in its reset state | 量 2026-10-08 at `v1.0`'s qualification seating, by a ping after the first boot from flash: 0 of 2 (`X-V06n`). Booted from slot B through `rlxboot`, the release image brings `rlx0` up with `10.1.1.1` and, across a host ping, counts no frame in or out, after a watchdog reset (`X-V06q`) and after a cold power-on (`X-V08q`), with `n_rx 0` and `n_irq 0` (`X-V08r-nic`); booted from RAM through the prompt, the same image answered 2 of 2 (`X-V02n`). It follows the loader's path, not the reset. Of 37 switch registers 10 differ from a RAM boot through the prompt, and the autoboot's are reset values — `PVCR0`–`3` `00010001` against `00080008`, `FFCR` 0 against 3, `SWTAA` 0 (`X-V08r-sw` against `bench/2026-10-04/PER-SW`). ⚠️ The mechanism, a frame from port 3 meeting PVID 1 under ingress filtering with no VLAN entry, was 推 at that seating, where no MIB counter was read. 量 2026-10-08 on the same cold boot (`bench/2026-10-08b`, `R6c`'s read-only seating A), the host's three broadcast ARP requests and six unicast ARP replies each entered port 3 and raised its `dot1dTpPortInDiscards` by the same 3 and 6. The CPU port's out counters stayed 0, `rlx0` received nothing, and the VLAN, netif and L2 tables read empty, while the board's own six ARP requests reached the host (`NET-172`, `notes/switch-driver.md` § 21.1). Which switch rule discards the frames is the 推 that remains. 🔴 The case had been written down as open since `R6b` (`notes/switch-driver.md` §§ 17.4, 17.10), unreachable while `R9`'s zero-write rule held; `R8b` made it reachable, and none of `R8b`'s flash boots read the network | **Not worked around.** The network exists only after a boot through the loader's prompt — a RAM boot over TFTP — and the console works on both paths. The fix is gate `R6c`'s, and this report does not predict it | 量 + 推 | `NET-171`, `NET-172`, `notes/switch-driver.md` §§ 20, 21.1 |
+
+### 14.7 What § 14 does not establish
 
 ⚠️ **Each row is one die.** Nothing here distinguishes an erratum of the part
 from a property of this instance (§ 0 ②), and `docs/rlx-isa.md` § 0 makes the
@@ -1512,6 +1592,10 @@ of traps this project hit or read while doing something else;
 `docs/KNOWN-ISSUES.md` owns what currently depends on rlxfw's drivers, and
 `SPEC.md` § 17 owns what is still open — including `FLS-26`, `CLK-08b` 殘留,
 `NET-54` 殘留 and `NET-61` 殘留, all `⊘`.
+
+⚠️ **§ 14.6 ② is the one row whose fix belongs to a gate**, `R6c`, and this report
+does not predict it: `PROGRESS.md` owns where that gate stands, and
+`docs/KNOWN-ISSUES.md`'s entry of 2026-10-08 says when the issue closes.
 
 ---
 
@@ -1768,3 +1852,41 @@ Stated so that the difference is checkable:
 block this document does not list. § 0 ④ says the census is of what has been
 touched. An absent block is a gap in the project's coverage, which is what
 § 13.0 is for, and `PROGRESS.md` owns what happens next.
+
+### 16.7 What `R8b`'s readings add, and what they do not
+
+`R8b`'s readings entered §§ 11.2, 11.4, 12.1–12.4 and 14.6 on 2026-10-08 by the rule
+of § 16.2: they were taken for `R8b`'s question, all on mainline `f9adc9e8` — the
+boots of `6a11de02` in § 12.4 and § 14.6 ② are `v1.0`'s qualification seating's and
+`R6c`'s seating A's (`FW-255`, `NET-171`, `NET-172`), taken for those seatings'
+questions — and `docs/GATE-RESULTS.md` entry 20 is where they are judged. What they
+leave open, quoted from there and from their rows, so that this page reads no wider
+than the gate did:
+
+* **One unit, one part (`1C7016`), one loader build.** That `cs6c` boots in any other
+  flash state is 讀 (`FW-241`), and every slot boot read `ctr=0`, so a rollback
+  refused from flash has never been seen (`FW-242`).
+* **Ten power cuts, all in writes paced at 2 s per 64 KiB block**, and 推 a pull
+  landing uniformly in time falls in the pace's sleep about 83 % of the time in the
+  erase phase and 92 % in the program phase; none landed in block 0's erase, the last
+  six seconds before the header, the header page, the read-back or an unpaced write,
+  and every torn slot failed at `bad=magic`, so `rlxboot`'s signature and digest
+  refusals were never reached by a torn slot on the die (`FW-243`).
+* **The rescue copy took over from an erased `rlxboot`**, not from one that is signed
+  and wrong (`FW-242`), and the end-to-end case of § 12.3 ② — `rlxboot` and its
+  rescue copy both torn — was not run (`C-4`).
+* **The last bracket and the expected image.** `F02`'s three `FLR`s did not run, nor
+  did `map 1 21` and `map 1 31`, so `0x2B0000`–`0x2BFFFF` is not shown unchanged at
+  4 KiB, and the groups § 11.4 calls changed were not compared against an image built
+  at the desk: each region's read-back at the moment it was written is the evidence
+  for its content (`docs/GATE-RESULTS.md` entry 20).
+* **Every write was a provisioning write.** The armed image, RAM-booted through the
+  loader's TFTP, wrote the slots; the mainline image in them has no write path, so
+  nothing rlxfw writes while running outlives a power cycle.
+* **The erase size is two measurements and arithmetic**, and page and block size were
+  not established: no `0xD8` was issued, and the page is bounded only from below, at
+  256 (`FW-244`, `FW-246`).
+* **No voltage was read at the seating**, so § 7 stays undelivered.
+* **The boot the device makes by itself receives no frame** — 量 at `v1.0`'s
+  qualification seating, not at `R8b`'s, whose flash boots never read the network
+  (`NET-171`, § 14.6 ②) — and its fix is a gate of its own, `R6c`.

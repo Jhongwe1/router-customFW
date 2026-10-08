@@ -4111,7 +4111,176 @@ drafts are in the closing commit; what each says is the row's, not this entry's.
 
 ---
 
-## The operating clause, re-run at twenty entries
+## 2026-10-08 — `P3` (the bring-up report closes on `R8b`'s readings: the boot from flash through `rlxboot`, the bad-image branch measured on the die, two traps of that boot, and a power tree still not measured, by decision)
+
+### One line
+
+**v0.6+, three segments — the 122nd, which wrote the plan's ten sections as §§ 6–15 of
+`docs/bringup.md`; the 124th, which corrected the report against its owner rows and re-specified
+this row, the first two shared with `R9`'s close and `R8b`'s opening; and the 128th, for `R8b`'s
+readings and this closing — the 126th and the 127th touched the report and the row for other gates
+and are not counted (ruling 6) — and no power action of its own.**
+§ Gate board costs `P3` at 5, the plan's own figure (5 desk, 0 bench and 0 instrument segments),
+so the actual is 3 against 5. Since 2026-10-05 (`f071b162`) the row has closed on *`R8b`'s readings
+folded into the report*; `R8b` closed on 2026-10-08 (entry 20), and this closing folds them in,
+with the readings of `v1.0`'s qualification seating and of `R6c`'s seating A that bear on them
+(`FW-255`, `NET-171`, `NET-172`), at nine places: § 11.2 the erase size (`FW-244`); § 11.4 the
+layout the part now carries; § 12.1 the boot from flash through `rlxboot` (`FW-241`, `FW-242`);
+§ 12.2 its times (`FW-249`, `FW-250`); § 12.3 ① which window catches ESC on a `cs6c` image
+(`FW-249`) and ② the bad-image branch on the die (`RD05`, `T2a`; `C-4`); § 12.4 rlxfw's userspace
+started from flash (`FW-242`, `FW-255`); § 14.6 two traps of the boot the device makes by itself —
+the stock loader's rootfs rule behind `cr6c` (`FW-241`) and a VLAN group nobody configures on an
+autoboot (`NET-171`, `NET-172`); and § 16.7 `R8b`'s limits.
+**Nothing on the device was measured for this gate**: every reading the report holds was taken
+for another gate's question (its § 16.2), and the report is a second source for nothing (§ 16.1).
+
+**The weakest thing here is the one section the plan asks to be measured and that is not.** The
+plan's section 2 is *電源樹（實測，含 `S0b`）*; § 7 is a desk reconstruction with two surviving
+hypotheses, `S0b` and `BRD-01` are ⊘ by recorded decisions, and `R8b`'s seating took no voltage,
+by a ruling (entry 20, ruling 2). So `P3` closes with one of its ten sections written 讀 and 推
+where 量 was asked, which § 0 ③ of the report says on its first page. The operating clause below
+meets the same item from the other side.
+
+### Three claims that stand
+
+**① The report holds the plan's ten sections and, now, `R8b`'s readings, each traceable to the row
+that owns it.** 讀 `docs/bringup.md`: the plan's ten are §§ 6–15 (`0946243b`, 2026-10-04), and §§ 1–5
+with the `### 3a` anchor are byte-identical to the `R5` file — `docmove` read 67 blocks conserved
+and 3 declared rewrites at that commit. This closing adds `R8b`'s readings at the nine places above,
+and every sentence it adds names its owner — a `SPEC.md` row, a note, a capture under `bench/`, or,
+for § 16.7's quotations, entry 20. 量 at this closing, by a script kept outside the tree
+(`$FWRE_WORK/rebuild/s128/p3/idcheck.py`), every id, capture and seating cell in the report's lines
+this closing adds or rewrites: 49 — 21 `SPEC.md` rows, one carried-forward row, 25 captures, one
+seating cell and one card cell that entry 20 records as unrun — and none missing, with four planted
+unknowns read as missing as its control. ⚠️ No tool checks that a sentence says what its row says,
+and `spec-check` does not check an id cited outside `SPEC.md`, so the agreement was read by hand
+against each row, and then line by line by an independent audit
+(`$FWRE_WORK/rebuild/s128/p3audit/AUDIT.md`), whose findings are applied here; that is § 0's rule
+kept by readers, not by an instrument.
+
+**② § 12 now describes the boot the device makes by itself, and § 14 holds both traps that boot
+met, each with how it was hit.** 量 `bench/2026-10-07` and `bench/2026-10-08`. The first was hit by
+`R8b` failing once: a `cr6c` `rlxboot` booted while the vendor's SquashFS sat at `0x180000` (`T1a`),
+and once slot A held a container the loader stopped at `<RealTek>` having accepted `0x010000`
+(`T2a`, `X-T2-dd3c`); `cs6c` avoids it (`T2ra`, `RD05`; `FW-241`). The second was hit at `v1.0`'s
+qualification seating by a ping after a flash boot, 0 of 2 (`X-V06n`): booted from a slot, `rlx0`
+counts no frame after a watchdog reset and after a cold power-on, while a RAM boot through the
+prompt answers (`X-V06q`, `X-V08q`, `X-V02n`; `NET-171`). ⚠️ The second is not worked around — its
+fix is `R6c`'s. Its mechanism was 推 at the qualification seating, where no MIB counter was read;
+`R6c`'s read-only seating A on the same boot (`bench/2026-10-08b`) then counted the host's frames
+into port 3 and discarded there, none reaching the CPU port (`NET-172`), so what remains 推 is
+which switch rule discards them.
+
+**③ Closing `P3` leaves no debt it held without an owner.** `LA-1` moves to a standing instruction
+by the 126th segment's decision (`LOG.md`, its 2026-10-08 entry) — any segment whose seating has
+the logic analyser attached, rung 1 first — and `SPEC.md` `CLK-31` 殘留's analyser half follows
+it; `FW-177` 殘留 ③'s device half, the WAN-side host probe `docs/threat-model.md` gave `P3`, moves
+to a standing instruction by ruling 4 below. 量 `tools/cfcensus.py check` on this entry's tree: 25
+rows, 0 findings, the guard reading `P4b` and `R6c` in progress with one OPEN row live-owned,
+`FLW-1`, `P4b`'s; `LA-1` reads `SEGMENT`, and `ratchet` is at its baseline. ⚠️ `cfcensus` reads only
+`PROGRESS.md`'s table: no tool reads `SPEC.md` § 17's owners, which is how `FW-177` 殘留's ① and ②
+and `TC-26` 殘留 still name `R9-9`, a step of a gate closed on 2026-10-04 — not `P3`'s, recorded in
+the booking below and left as they stand.
+
+### The board row's clauses, read one at a time
+
+| the row says | verdict |
+|---|---|
+| **bring-up report** | 🟢 **met**: `docs/bringup.md`, the plan's ten sections as §§ 6–15 (claim ①). ⚠️ Section 2 is not 實測 (the weakest-thing paragraph) |
+| **grows every gate** | ⚠️ **not as worded.** 量 `git log -- docs/bringup.md`, twelve commits: 2026-09-09–11 (`R5`, §§ 1–5), 2026-10-04 (the peripheral census in § 13.1, in `R9`'s first segment, then `P3`'s ten sections), 2026-10-05 (the report corrected against its owner rows, and `R8b`'s desk findings) and 2026-10-08 (the `cs6c` correction). The ten gates that closed between `R5` and `R9` — `R1-pub` through `R8` — added nothing to it, and §§ 6–15 assemble their readings after the fact (§ 16.2) |
+| **and closes on `R8b`'s readings** | 🟢 **met**: folded in at nine places (One line), with `R8b`'s limits quoted in § 16.7 |
+| *(the evidence cell until this entry)* **or on the record that a pull failed** | not needed: no pull failed — 10 of 10 booted the other slot (entry 20) |
+
+### The questions this gate must be able to answer
+
+The plan's hostile-question list (§ 11) asks none of `P3` by name: its `P1`–`P4` row holds one
+question for `P1` and one for `P4`. The question the report is for is the plan's note on its
+section 9 — where this part bites, how it was hit and how it was worked around — and § 14 answers
+it per row, two of them new here.
+
+### What `P3` did not establish
+
+🔴 **A measured power tree.** The plan's section 2 asks for it, with `S0b`. § 7 holds the only rail
+voltages on file, taken through a programmer clip with the board's 3.3 V net at ~1.79 V; the
+regulator's output pin was never probed and `BRD-01`'s part is unidentified. `S0b` is ⊘
+(`PROGRESS.md`'s `S0` row), `BRD-01` is ⊘ (`SPEC.md` § 17, 2026-09-30), and `R8b`'s seating took no
+voltage, by entry 20's ruling 2.
+
+🔴 **An interrupt-latency figure by logic analyser.** `LA-1`, carried from `P2` (entry 13): neither
+rung ran and the analyser has never been connected. It leaves this gate as a standing instruction
+(claim ③).
+
+🔴 **A network on the boot the device makes by itself.** § 14.6 ② records the trap and no
+workaround; the fix is `R6c`'s. So § 12's boot flow, followed from flash, ends at a shell whose
+`rlx0` receives nothing.
+
+🔴 **That anything in the report is a second source.** Every number was in an owner file first
+(§ 16.1); `R8b`'s readings are in it as `R8b` measured them, and § 16.7 quotes their limits rather
+than carrying them.
+
+⚠️ **The open values the report names and does not fill**: the strap word's field layout (`REG-40`
+殘留), the clock tree's root (`CLK-50` 殘留), `PIN_MUX_SEL`'s fields (`NET-170` 殘留), the memory
+controller never read (`MEM-08` ⊘), the radio's attachment (`RF-04` ⊘) and the CPU clock apart from
+CPI (`CLK-03` ⊘) — §§ 8.3, 9.5, 10.3 and 15.5 name the first three, § 0 and § 16.3 the last three.
+
+⚠️ **The WAN-side host probe.** `docs/threat-model.md` § 4 gave it to `P3` (`FW-177` 殘留 ③'s device
+half), and no boot has brought a WAN interface up. It moves to a standing instruction (ruling 4).
+
+⚠️ **One unit** (§ 0 ②, § 16.5) **and no minimum configuration** (§ 16.4): what the report holds is
+what one board returned while it worked.
+
+⚠️ **Flash.** Closing `P3` took no seating of its own and issued no `FLW`, `EW`, `EB`, non-zero
+`AUTOBURN` or `FLR`; no flash map was taken for it. What that cannot see: two writes that cancel,
+every byte outside the units read, and `H601`, never hashed. The `FLR` bracket stays at 1,024 of
+4,194,304 bytes = **0.0244 %**, and the last map is `R8b`'s (entry 20).
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner's own — the relaxed process with the flash rules, `H601`, the power handshake and
+`NET-165` unchanged — are not listed.
+
+1. **`P3` closed without waiting for `R6c`**, as the board and § Now already said: § 14.6 ②'s
+   workaround cell and § 12's flash boot change if `R6c` closes with a fix, and the report is a
+   finding file that keeps growing after its gate, as it grew before it.
+2. **The two traps go in a new § 14.6, and *What § 14 does not establish* becomes § 14.7**, so
+   every subsection keeps its *does not establish* last; 量 `git grep` finds no file citing
+   § 14.6 by number.
+3. **Sentences `R8b`'s readings had made stale corrected in place, beyond the list the owner
+   gave** — § 11.4's live layout, § 12.1's third, fifth and sixth rows, § 12.2's ESC-window row and
+   § 12.3 ① — because each described a flash layout the part no longer carries.
+4. **`FW-177` 殘留 ③'s device half re-owned to a standing instruction — any seating that brings a
+   WAN interface up** — because `P3` held no seating in its budget and no boot has brought WAN up.
+   A ⊘ was the alternative; it would have left `docs/threat-model.md`'s `T3` with its desk read of
+   `bind` and no device-side experiment named.
+5. **`README.md`'s *Not measured* cell rewritten where `FW-255` and `NET-171` had made two of its
+   clauses false** — `v1.0`'s image has run from a slot, and a boot without the loader's network
+   has been measured, deaf — and its gate list given `P3`'s close date and the `R6c` line its
+   opening commit left out.
+6. **Actual 3**, counting the segments that worked on `P3`'s own report or row after the row
+   entered `~` on 2026-10-04 — the 122nd, the 124th and the 128th — not the segments between the
+   previous close and this one, the column's first definition. Two segments whose commits touched
+   the report or the row for another gate are not counted: the 126th's `f257a848` carried `R8b`'s
+   `cs6c` finding into § 12.1's stage-4 row, and the 127th's `2f31b080` added `R6c` to the row's
+   list of `v1.0`'s gates. The 120th segment's peripheral census (§ 13.1) was read for the report
+   as well and is not counted, because the report's own Contents files § 13.1 as predating `P3`.
+   Counted by every segment whose commits touched `docs/bringup.md` or the row from 2026-10-04 on,
+   the figure is 6.
+
+### The booking: what moved to another gate, and what was declined
+
+| row | to | why |
+|---|---|---|
+| `PROGRESS.md` `LA-1` | a standing instruction: **any segment whose seating has the logic analyser attached**, rung 1 first | the 126th segment's decision (`LOG.md`, its 2026-10-08 entry); `P3`'s budget never held a seating, and both rungs need a powered board |
+| `SPEC.md` `CLK-31` 殘留, its logic-analyser half | follows `LA-1` | it pointed at `LA-1` and named `P3` beside it |
+| `SPEC.md` `FW-177` 殘留 ③, its device half | a standing instruction: **any seating that brings a WAN interface up** | ruling 4; `docs/threat-model.md` § 4 and `docs/hardening-matrix.md` point at the row instead of naming `P3` |
+
+Nothing is declined. ⚠️ `FW-177` 殘留's ① and ② and `TC-26` 殘留 name `R9-9`, a step of `R9`,
+closed on 2026-10-04 (claim ③); they were never `P3`'s, and their next owner is a decision this
+gate was not handed, so they are recorded here and not re-owned.
+
+---
+
+## The operating clause, re-run at twenty-one entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -4121,7 +4290,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs. Re-run 2026-10-04 with `R9` appended, which adds exactly one pair — **and that pair FIRES on the same thing a third consecutive time**. Re-run 2026-10-08 with `R8b` appended, which adds exactly one pair, and that pair does NOT fire — `R8b` closed the thing the three pairs before it fired on, and the one item both entries still carry is a resemblance.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs. Re-run 2026-10-04 with `R9` appended, which adds exactly one pair — **and that pair FIRES on the same thing a third consecutive time**. Re-run 2026-10-08 with `R8b` appended, which adds exactly one pair, and that pair does NOT fire — `R8b` closed the thing the three pairs before it fired on, and the one item both entries still carry is a resemblance. Re-run 2026-10-08 with `P3` appended, which adds exactly one pair, and that pair does NOT fire — the one thing both entries name that the clause counts, `P3`'s power tree, was declined three times in writing, and the clause surfaces what nobody decided.)*
 
 | pair | shared? |
 |---|---|
@@ -4144,6 +4313,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R7` → `R8` 🆕 | **yes — the same thing as `R8a` → `R7`: persistence, that nothing rlxfw writes survives because there is no write path, and `R8b` owns the half that would give it one.** `R7` carries *"That the config store survives anything"* and names `R8` in it as the gate that supplies the MTD backing; `R8`'s entry carries persistence and the ten power cuts, moved to `R8b`'s row. ⚠️ The weakest firing in this table: `R8`'s list holds it because the decision that closed `R8` moved it there, so it adds no evidence the seventeen-entry run had not, and its instruction — *that thing is the next gate* — points at a gate booked behind `R9` |
 | `R8` → `R9` 🆕 | **yes — the same thing a third consecutive time: that nothing rlxfw writes survives, because there is no write path, and `R8b` owns the half that would give it one.** `R8` carries *"That anything can be written to flash and read back after a reset"* and *"the monotonicity the design rests on is asserted and never exercised"*; `R9` carries *"That `R8b` is any closer"* — 讀 `MK5` gates `rtl819x-spi-write.o` on `CONFIG_MTD_RTL819X_WRITE` and 量 `R9-5` found the object absent from both staged trees. 🔴 **The clause's instruction is already carried out**: `R8b` is booked as a gate of its own and is the next gate in the owner's serial order, so this firing adds evidence and not an instruction — the third consecutive firing on one subject, which is itself the reading. ⚠️ What it does not establish: a rule that fires more often because the ledger got longer is measuring length, not repetition, and whether the clause should stop counting a subject already booked as a gate is an open question about the clause that this entry does not decide |
 | `R9` → `R8b` 🆕 | **no — `R8b` closed the subject the last three pairs fired on, and a second of `R9`'s residuals with it.** `R9` carries *"That `R8b` is any closer"* and *"That the flash bracket would detect a small write"*; `R8b` wrote a slot, booted it from flash and survived ten cuts (claims ① and ②), and the `cs6c` re-install changed one byte in each of two 64 KiB regions, which the 4 KiB map resolved to exactly those regions' first units — group 0 moved on `0x010000` alone, its other 31 units equal (`X-W2c-m0f` against `X-K2c-m0f`), and in group 1 the rescue region moved on `0x020000` alone (the barrier's sixteen units there moved too, because `W4b` erased them between the two maps) — a known change, which is the sensitivity control `R9` said needed a write. ⚠️ Closed for an image a provisioning boot writes, not for anything the running firmware writes — `R7`'s config store is no nearer, and that is in neither list. Both entries carry a 推 refuted inside the gate that wrote it (`FW-198`; `R8b`'s *"`W3` overwrote the rootfs at `0x130000`"*, refuted by the dump); declined as a resemblance, the ten-entry run's rule. The flash boundary is not counted, the thirteen-entry run's reason |
+| `R8b` → `P3` 🆕 | **no — the one thing both entries carry is `P3`'s power tree, and three recorded decisions declined it.** `R8b` carries *"no voltage was read, so `P3`'s power tree stays undelivered"*; `P3` carries the plan's section 2 written 讀 and 推 where 量 was asked. `S0b` and `BRD-01` are ⊘ and entry 20's ruling 2 took no voltage, and the fourteen-entry run's reason governs: *the clause surfaces what nobody decided, and a ⊘ is a decision.* ⚠️ The weakest decline in this table: the earlier entry names the later gate — the shape of `P1` → `R6`, `P2` → `R6b` and `R7` → `R8`, all three of which fired, and of `R9` → `R8b`, declined only because the later gate had closed the thing. Most of `R8b`'s other residuals are quoted in `docs/bringup.md` § 16.7, not carried; the instruments the tree does not hold are in neither the report nor `P3`'s list, and `v1.0`'s image has since booted from a slot (`FW-255`); one unit and the flash boundary are not counted |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -5025,6 +5195,87 @@ read only; sha256 `1e81ac1a…`), the eighteen-entry run's three arms pointed at
 **79 clauses, unchanged**: neither `R9`'s list nor `R8b`'s carries a `### The DoD, split into what
 can be refuted` header (量, `grep -c`), so the population cannot grow. **No sixth instance**, by
 construction.
+
+### 🆕 At twenty-one entries the clause does not fire — on the weaker of its reasons, and on the strongest shape it has declined
+
+**`R8b` → `P3` shares one counted item, and the earlier entry names the later gate.** `R8b`'s *what
+it did not establish* carries *"no voltage was read, so `P3`'s power tree stays undelivered"*, and
+its ruling 2 says the same. `P3`'s carries the plan's section 2 — *電源樹（實測，含 `S0b`）* —
+written 讀 and 推. That is the shape of `P1` → `R6` and `P2` → `R6b`, whose runs wrote that nothing
+had to be read into either entry, and of `R7` → `R8`; all three fired. `R9` → `R8b` had it too and
+was declined, because the later gate had closed the thing.
+
+🔴 **It does not fire, because the thing was decided three times and the clause surfaces what nobody
+decided.** `S0b` is ⊘ on `PROGRESS.md`'s `S0` row. `BRD-01`, the regulator whose output pin would
+anchor the tree, is ⊘ in `SPEC.md` § 17 since 2026-09-30, its reopen condition naming `P3`'s
+power-tree section or a powered seating's side measurement with the owner's word. And entry 20's
+ruling 2 kept voltage out of `R8b`'s seating, under a delegation the owner gave on 2026-10-05. The
+fourteen-entry run declined `1472|mdev` on this reason and called it weaker than the others,
+because the decision there was the main session's; ruling 2 is too. **If the owner reopens
+`BRD-01` — an override of ruling 2 would be the owner's word its reopen condition asks for — this
+pair fires on the power tree, `S0b` aside** — and its instruction could not be followed as
+written, because the gate it names has closed: the thing would need a gate of its own, or the
+powered seating's side measurement that `BRD-01`'s own reopen condition already names.
+
+⚠️ **Most of `R8b`'s other residuals are in the report, and not as `P3`'s.** `docs/bringup.md` § 16.7
+quotes them — every write a provisioning write, so no update path in mainline, which the
+twenty-entry run said the pair after `R8b` could fire on; a rollback refused from flash never seen;
+ten cuts all in paced writes; a rescue from an erased `rlxboot` only; the `C-4` extension not run;
+the last bracket and the expected image; `cs6c` in one flash state; the erase size by arithmetic.
+The `v1.0` image from flash, which the twenty-entry run also sent to this pair, booted from slot B
+at `v1.0`'s qualification seating (`FW-255`), so it is not carried; and one of `R8b`'s items — the
+instruments the tree does not hold — is in neither the report nor `P3`'s list. `P3`'s row took
+`R8b`'s readings on in writing to report them, which is not what `R4` → `R5`'s firing needed of the
+later gate: there `R5-0` ② made the residual its own question. A report that quotes a limit has not
+set out to establish its opposite, and the guard written at eight entries decides the rest — *a
+gate does not inherit its predecessor's residuals by default*. 🔴 This is the first entry whose
+definition of done was to quote its predecessor, so the reason is used here for the first time; if
+the owner reads quoting as taking on, the pair fires on each of `R8b`'s residuals that § 16.7
+quotes.
+
+⚠️ **One unit is in both lists and is not counted** — `R8b`'s *"One unit, one part (`1C7016`), one
+loader build, one evening"* and the report's § 0 ② and § 16.5. No gate can set out to establish a
+second unit, because the project has one device and no spare by its premise. Counted by the letter
+it has been shared once before, at `R5` → `R1-pub + R2c` (*"One board, one unit, one operator, and
+six seatings"*; *"One die, one revision, one operator"*), and the nine-entry run passed over it;
+counted as what it is — true of every entry, written down or not — it would fire on every pair,
+which the eight-entry run said would end its meaning. **The flash boundary** is in both and is not
+counted, for the reason the thirteen-entry run gave.
+
+**What `P3` carries that `R8b` does not** — `LA-1`, the WAN-side host probe, the network on an
+autoboot, the open values the report names — waits for the next pair.
+
+🔴 **And one of those is a thing the clause could not have seen, which a measurement found
+instead.** Entry 14's weakest-thing paragraph carried it — `R6b`'s switch state, *"none was read on
+a boot for which the loader did not bring its network up — the way a product boots, from flash, and
+the path `R9`'s zero-write rule keeps out of reach"* — and 量 by `grep` over their text, none of
+entries 15–20 carries it. `R8b` made the path reachable and read no network on it; a ping after a
+flash boot at `v1.0`'s qualification seating found it (`NET-171`), and the owner opened `R6c` on
+it. A residual whose premise lapsed — *"the path `R9`'s zero-write rule keeps out of reach"* — went
+quiet for six entries, and the clause compares neighbours only. Recorded and not made into a rule,
+for the reason given at seven entries.
+
+### 🆕 The census re-run at twenty-one entries — unchanged, because `P3` brings no step list
+
+量 2026-10-08 with the unchanged thirteen-entry script (`$FWRE_WORK/rebuild/s111/land/gate/census.py`,
+read only; sha256 `1e81ac1a…`), the twenty-entry run's three arms pointed at this entry's tree
+(`$FWRE_WORK/rebuild/s128/p3/census21.sh`), exit codes read inside one script file:
+
+* **on `PROGRESS.md` alone** it refuses, rc 1, with all eight control gates reading 0, as at twenty
+  entries;
+* **on a scratch root whose `PROGRESS.md` is the real file followed by all nineteen
+  `docs/history/steps-*.md`** it reproduces **44 clauses across 8 gates** and exits 0, and the
+  `D`-row form reads **66 clauses across eleven gates** with every per-gate figure of the
+  twenty-entry run unchanged;
+* **on the same root with one of `P1`'s `D` rows un-bolded** it exits 1 and names `P1: (3, 4)`.
+
+**79 clauses, unchanged.** `P3` had no step list of its own, so it brings none to
+`docs/history/`, and `R6c`'s list in `PROGRESS.md` does not use the form (量, `grep -c`): the
+population cannot grow, and **no sixth instance**, by construction. ⚠️ `P3`'s board row is a
+gate-board cell and outside the population, and its *grows every gate* is read above as not met as
+worded. It is not recorded beside `R7`'s candidate of seventeen entries — it describes how the
+report was to be written, not an artefact named in place of a property — so it stands where the
+eighteen-entry run left `R8`'s rewritten row.
 
 ### Carried unchanged from the seven-entry run
 
