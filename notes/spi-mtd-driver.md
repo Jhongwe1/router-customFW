@@ -1870,8 +1870,8 @@ then drains them into procfs at most 4 KiB per `write()`.
 
 `rtl819x-spi-wrpolicy.h` (three places, including `RLXFW_SPI_WR_ERASE_GRAIN`'s own line) and
 `rtl819x-spi.c` (two) still call the erase size unsettled. They are left: every byte under `config/`
-moves `RECIPE_ID`, and `v1.0`'s recipe is `6a11de02`. They change in the next commit that moves the
-recipe for another reason, and § 12.4's quotation of that line stays a true quotation until then.
+moves `RECIPE_ID`, and `v1.0`'s recipe is `9bb2bec7`. 🔄 `034b5a7d` moved the recipe for `R6c` and left them, so they
+change in the next commit after `v1.0` that moves the recipe, and § 12.4's quotation of that line stays a true quotation until then.
 
 ### 14.7 What § 14 does not establish
 

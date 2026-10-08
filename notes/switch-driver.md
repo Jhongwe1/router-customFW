@@ -4537,9 +4537,12 @@ only staged and installed T.
   tables kept, `n_writes` 11 -- did not happen.
 * With netif slot 0 cleared, the RAM path still receives: across the host's ping, port 3's in
   columns and the CPU port's out columns moved together column for column and the discard
-  columns stayed 0 (`R09` → `R11`, and `X-R15` after the board's 225). That is `FFCR`'s
-  unknown-unicast trap carrying `rlx0`'s unicast, `NET-169`'s mechanism, measured for the first
-  time. Ruling O1's fallback, netif slot 0 with `rlx0`'s address, is not needed.
+  columns stayed 0 (`R09` → `R11`, and `X-R15` after the board's 225). So the netif entry is not
+  what carries `rlx0`'s unicast, and ruling O1's fallback, netif slot 0 with `rlx0`'s address, is
+  not needed. 🔄 2026-10-08 (130th segment): this bullet first called the path `FFCR`'s
+  unknown-unicast trap, `NET-169`'s mechanism, "measured for the first time". It is not: no L2
+  table was read on these boots, and `NET-169`'s deciding experiment (the RX header's `ph_reason`,
+  or a unicast ping with `FFCR` bit 1 cleared) did not run, so the trap stays 推.
 * Booted from flash, rlxfw receives (`NET-171` reversed for 1.6): `rlx0`'s RX went 0 → 6 → 10 on
   each flash boot, and port 3's discards stayed 0 where seating A counted every frame.
 * The install: 4,625 operations (288 sector erases, 4,337 page programs), slot A's 1,179,648 bytes
@@ -4550,4 +4553,5 @@ only staged and installed T.
 only that the slot reads back as stored); what happens to a frame that arrives while `STOP_TLU`
 holds the lookups on the RAM path; which part of the written group is necessary; `MACCR`'s and
 `QNUMCR`'s part (they differ between the paths, and both paths work); more than one warm and one
-cold boot; load, a second port, the vendor's firmware.
+cold boot; load; a second port — the layout makes ports 0–5 one VLAN, port 0, the vendor
+firmware's WAN, among them, so 推 a peer there is a LAN peer (`NET-174`); the vendor's firmware.

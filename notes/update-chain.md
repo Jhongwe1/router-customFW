@@ -681,7 +681,7 @@ controls.
 
 ---
 
-## 9. 🆕 2026-10-08 (127th segment): `v1.0`'s release image through the update path
+## 9. 🆕 2026-10-08 (127th segment): `v1.0`'s candidate image through the update path (🔄 superseded by `9bb2bec7`, § 10)
 
 The candidate `v1.0` image — `mainline-6a11de02.img`, sha256 `a3a75f8c…`, 1,108,992 bytes,
 built twice byte-equal from `f257a848` (`FW-254`) — was taken through the product's own
@@ -711,5 +711,30 @@ update path on one seating, `bench/2026-10-08/V10-CARD.md`, with one flash write
   counter of 0, and so would P, Q or R be.
 
 **What this does not establish.** That the image has a network from flash: it has none
-(`notes/switch-driver.md` § 20, `SPEC.md` `NET-171`), which is why `v1.0` waits on `R6c`.
+(`notes/switch-driver.md` § 20, `SPEC.md` `NET-171`), so `R6c` rebuilt it and `v1.0` ships `9bb2bec7` (§ 10).
 More than one cold boot. Anything under load.
+
+## 10. 🆕 2026-10-08 (129th segment): `v1.0`'s image, `9bb2bec7`, installed in slot A as T
+
+`R6c` rebuilt the release image with `rtl819x-switch` 1.6 — `mainline-9bb2bec7.img`, sha256
+`295d4f6a…86bd`, 1,110,016 bytes, built twice byte-equal from `034b5a7d` — and it went through
+the same update path on one seating, `bench/2026-10-08c/R6C-4-CARD.md`, with one flash write.
+
+* **Container T.** Version 5, slot A at `0x070000`, form whole, recipe `9bb2bec7`, signed by
+  the owner with the production key `rlxboot` holds (`4a6eda72…`); 1,110,176 bytes, sha256
+  `113f5542…`. 量 at the desk before the seating (`LOG.md`, the 129th segment), four checks:
+  the header field by field, `mkfw2 verify` (slot A accepted, slot B refused at `flash_match`),
+  the armed image's install check compiled on the host (slot B `HDR_FLASH_AT`), and `rlxboot`'s
+  slot choice compiled on the host (`slotcheck` V1–V4).
+* **Installed.** 量 `I10`: the armed image `8dce09c5`, booted from RAM through the loader's
+  prompt (`I02`), staged T (`img_len 1110176`, `img_writes 271`) and wrote slot A — 288 sector
+  erases and 4,337 page programs — and slot A's 1,179,648 bytes read back with no difference
+  (`I11`, `inst_cmp_diff 0`). The owner's dated yes for that payload is on the card.
+* **Booted.** 量 `W01` (after `busybox reboot -f`) and `C01` (after a cold power-on): `rlxboot`
+  read A at version 5 and B (S) at version 4, both `ok`, every one at `ctr=0`, and booted A;
+  `/init` printed `rlxfw: lan up, rlx0 10.1.1.1/24`, and `rlx0` pinged both ways
+  (`notes/switch-driver.md` § 21.6, `SPEC.md` `NET-173`).
+
+**What this does not establish.** More than one warm and one cold boot. A rollback refused from
+flash: the counter is still 0, so S would be accepted if A were invalid. That an `rlxboot`
+holding another key refuses T, which only `slotcheck` V4 shows, on the host. Anything under load.

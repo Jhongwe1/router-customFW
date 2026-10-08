@@ -50,7 +50,7 @@ userspace found. One piece of state has one owner.
 |---|---|---|---|
 | **`T1`** | **LAN peer, unauthenticated** | rlxfw's `httpd` on 80 and `dnsfwd` on UDP 53 (讀 `notes/dnsfwd.md` § 1; 量 both answering on the device, `SPEC.md` `FW-175`), `udhcpd` when `dhcpd.enable` = 1 (讀 `notes/init.md` § 4), ICMP, and the switch's forwarding behaviour | **bounded**, § 2 |
 | **`T2`** | **LAN peer with valid credentials** | everything `T1` reaches, plus `brokerd`'s session-gated ops through `httpd` | **bounded**, § 3 |
-| **`T3`** | **WAN-side peer** | **未定** — which rlxfw services bind on a WAN interface has not been read | **未定**, § 4 |
+| **`T3`** | **WAN-side peer** | **未定** — which rlxfw services bind on a WAN interface has not been read; 🔄 2026-10-08: rlxfw has no WAN, and 推 the port the vendor runs as WAN is in rlxfw's LAN VLAN (`NET-174`) | **未定**, § 4 |
 | **`T4`** | **Wireless client associating to the radio** | the vendor's WLAN driver directly, in kernel context | **bounded only by the radio being down**, § 5 |
 | **`T5`** | **Physical attacker with the board** | the SPI flash off-circuit, the UART console, the loader prompt, every byte of RAM | 🔴 **unmitigated**, § 6 |
 | **`T6`** | **Anyone who reaches the loader prompt** | the loader's unauthenticated TFTP rescue, arbitrary memory writes, and a flash burn | 🔴 **unmitigated by design**, § 7 |
@@ -173,6 +173,18 @@ it, and `SPEC.md` `FW-177` 殘留 names who holds it now.
 ⚠️ So this file **cannot** say rlxfw's WAN exposure is smaller than the
 vendor's. It can say the vendor's WAN reachability for one service class was
 also never settled, which is upstream's open question and not an rlxfw result.
+
+🔴 **🆕 2026-10-08 (130th segment): the premise above holds for interfaces, and
+not for the port.** rlxfw has no WAN: the switch layout it runs — the loader's on
+every RAM boot through the prompt since `R6`, and since `rtl819x-switch` 1.6 its
+own on a flash boot too — puts ports 0–5 in one VLAN, untagged (slot 8
+`00807E3F`, read back on all three of `R6c-4`'s paths), and port 0 is the port the
+vendor firmware runs as its WAN, on VID 8 apart from the LAN's VID 9 (`SPEC.md`
+`NET-04`). 推 So a peer on port 0 is a LAN peer to rlxfw: it reaches `rlx0`, and
+`dnsfwd`'s LAN address and `httpd` with it, whichever address `httpd` binds. No
+boot has had a peer on port 0, its link under rlxfw was not read, and which jack
+is port 0 is ⊘ (`NET-13`), so this is 讀 and 推 and not a probe (`SPEC.md`
+`NET-174`). Until a WAN exists, the WAN-labelled jack is not a boundary.
 
 ## 5. `T4` — a wireless client associating to the radio
 

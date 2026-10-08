@@ -462,7 +462,7 @@ the image containers P, Q and R wrap. The commit that made `rlxboot` and its res
 `f257a848`, changed one file under `config/` — the install guard, which compiles only under
 `CONFIG_MTD_RTL819X_WRITE=y` and so never into mainline — and every byte under `config/` is an
 input of `RECIPE_ID`, so the mainline recipe moved to `6a11de02`. `docs/release-process.md` A1/B1
-tie the release image to the release commit's recipe, so `v1.0` ships a `6a11de02` image, and the
+tie the release image to the release commit's recipe, so `v1.0` ships a `6a11de02` image (🔄 since `R6c`, `9bb2bec7`: § 10), and the
 question is how far it is from the bytes that were tested. `SPEC.md` `FW-236` is the precedent: an
 armed-only change left mainline's `vmlinux` 8 bytes apart, the two copies of the id.
 
@@ -489,3 +489,36 @@ bytes against the 5,242,880-byte ceiling, which `mkinitramfs --kernel-image` enf
 or from a slot — it has not run anywhere; that the container wrapping it verifies — container S is
 not yet signed; anything a byte comparison of `vmlinux` cannot see, such as a difference in how the
 same bytes are staged. `SPEC.md` `FW-254`.
+
+## 10. 🆕 2026-10-08: `v1.0`'s image is `9bb2bec7` — built twice byte-equal, and the bytes the device ran
+
+**Why it moved.** Booted from a slot, the `6a11de02` image receives no frame (`SPEC.md` `NET-171`),
+so `R6c` changed the switch driver (`rtl819x-switch` 1.6, `034b5a7d`, `NET-173`); that is a byte under
+`config/`, so the mainline recipe moved to `9bb2bec7` and the armed one to `8dce09c5`. `v1.0` ships
+`9bb2bec7`, and § 9's comparison is about an image that is no longer the release's.
+
+**What was built.** 量 2026-10-08 (the 129th segment), `$FWRE_WORK/rebuild/s128/p/build-r6c.sh`
+from an ext4 clone at `034b5a7d`, each image twice, cells `s128p-r6c-mA`/`-mB` and `-aA`/`-aB`,
+re-read by sha256 from the four cells' own products in the 130th segment:
+
+| | `nfjrom` (the image) | `vmlinux` |
+|---|---|---|
+| mainline `9bb2bec7`, `mA` = `mB` | 1,110,016 B, `295d4f6aec14f8b6ee21ebccec05e6b5492d8785274afe676fbfa5a070fb86bd` | 4,621,952 B, `3bc8f1ba…` |
+| armed `8dce09c5`, `aA` = `aB` | 1,117,184 B, `9328dcf9ddaaa4b4f8bc1e586d2993c7a670f2fd13d3f72c16f8da6cd16cd735` | 4,625,665 B, `2fc7ca2c…` |
+
+The decompressed mainline image is 4,128,768 bytes against the 5,242,880-byte ceiling (78.8 %),
+which `mkinitramfs --kernel-image` enforces. The build manifest beside the products
+(`$FWRE_WORK/rebuild/s128/p/run/r6c/MANIFEST.tsv`) records every input tool and file by sha256.
+
+**The bytes the device ran.** 量 `bench/2026-10-08c`: the card pins `R02`'s upload with
+`looprun --image-sha256 295d4f6a…86bd`, T's payload is the same bytes (`notes/update-chain.md`
+§ 10), and `R02`, `W01` and `C01` printed `RLXFW-ID0=9BB2BEC7`.
+
+**The release commit can be any later commit that changes no build input.** 量 2026-10-08, 130th segment:
+`git diff --name-only 034b5a7d HEAD -- src config` is empty at `28a490c7`, and the 18 repository
+files the manifest's `init` rows list hash at `28a490c7` to the manifest's values (the same check
+at `2009c4eb` reads `config/rlxfw-initramfs.tsv` different, its control). The tools that changed
+in between, `tools/bootbytes.py` and `tools/ci-expected.tsv`, are not build inputs.
+
+⚠️ **What this does not establish**: that a third party rebuilds `295d4f6a…` (`P4a` closed at Level 1;
+`P4A-1`); anything about images built from a later `config/`. `SPEC.md` `FW-256`.

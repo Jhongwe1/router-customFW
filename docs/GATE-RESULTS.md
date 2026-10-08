@@ -4280,7 +4280,353 @@ gate was not handed, so they are recorded here and not re-owned.
 
 ---
 
-## The operating clause, re-run at twenty-one entries
+## 2026-10-09 — `R6c` (booted from a flash slot, rlxfw pings both ways after a watchdog reset and after a cold power-on, because its own switch driver now writes the VLAN group the stock loader configures only on its prompt path; the RAM path still pings, and the write set is shown sufficient as a unit, with no on/off control on one boot)
+
+### One line
+
+**v0.6+, four segments — the 127th, which opened the gate on `v1.0`'s qualification seating's
+finding and wrote its list (`R6c-0`); the 128th for `R6c-1`, `R6c-2` and a read-only seating; the
+129th for `R6c-3` and `R6c-4`'s seating; the 130th for this closing — and two power actions, the
+off and on of one cold boot in the 129th, beside one flash write, `I10`.** § Gate board leaves
+`R6c` uncosted — the plan does not name it, and the owner opened it on 2026-10-08 — so there is no
+estimate to divide by; the qualification seating that found the fault (`bench/2026-10-08`, two
+power actions and the write `V05b`) ran before the gate opened and is `FW-255`'s, not counted
+here. **Booted from slot A through `rlxboot`, the release image `9bb2bec7` pings both ways after a
+watchdog reset and after a cold power-on**, 4 of 4 each way on each boot (`W10`, `X-W14`; `C10`,
+`X-C14`), where the same two kinds of boot of `6a11de02`, on 2026-10-08, counted no frame
+(`NET-171`) and its switch discarded every frame from the host at port 3 (`NET-172`). What changed is
+`rtl819x-switch` 1.6's `vlan` (`034b5a7d`, `NET-173`): PID 1 types it between `init` and `start`,
+and it writes the loader's one-VLAN layout wherever the switch differs from it — VLAN slot 8
+`00807E3F` and the other fifteen slots zero, the eight netif slots zero, `PVCR0`–`3` `00080008`,
+`FFCR` 3 — after verifying four words it never writes. On a flash boot that is one table write
+and five registers, `n_writes` 6 → 23; on a RAM boot through the prompt, where the loader has
+written the group, it is netif slot 0 alone, 6 → 18, and that path still pings both ways. The
+layout is the owner's (ruling O1, 2026-10-08), admitted on two sources — the vendor bootcode and
+the measured working state, with the loader's own stores a third — after `R6c-1` read the
+loader's 30 Ethernet-init writes from two sources and found that an autoboot makes none of them
+(`LDR-47`).
+
+**The card was wrong once at the bench, and the main session's review passed it.** It wrote the
+board's `ping` without `-c` on all three paths, because it took the 2026-09-06 finding — *this
+image's `ping` ignores `-c` and always sends exactly four packets* (`NET-26`,
+`notes/rootfs-census.md`, restated in `CLAUDE.md`) — as true of the image under test, and pinned
+that sentence in a `cardnum` row (`ping-four`). 讀 The finding was measured on the vendor's
+busybox (273,332 bytes); the image under test carries rlxfw's own (`prebuilt:busybox/busybox`,
+447,684 bytes). 量 Its `ping 10.1.1.2` in `R14` was still answering when the cell's 35 s window
+closed, and it held the console through `R15` and `R16`, whose captures hold its reply lines; a
+Ctrl-C (`X-R14i`) ended it at 225 transmitted, 225 received, and the two cells were typed again as
+`X-R15` and `X-R16`. `CORRECTIONS-R6C-4.md`, each entry written before what it changes ran, typed
+the flash boots' board ping with `-c 4` (`X-W13`, `X-C13`, writing `X-W14`, `X-C14`; C1), read
+`D1`'s *`R14` `4 packets received`* as every request answered, with the host's `tcpdump` in `R13`
+showing each request and its reply (C2), and kept the closing count off the card, whose mtime
+`check-predictions` compares with the captures' (C3). It cost two re-taken cells and one
+interrupt, and no write or power action. `NET-26` now says it holds for the vendor's busybox
+only, and `CLAUDE.md`'s line asks for `-c 4`.
+
+**The weakest thing here is the causal half: the take-over is shown sufficient, as a unit, on one
+boot of each kind, against a control that is a different image on other boots.** 讀 `git diff
+f257a848 034b5a7d -- config src`: the build inputs of `6a11de02`, deaf from flash, and
+`9bb2bec7` differ in seven files, and the code among them is the 1.6 block and the line that
+types `vlan`, in `src/init/main.c` and in `config/rlxfw-init.sh` — the rest are comments and the
+`/init` row's description — so the comparison has one variable, but it spans two images and four
+flash boots, and no cell takes the write set away on one boot and watches the frames die again.
+The design asked for exactly that — `vlan reset`, predicted to bring the flash symptom back on a
+RAM boot (`$FWRE_WORK/rebuild/s127/r6c2/TAKEOVER-DESIGN.md` § 4.3, B2) — and ruling E1 declined
+it, naming 2026-10-08's flash boots without the verb as the control. So which of the 17 stores is
+necessary is not measured — O1 writes the group as a unit — and which switch rule discarded the
+frames before, ingress filtering or the lookup of a VID with no entry, stays 推: the write set
+changes the PVIDs and the table together. And each path is one boot: one warm and one cold flash
+boot, which read alike (`W03` and `C03` differ in their `jiffies` line alone), and one RAM boot
+through the prompt.
+
+### Three claims that stand
+
+**① Booted from slot A through `rlxboot`, rlxfw receives: the release image pings both ways after
+a watchdog reset and after a cold power-on, and the switch now delivers to the CPU port what it
+discarded before.** 量 `bench/2026-10-08c` (`NET-173`; `NET-171`'s 🔄). `W01` (`busybox reboot -f`,
+then `Reboot Result from Watchdog Timeout!`) and `C01` (the owner's off and on; no such line) each
+read `RLXBOOT-FROM 05010000`, `RLXBOOT-VERDICT A ok ver=5`, `RLXBOOT-VERDICT B ok ver=4`,
+`RLXBOOT-SLOT A` and `RLXFW-ID0=9BB2BEC7`, and `tools/bootslot.py judge` read PASS on both (`W02`,
+`C02`). Host → board: `4 packets transmitted, 4 received, 0% packet loss`, `ping_rc=0`, the host's
+entry for `10.1.1.1` `REACHABLE` (`W10`, `C10`); board → host: `4 packets transmitted, 4 packets
+received` (`X-W14`, `X-C14`), the host's `tcpdump` showing four echo requests and four replies
+(`X-W13`, `X-C13`). `rlx0`'s RX went 0 → 6 → 10 across the two exchanges on each boot (`W08`,
+`W12`, `W16`; `C08`, `C12`, `C16`). In the switch's own counters, across the host's ping, port 3's
+in columns and the CPU port's out columns moved together, column for column — 536 octets, 5
+unicast, 1 broadcast — and port 3's two discard columns stayed 0 (`W09` → `W11`, `C09` → `C11`);
+on seating A's flash boot without the verb the host's three ARP requests raised each of port 3's
+discard columns by 3 and moved none of the CPU port's (`bench/2026-10-08b`, `A10` → `A12`,
+`NET-172`). That seating and 2026-10-08's two flash boots of `6a11de02` (`X-V06q`, `X-V08q`: 0
+of 3, the entry `FAILED`) are the control. ⚠️ Four pings each way on each boot, one host on port
+3, and a control that is another image (the weakest-thing paragraph).
+
+**② `vlan` stores exactly what differs from the loader's layout, and every field of its line that
+the card predicted from the code read as predicted, on all three paths.** 量 `R03`, `W03` and `C03`
+against `R6C-4-CARD.md`, whose predictions sit in `cardnum` rows derived from `034b5a7d` by a
+script outside the tree (`$FWRE_WORK/rebuild/s129/r6c4/derive.py`, pinned by sha256). From flash:
+`vw 0100 nw 00 rw 1F` — one table write, VLAN slot 8, and the five registers — `n_writes 23` = 5
+(`init`) + 17 + 1 (`start`), `n_reads 133` = 131 + `sta` + `spin`. Through the prompt: `vw 0000 nw
+01 rw 00` — netif slot 0 alone — `n_writes 18`, `n_reads 128` = 126 + `sta` + `spin`. On all
+three `rc 0`, `final 0`, `ld 784` (every double read agreed at once), `to 0`, `rb 0`, and the
+four fields the card left to be read came back `tlu 000C0000` (bit 18 read back set after step
+(2), recorded and not required), `sta 1`, `spin 1`, `swtasr 00000000`; the live `SWTCR0` reads
+`00080000`, bit 18 clear. Afterwards the tables hold the write set — VLAN slot 8 `00807E3F` and
+seven zero words, the other fifteen slots and all eight netif slots zero (`R04`–`R05`,
+`W04`–`W05`, `C04`–`C05`) — and the registers read `PVCR0`–`3` `00080008` and `FFCR` 3, with
+`PVCR4` 1, `VCR0` `1FF` and `PBVCR0` 0 on the page and `PLITIMR` `07FAC688` in the ALE run (`R06`,
+`W06`, `C06`). 🟢 **The warm flash boot refuted an alternative the review had added to the card**:
+a watchdog reset that clears the registers but keeps the on-chip tables would have read `vw
+0000` and `n_writes 11`; `W03` read `vw 0100` and 23, as the cold boot did — a watchdog reset
+clears the ASIC tables with the registers. ⚠️ Equal read-backs say the slot reads back as stored,
+not how many `TCR` words the engine took; and the desk harness that predicted the same fields
+(`tools/mdiocheck.py`, 152 run, 0 failed, 82 of 82 mutants killed by the case named for each)
+models the engine from the vendor readings the driver follows.
+
+**③ The RAM boot through the loader's prompt still pings both ways with netif slot 0 cleared, so
+the netif entry was not what carried `rlx0`'s unicast.** 量 `R02`: `looprun` uploaded
+`9bb2bec7` against its pinned sha256 and read `A3` `board printed 9bb2bec7, build computed
+9bb2bec7`; it failed `A4` (`neither '<RealTek>' nor a shell prompt`), `FW-252`'s fifth time —
+the shell's prompt printed before `dnsfwd`'s lines — and `X-R02p` read `37.53 31.98` and the
+prompt, the route the card gave that case. `R05`: all eight netif slots zero. Host → board 4 of 4
+(`R10`); board → host 225 of 225 (`X-R14i`, unbounded: the paragraph above). Port 3's in columns
+and the CPU port's out columns moved together, column for column, and port 3's discard columns
+stayed 0 (`R09` → `R11`, and `R11` → `X-R15` across the board's 225). ⚠️ That `FFCR`'s
+unknown-unicast trap is what delivers that unicast stays `NET-169`'s 推 on one source: its
+deciding experiment — the RX header's `ph_reason`, or a unicast ping with `FFCR` bit 1 cleared —
+was not run, and the L2 table was not read on this boot. What is measured is that the netif
+entry is not needed, and ruling O1's fallback, netif slot 0 with `rlx0`'s own address, was not
+built.
+
+### The board row's clauses, read one at a time
+
+| the row says | verdict |
+|---|---|
+| **an image booted from a slot through `rlxboot`** | 🟢 **met**: T — `9bb2bec7` in a container the owner signed as version 5 for slot A — installed by `I10` (`I11`: `inst_reason OK`, 288 sector erases and 4,337 page programs, `inst_cmp_diff 0` over 1,179,648 bytes), then chosen by `rlxboot` over S (`ok:4`) on both flash boots (`W01`, `C01`; `bootslot` PASS) |
+| **pings both ways** | 🟢 **met**: 4 of 4 each way on each flash boot, read on the host (`ping`, `tcpdump`) and on the board (`rlx0`'s counters, the switch's MIB) — claim ① |
+| **after a watchdog reset** | 🟢 **met**: `W01`, `busybox reboot -f`, `Reboot Result from Watchdog Timeout!` printed |
+| **and after a cold power-on** | 🟢 **met**: `C01`, after the owner's off (`PF2`: 0 bytes in 3.08 s, the board off) and on, with no watchdog line |
+| **and a RAM boot through the loader's prompt still does** | 🟢 **met** (claim ③): 4 of 4 host → board (`R10`), and every request answered board → host (`X-R14i`, 225 of 225). ⚠️ `looprun` read `R02` as 1 of 8 assertions failed, `A4`, `FW-252`'s, and the board's `ping` was not bounded at four (C1, C2) |
+| *(the card's refutation)* any flash boot below 4/4 either way; `n_rx` 0 while the host's TX grows; a table or register other than the write set; `vlan`'s rc not 0; `STOP_TLU` left set; B1 failing | **did not fire**, with `D1` read as `CORRECTIONS-R6C-4.md` C2 reads `R02` and `R14` |
+
+### The steps' DoD, read one row at a time
+
+| the DoD says | verdict |
+|---|---|
+| **`R6c-0`** the board row reads `~` and names this list | 🟢 met 2026-10-08 (`2f31b080`) |
+| **`R6c-1`** a table with both sources per row, each agreeing or recorded undetermined | 🟢 met 2026-10-08 (`b3a32ee5`, `LDR-47`, `docs/loader-phy-and-switch.md` § 2026-10-08): 30 writes in program order, each with A and Bb or Bk and with 量 where read; `MEMCR` stands on A and 量 alone, and row 12's two arms are recorded as not executed. ⚠️ No held tree builds this loader (the hazard column) |
+| **`R6c-2`** written, with where it will fail | 🟢 met 2026-10-08: the design (`$FWRE_WORK/rebuild/s127/r6c2/TAKEOVER-DESIGN.md`, nine risks in its § 6), checked by `$FWRE_WORK/rebuild/s128/v2/VERIFY-R6C2.md`, and the rulings (`$FWRE_WORK/rebuild/s128/RULINGS-R6c.md`: O1, O2, and E1–E4, each with where it fails); in the tree, `notes/switch-driver.md` § 21.3. ⚠️ The design and the rulings are outside the tree |
+| **`R6c-3`** builds byte-equal; tests green and the mutation red | 🟢 met 2026-10-08 (`034b5a7d`): mainline `s128p-r6c-mA` == `-mB` (`nfjrom` `295d4f6a…`), armed `-aA` == `-aB` (`9328dcf9…`), the six userspace programs A == B; `mdiocheck` 152 run, 0 failed, 82 of 82 mutants killed; the main session's mutant of (4)'s busy exit, green under the implementation agent's 68 cases, is red under `K67` alone (`M82`) |
+| **`R6c-4`** each boot judged by `bootslot`, each ping read from both sides | 🟢 met for the two flash boots (`W02`, `C02` PASS; each ping read on the host and on the board). ⚠️ By the letter `bootslot` cannot judge the RAM boot: it reads `rlxboot`'s lines, which a boot through `J 80500000` does not print, and `R02`'s `A3` identified that one. ⚠️ `R14`, unbounded, was read by C2 |
+| **`R6c-5`** `cfcensus` and `spec-check` green on the closing tree | 🟢 met 2026-10-09, on this entry's tree: `spec-check` rc 0; `cfcensus` `write`, then `check` rc 0 — 25 rows, 0 findings, the guard reading `P4b` alone in progress with one OPEN row live-owned, `FLW-1`; `docmove` CONSERVED, 150 blocks conserved and the seven in-place rewrites declared (`$FWRE_WORK/rebuild/s130/r6c-move.allow`) |
+
+### The step list's hazard column, read one at a time
+
+* **`R6c-1`, a function in a drop that does not build this loader** — it fired in the form named:
+  讀 no held tree builds this loader, whose `P0phymode=%02x, %s phy` format is in neither bootcode
+  tree, so every row stands on `stage2.bin`'s disassembly (A) with the vendor bootcode of another
+  generation (Bb, built for 8196C and 8198) or the kernel's 8196E arm (Bk) beside it, and nothing
+  was admitted for rlxfw on A alone. It also found three rows of `notes/switch-driver.md` § 8.9 —
+  `MACCR |= 0x1000`, `PITCR |= 0x1`, `P0GMIICR |= 0x40` — to sit in the `BOND_8196ES` arm, which
+  this part does not run (`REG-30`); § 8.9 is corrected in place.
+* **`R6c-2`, a value with one source, taken because the loader's state worked** — the design's own
+  risk 4, and the reason 8d ruling 3 had refused a take-over. The owner's O1 admitted the layout on
+  Bb and 量, A a third; the four words whose only source is 量 — `PVCR4`, `VCR0`, `PBVCR0`,
+  `PLITIMR` — are verified and never written, and a mismatch refuses with nothing stored.
+* **`R6c-3`, a RAM boot through the prompt broken by writing over the loader's state** — did not
+  fire: on that path `vlan` stored netif slot 0 alone (`vw 0000 nw 01 rw 00`) and the boot pinged
+  both ways (claim ③).
+* **`R6c-4`, a cold boot that differs from the warm one** — did not fire: `W03` and `C03` differ in
+  their `jiffies` line alone, the tables, the ALE run and `QNUMCR` read the same (`W04`–`W07`
+  against `C04`–`C07`, counter lines aside), and the two pings moved the MIB by the same deltas.
+
+### The questions this gate must be able to answer
+
+The plan's hostile-question list (§ 11) has no row for `R6c`: 量 `grep -c R6c
+plan/router-rebuild-plan.md` returns 0, the owner having opened the gate on 2026-10-08. The
+question it exists for is the one `v1.0`'s qualification seating raised — *why does an image
+booted from flash hear nothing, and is the fix the reason it now does?* — and the answer has three
+parts: the loader configures the switch only on the path into its prompt, and an autoboot writes
+none of it (`LDR-46`, `LDR-47`); booted from flash, the switch discarded every frame from the host
+at port 3 (`NET-172`); and with `vlan`, the same port delivers to the CPU port and its discard
+counters stay 0 (claim ①), between two images whose build inputs differ by `R6c-3`'s change set
+alone — with no on/off control on one boot (the weakest-thing paragraph). 讀 The plan's own scope
+for `R6` lists 「switch 初始化到 dumb 狀態（全 port 同 VLAN，無加速）」; until this gate rlxfw met
+it by inheriting the loader's state, which only the prompt path has, and since 1.6 it writes that
+state wherever it differs. `R8`'s 「只有一台機器你敢寫 flash？」, entry 20's to answer, had one more
+instance here: `I10`, under the owner's dated yes for its exact string, read back whole, with
+slot B outside the arm window (`arm 0x70000 0x190000 0x120000`).
+
+### What `R6c` did not establish
+
+🔴 **Why the frames died before, and which of the writes is necessary.** Ingress filtering or the
+lookup of a VID with no entry is 推: seating A's discard counters cannot tell them apart, and the
+write set changes the PVIDs and the table together. No cell takes the 17 stores apart — O1 writes
+the group as a unit — and no cell removes them on one boot, E1 having declined the design's
+`vlan reset` (the weakest-thing paragraph).
+
+🔴 **More than one boot of each kind.** One warm and one cold flash boot of one image,
+`9bb2bec7`, and one RAM boot through the prompt; no cold boot with ESC.
+
+⚠️ **That `FFCR`'s unknown-unicast trap is what delivers `rlx0`'s unicast** (claim ③). On the
+flash path the L2 table read empty on seating A's boot (`A07`, `NET-172`) and was not read after
+`vlan` wrote `FFCR`.
+
+⚠️ **The engine's side of the table write.** How many `TCR` words it copies — equal read-backs
+say only that the slot reads back as stored — and what the switch does with a frame that arrives
+while `STOP_TLU` holds the lookups on the RAM path, where `TRXRDY` is already set: a frame lost
+there does not show in a later ping. The rest of the table write the silicon did answer: `SWTCR0`
+read `000C0000` with `STOP_TLU` set, one poll at each of steps (3) and (8) (`sta 1`, `spin 1`), and
+`SWTASR` 0 after a force (`notes/switch-driver.md` § 21.6).
+
+⚠️ **`MACCR` and `QNUMCR`'s CPU field.** Each differs between the two paths that ping — `MACCR`
+`804A0185` through the prompt and `80420186` from flash, `QNUMCR` `00001249` and `00041249`
+(`R03` and `R07` against `W03` and `W07`) — and `vlan` writes neither, so neither decides four
+pings on port 3; nothing more is shown. The PHY patch and `LEDCREG` were not read.
+
+⚠️ **That a second `vlan` stores nothing on the silicon.** No cell typed it; the harness's `K55`
+does (E3).
+
+⚠️ **A second port.** Every frame was counted on port 3, with the host's adapter at 100 Mb/s,
+half duplex (seating A). 讀 The written VLAN 8 makes ports 0–5 members, untagged (`00807E3F`,
+`notes/switch-driver.md` § 21.4), port 0 among them — the port the vendor firmware runs as its
+WAN, on VID 8 apart from the LAN's VID 9 (`NET-04`). 推 So a peer on port 0 now reaches `rlx0`
+from flash as a LAN peer does, as it has on every RAM boot through the prompt, whose layout this
+is; nothing on a port but 3 was counted (`NET-174`).
+
+⚠️ **Load, and the vendor's firmware.** Four pings each way on each flash boot and 225 on the RAM
+path; no throughput and no flood.
+
+⚠️ **The harness shares its sources with the driver.** `tools/mdiocheck.py`'s engine follows the
+same two vendor readings the driver does — the step order of A (`LDR-47`) and of Bb's
+`swTable_forceAddEntry`, the command and the entry layout of B — so the device agreeing with both
+predictions does not separate them, and an error the two share passes both (`NET-173`).
+
+⚠️ **The fallback slot is deaf.** Slot B still holds S — `6a11de02`, version 4 — which `rlxboot`
+verified on both flash boots (`RLXBOOT-VERDICT B ok ver=4`); 推 from `NET-171`, a boot that falls
+back to it, as a torn or invalid slot A would, comes up with no Ethernet. The counter read
+`ctr=0` on both boots, so nothing refuses S either. Rewriting slot B is another flash write.
+
+⚠️ **That `v1.0` is released, or that rlxfw updated itself.** `v1.0`'s image is re-pinned to
+`9bb2bec7` (`FW-256`, the owner's instruction for this closing), and `P4b`'s phases are not this gate's. T went into slot
+A as `R8b`'s containers did, by the armed image RAM-booted through the loader (`I01`–`I11`); the
+release image has no write path (`W17`, `C17`: `wr_linked 0`, `n_mtd_write_calls 0`,
+`n_mtd_erase_calls 0`).
+
+⚠️ **What the gate got wrong at the desk**, each caught before a byte reached the device and
+recorded in `LOG.md`'s 127th–129th entries. The first draft of `NET-171` counted the switch's
+differences as 7 — they are 10, `PVCR0`–`3` being four rows — and said nobody had connected the
+two halves, which `notes/switch-driver.md` §§ 17.4 and 17.10 had (the `R6c-2` agent's
+correction). The two research reports, checked against the raw sources by two more agents, held
+on every disassembly row but carried errors of method — two 量 cells cited wrongly, the loader's
+second init entry under-described, a boot mark that would have moved `bootbytes`' counts, a
+harness that compared literals only, a bit-18 read-back never measured — and contradicted each
+other on whether PVID 8 has a second source (it has: Bb's `swCore.c`). The implementation agent's
+68 cases let one of the main session's twelve mutants through — (4)'s busy answer skipping the
+undo, which would leave `STOP_TLU` set and stop every lookup — closed by `K67` and `M82` before
+the patch was committed. And `034b5a7d` left `src/init/main.c`'s header naming *five* `/proc`
+verbs, one short since `vlan`; it was corrected after the build and then reverted, so that no
+build input moved after the build, and the comment waits for the next rebuild (`FW-256`).
+
+⚠️ **Instruments the tree does not hold.** The design and its check, the two research reports
+and theirs, the rulings (`$FWRE_WORK/rebuild/s127/`, `s128/`); the card's draft, its review and
+`derive.py` with `derive.out`, which the card pins by sha256 (`s129/r6c4/`); the main session's
+twelve mutants (`s129/mut.py`); the seating's scripts (`s129/bench/`); and the build records
+(`s128/p/run/r6c/`). The card's review found three defects in the tools and fixed none before the
+seating: `cardcheck`'s `--idle` guard on a `sleep` skips every line without the literal
+`console-capture`, so no `CAP` line on any card has been checked by it; V10's `--boot-until`
+never matched (`FW-253`); and under `--skip S4` `looprun`'s `A0a` reads only its own `S4`. None
+let a write happen. After the seating `tools/bootbytes.py` went red at the desk on `R02-boot.log`,
+which `FW-252`'s race had cut 257 bytes short, and was repaired before the push by naming that
+capture (`CUT_SHORT`, `K10`, `f19c0e33`) rather than declaring its length.
+
+⚠️ **One unit, one loader build, one evening's seating** (20:19–21:59).
+
+⚠️ **Flash.** 量, counted over the 79 `.meta.json` files of `bench/2026-10-08b` and
+`bench/2026-10-08c` — 75 `sent` fields, classified by a script whose planted strings each landed
+in their class (`$FWRE_WORK/rebuild/s130/r6c5/sent.py`): `FLW` 0, `EW` 0, `EB` 0 and `AUTOBURN`
+0 — not even `AUTOBURN 0` was sent; `looprun` read `0x8040D4A0` back as `00000000` before each of
+the two uploads (`R02`, `I02`: `A0b`, through `DW 8040D4A0 1`) — and `FLR` 0. One flash-writing
+command, `I10`, `install slotA sha=113f5542…`, under the owner's dated yes of 2026-10-08 (the
+card's `owner-yes` row). rlxfw's `n_writes`: 4,625 on the armed image after `I10` (`I11`: 288 sector
+erases + 4,337 page programs = `inst_ops_planned` 4,625), and 0 on the release image after each
+flash boot (`W17`, `C17`); seating A's image has no install verb. Power: two actions, both the
+owner's on the handshake — off before `PF2` (0 bytes in 3.08 s from 21:57:01) and on inside
+`C01`'s window, opened at 21:57:13, whose first byte arrived 13.6 s later — and none at seating
+A. The bracket's reach: `I10`'s read-back of slot A's 1,179,648 bytes (`inst_cmp_bytes 1179648`,
+`inst_cmp_diff 0`, `inst_cmp_first -1`), and `rlxboot`'s digest of slot A's 1,110,176 bytes and
+slot B's 1,109,152 on both flash boots (`RLXBOOT-DIGEST ok` twice in each of `W01`, `C01`). What
+none of it sees: two writes that cancel; every byte outside slot A and the two containers, slot
+B's last 70,496 bytes among them; any region against the 2026-08-16 dump, since no `FLR` ran and
+no map was taken (the last map is `R8b`'s, entry 20); and `H601`, never read. `flashwin scan
+--sweep` read both directories CLEAN — 54 files and 208, 113 probes each (`LOG.md`, the 128th and
+129th entries).
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner's own — opening `R6c` and holding `v1.0` for it, the loader's layout taken over as a
+unit (O1, superseding 8d ruling 3), seating A before any code (O2), the dated yes for `I10`,
+seating `R6c-4` the same evening, `v1.0` re-pinned to `9bb2bec7` for this closing, and the relaxed process with the flash rules, `H601`, the power
+handshake and `NET-165` unchanged — are not listed.
+
+1. **`vlan` is a verb in a 1.6 block of `rtl819x-switch.c`, typed by PID 1 between `init` and
+   `start`** (E1); the driver still writes nothing at boot on its own, and a failed `vlan` is
+   printed and `start` still runs.
+2. **No `vlan reset`, so no on/off control on one boot** (E1): the control is 2026-10-08's flash
+   boots without the verb. What that costs is the weakest-thing paragraph.
+3. **The table write** (E2): IRQs off, `STOP_TLU` set and, on every exit after it, cleared with
+   a read-back; all eight `TCR` words, zero-filled; and the command 9 (force) where the loader uses
+   3 (add), because B's VLAN and netif setters and its table clear force-add
+   (`rtl865x_asicCom.c:121`, `:553`, `:1124`).
+4. **Write only what differs** (E3), so the RAM path's one variable is netif slot 0 and a second
+   `vlan` stores nothing; on `SWCORE=y` it stores nothing and says so (E4).
+5. **The patch entered the repository on the main session's re-run, not on the implementation
+   agent's report**: every suite and twelve mutants of its own on `2009c4eb` plus the patch, and
+   the one that survived became `K67` and `M82`.
+6. **Three changes to the card in review**: a third alternative for the warm boot (tables kept,
+   `n_writes 11`), which `W03` refuted; up to three re-reads before a short `img_len` stops the card
+   (`FW-248`); and the owner's choice between `J BFC00000` and a power cycle if a flash boot stops
+   at `<RealTek>`.
+7. **`CORRECTIONS-R6C-4.md` C1–C3**: an interrupt and two re-takes rather than cells re-run under
+   their own names; the flash boots' board ping with `-c 4`; `D1` read through `X-R02p` and
+   through `R14`'s statistics line with the host's `tcpdump`; the closing count kept off the card.
+8. **`R02-boot.log`'s length named as a capture cut short**, `CUT_SHORT` and `K10`, rather than
+   declared as a constant of the console (`f19c0e33`).
+9. **`src/init/main.c`'s stale header comment left until the next rebuild**, so that `v1.0`'s
+   image is the `9bb2bec7` the device ran, with no build input changed since (`FW-256`).
+10. **`docs/sbom.md`, a snapshot of `f184a`, given a 🔄 note on U1 rather than one cell updated**,
+    and `notes/userspace-integration.md`'s row left as it stands: one updated cell would mix two
+    builds in one SBOM.
+11. **`NET-26` narrowed to the vendor's busybox, and `CLAUDE.md`'s line changed to ask for `-c
+    4`.**
+12. **The card review's three tool defects recorded and left unfixed before the seating**, the
+    129th segment keeping `tools/` out of its pre-seating work; `cardcheck`'s is in § Now's next
+    line.
+13. **Actual 4**, counting the segments that worked on `R6c`'s own steps or row after it opened —
+    the 127th to the 130th — entry 21's ruling 6. The 128th, which also closed `P3`, is counted
+    because it closed `R6c-1` and `R6c-2` and held seating A.
+
+### The booking: what moved to another gate, and what was declined
+
+Nothing in `PROGRESS.md` § Carried forward or `SPEC.md` § 17 names `R6c` (量 `grep` at
+`28a490c7`), so no row is re-owned.
+
+| item | to | why |
+|---|---|---|
+| `docs/KNOWN-ISSUES.md`, the entry of 2026-10-08 (booted from flash, rlxfw receives no Ethernet frame) | closed in place, on its own condition | its closing condition is the board row's, met by `R6c-4` (claims ①, ③) |
+| `v1.0`'s image | `9bb2bec7` (`FW-256`), for `P4b` | the image the board ran in claims ①–③; `6a11de02` is deaf from flash |
+| `cardcheck`'s `CAP` blind spot | § Now, *Next after this* | a fix with a control that goes red; no gate owns it |
+| V10's `--boot-until`, and `looprun`'s `A0a` under `--skip S4` | recorded, not owned | `FW-253` already says why `job control turned off` no longer matches; `A0a`'s reach is a card's to know, and `R6C-4-CARD.md` says it |
+| `NET-169`'s mechanism | stays in its row, whose 判定 names the experiment | one source, as before; `R6c-4` removed one alternative (claim ③). `notes/switch-driver.md` § 21.6 and `NET-173` had called it measured; both are corrected in place, and `NET-169` gains a 🔄 |
+| port 0, the vendor firmware's WAN, in the VLAN `vlan` writes | `docs/threat-model.md` § 4 (`T3`) and `SPEC.md` `NET-174`; `v1.0`'s known issues | 推 a peer on port 0 is a LAN peer to rlxfw (*What `R6c` did not establish*, a second port); no gate owns a WAN |
+| O1's fallback, netif slot 0 with `rlx0`'s address | not built | the RAM path pinged with netif cleared (claim ③) |
+| the design's seating B — `vlan reset`, and `reset full` before `init` | declined | E1, and the design's own condition on `reset full` (the NIC's re-arm after a switch reset, unsettled at the desk) |
+
+**Declined**: which of the writes is necessary. O1 writes the group as a unit, never partially,
+and no step of `R6c` set out to take it apart; what that leaves open is the first 🔴 above.
+
+---
+
+## The operating clause, re-run at twenty-two entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -4290,7 +4636,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs. Re-run 2026-10-04 with `R9` appended, which adds exactly one pair — **and that pair FIRES on the same thing a third consecutive time**. Re-run 2026-10-08 with `R8b` appended, which adds exactly one pair, and that pair does NOT fire — `R8b` closed the thing the three pairs before it fired on, and the one item both entries still carry is a resemblance. Re-run 2026-10-08 with `P3` appended, which adds exactly one pair, and that pair does NOT fire — the one thing both entries name that the clause counts, `P3`'s power tree, was declined three times in writing, and the clause surfaces what nobody decided.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs. Re-run 2026-10-04 with `R9` appended, which adds exactly one pair — **and that pair FIRES on the same thing a third consecutive time**. Re-run 2026-10-08 with `R8b` appended, which adds exactly one pair, and that pair does NOT fire — `R8b` closed the thing the three pairs before it fired on, and the one item both entries still carry is a resemblance. Re-run 2026-10-08 with `P3` appended, which adds exactly one pair, and that pair does NOT fire — the one thing both entries name that the clause counts, `P3`'s power tree, was declined three times in writing, and the clause surfaces what nobody decided. Re-run 2026-10-09 with `R6c` appended, which adds exactly one pair, and that pair does NOT fire — `R6c` closed the one counted thing `P3` carried, the thing `P3` had named `R6c` to fix, and the nearest candidate, which of the writes is necessary, the owner had ruled on before any code was written.)*
 
 | pair | shared? |
 |---|---|
@@ -4314,6 +4660,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R8` → `R9` 🆕 | **yes — the same thing a third consecutive time: that nothing rlxfw writes survives, because there is no write path, and `R8b` owns the half that would give it one.** `R8` carries *"That anything can be written to flash and read back after a reset"* and *"the monotonicity the design rests on is asserted and never exercised"*; `R9` carries *"That `R8b` is any closer"* — 讀 `MK5` gates `rtl819x-spi-write.o` on `CONFIG_MTD_RTL819X_WRITE` and 量 `R9-5` found the object absent from both staged trees. 🔴 **The clause's instruction is already carried out**: `R8b` is booked as a gate of its own and is the next gate in the owner's serial order, so this firing adds evidence and not an instruction — the third consecutive firing on one subject, which is itself the reading. ⚠️ What it does not establish: a rule that fires more often because the ledger got longer is measuring length, not repetition, and whether the clause should stop counting a subject already booked as a gate is an open question about the clause that this entry does not decide |
 | `R9` → `R8b` 🆕 | **no — `R8b` closed the subject the last three pairs fired on, and a second of `R9`'s residuals with it.** `R9` carries *"That `R8b` is any closer"* and *"That the flash bracket would detect a small write"*; `R8b` wrote a slot, booted it from flash and survived ten cuts (claims ① and ②), and the `cs6c` re-install changed one byte in each of two 64 KiB regions, which the 4 KiB map resolved to exactly those regions' first units — group 0 moved on `0x010000` alone, its other 31 units equal (`X-W2c-m0f` against `X-K2c-m0f`), and in group 1 the rescue region moved on `0x020000` alone (the barrier's sixteen units there moved too, because `W4b` erased them between the two maps) — a known change, which is the sensitivity control `R9` said needed a write. ⚠️ Closed for an image a provisioning boot writes, not for anything the running firmware writes — `R7`'s config store is no nearer, and that is in neither list. Both entries carry a 推 refuted inside the gate that wrote it (`FW-198`; `R8b`'s *"`W3` overwrote the rootfs at `0x130000`"*, refuted by the dump); declined as a resemblance, the ten-entry run's rule. The flash boundary is not counted, the thirteen-entry run's reason |
 | `R8b` → `P3` 🆕 | **no — the one thing both entries carry is `P3`'s power tree, and three recorded decisions declined it.** `R8b` carries *"no voltage was read, so `P3`'s power tree stays undelivered"*; `P3` carries the plan's section 2 written 讀 and 推 where 量 was asked. `S0b` and `BRD-01` are ⊘ and entry 20's ruling 2 took no voltage, and the fourteen-entry run's reason governs: *the clause surfaces what nobody decided, and a ⊘ is a decision.* ⚠️ The weakest decline in this table: the earlier entry names the later gate — the shape of `P1` → `R6`, `P2` → `R6b` and `R7` → `R8`, all three of which fired, and of `R9` → `R8b`, declined only because the later gate had closed the thing. Most of `R8b`'s other residuals are quoted in `docs/bringup.md` § 16.7, not carried; the instruments the tree does not hold are in neither the report nor `P3`'s list, and `v1.0`'s image has since booted from a slot (`FW-255`); one unit and the flash boundary are not counted |
+| `P3` → `R6c` 🆕 | **no — `R6c` closed the one counted item `P3` carried and named it to fix, and the nearest candidate was ruled on by the owner before any code.** `P3` carries *"A network on the boot the device makes by itself … the fix is `R6c`'s"*; `R6c` booted `9bb2bec7` from slot A after a watchdog reset and after a cold power-on and pinged both ways, 4 of 4 each way (`NET-173`) — the shape of `R9` → `R8b`, declined because the later gate closed the thing. ⚠️ The nearest candidate is the minimum configuration: `P3` carries *"no minimum configuration"* (`docs/bringup.md` § 16.4) and `R6c` carries which of its 17 stores is necessary; the owner's ruling O1 wrote the group as a unit, never partially, before `R6c-3` began — a decision, and the clause surfaces what nobody decided. If the owner reads O1 as a rule for the driver and not a decision about what to measure, the pair fires on the VLAN group's minimum write set. A second port against the WAN-side host probe is declined as two objects, and a harness that shares the driver's sources against *"That anything in the report is a second source"* as a resemblance; one unit and the flash boundary are not counted |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -5276,6 +5623,107 @@ gate-board cell and outside the population, and its *grows every gate* is read a
 worded. It is not recorded beside `R7`'s candidate of seventeen entries — it describes how the
 report was to be written, not an artefact named in place of a property — so it stands where the
 eighteen-entry run left `R8`'s rewritten row.
+
+### 🆕 At twenty-two entries the clause does not fire — the gate the earlier entry named closed what it named, and the nearest candidate was ruled on before any code
+
+**`P3` → `R6c` shares one counted item, and the earlier entry names the later gate as its fix.**
+`P3`'s *what it did not establish* carries *"A network on the boot the device makes by itself.
+§ 14.6 ② records the trap and no workaround; the fix is `R6c`'s. So § 12's boot flow, followed
+from flash, ends at a shell whose `rlx0` receives nothing."* — one of the four items the
+twenty-one-entry run left to this pair. 量 `R6c` booted `9bb2bec7` from slot A through `rlxboot`
+after a watchdog reset and after a cold power-on, and it pinged both ways, 4 of 4 each way, with
+`rlx0`'s RX going 0 → 6 → 10 on each boot (`bench/2026-10-08c`, `NET-173`): the shell at the end
+of § 12's flash boot now receives. This file's own rule governs — *a residual that a later gate
+closes is removed from the clause's input by being closed, not by being edited out* — and the
+pair has the shape of `R9` → `R8b`, declined for that reason, while `P1` → `R6`, `P2` → `R6b` and
+`R7` → `R8`, where the later gate carried the thing instead, fired. ⚠️ **Closed for what `P3`
+said, and no more**: `P3`'s sentence was categorical, and one boot of each kind refutes it; that
+more boots, load or a second port behave the same is `R6c`'s own residual, with no predecessor in
+`P3`'s list.
+
+🔴 **The nearest candidate is the minimum configuration, and it is declined because it was
+decided — by the owner, before any code.** `P3` carries *"One unit (§ 0 ②, § 16.5) and no minimum
+configuration (§ 16.4): what the report holds is what one board returned while it worked"*, and
+§ 16.4 says that no row of the report says which register write is necessary. `R6c` carries which
+of its seventeen stores is necessary (its first 🔴). That is one thing at two scopes, since the
+group `R6c` writes is now one of the report's writes. But `notes/switch-driver.md` § 16.8 wrote at
+`R6b`'s 8d that the VLAN group is *"either left loader-inherited as a unit or taken over as a
+unit, never partially"*, and the owner's ruling O1 of 2026-10-08 made `R6c`'s take-over that
+unit — *"the group is determined as a unit or not touched"* — before `R6c-3` began. The
+fourteen-entry run's reason applies: *the clause surfaces what nobody decided, and a ⊘ is a
+decision.* It is stronger here than at fourteen and twenty-one entries, where the decision was the
+main session's; this one is the owner's. 🔴 **The honest deduction**: § 16.4 names the one way
+this project has measured necessity, a single-variable A/B (`NET-52`, the switch's `TRXRDY`), and
+`R6c` added seventeen stores with no such A/B, while E1, the main session's, also declined the
+design's on/off control on one boot. **If the owner reads O1 as a rule for what the driver writes
+rather than a decision about what to measure, this pair fires on the VLAN group's minimum write
+set** — a thing, not a gate, the precedent `CPU-45` set at five entries.
+
+⚠️ **A second port against the WAN-side host probe is declined as two objects.** `P3` carries
+*"The WAN-side host probe … no boot has brought a WAN interface up. It moves to a standing
+instruction (ruling 4)"*; `R6c` carries that only port 3 was counted while its layout makes ports
+0–5 one VLAN, port 0, the vendor firmware's WAN, among them. One is the address a service binds,
+the other the jacks that reach `rlx0`. They meet in one place the clause does not score: 推 under
+that layout a peer on port 0 is a LAN peer, which bears on `docs/threat-model.md`'s `T3` and is
+neither entry's subject.
+
+⚠️ **The nearest resemblance is an instrument that shares its sources with what it checks**:
+`P3`'s *"That anything in the report is a second source"*, and `R6c`'s harness, whose engine
+follows the vendor readings the driver follows. Two instruments, two subjects; the ten-entry run's
+rule governs: *a clause that fires on a resemblance measures the reader, not the ledger.*
+
+⚠️ **One unit and the flash boundary** are in both lists and are not counted, for the
+twenty-one- and thirteen-entry runs' reasons.
+
+**What `R6c` carries that `P3` does not** — which rule discarded the frames, the `FFCR` trap's
+deciding experiment, the engine's `TCR` count and its `STOP_TLU` window, `MACCR` and `QNUMCR`, a
+second `vlan` on the silicon, a fallback slot whose image is deaf from flash, one boot of each
+kind — waits for the next pair.
+
+🟢 **And the residual the twenty-one-entry run recorded as one the clause could not see is
+closed, in part, by this gate.** Entry 14's weakest thing — *"`D8` passes on switch state rlxfw
+did not write … none was read on a boot for which the loader did not bring its network up — the
+way a product boots, from flash"* — is answered for the VLAN group: the boots the loader did not
+configure were read (`NET-171`, `NET-172`), and on them rlxfw now writes the group itself (`W03`,
+`C03`), while on the prompt path it verifies the loader's and rewrites what differs (`R03`). It
+stays open for the rest of entry 14's list, EEE and `QNUMCR`, and for what O1 leaves untouched
+besides — `MACCR`, `MEMCR`, the PHY patch, `LEDCREG` — and for entry 14's last sentence, which
+`R6c` repeats: one image, one cold and one warm boot, one host on port 3. Neither entry 14's
+weakest thing nor its closing is in `P3`'s list, so the clause could not have credited this
+either.
+
+### 🆕 The census re-run at twenty-two entries — unchanged, because `R6c`'s list does not use the form
+
+量 2026-10-08, in the 130th segment, with the unchanged thirteen-entry script
+(`$FWRE_WORK/rebuild/s111/land/gate/census.py`, read only; sha256 `1e81ac1a…`), the twenty-one-entry
+run's three arms pointed at this entry's closing tree — its `PROGRESS.md`, with `R6c`'s list moved
+out, and all twenty `docs/history/steps-*.md`, `steps-R6c.md` among them, copied from the working
+tree before the commit (`$FWRE_WORK/rebuild/s130/r6c5/census22w.sh`) — exit codes read inside one
+script file. A reconstruction of the same tree from `28a490c7` (`census22.sh`, whose `build22.py`
+refuses unless the moved section, its two declared lines put back, reassembles `28a490c7`'s
+`PROGRESS.md` byte for byte) printed the same output:
+
+* **on `PROGRESS.md` alone**, which now holds no step list at all, it refuses, rc 1, with all
+  eight control gates reading 0, as at twenty-one entries;
+* **on a scratch root whose `PROGRESS.md` is that file followed by all twenty
+  `docs/history/steps-*.md`** it reproduces **44 clauses across 8 gates** and exits 0, and the
+  `D`-row form reads **66 clauses across eleven gates** with every per-gate figure of the
+  twenty-one-entry run unchanged;
+* **on the same root with one of `P1`'s `D` rows un-bolded** it exits 1 and names `P1: (3, 4)`.
+
+**79 clauses, unchanged**: `steps-R6c.md` carries no `### The DoD, split into what can be refuted`
+header (量, `grep -c`: 0), so the population cannot grow, and **no sixth instance**, by
+construction.
+
+One candidate is recorded so a twenty-third entry does not find it and call it a sixth:
+`R6c-4`'s DoD, *"each boot judged by `bootslot`"*, names an instrument that cannot judge one of the
+step's three boots. `bootslot` reads `rlxboot`'s lines, and the RAM boot through the prompt
+prints none (entry 20: on `T2a`, which never reached `rlxboot`, it read REFUSED), so `looprun`'s
+`A3` identified that boot. It is not counted: it is a step's DoD cell, outside the `D`-row
+population, and the property it stands for — that each boot ran the image under test — was
+measured on all three. Were it inside, it would be `R3`'s `MemTotal:` shape, an artefact that
+cannot deliver the property for one of its objects, and not entry 11's *capable and idle*.
+⚠️ **The weaker class stays at two.**
 
 ### Carried unchanged from the seven-entry run
 

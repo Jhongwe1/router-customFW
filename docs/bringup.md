@@ -1061,8 +1061,8 @@ image; with neither slot valid it prints both reasons and halts
 rescue copy (`RD05`, the power-on after `RD03`'s cut; `RD07a` then read `0x010000`
 as `FFFFFFFF`). ⚠️ The design is `notes/rlxboot.md`'s; the die showed it on the 17
 slot boots of `FW-242` and `FW-243`, every one of which read `ctr=0` because nothing
-writes the counter, and none of which read the network; booted this way, `v1.0`'s
-image received no frame on `rlx0` at its qualification seating (`NET-171`, § 14.6 ②).
+writes the counter, and none of which read the network; booted this way, image `6a11de02`
+received no frame on `rlx0` (`NET-171`), and `9bb2bec7` pings both ways (`NET-173`, § 14.6 ②).
 
 ### 12.2 The timings, with their state, class and population
 
@@ -1198,11 +1198,11 @@ kernel, not rlxfw's.
 ⚠️ **Stage 9b's reading is two boots from RAM on one day** — `r78a`, `RLXFW-ID0`
 `BF182DE2`, then its rebuild, `0E45C61D`. 🔄 量 Since 2026-10-07 rlxfw's userspace
 has also started from flash: `/init` printed `rlxfw: lan up, rlx0 10.1.1.1/24` from
-slot A on `f9adc9e8` (`bench/2026-10-07` `T2ra`, `F05`) and from slot B on
-`6a11de02` after a watchdog reset and after a cold power-on (`bench/2026-10-08`
-`V06`, `V08`; `FW-255`), the prompt about 15.6 s after `busybox reboot -f`
-(§ 12.2) — and on the two of those boots that tried the network, `rlx0` received
-no frame (`NET-171`, § 14.6 ②). The privilege separation's refusal half was never
+slot A on `f9adc9e8` (`bench/2026-10-07` `T2ra`, `F05`), from slot B on `6a11de02`
+after a watchdog reset and after a cold power-on (`bench/2026-10-08` `V06`, `V08`; `FW-255`),
+the prompt about 15.6 s after `busybox reboot -f` (§ 12.2), and from slot A on `9bb2bec7` the
+same two ways (`bench/2026-10-08c` `W01`, `C01`) — on the `6a11de02` boots `rlx0` received no
+frame (`NET-171`), on the `9bb2bec7` ones it pinged both ways (`NET-173`, § 14.6 ②). The privilege separation's refusal half was never
 returned on the board: the only peers in stage 9b's captures are in the
 authorisation table, so a refusal rests on the host's matrix
 (`docs/GATE-RESULTS.md` entry 17, claim ②).
@@ -1552,7 +1552,7 @@ and *time* — the whole vendor HTTP episode finished inside the post-boot
 threshold (`docs/GATE-RESULTS.md` entry 19, claim ③). `FW-196`,
 `docs/threat-model.md`.
 
-### 14.6 The boot from flash: the loader's rootfs rule, and a VLAN group nobody configures
+### 14.6 The boot from flash: the loader's rootfs rule, and a VLAN group only the prompt path configures
 
 Both rows are about the boot the device makes by itself once `R8b` had put
 `rlxboot` and two slots in flash (§ 11.4, § 12.1), and a seating found each.
@@ -1560,7 +1560,7 @@ Both rows are about the boot the device makes by itself once `R8b` had put
 | # | the trap | how it was hit | how it was worked around | V | owner |
 |---:|---|---|---|:-:|---|
 | ① | 🔴 **Behind a `cr6c` header the stock loader also wants a rootfs, and it looks only inside slot A.** For `cr6c` `check_image()` returns 2, and the locator then tries eleven rootfs candidates — `0x0E0000`, `0x0F0000` and `0x130000`, then `0x100000` to `0x180000` at the `0x10000` step, skipping those three — every one inside slot A (`0x070000`–`0x18FFFF`). Finding none, it returns 0 without trying the next kernel candidate, and `doBooting()` drops to the prompt silently (`LDR-17`, `LDR-20`). So a `cr6c` stage at `0x010000` boots only while something in slot A reads as a rootfs | 量 2026-10-07, by `R8b` failing once. `rlxboot`, first installed as `cr6c`, booted (`T1a`) while the vendor's SquashFS still sat at `0x180000`; after slot A's first write (`W3`), `T2a` — `busybox reboot -f`, no ESC — printed only the loader's lines and `<RealTek>` in 180 s, and `X-T2-dd3c` read `0x8040DD3C` as `05010000`: the loader had accepted `0x010000` and never tried `0x020000` (§ 12.3 ②). 讀 `stage2.bin`, disassembled twice, the second time with `ComSrlCmd_RDID`'s instructions as the control. ⚠️ What the rootfs check accepts was not read, so which candidate passed on `T1a` is 推 (`0x180000`, the only SquashFS) | **`cs6c`**, for which `check_image()` returns 1 and skips the search; the halfword sum still has to be zero, and it covers the payload and not the header, so the two images differ in the signature's second byte. 量 re-installed as `cs6c` (`K1b`, `K2b`), `rlxboot` booted slot A (`T2ra`) and its rescue copy took over when `rlxboot` was torn (`RD05`). The install path now accepts only `cs6c` in those two regions, and `tools/mkcr6c.py` 2.0 emits it (`f257a848`). ⚠️ One side effect: ESC is caught in `doBooting()`'s window rather than in the rootfs scan, and banner → `Jump` falls from 4.97 s to 2.02 s (`FW-249`, § 12.2) | 量 + 讀 | `FW-241`, `notes/update-chain.md` § 6 |
-| ② | 🔴 **Booted from flash, rlxfw's Ethernet receives nothing, because only the loader's prompt path configures the switch.** The loader brings its network up — `P0phymode=01, embedded phy`, `---Ethernet init Okay!` — only on the path that enters its prompt (`LDR-46`; `T2a`, which reached the prompt with no ESC, printed both lines too), and the mainline (`SWCORE=n`) leaves the switch's VLAN group to the loader (`notes/switch-driver.md` § 16.8). On an autoboot nothing writes that group, and it stays in its reset state | 量 2026-10-08 at `v1.0`'s qualification seating, by a ping after the first boot from flash: 0 of 2 (`X-V06n`). Booted from slot B through `rlxboot`, the release image brings `rlx0` up with `10.1.1.1` and, across a host ping, counts no frame in or out, after a watchdog reset (`X-V06q`) and after a cold power-on (`X-V08q`), with `n_rx 0` and `n_irq 0` (`X-V08r-nic`); booted from RAM through the prompt, the same image answered 2 of 2 (`X-V02n`). It follows the loader's path, not the reset. Of 37 switch registers 10 differ from a RAM boot through the prompt, and the autoboot's are reset values — `PVCR0`–`3` `00010001` against `00080008`, `FFCR` 0 against 3, `SWTAA` 0 (`X-V08r-sw` against `bench/2026-10-04/PER-SW`). ⚠️ The mechanism, a frame from port 3 meeting PVID 1 under ingress filtering with no VLAN entry, was 推 at that seating, where no MIB counter was read. 量 2026-10-08 on the same cold boot (`bench/2026-10-08b`, `R6c`'s read-only seating A), the host's three broadcast ARP requests and six unicast ARP replies each entered port 3 and raised its `dot1dTpPortInDiscards` by the same 3 and 6. The CPU port's out counters stayed 0, `rlx0` received nothing, and the VLAN, netif and L2 tables read empty, while the board's own six ARP requests reached the host (`NET-172`, `notes/switch-driver.md` § 21.1). Which switch rule discards the frames is the 推 that remains. 🔴 The case had been written down as open since `R6b` (`notes/switch-driver.md` §§ 17.4, 17.10), unreachable while `R9`'s zero-write rule held; `R8b` made it reachable, and none of `R8b`'s flash boots read the network | **Not worked around.** The network exists only after a boot through the loader's prompt — a RAM boot over TFTP — and the console works on both paths. The fix is gate `R6c`'s, and this report does not predict it | 量 + 推 | `NET-171`, `NET-172`, `notes/switch-driver.md` §§ 20, 21.1 |
+| ② | 🔴 **Only the loader's prompt path configures the switch, so booted from flash an image that leaves the switch's VLAN group to the loader receives nothing** — rlxfw through `rtl819x-switch` 1.5. The loader brings its network up — `P0phymode=01, embedded phy`, `---Ethernet init Okay!` — only on the path that enters its prompt (`LDR-46`; `T2a`, which reached the prompt with no ESC, printed both lines too), and the mainline (`SWCORE=n`) left the switch's VLAN group to the loader until 1.6 (`notes/switch-driver.md` § 16.8). On an autoboot the loader writes none of that group, and it stays in its reset state until rlxfw writes it | 量 2026-10-08 at `v1.0`'s qualification seating, by a ping after the first boot from flash: 0 of 2 (`X-V06n`). Booted from slot B through `rlxboot`, the release image brings `rlx0` up with `10.1.1.1` and, across a host ping, counts no frame in or out, after a watchdog reset (`X-V06q`) and after a cold power-on (`X-V08q`), with `n_rx 0` and `n_irq 0` (`X-V08r-nic`); booted from RAM through the prompt, the same image answered 2 of 2 (`X-V02n`). It follows the loader's path, not the reset. Of 37 switch registers 10 differ from a RAM boot through the prompt, and the autoboot's are reset values — `PVCR0`–`3` `00010001` against `00080008`, `FFCR` 0 against 3, `SWTAA` 0 (`X-V08r-sw` against `bench/2026-10-04/PER-SW`). ⚠️ The mechanism, a frame from port 3 meeting PVID 1 under ingress filtering with no VLAN entry, was 推 at that seating, where no MIB counter was read. 量 2026-10-08 on the same cold boot (`bench/2026-10-08b`, `R6c`'s read-only seating A), the host's three broadcast ARP requests and six unicast ARP replies each entered port 3 and raised its `dot1dTpPortInDiscards` by the same 3 and 6. The CPU port's out counters stayed 0, `rlx0` received nothing, and the VLAN, netif and L2 tables read empty, while the board's own six ARP requests reached the host (`NET-172`, `notes/switch-driver.md` § 21.1). Which switch rule discards the frames is the 推 that remains. 🔴 The case had been written down as open since `R6b` (`notes/switch-driver.md` §§ 17.4, 17.10), unreachable while `R9`'s zero-write rule held; `R8b` made it reachable, and none of `R8b`'s flash boots read the network | **rlxfw writes the group itself** (gate `R6c`): `rtl819x-switch` 1.6's `vlan`, which PID 1 types between `init` and `start`, writes the loader's single-VLAN layout — VLAN slot 8 `00807E3F`, the other VLAN and netif slots cleared, `PVCR0`–`3` `00080008`, `FFCR` 3 — only where the switch differs, and checks four words it never writes (`NET-173`, `notes/switch-driver.md` §§ 21.3–21.4). 量 2026-10-08 (`bench/2026-10-08c`): booted from slot A through `rlxboot` on `9bb2bec7`, after a watchdog reset and after a cold power-on, `vlan` wrote 17 words (`W03`, `C03`) and `rlx0` pinged 4 of 4 each way (`W10`, `X-W14`, `C10`, `X-C14`); booted from RAM through the prompt it wrote 12 (`R03`) and the network still answered (`R10`; `X-R14i`, 225 of 225). Images through 1.5 — `6a11de02` among them — stay deaf from flash | 量 + 推 | `NET-171`, `NET-172`, `NET-173`, `notes/switch-driver.md` §§ 20, 21.1, 21.6 |
 
 ### 14.7 What § 14 does not establish
 
@@ -1593,9 +1593,9 @@ of traps this project hit or read while doing something else;
 `SPEC.md` § 17 owns what is still open — including `FLS-26`, `CLK-08b` 殘留,
 `NET-54` 殘留 and `NET-61` 殘留, all `⊘`.
 
-⚠️ **§ 14.6 ② is the one row whose fix belongs to a gate**, `R6c`, and this report
-does not predict it: `PROGRESS.md` owns where that gate stands, and
-`docs/KNOWN-ISSUES.md`'s entry of 2026-10-08 says when the issue closes.
+⚠️ **§ 14.6 ②'s workaround is one gate's measurement**, `R6c`'s (`docs/GATE-RESULTS.md`
+entry 22): one warm and one cold flash boot of one image, `9bb2bec7`, and one RAM boot;
+what it does not establish is that entry's and `NET-173`'s.
 
 ---
 
@@ -1857,8 +1857,8 @@ touched. An absent block is a gap in the project's coverage, which is what
 
 `R8b`'s readings entered §§ 11.2, 11.4, 12.1–12.4 and 14.6 on 2026-10-08 by the rule
 of § 16.2: they were taken for `R8b`'s question, all on mainline `f9adc9e8` — the
-boots of `6a11de02` in § 12.4 and § 14.6 ② are `v1.0`'s qualification seating's and
-`R6c`'s seating A's (`FW-255`, `NET-171`, `NET-172`), taken for those seatings'
+boots of `6a11de02` and `9bb2bec7` in §§ 12.1, 12.4 and 14.6 ② are `v1.0`'s qualification
+seating's and `R6c`'s seatings' (`FW-255`, `NET-171`–`NET-173`), taken for those seatings'
 questions — and `docs/GATE-RESULTS.md` entry 20 is where they are judged. What they
 leave open, quoted from there and from their rows, so that this page reads no wider
 than the gate did:
@@ -1887,6 +1887,6 @@ than the gate did:
   not established: no `0xD8` was issued, and the page is bounded only from below, at
   256 (`FW-244`, `FW-246`).
 * **No voltage was read at the seating**, so § 7 stays undelivered.
-* **The boot the device makes by itself receives no frame** — 量 at `v1.0`'s
+* **The boot the device makes by itself received no frame** — 量 at `v1.0`'s
   qualification seating, not at `R8b`'s, whose flash boots never read the network
-  (`NET-171`, § 14.6 ②) — and its fix is a gate of its own, `R6c`.
+  (`NET-171`, § 14.6 ②) — and `R6c` fixed it: booted from slot A, `9bb2bec7` pings both ways (`NET-173`).

@@ -34764,3 +34764,23 @@ J = 12:52:06.4，`boa` 在 **J+32.7 s** 起來。
 **做錯的事（上機）。** 審卡片時把「板子的 ping 永遠送四個」當成事實，沒有回去看它是對哪一個 busybox 量的 —— 起草代理照 `CLAUDE.md` 拿掉 `-c`，我照它的報告放行；代價是兩格要補拍、一次 Ctrl-C，沒有別的影響。
 
 **下一段。** `R6c-5`（桌面）：`docs/GATE-RESULTS.md` 的 `R6c` entry、`docs/KNOWN-ISSUES.md` 2026-10-08 那一則關掉、`v1.0` 的映像改指 `9bb2bec7`（`P4b`）。`cardcheck` 的 `CAP` 盲點要修，附一個會變紅的控制。交接在 `plan/handoff-s130.md`。
+
+## 2026-10-08 — 第一百三十段（22:59 開場，桌面；零次電源動作，零次 flash 寫入，零次 `FLW`／`EW`／`EB`／非零 `AUTOBURN`／`FLR`）：`R6c` 關了（`docs/GATE-RESULTS.md` entry 22）；`v1.0` 的映像改指 `9bb2bec7`，`P4b` 的 phase A–B 開始
+
+**開場量測。** 22:59:37（`date`）。HEAD `28a490c7`、`git status` 乾淨、`LOG.md` 最後一則第一百二十九段、study 最新 `20261008-study4.md`，與交接相符。CI：`d9e39152` 的 run `37796005856` 四個 job 全 success；`28a490c7` 的 run `37796659505` 開場時還在跑，之後 completed success（15:28:44Z）。
+
+**發行 commit 的前提，量了才接受。** `$FWRE_WORK/rebuild/s130/precheck.sh`：`git diff --name-only 034b5a7d HEAD -- src config` 為空；`run/r6c/MANIFEST.tsv` `init` 列的 18 個 repo 檔，在 HEAD 的 blob sha256 都等於清單，清單外的 14 列（helper、腳本、prebuilt、參考）在磁碟上也都相同；對照：同一支在 `2009c4eb` 讀到 `config/rlxfw-initramfs.tsv` 不同、rc 1。`twice.sh` 從四格的產物重算：`mA`＝`mB`（`nfjrom` `295d4f6a…`、`vmlinux` `3bc8f1ba…`），`aA`＝`aB`（`9328dcf9…`、`2fc7ca2c…`）。這兩件事原本只在第一百二十九段的紀錄裡，沒有發現檔擁有：落在 `notes/reproducible-build.md` § 10 與新列 `FW-256`。
+
+**擁有者把 asset 的決定交給主線（「用最頂的工程思維幫我決定」）。** 裁決：映像加 T，不帶 `rlxboot`。理由：發出去的每一個二進位要（a）從發行 commit 建出、或可證明等於它建出的，（b）收到的人能驗、或用得上，（c）不是陷阱。T 三條都過（payload 逐位元組是映像、簽章對 repo 裡的公鑰可驗、沒有 armed 映像就裝不進去，而 armed 映像不發）；`rlxboot` 建於 `f257a848` 不是 C、第三方照寫 `0x010000` 有風險、而且只信擁有者的金鑰 —（a）（c）不過，對收件人也沒有用處。
+
+**`R6c-5`。** 五支代理平行（entry 草稿、P4b 工具步驟的排練、發行文字、SBOM 重導、`cardcheck` 修正），之後一支補 `FLW-1`；主線同時改發現檔。entry 22 的草稿附 177 列 claims 表，主線抽查：`RLXBOOT-SLOT A` 兩次、看門狗那一行只在 `W01`、`arm 0x70000 0x190000 0x120000`、`W02`／`C02` 的 `bootslot` 檢查、`REACHABLE` 兩次、`b3a32ee5` 就是 `R6c-1`／`R6c-2`、`f257a848..034b5a7d` 七個檔；自己重跑代理的 `mib.py`，熱、冷開機主機 → 板子都是埠 3 進 +536 octets／+5 單播／+1 廣播、CPU 埠出逐欄相等、丟棄 +0。operating clause 在二十二則不觸發（`P3` 點名要 `R6c` 修的那一項被 `R6c` 關了；最近的候選「哪些寫入必要」由擁有者的 O1 事先決定）。census 在**真的收 gate 的樹**上重跑（工作樹的 `PROGRESS.md` 加二十個 `docs/history/steps-*.md`，`census22w.sh`）：arm 0 rc 1、arm 1 rc 0 44 個子句 8 個 gate、`D` 列形式 66 個 11 個 gate、arm 2 rc 1 `P1: (3, 4)`，與代理從 `28a490c7` 重建的樹輸出相同；79 個子句不變。`docmove`：150 個區塊保留、7 個原地改寫以 `--allow-drop` 宣告（`s130/r6c-move.allow`），CONSERVED。`cfcensus` `write` 之後 `check` rc 0：25 列、0 findings，guard 讀到只剩 `P4b` 在進行、一列 OPEN 活著（`FLW-1`）。
+
+**改成現值的發現檔。** `docs/bringup.md` §§ 12.1、12.4、14.6 ②、14.7、16.7（行數不變，引用逐一對擷取：`W03`／`C03`、`W10`、`X-W14`、`C10`、`X-C14`、`R03`、`R10`、`X-R14i`）；`docs/KNOWN-ISSUES.md` 2026-10-08 那一則原地結案、第 24 行「not yet run on the device」改成現值；`README.md` 的 *Not measured*；`notes/update-chain.md` 新 § 10（T 進 slot A）；`notes/spi-mtd-driver.md` § 14.6（`v1.0` 的 recipe 是 `9bb2bec7`，`034b5a7d` 動了 recipe 卻沒改那五個註解）；`SPEC.md` `FW-254`、`FW-255` 加 🔄。
+
+**撤回：第一百二十九段說 `NET-169` 的機制「第一次被量到」，不對。** entry 的起草代理指出、主線核實：`R6c-4` 沒有一格讀 L2 表，卡片本身只是**預測**單播走 `FFCR` 的 trap；`NET-169` 自己寫的判定實驗（RX 標頭的 `ph_reason`，或清 `FFCR` bit 1 再單播 ping）沒有跑。量到的是：netif 全空時 RAM 路照樣收得到 —— netif 項不是來路。`notes/switch-driver.md` § 21.6 與 `NET-173` 原地改成這樣，`NET-169` 加 🔄；第一百二十九段那一則照原樣留著，這一則是撤回的紀錄。
+
+**新發現（讀＋推）：rlxfw 沒有 WAN。** 起草代理指出、主線核對：`vlan` 寫的 VLAN slot 8 `00807E3F` 成員是埠 0–5，而 `NET-04` 記埠 0 是廠商韌體當 WAN 的埠（VID 8，LAN 是 VID 9）。所以接在埠 0 的對端對 rlxfw 就是 LAN 對端（推：沒有一次開機在埠 0 接過對端）——從 `R6` 起每一次經提示字元的 RAM 開機就是 loader 寫的同一個佈局，1.6 之後從 flash 開機也是。`docs/threat-model.md` § 4 的 `T3` 前提「沒有任何開機帶起 WAN 介面」對介面成立、對埠不成立：加一段，`SPEC.md` 新列 `NET-174`；`v1.0` 的已知問題要寫。哪一個插孔是埠 0 是 ⊘（`NET-13`），所以只說「廠商當 WAN 用的埠」。
+
+**另一個要寫進 `v1.0` 已知問題的（量＋讀）：release 映像在 console 開一個免密碼的 root shell。** 發行文字的代理指出，主線核實：`W01`、`C01` 都印 `*** BENCH PROFILE: A ROOT SHELL IS ENABLED ON /dev/console ***`；`src/init/Makefile` 預設 `BENCH_SHELL ?= 1`，只有 kernel 命令列的 `rlxfw.noshell` 能關。代理還說 `BENCH_SHELL=0` 重建不會動 `RECIPE_ID`（`RECIPE_ID` 只算 `config/` 的位元組，這個旗標在 `src/init` 的 make 變數）—— 讀，兩顆不同的映像會印同一個 id；認映像本來就靠 `looprun --image-sha256`，但這一句要寫出來。
+
+**做錯的事。** `cd` 進 `bench/2026-10-08c` 讓工作目錄跟著換了（之後一律絕對路徑）；為了核對 claims 表寫的 `verify_claims.py` 只解析得到少數來源路徑（353 個片段找到 171 個，沒找到的多半是 0 個檔讀進來），改成主線逐項手查；在 `wsl … bash -lc '…'` 裡用 `$?` 讀 `docmove` 的 exit code 讀到 0、而 verdict 是 FINDINGS —— 又是同一個陷阱，改成腳本檔。
