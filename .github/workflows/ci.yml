@@ -769,6 +769,30 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/capdate.py bench 2>&1 | tee ci-out/capdate.out; exit "${PIPESTATUS[0]}"
 
+      # FLW-1: does a file carry a DIGEST of a flash window that overlaps
+      # H601?  flashwin scan finds the region's bytes, leakscan an address's
+      # text shapes, audit-bench-log topic words -- and a sha256 holds none of
+      # them: 量 2026-09-07, `flashwin scan` read LOG.md and leakscan.py,
+      # each with the whole image's full sha256, and was right to say CLEAN.
+      # The VERDICT needs this unit's dump and stays at the desk, like
+      # leakscan's; what runs here is the instrument's controls (31 of 34 --
+      # R1-R3 stand down as one skip covering 3), its mutation suite, and
+      # `check`, the dump-free half of two joins: every FLR window over H601
+      # in the tree is in its table, and each exemption still names a line
+      # starting a hex chain of the length it exempts -- a proxy; only the
+      # scan at the desk, with the dump, sees which digest it is.
+      - name: digestscan self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/digestscan.py --self-test 2>&1 | tee ci-out/digestscan.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-digestscan-mutants
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/test-digestscan-mutants.py --jobs 8 2>&1 | tee ci-out/test-digestscan-mutants.out; exit "${PIPESTATUS[0]}"
+
+      - name: digestscan check (exit-code gate)
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/digestscan.py check
+
       # `FW-70`'s instrument. Two estimators over committed .timing files; one
       # of them REFUSES on this console and the refusal is the point -- at
       # 38400 the reader is faster than the wire, so every read returns 3-4

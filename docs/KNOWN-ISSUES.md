@@ -6,10 +6,10 @@ This is that list, and it is written to the same standard as everything else
 here: each entry names what is *not* true, what was measured instead, and which
 gate changes it. Nothing below is a plan; the plan is `PROGRESS.md`'s gate board.
 
-⚠️ **This file on `main` is the CURRENT list, not `v0.6`'s.** A release's list is
+⚠️ **This file on `main` is the CURRENT list, not `v1.0`'s.** A release's list is
 the copy at that release's tag, which is frozen; this one keeps moving. Anything
 that has since been closed is at the bottom rather than deleted, so the two can
-be read against each other. 🔄 **`v0.2` → `v0.3` on 2026-09-11.** 🔄 **`v0.3` → `v0.4` on 2026-09-17.** 🔄 **`v0.4` → `v0.5` on 2026-09-29.** 🔄 **`v0.5` → `v0.6` on 2026-10-04.**
+be read against each other. 🔄 **`v0.2` → `v0.3` on 2026-09-11.** 🔄 **`v0.3` → `v0.4` on 2026-09-17.** 🔄 **`v0.4` → `v0.5` on 2026-09-29.** 🔄 **`v0.5` → `v0.6` on 2026-10-04.** 🔄 **`v0.6` → `v1.0` on 2026-10-09.**
 
 Marked the same way as the rest of the repository: **量** measured on the device
 · **讀** read out of code, a dump or a document · **推** inferred, pending a
@@ -17,7 +17,7 @@ measurement.
 
 ---
 
-## The firmware does not exist
+## 🔄 ~~The firmware does not exist~~ — struck at `v1.0` (2026-10-09); each row below says what is still true
 
 | | |
 |---|---|
@@ -26,7 +26,7 @@ measurement.
 | 🆕 **The vendor's factory-reset path is now READ and partly measured, and that narrows a safety question rather than closing it.** | 🟢 量/讀 2026-09-06: in **Linux**, holding the reset button runs `rtl_gpio_timer` once a second; a 2–4 s hold sends SIGTERM to PID 1 (which this image's PID 1 ignores — `FW-37`) and a **≥ 5 s hold writes ASCII `'1'` into `default_flag`**, which in this image has exactly two readers and both are `/proc` handlers. Confirmed on the die: `/proc/load_default` read `0`, then `1` after a timed hold. **So the kernel does not write flash on this path; the vendor's userspace would, and this image has none.** `SPEC.md` `FW-40`. 🔴 **This says nothing about the LOADER**, which is where `R5-4`'s card drew its line and where a factory reset would actually be a flash write. That question is open and untouched. 🔴 **And no `FLR` bracket ran this seating**, so the flash claim did not move: still 1,024 of 4,194,304 bytes, 0.0244 %. ⚠️ Seven of the nine functions that touch `PABCD_DAT` — `autoconfig_gpio_init`, `autoconfig_gpio_off`, `autoconfig_gpio_on`, `autoconfig_gpio_blink`, `autoconfig_gpio_slow_blink`, `read_proc` and `rf_switch_read_proc` — were **seen and not read** (🔴 *this said TWO, from a count taken over five of eleven resolved addresses*), and `sys_bonding_type()`, the gate on the whole button path in *both* the loader and this kernel, is not understood by anything here. 🟢 **2026-09-10 (`R5-7`'s desk half): that count was re-derived by tool and THIS FILE WAS THE HALF THAT WAS RIGHT.** `tools/regcensus.py` on `r57`, attributing every materialisation to a `System.map` symbol without disassembling any of them: **9 symbols, and the seven named above are exactly the unread ones.** `docs/blind-write-ledger.md` § 4.9 said *"three of them were actually read"* and named `rtl_gpio_init` as the third — but `rtl_gpio_init` is not one of the nine (it materialises the block base and `PABCD_DIR`, never `PABCD_DAT`, which is what `REG-35`'s own reading of it says). **Two files disagreed and this one had it.** 🔴 **And `R5-7` has decided to leave the seven unread**, on the ledger § 6 principle that the reading is available later and the blindness is not — the trade, its number, and the runtime instrument that replaces it are in `notes/gpio-driver.md` § 5–§ 6. |
 | 🆕 **2026-09-10 (`R5-12`): all four drivers compile against the current longterm kernel, and NONE of them has ever been built into a 6.18 kernel, let alone run on one.** | 量: `rtl819x-timer` / `-gpio` / `-spi` / `-wdt` each reach `rc 0`, 0 errors and 0 warnings against **6.18.50**, producing 37,300 / 11,512 / 27,572 / 22,696-byte `elf32-tradbigmips` objects. **What that is:** four `.o` files. **What it is not:** a kernel, a boot, or a device. There is no 6.18 kernel on this part and there will not be one inside `R5` — the part boots the vendor's 2.6.30 and everything measured on the silicon was measured there. 🔴 **Nor is compiling upstream acceptance**, which is what `D1` actually asks for: three of the four would be rejected on sight — the watchdog is a hand-rolled `miscdevice` where a modern driver registers a `watchdog_device`, the gpio chip has no `of_node`/`fwnode` and is not a `platform_driver` bound through the `dt/` bindings this project already wrote, and every one of them carries a `/proc` file that upstream would want in debugfs or nowhere. ⚠️ **And the port's own cost figure is a floor**, by two measured mechanisms — see `notes/modern-kernel-port.md` § 9.4. | 
 | 🔄 **No userspace of mine — and as of 2026-09-30 that is no longer true, so this row now says what is still not established in userspace.** | 🔄 **2026-09-30: `R7` superseded this row.** 量 on image `r78a`, booted from RAM: `/init` is rlxfw's compiled PID 1, and `cfgstore`, `httpd` (through `brokerd`), `dnsfwd` and `ifupd` each answered on the die, `httpd` as uid 100 in a chroot and `dnsfwd` as uid 101 (`SPEC.md` `FW-175`, `FW-181`; `docs/GATE-RESULTS.md` 2026-09-30, `R7`). rlxfw's busybox, built from the drop's 1.13.4 source, replaces the vendor's busybox, uClibc and `libgcc_s`, which retires `R3`'s Decision B — *if the shell does not come up, the shell is not the new thing* (`config/rlxfw-initramfs.tsv`). **What is still not established in userspace**: anything under load; TLS, since `httpd` serves plain HTTP; a config store that outlives a power cycle, since it is on ramfs; a lease from a DHCP server, since `udhcpc` has never run on the board; and a refusal returned by `brokerd` on the board, which rests on the host's 264-cell authorisation matrix. `docs/GATE-RESULTS.md`'s `R7` entry lists the rest. *(Until 2026-09-30 this row said the initramfs was built from this unit's own extracted rootfs, with busybox and uClibc the vendor's binaries; its 2026-09-15 narrowing, when `/bin/uprobe` was declared, read "nothing of mine has RUN in userspace ON THE DIE"; and it named `R7` as the gate that would change it.)* |
-| ⚠️ **Nothing has been written to flash, and that is a weaker sentence than it sounds.** | See the next section. |
+| 🔄 **Flash has been written since 2026-10-07, each time by rlxfw's own install path under the owner's dated yes for that exact payload.** | 量 `R8b`'s seating (2026-10-07): 33 driver write verbs, 20 completed and read back equal, 11 cut by a power pull, 2 refused before any operation (`docs/GATE-RESULTS.md` entry 20); `V05b` (`SPEC.md` `FW-255`) and `I10` (entry 22) on 2026-10-08, one each, both read back with 0 differences; never `FLW`, `EW`, `EB` or a non-zero `AUTOBURN`. What the bracket can see is the next section. *(Until 2026-10-09 this row read "Nothing has been written to flash, and that is a weaker sentence than it sounds", which stopped being true on 2026-10-07.)* |
 
 ---
 
@@ -85,7 +85,7 @@ measurement.
 | | |
 |---|---|
 | ⚠️ **The 60-second take is a REPLAY, not a live recording.** | It is seven committed serial captures replayed at true wire speed by `tools/replay-capture.py reel config/r3-11-reel.tsv`. `plan/ARTIFACTS.md` §2's v0.2 row describes a live power-up. The replay is reproducible by anyone who clones this repository, which a recording is not — but it is not a recording of the board, and the video says so. |
-| 🔴 **The `v0.2` release ships no image, and that is deliberate.** | 量: the release has **0 assets**. Three reasons, each checkable rather than a preference. **① GPL.** The kernel is a derivative of Realtek's GPL source, so distributing the binary carries the corresponding-source obligation — and `P4b` (corresponding source — since 2026-10-05 shipped beside the binary, GPLv2 § 3(a), not by written offer — and a per-file modification record) is on the gate board at **v1.0**. 🔄 **2026-10-04: `P4b` is no longer *not started* — it is `~`.** All three of its named deliverables exist: `NOTICE` and `LICENSE` declare the licences, `docs/offer.md` says how the source ships with the binary, and `docs/vendor-modifications.md` is the per-file record, generated by `tools/modrecord.py`. What is still missing is the **corresponding-source archive itself**, and 讀 `docs/offer.md` § 4 names two gaps that must close before a release carries the components they are about. So publishing the binary now would still create an obligation this project cannot meet — the reason is narrower than it was, and it is the archive and the two gaps rather than the absence of a licence. **② It is not all mine to publish.** 量 `config/rlxfw-initramfs.tsv`: ~~**four of the five `file` entries are `owner=unit`**~~ 🔄 **量 2026-09-15: four of SIX, and TWO are mine** 🔄 **2026-10-04: the premise is gone and this clause is withdrawn as stated.** 量 `config/rlxfw-initramfs.tsv` at `HEAD`: **17 `file` rows, 0 `owner=unit`, and no `owner=` column at all**. 讀 `docs/sbom.md` § 6 re-derived it per revision and `R7-8` is what deleted those rows; that file owns the count and this one was still stating the withdrawn one. **The conclusion survives on different grounds** — the kernel is Realtek's GPL tree with Realtek's WLAN driver in it — and `docs/sbom.md` § 6 owns which grounds. The withdrawn naming follows — this count was exactly right until the seventy-second segment added `/bin/uprobe`. The conclusion is unchanged and holds on four of six: — `/bin/busybox`, `/lib/libuClibc-0.9.30.3.so`, `/lib/ld-uClibc-0.9.30.3.so` and `/lib/libgcc_s.so.1`, all carved out of this device's own flash dump. Only `/init` is mine. Shipping the image ships the vendor's userspace. **③ It would not help anyone check anything.** `P4a` closes at Level 1, so a third party rebuilding the published recipe does not get this hash — a published binary could not be verified against the published source, which is the only reason to publish one. Level 2 is what would change that. ⚠️ What IS published is what can be checked: the seven captures the take is made of, every declaration the build reads, and the tools with their controls. |
+| 🔄 **`v0.2`–`v0.6` ship no image, by decision; the binaries `v1.0` is made with travel only with their corresponding source beside them.** | 量 2026-10-08 (`gh release view`): `v0.2`, `v0.3`, `v0.4`, `v0.5` and `v0.6` have **0 assets** each. The binaries `v1.0` is made with are the image `mainline-9bb2bec7.img` (sha256 `295d4f6a…86bd`) and the same bytes in the signed container `T.rlxu`; `docs/release-process.md` phase C uploads them with their corresponding-source archive, its manifest and the licence texts, as assets of the same release, or uploads none of them. The three reasons this row gave for `v0.2` stand as follows. **① GPL** — answered by a rule rather than by not publishing: the corresponding source is an asset beside the binary (`docs/offer.md` § 0, GPL-2.0 § 3(a)), built by `tools/srcarchive.py` from the release commit and read against `docs/offer.md` § 5 (`docs/release-process.md` B7). Its two gaps are stated, not closed (`docs/offer.md` § 4): `SBOM-3`, iperf3's upstream tarball is in the archive but no step unpacks it where the recipe builds from; `SBOM-4`, no pinned tree holds the source of `libgcc.a`, and § 5 row 6 has the release notes say so. **② Withdrawn** 2026-10-04: 量 17 `file` rows in `config/rlxfw-initramfs.tsv`, 0 `owner=unit`; `docs/sbom.md` § 6 owns why the image is still not all rlxfw's to publish — Realtek's GPL kernel and WLAN driver, busybox, iperf3, uClibc and `libgcc.a`. **③ Declined with `P4A-1`**: a third party's rebuild differs at least in the kernel banner's `(key@K)`, so the binary cannot be checked against the source by rebuilding it; what a recipient can check is the commit id and each asset's sha256 against the release notes (`docs/offer.md` § 3, `docs/release-process.md`). *(Until 2026-10-09 this row read "The `v0.2` release ships no image, and that is deliberate" and argued all three reasons as standing; `PROGRESS.md` `IMG-1` closed them by decision on 2026-10-05.)* |
 | ⚠️ **The take is PUBLIC where the project's own plan asked for unlisted.** | `plan/ARTIFACTS.md` §2 specifies an unlisted link. The owner ruled otherwise on 2026-09-01, so it is a departure from the plan rather than an oversight. 🟢 **The containment check is the same either way and it was run before the recording**: `flashwin scan` reports CLEAN on all seven segments against this unit's reference dump, and a MAC-shaped sweep returns 0 — so nothing in the frames identifies the device beyond what this repository already publishes. |
 | 🔴 **It measures 62.2 s against a 60 s spec, and the gate that checks the length cannot see it.** | 量 2026-09-01, three runs: **62.246 / 62.235 / 62.310 s** (range 0.075 s) against a computed 59.749 s. `replay-capture`'s `R16` asserts on capture-plus-pause; a stopwatch measures the replay, and the difference is ~0.065–0.14 s of fixed cost per segment plus **1.461 s in one 33 s segment** whose 2,339 timing records each pay ~0.62 ms of `sleep` granularity. **The pause column was not trimmed to fit** — that is what `config/r3-11-reel.tsv`'s own rule forbids. Open: whether `R16` should measure wall time (which would make it host-dependent, and therefore a bad CI case) or whether the ceiling should move. |
 
@@ -116,8 +116,8 @@ every image this project has ever built and in the vendor's shipped one.
 
 What keeps them from being reached is the userspace surface, not their absence:
 `/dev/mtd0ro` is an odd minor and `mtdchar`'s `mtd_open` refuses it for writing
-(`:73`), and `/dev/mtdblock1` is declared `0400` in
-`config/rlxfw-initramfs.tsv`. **Those are access controls on a path that
+(`:73`), and every MTD node `config/rlxfw-initramfs.tsv` declares is such a minor, `0400` —
+`/dev/mtd0ro`, `mtd1ro`, `mtd2ro` (🔄 2026-10-09: this named `/dev/mtdblock1`, which the declaration withdrew on 2026-08-30). **Those are access controls on a path that
 exists.**
 
 🔴 **2026-09-14 (sixty-ninth segment): that access control exists on MY side and
@@ -1650,6 +1650,117 @@ booted from RAM through the prompt it still did (`notes/switch-driver.md` § 21.
 `9bb2bec7`** (`FW-256`); `6a11de02`, the image above, stays deaf from flash and is not released.
 ⚠️ What the close does not establish is `NET-173`'s and `docs/GATE-RESULTS.md` entry 22's: one warm
 and one cold flash boot, no load, one port, and which part of the written group is necessary.
+
+## 🔴 What `v1.0` does not establish — 2026-10-09 (`R9`, `R8b`, `P3`, `R6c`, `P4b`)
+
+`v1.0` is defined by `R6c`, `R8`, `R8b`, `R9`, `P3` and `P4b` (`README.md`'s version map). `R8` closed
+on 2026-10-04 before `v0.6` was tagged and is in `v0.6`'s section above; this release adds the other
+five, and each gate's full list is its entry in `docs/GATE-RESULTS.md` — `R9` 19, `R8b` 20, `P3` 21,
+`R6c` 22, `P4b` 23. It is the first release made with a binary: the image `mainline-9bb2bec7.img`,
+1,110,016 bytes, sha256 `295d4f6aec14f8b6ee21ebccec05e6b5492d8785274afe676fbfa5a070fb86bd`,
+`RECIPE_ID` `9bb2bec7`, built twice byte-equal from `034b5a7d`, and the same bytes in the signed
+container `T.rlxu`. The ones a reader of this release most needs:
+
+* **Every reading of this image is one unit, one loader build, and one boot per path.** One N150RT,
+  with the loader it shipped with (bootcode 2014.04.22 v1.3, `docs/sbom.md` `SBOM-7`), on 2026-10-08
+  (`bench/2026-10-08c`): one boot from RAM through the loader's prompt and, from slot A through
+  `rlxboot`, one after a watchdog reset and one after a cold power-on. There is no second unit
+  (`SPEC.md` `FLS-24`). `R8b`'s ten power cuts and its slot choices were read on mainline
+  `f9adc9e8`, not on this image (entry 20).
+* **The image opens a root shell with no password on the serial console, so anyone with the serial
+  header has root.** 量 every boot of it in `bench/2026-10-08c` — `R02-boot`, `W01` and `C01` —
+  printed `*** BENCH PROFILE: A ROOT SHELL IS ENABLED ON /dev/console ***`. 讀 `src/init/Makefile`
+  builds PID 1 with `BENCH_SHELL ?= 1`, and in such a build only `rlxfw.noshell` on the kernel
+  command line turns the shell off (`src/init/init.h`, `notes/init.md` § 5); a `BENCH_SHELL=0` build
+  leaves it out and is another image (the next item). The console is unauthenticated whatever the
+  image does: it also reaches the loader's prompt (`docs/threat-model.md` `T5`, `T6`).
+* **`RLXFW-ID0` names the kernel recipe, not the image.** 讀 `RECIPE_ID` is the first eight hex digits
+  of a sha256 over the files under `config/` and nothing else (`tools/rlxfw-kbuild.sh`), and
+  `BENCH_SHELL` is a `make` variable of `src/init`, so a `BENCH_SHELL=0` build, or a userspace program
+  rebuilt from a changed `src/`, is a different image that prints the same `RLXFW-ID0=9BB2BEC7`. An
+  image is identified by its sha256: `looprun --image-sha256` before a RAM upload, and T's signed
+  payload digest, which `rlxboot` checks before the jump.
+* **The device cannot update itself, and nothing the running firmware writes persists.** Every slot
+  write was made by the armed image — not an asset of this release, because it carries the write
+  path — RAM-booted through the loader's prompt and fed from a host, under the owner's dated yes for
+  that exact payload (entries 20 and 22, `FW-255`). The image in the slots has no install path
+  (`CONFIG_MTD_RTL819X_WRITE=n`). The config store is on ramfs, so a password set with `cfgstore
+  passwd` is gone after a power cycle; 讀 with none set, `brokerd` refuses every login
+  (`src/brokerd/ops.c`, "No password set -> AUTH").
+* **Rollback is not refused from flash.** Nothing in this release writes the anti-rollback state,
+  so every slot boot on the die read `ctr=0`, and `rlxboot` checks a validly signed container's
+  version against that 0, which every version `tools/mkfw2.py` builds, 1 and up, passes (entry 20,
+  `notes/update-chain.md` § 10). That `rlxboot` reads the counter from `0x3F0000` at all is 推: an
+  erased region and an undecoded window both read `ctr=0` (`docs/bringup.md` § 12.1).
+* **Power cuts were survived at ten points of paced writes, and nowhere else.** Five in the erase
+  phase and five in the program phase, most of the time cut being the pace's sleep; none inside
+  block 0's erase, during the header page, or in an unpaced write, which is the kind an update uses.
+  Every torn slot failed at `HDR bad=magic`, so `rlxboot`'s signature and digest refusals were never
+  reached by a torn slot on the die (entry 20).
+* **Booted from flash, the Ethernet rests on two boots and on a write set shown sufficient, not
+  necessary.** `vlan` writes the loader's VLAN group as a unit (`SPEC.md` `NET-173`). Not measured:
+  which part of the group is needed, and which switch rule discarded the host's frames before it;
+  what carries `rlx0`'s unicast — not the netif entry, and `FFCR`'s unknown-unicast trap is 推
+  (`NET-169`), its deciding experiment not run; how many `TCR` words the table engine copies; what
+  becomes of a frame that arrives while `STOP_TLU` holds the lookups; what `MACCR` and `QNUMCR`'s CPU
+  field contribute — they differ between the two paths and both paths work; anything under load, on
+  a second port, or over more than one warm and one cold boot (`notes/switch-driver.md` § 21.5–21.6,
+  `docs/GATE-RESULTS.md` entry 22). EEE, the CPU queue count, the PHY patch and `LEDCREG` stay as the
+  boot leaves them, and the WLAN driver is the vendor's.
+* **rlxfw has no WAN: switch ports 0–5, the jack labelled WAN among them, are in one VLAN.** The
+  layout `vlan` writes — the loader's, which every RAM boot through the prompt has carried since
+  `R6` — makes ports 0–5 members of VLAN slot 8, untagged (讀 the decoding of `00807E3F`; 量 read
+  back on all three of `R6c-4`'s paths). Port 0 is the jack labelled WAN (量 2026-08-25, `SPEC.md`
+  `NET-13`) and the port the vendor firmware runs as its WAN, on VID 8 apart from the LAN's VID 9
+  (`SPEC.md` `NET-04`). 推 A peer on
+  port 0 reaches `rlx0`, and `httpd` and `dnsfwd` with it, as a LAN peer does, so the WAN-labelled
+  jack is not a boundary. No boot has had a peer on port 0, and its link under rlxfw was not read
+  (`SPEC.md` `NET-174`, `docs/threat-model.md` § 4).
+* **None of it is secure boot.** The stock loader runs first, unverified, and anyone at its prompt
+  can write flash: `FLW` writes it, `EW` and `EB` write any address, and a TFTP upload without
+  `AUTOBURN 0` goes to its burn path (`docs/threat-model.md` § 7; `RUNSHEET.md`, *Do not type*).
+  There is no evidence of a key-hash fuse on this part, and `rlxboot` does not resist an attacker
+  who can already write flash; the key it trusts is compiled into it (`src/rlxboot/prodkey.h`), so
+  replacing that key means writing `rlxboot` itself. 讀 the image also still holds the vendor's
+  flash-write functions — `mtd_spi_write` and `mtd_spi_erase` are in its `System.map` — kept from
+  userspace by access controls, not removed (§ *The image contains a flash-write path, and it is not
+  mine*).
+* **Carried from `v0.6`, unchanged**: no TLS, so every password sent to `httpd` crosses the LAN in
+  clear; `/var`, `/run`, `/tmp` and `/srv/www/run` are served by ramfs and unbounded; the entropy
+  result is an accounting result, not a strength result (`FW-180`); and whether `rlxboot`'s cache
+  flush is necessary is 推 (`FW-172`).
+* **`R9`'s table does not say rlxfw is more secure.** Five classes of variable are uncontrolled; the
+  live column speaks for 21 of 89 `V-A` cases; the vendor firmware was probed from the network and
+  never tested from inside; and 16 held rows reach the table as counts (entry 19).
+* **The bring-up report's power tree is a desk reconstruction**, by decision (`S0b`, `BRD-01` ⊘),
+  and no interrupt latency was taken by logic analyser (`LA-1`, a standing instruction) (entry 21).
+* **The corresponding source does not rebuild the image bit for bit, and two parts of it are
+  missing.** `P4a` closed at Level 1: a third party's rebuild differs at least in the kernel
+  banner's `(key@K)` (`P4A-1`); the archive leaves out the toolchain and the drop's prebuilt
+  `rtkload/lzma-26` and `rtkload/cvimg`; and no `--recipient` kernel build has run. No pinned tree
+  holds the source of `libgcc.a` (`SBOM-4`), and iperf3 builds from a clean clone only after its
+  tarball is unpacked by hand (`SBOM-3`). The licence readings are `NOTICE`'s, not legal advice.
+* **`iperf3` rebuilds to the shipped bytes only at the path it was first built at.** `uprobe`,
+  `ucost`, `linkprobe` and `iperf3` are in the image as an earlier build's bytes, admitted by their
+  digests (`docs/sbom.md` § 3). 量 at the desk on 2026-10-09, each rebuilt twice from the committed
+  sources with the drop's toolchain, the first three come out byte for byte; `iperf3`, from the
+  pinned tarball and the committed recipe, does only with `SRC` at
+  `/home/key/fwre-work/iperf3-port/src313/src`, because three `assert()` `__FILE__` strings embed the
+  absolute source path — built under the two other paths tried, it has 80 more bytes of `.rodata`
+  and every later section moved (`docs/sbom.md` `SBOM-R5`). No committed step stages the tree at that
+  path (`SBOM-3`), so a recipient who builds `iperf3` anywhere else gets other bytes than the image's.
+* **The tag is unsigned.** A recipient can check the commit id and each asset's sha256 against the
+  release notes; nothing ties either to the owner.
+* **Flash.** Since `v0.6`, writes were made at three seatings, each through the armed image's install
+  path under the owner's dated yes for that exact payload: `R8b`'s, 2026-10-07 — 33 driver write
+  verbs, 20 completed and read back equal, 11 cut by a pull, 2 refused before any operation, and 4
+  `FLR`, each through `tools/flrbracket.py` (entry 20); the qualification seating, 2026-10-08 — one,
+  `V05b` (`FW-255`); and `R6c-4`, 2026-10-08 — one, `I10`, slot A read back with 0 differences. No
+  `FLW`, `EW`, `EB` or non-zero `AUTOBURN` was issued at any of them, nor at `R9`'s seating. The
+  loader region read equal to the opening baseline at five points of `R8b`'s seating; the two later
+  seatings took no flash map. What none of it sees: two writes that cancel, every byte outside the
+  regions read back, and `H601`, never hashed. The `FLR` bracket stays at 1,024 of 4,194,304 bytes,
+  0.0244 %.
 
 ## Closed since `v0.2` was tagged
 

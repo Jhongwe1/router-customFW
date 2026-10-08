@@ -317,8 +317,8 @@ agree: name the tool that could be lying and the second source that settles it.
   which sweeps `git ls-files`.
 - Run `spec-check`, `citecheck`, `cfcensus` (`--self-test`, `ratchet`, `check`),
   `ledgerscan check` and `quarantine`, `xcheck sweep`, `capdate`, `docsize`,
-  `test-file-modes`, and `flashwin scan --dump` with this unit's dump — no CI job
-  runs it. Take `citecheck`'s verdict after the commit (`0 suspended`); before it,
+  `test-file-modes`, and `flashwin scan --dump` and `digestscan scan` with this unit's dump —
+  no CI job runs either. Take `citecheck`'s verdict after the commit (`0 suspended`); before it,
   re-derive every citation you touched. A burst of `C9`/`C10` is usually one
   unclosed backtick.
 - Repair a citation by changing its digits only, after confirming the old token is

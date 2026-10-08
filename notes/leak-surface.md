@@ -86,8 +86,8 @@ none asks whether a committed file holds a **digest of** a forbidden window —
 and a digest contains neither. The line four paragraphs up prints one. **The
 finding, the adjudication and the numbers live in
 `notes/flash-digest-scope.md` and `SPEC.md` `FLS-24`; they are deliberately
-not restated here**, and the missing instrument is carried forward as `FLW-1`
-with its positive control already fixed.
+not restated here**; the instrument, `tools/digestscan.py`, closed `FLW-1` on
+2026-10-09 with its positive control as fixed (`SPEC.md` `FLS-32`).
 
 **A second, narrower gap, closed the same way it was found.** `enx<12 hex>` —
 the form in which the workstation's adapter appears in nine tracked files and

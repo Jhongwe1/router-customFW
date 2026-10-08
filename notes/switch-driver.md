@@ -4495,7 +4495,9 @@ row, which now leaves the binary's size to `docs/sbom.md`. The header's item 2 (
   plausible — on that path `rlx0`'s own address is in no table, so its unicast reaches the CPU by
   `FFCR`'s unknown-unicast trap and not through the netif entry — but that mechanism is itself 推
   on one source. The ruling's fallback, netif slot 0 with `rlx0`'s own address, is not written.
-  🔄 § 21.6: the RAM path pings both ways with it cleared, through that trap.
+  🔄 § 21.6: the RAM path pings both ways with it cleared, so the netif entry is not the way in;
+  that the trap is stays 推 — no L2 table was read and `NET-169`'s deciding experiment did not run.
+  (Until 2026-10-09 this line ended "through that trap", the claim the 130th segment retracted.)
 * How `SWTCR0` reads while `STOP_TLU` is set, whether the engine copies all eight `TCR` words or
   three and five, how many polls a command takes, and what `SWTASR` reports after a force: the
   harness scripts each, and the silicon has answered none. 🔄 § 21.6: it has answered all but

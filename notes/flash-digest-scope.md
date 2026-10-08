@@ -105,14 +105,14 @@ remove. `flashwin` governs **windows read at the bench**. The whole-image
 digest is `FLS-14`'s, its precondition is `FLS-22`'s, and the two rows now
 carry that coupling.
 
-🔴 **What this repository still does not have**: anything that checks whether a
-committed file contains a *digest of* a forbidden window. `scan` reads bytes,
-`leakscan` reads address shapes, `audit-bench-log` reads topic keywords — all
-three are blind to a hash. Carried forward as `FLW-1`, with its positive
-control already fixed: **the instrument must report `LOG.md:87` on its first
-run, and must not report the complement digest of §5.** An enforcer built in
-the same hour as the decision it would have flagged has no independent control,
-which is why it is not built today.
+🔴 **What this repository did not have until 2026-10-09**: anything that checks
+whether a committed file contains a *digest of* a forbidden window. `scan` reads
+bytes, `leakscan` reads address shapes, `audit-bench-log` reads topic keywords —
+all three are blind to a hash. Carried forward as `FLW-1`, with its positive
+control fixed that day: **the instrument must report `LOG.md:87` on its first
+run, and must not report the complement digest of §5.** 🔄 2026-10-09:
+`tools/digestscan.py` asks it, and both controls hold; its first readings are
+the last section of this file (`SPEC.md` `FLS-32`).
 
 ## 5. The digest `R5-5` can actually use
 
@@ -681,3 +681,39 @@ flag reading zero is a claim, and **what settled this was the byte-level diff**.
 
 🟢 One free reading: `map_jiffies` is **1279**, inside the 1279–1280 band this
 file already records, making it ten runs over five seatings and nine days.
+
+## 🆕 2026-10-09 (131st segment, `FLW-1`) — the digest scanner, and what its first run read
+
+`tools/digestscan.py` asks the question § 4 left open: does a committed file hold
+a digest of a window that overlaps `H601`? 讀 the tool: for each window it
+enumerates that overlaps `H601` — 34 of them, 166 candidate digests after its
+constant filter (sha256, sha1 and md5 47 each, crc32 25) — it computes the digest
+in memory from the reference dump and looks in every file for a hex chain equal
+to it whole, or to its first or last N digits; it prints file, line, window
+label, kind and digit count, never the digits. N = 8: 量 by its own `measure`
+over the tracked tree at `28a490c7`, 17,671 files, the expected false hits are
+0.034 per scan and P(any) 0.0073, and N = 10 would miss every 32-bit form the
+repository is known to hold (its docstring, *N*).
+
+量 2026-10-09, with the scanner staged on `1b13303d` in the main checkout:
+17,674 of 17,675 tracked files read (the submodule gitlink is not read) and 17
+hits, every one the whole-image sha256, `whole@0x000000+0x400000`: its two full
+copies, `LOG.md:87` and `tools/leakscan.py:137`–`138` — the positive control § 4
+fixed, covered by the 2026-09-07 ruling — and fifteen prefixes of it, 8 or 16
+digits, on fourteen lines of eight files, two of them on `SPEC.md`'s `FLS-14`
+line. § 5's complement digest is not reported (the negative control). The main
+session ruled on 2026-10-08 that a prefix of a digest published in full discloses
+nothing more, and each of the fifteen is exempted by name, one row per hit; with
+the rows the scan reads 0 findings, 17 exempt, 0 stale, and an exempted line
+copied to another file is a finding. The 130th segment's record counted the
+prefix lines as thirteen; its own list names fourteen. The public `upstream/` at
+its pin reads 46 hits, none exempted: the owner's to rule on (`FLS-22` left
+`upstream/` as it is for `H601`'s bytes, and said nothing of digests).
+
+What this does not establish: a digest shorter than 8 digits — `FLS-14`'s own
+7-digit suffix among them — a fragment from the middle of one, any encoding but
+hex, a window the tool does not enumerate, a digest of a digest, or a file it
+does not read. The verdict needs the dump and runs only at the desk
+(`CLAUDE.md` § Closeout); CI runs the tool's controls, its mutation suite and
+the dump-free `check`, whose `K2` sees a row's digest leave its line for 14 of
+the 17 rows and not for the other three. `SPEC.md` `FLS-32`.

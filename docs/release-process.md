@@ -72,7 +72,7 @@ protects the device is the update container's, not the tag's.
 |---|---|---|---|
 | B1 | the release image is the tested one | the test record's pin (`looprun --image-sha256`, `rtkimage-record.tsv`) and the build manifest | its sha256 equals the tested bytes', and the manifest's `recipe_id` equals A1's |
 | B2 | the corresponding-source archive: `tools/srcarchive.py build --rev <C> --fetched <root> --out <dir> --dump $FWRE_WORK/dumps/flash-n150rt-console-2.bin --cell <the release build's cell>` | the tool's own refusals; its manifest | rc 0; the manifest's `recipe_id` equals B1's; `h601_scan` reads CLEAN; the cell line reads without `--cell-other-recipe` |
-| B3 | a second reading of the archive, and a sweep of every binary the release carries | `tools/srcarchive.py verify --archive <archive> --sums <SHA256SUMS>`; then the archive unpacked into an empty ext4 directory, the image and every other binary asset (the slot containers and the `rlxboot` artefacts, when the release carries them) copied beside it, and `tools/flashwin.py scan --sweep <dir> --dump <dump>` | verify rc 0; the sweep CLEAN over the unpacked members and every binary asset |
+| B3 | a second reading of the archive, and a sweep of every binary the release carries | `tools/srcarchive.py verify --archive <archive> --sums <base>.SHA256SUMS`; then the archive unpacked into an empty ext4 directory, the image and every other binary asset (the slot containers and the `rlxboot` artefacts, when the release carries them) copied beside it, and `tools/flashwin.py scan --sweep <dir> --dump <dump>` | verify rc 0; the sweep CLEAN over the unpacked members and every binary asset |
 | B4 | the archive is reproducible | `tools/srcarchive.py build` again into a second directory | archive and manifest sha256 identical to B2's |
 | B5 | the licence texts | written by B2 beside the archive (`<base>.licence--<origin>--<path>`) and listed in `<base>.SHA256SUMS` | one file per licence text the tool finds; `NOTICE`, `LICENSE` and `config/rlxfw-src/LICENSE` among them |
 | B6 | the release notes, drafted | reading them against the assets | they carry: the commit id; the image's sha256 and size and its `RECIPE_ID`; the sha256 of every asset; GitHub Issues as the only channel; the `libgcc.a` statement (`docs/offer.md` § 4, gap 2) and the iperf3 one (gap 1); what the release does not establish |
@@ -80,8 +80,10 @@ protects the device is the update container's, not the tag's.
 
 The assets are: the image, and any other binary the owner names for the release
 (the slot containers, the `rlxboot` artefacts); the archive; its manifest;
-`SHA256SUMS`; the licence files of B5, `NOTICE` and `LICENSE` among them; and
-`docs/offer.md` and `docs/sbom.md`, copied from C.
+`<base>.SHA256SUMS` and `<base>.record.tsv`; the licence files of B5, `NOTICE`
+and `LICENSE` among them; `docs/offer.md` and `docs/sbom.md`, copied from C; and
+`SHA256SUMS`, written over every other asset once they all exist and not part
+of C, so that `sha256sum -c SHA256SUMS` checks the whole release.
 
 ## Phase C — the outward acts (owner's dated yes, each)
 

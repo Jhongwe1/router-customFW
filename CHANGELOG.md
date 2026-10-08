@@ -1478,6 +1478,129 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
+Nothing since `v1.0`.
+
+---
+
+## v1.0 — 2026-10-09
+
+**Contents, against [`README.md`'s version map](README.md#which-gates-make-which-version):**
+`R6c` + `R8` + `R8b` + `R9` + `P3` + `P4b`. `R8` closed on 2026-10-04 before `v0.6` was tagged and
+is in `v0.6`'s section; this one carries the five that closed after it — `R9` (2026-10-04), `R8b`
+and `P3` (2026-10-08), `R6c` (2026-10-09) and `P4b` (2026-10-09, in the commit this tag names). It is
+the first release made with a binary, and `docs/offer.md` § 0 is the rule it is made under: the
+binary and its corresponding source are uploaded together, as assets of `v1.0`, or not at all.
+
+**The image.** `mainline-9bb2bec7.img`, 1,110,016 bytes, sha256
+`295d4f6aec14f8b6ee21ebccec05e6b5492d8785274afe676fbfa5a070fb86bd`, `RECIPE_ID` `9bb2bec7`, variant
+`quiet`, built twice byte-equal from `034b5a7d`, the commit that carries `rtl819x-switch` 1.6. No
+file under `config/` or `src/` has changed since, so the recipe this commit declares is the
+image's (`docs/release-process.md` A1). It is also an asset as `T.rlxu`: the same bytes behind a
+96-byte header — format 2, version 5, slot A at `0x070000` — and the owner's 64-byte Ed25519
+signature, 1,110,176 bytes, sha256 `113f55427c0798ec9fbf6ecd7f6b5ddea90bc4573496f500931b9df4eacc9ba8`.
+The release notes list every asset's sha256, and `SHA256SUMS`, an asset of its own, lists every
+other asset's, so that `sha256sum -c SHA256SUMS` checks the whole release; the corresponding-source
+archive's sha256 is not here, because the archive contains this file.
+
+🟢 **`R6c` — booted from flash, rlxfw receives.** On 2026-10-08 the candidate image, booted from a
+slot through `rlxboot`, brought `rlx0` up and received no frame after a watchdog reset or a cold
+power-on (`NET-171`): the loader configures the switch only on its prompt path (`LDR-46`, `LDR-47`), rlxfw had
+left the switch's VLAN group to it, and a read-only seating counted the host's frames into port 3 and
+discarded there (`NET-172`). `rtl819x-switch` 1.6 adds `vlan`, which PID 1 types between `init` and
+`start`: it writes the loader's one-VLAN layout as a unit — VLAN slot 8 `00807E3F`, the other VLAN
+and netif slots cleared, `PVCR0`–`3` `00080008`, `FFCR` 3 — only where the switch differs, checks
+four more words without writing them, and writes nothing if they disagree (`NET-173`, the owner's
+ruling O1). The layout makes ports 0–5 one VLAN, the vendor's WAN port among them (`NET-174`). On
+the device (`bench/2026-10-08c`) the release image pinged both ways from RAM through the prompt and
+from slot A after a watchdog reset and after a cold power-on, every field of the `vlan` line reading
+as predicted from the code on all three paths; from RAM it receives with netif slot 0 cleared, so
+the netif entry is not what carries `rlx0`'s unicast — whether `FFCR`'s unknown-unicast trap does
+stays 推 (`NET-169`), since no L2 table was read and its deciding experiment did not run.
+`tools/mdiocheck.py` went from 98 to 152 cases; one of the main session's own mutants — the busy
+exit that would leave `STOP_TLU` set and stop every lookup — passed all 68 of the cases the
+implementation came with, until `K67` was added for it.
+
+🟢 **`R8b` — an update in a flash slot, and ten power cuts** (2026-10-08). One seating,
+2026-10-07: container P (version 1) in slot A booted through `rlxboot`, Q (2) in slot B booted B,
+R (3) in A booted A, and ten physical power pulls inside a slot write each booted the other slot,
+10 of 10 by `tools/bootslot.py`; a torn `rlxboot` hands over to its rescue copy through the stock
+loader's own scan. 🔴 The gate failed once, and that is its most consequential reading (`FW-241`):
+behind a `cr6c` header the stock loader also looks for a rootfs inside slot A and returns nothing
+when none is there, so `rlxboot` and its rescue copy now carry `cs6c` (`f257a848`). Every write went
+through the armed image's install path, RAM-booted through the loader, under the owner's dated yes
+for that exact payload; every `R8b` reading is on mainline `f9adc9e8`.
+
+🟢 **`R9` — the differential table** (2026-10-04). `docs/differential.md` publishes 16 rows standing
+for the register's 141 upstream cases, each with a mechanism class from a closed set, a vendor cell
+that is a reading or `⊘ Structural`, an rlxfw cell from the same instrument, and a check that would
+have detected the opposite of the row's claim together with that check's reading — a row without
+the reading publishes 未定: 量 win 17, surface-absent 5, not comparable 42, 未定 77. The pass
+condition was re-specified before the gate opened, because the old one was met by rows written
+before the gate existed. 🔴 The live column speaks for 21 of 89 `V-A` cases, and the table says
+so. `FW-198`'s 推 was retracted inside the gate, by measurement (`FW-201`).
+
+🟢 **`P3` — the bring-up report** (2026-10-08). `docs/bringup.md` holds the plan's ten sections as
+§§ 6–15 and closes on `R8b`'s readings, folded in at nine places: among them the boot from flash
+through `rlxboot`, the bad-image branch measured on the die, the erase size, and two traps of the
+boot the device makes by itself. 🔴 Its power tree is a desk reconstruction, by decision (`S0b` and
+`BRD-01` ⊘), and the logic-analyser interrupt latency is a standing instruction (`LA-1`).
+
+🟢 **`P4b` — the source ships beside the binary** (2026-10-09). rlxfw's kernel files are
+`GPL-2.0-only` by provenance and everything else of its own is `MIT` (`NOTICE`, `LICENSE`,
+`config/rlxfw-src/LICENSE`); `docs/vendor-modifications.md` is generated by `tools/modrecord.py` and
+compared with the declarations by a CI step; `docs/offer.md` makes the corresponding source an asset
+of the same release as the binary (GPL-2.0 § 3(a)) rather than a written offer; `tools/srcarchive.py`
+builds that archive from a release commit; and `docs/release-process.md` orders the release, every
+outward act an owner's dated yes. Two gaps stay open and are stated rather than closed: `SBOM-4`, no
+pinned tree holds the source of `libgcc.a`, and `SBOM-3`, iperf3 builds from a clean clone only
+after its tarball is unpacked by hand. 量 Of the four programs the image carries as an earlier
+build's bytes, three rebuild from the committed sources byte for byte, and `iperf3` only at the
+absolute source path it was first built at, which three of its `assert()` strings embed
+(`docs/sbom.md` `SBOM-R5`).
+
+🟢 **`FLW-1` — a scanner for digests of `H601`, closed with `P4b`.** `tools/digestscan.py` reads
+every tracked file for a sha256, sha1, md5 or crc32 — whole, or a prefix or suffix of at least 8
+hex digits — of the 34 flash windows it enumerates that overlap `H601`, 166 candidates computed in
+memory from this unit's dump, and reports file, line, window, kind and digit count, never the
+digits. The scan needs the dump and runs at the desk, where `CLAUDE.md` § Closeout now runs it
+beside `flashwin scan`; CI runs its self-test, its mutation suite and its dump-free `check`. 量
+2026-10-09 on the tracked tree: 0 findings and 17 exempt, by name, one row per hit — the two full
+copies of the whole-dump sha256 the 2026-09-07 ruling published, and fifteen prefixes of that
+digest on fourteen lines of eight files, under the main session's ruling of 2026-10-08. Its hits in
+the public `upstream/` are the owner's to rule on.
+
+🟢 **`cardcheck`'s `--idle` guard now reads the cells a card types through its `CAP` macro**
+(`1b13303d`; `docs/FINDINGS.md`). It skipped every line without the literal `console-capture`, so
+量 of the 260 corpus lines with a `--send`, an `--idle` and a `sleep` it had read 38, and `A24`
+could not fail. It now reads every `--send` line; over 123 files the only new findings are four
+cells of the frozen card B52, whose sleeps run in the background, excused by name.
+
+🔴 **The weakest thing in this release is that its flash path is a provisioning procedure on one
+unit, not an update the device performs.** Every slot write was made by an image this release does
+not carry, RAM-booted through the loader's prompt, with a host and the owner's dated yes; the image
+in the slots cannot write flash, the anti-rollback counter has never advanced, and the config store
+is on ramfs. Each path of the release image was read once — one RAM boot, one warm and one cold
+flash boot — on one N150RT with one loader build, and the image starts a root shell with no password
+on the serial console.
+
+⚠️ **What a release's known-issues list is**: the copy of
+[`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md) at this tag, which is frozen; this release's own
+section there is *What `v1.0` does not establish*.
+
+**Flash, since `v0.6`.** Writes were made at three seatings, each through the armed image's install
+path under the owner's dated yes for that exact payload: `R8b`'s, 2026-10-07 — 33 driver write
+verbs, 20 completed and read back equal, 11 cut by a pull, 2 refused before any operation, and 4
+`FLR`, each through `tools/flrbracket.py` (`docs/GATE-RESULTS.md` entry 20); the qualification
+seating, 2026-10-08 — one, container S into slot B (`FW-255`); and `R6c-4`, 2026-10-08 — one, T into
+slot A, 4,625 operations, slot A read back with 0 differences. No `FLW`, `EW`, `EB` or non-zero
+`AUTOBURN` was issued at any of them, nor at `R9`'s seating, which issued no flash-write command at
+all. The loader region read equal to the opening baseline at five points of `R8b`'s seating; the two
+later seatings took no flash map. What none of it sees: two writes that cancel, every byte outside
+the regions read back, and `H601`, never hashed. The `FLR` bracket stays at 1,024 of 4,194,304
+bytes, 0.0244 %.
+
+### Written under *Unreleased* on 2026-10-04
+
 **Contents, against [`README.md`'s version map](README.md#which-gates-make-which-version):**
 `R9` — the differential security proof, closed 2026-10-04 with zero flash-write commands issued.
 `P3`'s bring-up report and `P4b`'s three licence obligations land at `~` the same day.
@@ -1530,6 +1653,8 @@ half of the row is untouched; six § 17 rows for `SBOM-2`…`SBOM-7` are owed an
 is a pre-existing debt (量 `SBOM-*` has 0 rows in `SPEC.md`) rather than one this commit creates;
 and `tools/modrecord.py` has no CI step yet, because a new tool's row needs a local census run
 first.
+
+---
 
 ## v0.6 — 2026-10-04
 

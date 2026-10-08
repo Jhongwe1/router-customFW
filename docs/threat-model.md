@@ -182,9 +182,9 @@ own on a flash boot too — puts ports 0–5 in one VLAN, untagged (slot 8
 vendor firmware runs as its WAN, on VID 8 apart from the LAN's VID 9 (`SPEC.md`
 `NET-04`). 推 So a peer on port 0 is a LAN peer to rlxfw: it reaches `rlx0`, and
 `dnsfwd`'s LAN address and `httpd` with it, whichever address `httpd` binds. No
-boot has had a peer on port 0, its link under rlxfw was not read, and which jack
-is port 0 is ⊘ (`NET-13`), so this is 讀 and 推 and not a probe (`SPEC.md`
-`NET-174`). Until a WAN exists, the WAN-labelled jack is not a boundary.
+boot has had a peer on port 0 and its link under rlxfw was not read; port 0 is
+the jack labelled WAN (量 2026-08-25, `NET-13`), so this is 讀 and 推 and not a
+probe (`SPEC.md` `NET-174`). Until a WAN exists, that jack is not a boundary.
 
 ## 5. `T4` — a wireless client associating to the radio
 

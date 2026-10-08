@@ -4626,7 +4626,381 @@ and no step of `R6c` set out to take it apart; what that leaves open is the firs
 
 ---
 
-## The operating clause, re-run at twenty-two entries
+## 2026-10-09 — `P4b` (`v1.0` is release-ready, not released: the image the device ran and the same bytes signed into T, beside a corresponding-source archive built from the release commit's declarations — phase B rehearsed on `28a490c7` and owed again on this commit — with two gaps stated and every outward act left to the owner)
+
+### One line
+
+**v0.6+, five segments — the 122nd, which put the row at `~` with `NOTICE`, the two licence
+files, `docs/offer.md` and the generated per-file record (`01cff02b`); the 123rd, which measured
+the six § 17 rows the row said it owed not to be a debt and corrected the three places that still
+said iperf3 was not in `SOURCES.json`; the 124th, which put the source beside the binary, built
+`tools/srcarchive.py` and wrote `docs/release-process.md` (`33cb73a7`, `c0349701`, `f071b162`);
+the 130th, which rehearsed phases A and B on `28a490c7`, re-derived the SBOM, drafted the release
+texts and built `FLW-1`'s scanner, committing none of it; and the 131st, for the release commit
+and this closing — and no seating, no power action and no flash command.** § Gate board costs
+`P4b` at 2, so the actual is 5 against 2 (ruling 10). The release image is
+`mainline-9bb2bec7.img`, 1,110,016 bytes, sha256
+`295d4f6aec14f8b6ee21ebccec05e6b5492d8785274afe676fbfa5a070fb86bd`, `RECIPE_ID` `9bb2bec7` — the
+bytes `R6c-4` ran (`FW-256`) — and beside it `T.rlxu`, the same bytes behind `tools/mkfw2.py`'s
+96-byte header and the owner's 64-byte signature, 1,110,176 bytes, sha256
+`113f55427c0798ec9fbf6ecd7f6b5ddea90bc4573496f500931b9df4eacc9ba8`. Phase C uploads both with the
+corresponding-source archive `tools/srcarchive.py` builds from this commit, everything the tool
+writes beside it, `offer.md`, `sbom.md` and a release-level `SHA256SUMS`, or uploads none of them
+(`docs/offer.md` § 0; rulings 2 and 3). This entry is part of that commit and the archive is built
+from it, so the entry names the image and T by sha256 and the archive by none
+(`docs/release-process.md`, *Which records carry which digest*). **The `✓` is release-ready**:
+phase A reads as stated on the release commit C — A1 to A5 read on its tree before the commit and
+`citecheck` after it, and A6, CI on C, owed after the push (C1) — and phase B as rehearsed on
+`28a490c7`, with B2–B5 owed again on C before the tag. `FLW-1`, the one
+carried-forward row the gate owned, is paid by a scanner that lands in C, `tools/digestscan.py`
+(ruling 5).
+
+**The weakest thing here is that phase B's half of the `✓` rests on a rehearsal and a pass
+condition, not on a reading of C.** B2 builds the archive from a committed C, so it runs after
+this entry exists and its readings cannot be in it. What the entry holds is the run on
+`28a490c7`, 2026-10-08 23:15–23:50, in an ext4 clone whose porcelain stayed empty: the archive
+built twice byte-identical, its `verify` and its sweep clean (claim ②). C differs from that commit
+in no file under `config/` or `src/` (A1), so the image, its recipe and the build cell the
+archive's manifest names are the same; but the archive packs every tracked file outside `bench/`,
+and C changes some of them — the release texts, `FLW-1`'s scanner and this entry among them — so
+every archive-side digest moves and none of the rehearsal's carries. The condition the run on C
+must meet is written below, before it runs, and its readings belong to the publication record
+(D2, a later `LOG.md` entry). A6 is in the same position one step earlier: CI runs on C only once
+C is pushed, which is C1, the owner's first outward act.
+
+### Three claims that stand
+
+**① The release image is the bytes the device ran, and T carries exactly those bytes under the
+owner's signature, which anyone can check against the key in the repository.** 量 B1, 2026-10-08,
+against the build's output and every record of it: the image's sha256 and size equal the pin
+`R6C-4-CARD.md` gives `R02`'s `--image-sha256`, `R02.log`'s `pre image sha256 … <- matches the
+pin`, and the build's `rtkimage-record` and `MANIFEST.tsv`; both manifests carry `recipe_id
+9bb2bec7`, A1's; and the board printed `RLXFW-ID0=9BB2BEC7` on all three boots of
+`bench/2026-10-08c` (`R02-boot`, `W01`, `C01`). T's sha256 equals `I10`'s `install slotA sha=` and
+the manifest's `container:T`, and past its first 160 bytes T is the image (`cmp -i 160:0`, equal;
+the same `cmp` against the armed image differs). From a clone and again from the unpacked
+archive, `src/rlxboot/mkprodkey.py check` reads the production key `4a6eda72…` out of
+`prodkey.h`, and `tools/mkfw2.py verify T.rlxu --pubkey-hex <that key> --write-at 0x070000
+--write-form whole --stock-loader` reads `ACCEPTED: … version 5, recipe 9bb2bec7, flash
+destination 0x070000 form whole` and `stock loader verdict: NOT AN IMAGE`; four controls each read
+`REJECTED` — the development key and one flipped header byte at step 3 (`signature`), one flipped
+payload byte at step 4 (`payload_digest`), slot B's address at step 2 (`flash_match`). ⚠️ The
+board's `RLXFW-ID0` names the recipe and not the image: 讀 `RECIPE_ID` digests `config/` alone
+(`tools/rlxfw-kbuild.sh`), so a build with `BENCH_SHELL=0`, or any change under `src/`, is a
+different image that prints the same id. The image's identity is its sha256, which the board does
+not print; and no asset installs T (*What `P4b` did not establish*).
+
+**② The corresponding source is an archive packed from the git objects the build's declarations
+name, and on `28a490c7` it built twice byte-identical, read back against its own manifest, and
+held no 16-byte run of `H601` that the scan's probes find.** 量 B2, rc 0, 256.3 s: 26,918
+members — 623 files of the repository at the commit, `bench/` left out and `upstream/` listed as a
+gitlink; 26,293 files of the drop's declared paths at pin `5c9be5d9`, its 1,316 binary blobs left
+out and listed (17 `ar`, 32 other binaries, 1,267 ELF); and `tweetnacl` and the iperf 3.1.3
+tarball at their `SOURCES.json` sha256 — and the manifest's header reads `recipe_id 9bb2bec7`,
+`h601_scan CLEAN: 26918 member(s) and 8 licence file(s) scanned, 113 probe(s) of 16 bytes`, and a
+cell line for `s128p-r6c-mA` with recipe `9bb2bec7` and no other-recipe note. B4: built again,
+rc 0, all twelve files byte-identical. B3: `srcarchive.py verify` rc 0 — every member against its
+row, 28,235 rows for 26,918 members, 1,316 left-out blobs and one gitlink — and rc 1 on a sums file
+with one digit flipped; `flashwin scan --sweep` CLEAN over the unpacked archive with the image and
+T, and over the sixteen files the rehearsal could name as assets, the archive among them;
+`flashwin --self-test` 41 passed, 0 failed. B5: eight licence files beside the archive, each in its
+`SHA256SUMS`, with `NOTICE`, `LICENSE` and `config/rlxfw-src/LICENSE` byte-equal to the tree's.
+`docs/offer.md` § 5 rows 2 and 4 read as stated: `fetch-sources.sh --list` plans both imported
+sources, a missing or altered `tweetnacl` is refused with rc 3, and the manifest lists the drop's
+`config/uclibc/` (5,414 rows) and the repository's `src/` (224 files). ⚠️ All of it on
+`28a490c7`; on C it is owed before C2, under the pass condition below, and D2 records it. What
+the scan cannot see is in *What `P4b` did not establish*.
+
+**③ The per-file modification record is what the declarations derive, and the declarations apply
+to a fresh stage of the pinned drop in the order declared.** 量 A2 on `28a490c7`:
+`tools/modrecord.py emit` wrote a file byte-identical to the committed
+`docs/vendor-modifications.md` (24 vendor files), so the record is generated and not kept
+(`docs/offer.md` § 5 row 7), and `check` read rc 0 — a CI step since `33cb73a7` (`FW-233`). On a
+stage made from the pin's git objects (22,282 entries, the count `git ls-tree` lists), `check
+--tree` read rc 0: 22 hunks in declared order, two of them placed at the header's line because
+their pre-image occurs twice (`0003` on `linux-2.6.30/Kbuild`), and 28 marks rows each anchored
+once. Controls: the release cell's used tree, rc 3 (`0001-timeconst … pre-image is not in the
+file`); one anchor planted twice, rc 3; restored, rc 0. ⚠️ C changes no file under `config/`, so
+C's record is this one: 量 2026-10-09 on C's tree before the commit, the same readings — `emit` byte-identical, `check` rc 0, `check --tree` on a fresh stage rc 0, both controls rc 3. It records what rlxfw changed in vendor source, not what it
+read — `docs/blind-write-ledger.md` holds that, as a lower bound.
+
+### The board row's clauses, read one at a time
+
+| the row says | verdict |
+|---|---|
+| **complete GPL release** | ⚠️ **release-ready, not released** — what the row's evidence cell has defined its `✓` to mean since 2026-10-05 (`f071b162`): nothing in C is outward, and C1–C4 each wait for the owner's dated yes. *Complete* as `docs/offer.md` § 5 defines it, with two gaps stated rather than closed, which § 5 rows 2 and 6 allow (`SBOM-3`, `SBOM-4`) |
+| **corresponding source** | 🟢 **met as rehearsed** (claim ②); on C owed before C2, under the pass condition below |
+| **per-file modification record** | 🟢 **met** (claim ③) |
+| **+ release process** | 🟢 **met**: `docs/release-process.md`'s phases A and B ran as written, A on C and B on `28a490c7` with B2–B5 owed on C, and C and D follow this entry. What running it found short — A3's list, the one `SHA256SUMS` its asset paragraph named, B5's reach and the sweep's count — is in the steps' table and the booking |
+| **🔄 the source ships as an asset beside the binary (GPLv2 § 3(a)), in place of a written offer** | ⚠️ **a rule until C4**: `docs/offer.md` § 0 and phase C upload the archive with the binaries or upload neither (ruling 1); that it shipped is D1's reading |
+| *(the evidence cell)* **the `✓` … is set when every step of phases A and B reads as stated on the release commit** | ⚠️ **met for A on C, and for B as rehearsed** (the weakest-thing paragraph) |
+| *(the evidence cell)* **the tag, the release and the upload stay the owner's dated acts (phase C); and `v1.0` follows this row's close** | 🟢 **as written**: no outward act is taken in C |
+| *(the evidence cell)* **What was owed and IS paid here: `docs/sbom.md` § 2.2, `U9` and `SBOM-3` said iperf3 is not in `SOURCES.json`** | 🟢 **paid** in the 123rd segment, and B2 packed `refs/iperf-3.1.3.tar.gz` at its pinned sha256 |
+
+### The release process's steps, read one at a time
+
+| step | rehearsed on `28a490c7` | on C | after C |
+|---|---|---|---|
+| **A1** the recipe printed equals the image's | 量 `rlxfw-kbuild.sh s128p-r6c-mA --variant quiet --dry-run` printed `recipe=9bb2bec7`, rc 0, nothing staged; a clone at `2009c4eb` printed `6a11de02`, the control; `git diff --quiet` from `034b5a7d` over `config/` and over `src/` rc 0, and from `2009c4eb` to `034b5a7d` over `config/` rc 1 | 量 2026-10-09 on C's tree before the commit — `1b13303d` with C's edits, which touch no build input, in an ext4 clone: `recipe=9bb2bec7` for the row as written and for the build's full argv, rc 0, nothing staged; the controls `2009c4eb` `6a11de02` and `034b5a7d` `9bb2bec7`; `git diff --quiet` from `034b5a7d` over `config/` and `src/` rc 0 | — |
+| **A2** the per-file record regenerated, and checked twice | 量 claim ③ | 量 2026-10-09, the same tree: `emit` byte-identical to the committed record (24 vendor files), `check` rc 0, `check --tree` on a fresh stage of the pin's git objects (22,282 entries) rc 0, and the used tree and a planted anchor rc 3, restored rc 0 | — |
+| **A3** the sentences the upload would make false, true before and after it | ⚠️ the step names seven places in five files; a grep over the tree found five more that the release makes false — `docs/offer.md`'s tag paragraph and § 6's third bullet, `docs/sbom.md` §§ 1 and 2.4, and `README.md`'s *Release* line — besides `P4b`'s own row, and sentences false for other reasons that the tag would freeze (`$FWRE_WORK/rebuild/s130/p4b-text/A3.md`, O-1–O-11) | rewritten in this commit, the larger set (ruling 7): `docs/offer.md` §§ 0, 1, 2 (a row for T), 5 and 6, `NOTICE` §§ 1 and 8, `README.md` (the lead's third bullet, *Release*, *Status*, *Licences* and the gate list), `docs/KNOWN-ISSUES.md` (its header and four rows above its sections), `docs/sbom.md` (re-derived) and `docs/release-process.md` (the asset paragraph and B3's sums file) | *after* is D1's: the sentences describe an asset list that exists from C4 |
+| **A4** `CHANGELOG.md`'s `v1.0` section and `docs/KNOWN-ISSUES.md`'s *What `v1.0` does not establish*, both naming the image by sha256 | — | written in this commit: `## v1.0 — 2026-10-09` and *What `v1.0` does not establish — 2026-10-09*, each naming `mainline-9bb2bec7.img` by its sha256 | — |
+| **A5** the closeout checks, each rc 0 | 量 13 of 13 rc 0, with `upstream/` initialised at `4d3ff26` and `src-vendor` present; without the submodule `spec-check` reads rc 1 (84 findings, every owner under `upstream/`) and `ledgerscan quarantine` rc 0 while skipping | 量 2026-10-09 on the staged tree before the commit, with `upstream/` at `4d3ff26` and `src-vendor` present, each rc 0: `docsize`, `spec-check`, `cfcensus` `--self-test`, `ratchet` and `check`, `ledgerscan check` and `quarantine`, `xcheck sweep`, `capdate`, `test-file-modes`, `flashwin scan --dump`, `digestscan scan` and `modrecord check`; `citecheck` after the commit, and the full desk-sweep on C itself, both recorded in the 131st segment's `LOG.md` entry. ⚠️ 量 the last full desk-sweep before C ran on `a5a332e6` (2026-10-09 00:25–02:00), before `1b13303d` and before `FLW-1`'s three CI steps: 132 steps declared, 2 not run as needing root, 130 run, 127 green, the two census steps red by design, and one red not expected — `test-vendor-tripwire`'s `T13`, whose default tree discovery exits 4 where 0 is expected and watches 0 trees where 6 are: `FW-235`'s three deleted files in the shared vendor tree, a case CI skips, having no vendor tree (`tools/ci-expected.tsv`). While `FW-235` stands, a sweep on C reads that red too, and restoring the tree is the owner's | — |
+| **A6** CI green | 量 `28a490c7`'s run `37796659505`, `success` | — | owed: read after C1, and D2 records it |
+| **B1** the release image is the tested one | 量 claim ① | holds: C changes neither the image nor its test record | — |
+| **B2** the archive, from C | 量 claim ② | — | owed before C2 (the pass condition below); D2 records it |
+| **B3** a second reading, and a sweep of the binaries | 量 claim ②; of the 26,919 paths the sweep counted as scanned, 22 were skipped | — | owed before C2 (the pass condition below); D2 records it |
+| **B4** reproducible | 量 claim ② | — | owed before C2 (the pass condition below); D2 records it |
+| **B5** the licence texts | 量 claim ② | — | owed before C2; `NOTICE`'s file moves, since C edits `NOTICE` (A3) |
+| **B6** the release notes | drafted outside the tree, with C's id and every archive-side digest left as placeholders | — | filled from B2 on C, before C3 |
+| **B7** `docs/offer.md` § 5, seven lines | rows 2, 4 and 7 read as stated; rows 3 and 5 on the archive's side only; rows 1 and 6 need the notes | row 7 is A6's | rows 1 and 6 on the notes before C3; rows 3 and 5 after C4, by D1 |
+
+**The pass condition for phase B on C, written before the run.** In an ext4 clone at C, with
+`upstream/` at `4d3ff26`, the two imported sources at their `SOURCES.json` sha256, and the release
+cell `s128p-r6c-mA` and its manifest still on disk, before C2: B2 exits 0, its manifest reads
+`recipe_id 9bb2bec7` and `h601_scan CLEAN`, and its cell line carries no other-recipe note; B3's
+`verify` exits 0 and its one-digit control exits 1, and `flashwin scan --sweep` reads CLEAN over
+the unpacked archive, the image and T, with every `SKIP` line it prints named in the record; B4's
+second build is byte-identical to B2's, file for file; and B5 writes one licence file per text the
+tool finds, `NOTICE`, `LICENSE` and `config/rlxfw-src/LICENSE` among them and each byte-equal to
+C's. The readings, with the archive's sha256 as built on C, go into the release notes (B6) and the
+publication record (D2). **Refuted if** any one of them fails: then no tag is made, the row
+returns to `~` by a new `LOG.md` entry, and this entry is not edited.
+
+### The questions this gate must be able to answer
+
+The plan's hostile-question list (§ 11) asks one question of `P4`: *「你的 GPL 釋出完整嗎？」* — is
+your GPL release complete? At C the answer has three parts.
+
+**What it carries.** One archive per release, built from the release commit out of git objects:
+the repository at that commit, which holds the build driver, the declarations under `config/` and
+rlxfw's own sources; the drop's declared paths at pin `5c9be5d9` — the kernel tree, the board BSP,
+busybox and uClibc's source — with its prebuilt binary blobs left out and listed by sha256; and
+`tweetnacl` and the iperf 3.1.3 tarball at their pinned sha256 (`docs/offer.md` § 2). Beside it go
+its manifest, its sums, the licence texts, `offer.md` and `sbom.md`. Read on `28a490c7` by B2–B5
+and § 5 rows 2, 4 and 7; owed on C.
+
+**Where it is not complete, stated rather than closed.** No pinned tree holds the source of
+`libgcc.a`, whose objects are in the image (`SBOM-4`), and the release notes must say so (§ 5 row
+6); iperf3's tarball is in the archive and no step unpacks it where its recipe builds (`SBOM-3`);
+35 compiled sources in Realtek's directories and 3 in the loader stub carry no licence text
+(`SBOM-2`); the RC4 code's SSLeay text says it cannot be put under another licence, the GPL
+included (`SBOM-R3`); the archive leaves out the toolchain and the drop's prebuilt host programs,
+which a rebuild takes from the pinned drop; and the harness that drove the build of `9bb2bec7` is
+outside the repository (`docs/sbom.md` § 11). 量 Of the four programs copied into the image by
+digest and never rebuilt for it, `uprobe`, `ucost` and `linkprobe` rebuild byte-identical from the
+committed sources, and `iperf3` from the pinned tarball only with its source at the absolute path
+it was first built from (`SBOM-R5`): its source is complete, and what the path limits is a
+recipient's reproduction.
+
+**What *complete* cannot mean here.** That a third party's rebuild gives the same sha256 — `P4a`
+closed at Level 1 and `P4A-1` is ⊘; that any of it is a legal reading — the readings are
+`NOTICE`'s; or, until D1, that the release exists.
+
+### What `P4b` did not establish
+
+🔴 **That `v1.0` is released.** The `✓` is release-ready. C1–C4 each wait for the owner's dated yes
+for that exact act; D1 then downloads every asset and hashes it against the notes, and D2 records
+the release's URL and those digests. After C1 there is a pushed commit and no tag, after C2 a tag
+and no release, after C3 a release with no asset — and the texts A3 rewrote were written to hold in
+each of those states and after C4.
+
+🔴 **Phase B on C** (the weakest-thing paragraph): B2–B5 ran on `28a490c7`; B6 is a draft outside
+the tree; B7's rows 1 and 6 wait for the notes, and rows 3 and 5 for the upload.
+
+🔴 **That the archive rebuilds the image.** `P4a` closed at Level 1 (`P4A-1` ⊘): a third party's
+rebuild differs at least in the kernel banner's `(key@K)`. The archive leaves out the toolchain and
+the drop's prebuilt host programs (`rtkload/lzma-26`, `rtkload/cvimg`); five of the seventeen
+initramfs files were copied in by digest, and four of them had never been rebuilt for the image:
+量 `uprobe`, `ucost` and `linkprobe` rebuild byte-identical from the committed sources, in two
+independent builds, and `iperf3` only with its source at `$FWRE_WORK/iperf3-port/src313/src` —
+three `assert()` calls write `__FILE__` into `.rodata`, so anywhere else it is 80 bytes longer —
+and only after a staging step done by hand (`SBOM-R5`, `SBOM-3`; one host, one user,
+`$FWRE_WORK/rebuild/s130/sbomr5/`). The harness that built `9bb2bec7`,
+`$FWRE_WORK/rebuild/s128/p/build-r6c.sh`, is outside the repository; and no
+`--recipient` kernel build has run (`docs/release-process.md`, *The build a recipient runs*). Only a
+rebuild in an empty directory would test the archive's sufficiency, and none is a step here. The
+archive itself was reproduced on one machine, from one path, with one `liblzma` (5.4.5); the
+uncompressed tar's sha256 is the steadier identity.
+
+🔴 **That the two gaps are closed.** `SBOM-3` and `SBOM-4` are stated in `docs/offer.md` § 4 and
+left open, as § 5 allows: iperf3 builds from a clean clone only after its tarball is unpacked by
+hand, and `libgcc.a`'s source is held nowhere — 推 cosmetic if the libgcc linking exception
+applies.
+
+🔴 **Anything legal.** The licence readings are `NOTICE`'s and not advice: whether the 38 sources
+without licence text are covered by their directory's `COPYING` (`SBOM-2`), whether `1x_rc4`'s
+SSLeay text can sit in a `GPL-2.0-only` kernel (`SBOM-R3`), and whether notices that are source
+headers — RC4, MD5 and AES (`K3a`–`K3c`), Sun's `fdlibm` text (`L2`) — meet *"beside the binary"*
+by travelling inside the archive, since `tools/srcarchive.py` writes beside it only files named as
+licences (B5).
+
+🔴 **That no byte of `H601` is anywhere in the release.** The scans are `tools/flashwin.py`'s, with
+its gaps: runs under 16 bytes, byte-swapped or encoded copies, and the inside of a compressed
+member — the image's own LZMA stream and the iperf3 tarball among them, so the rehearsal swept what
+the build recorded as the image's inputs, `vmlinux.elf` and the 17 initramfs sources, CLEAN, and
+not a decompression of the image. 22 paths were not read at all — dangling symlinks, each a link
+target named in the log — and the sweep still counted them as scanned (讀 its loop prints the
+number of paths walked).
+
+⚠️ **That no file in the release holds a digest of `H601`.** That is `FLW-1`'s question, which
+`flashwin` cannot ask and `tools/digestscan.py` now asks of the tracked tree: 量 2026-10-09 on C's
+tree before the commit, 0 findings, 17 exempt and 0 stale (`SPEC.md` `FLS-32`). Every hit it makes
+there is the whole image's sha256 — the digest the 2026-09-07 ruling left published in full
+(`FLS-14`), because the owner's `FLS-22` decision had already made the MAC public: its two full
+copies, and fifteen prefixes of 8 or 16 hex digits on fourteen lines of eight files, each exempted
+by name, one row per hit (ruling 5). Thirteen of the fourteen lines, in seven files, are in files
+the archive packs, `bench/` being left out, and so are both full copies. What makes them safe is what makes the full
+digest safe, and the two futures `notes/flash-digest-scope.md` § 3 names — `upstream/` going
+private, or enough of the firmware region published to rebuild it — would reopen them all. The
+scanner cannot see a digest shorter than 8 digits, a fragment from the middle of one, an encoding
+other than hex, a window it does not enumerate, or a digest of a digest (its docstring, *What it
+cannot see*), and it read the tracked tree and the public `upstream/`, not the drop's members or
+the binaries. Over `upstream/` at its pin it reads 46 hits, prefixes of digests over
+windows that overlap `H601`, `H601` itself and its first 4 KiB among them, which no ruling covers
+yet — `FLS-22` left `upstream/` as it is for `H601`'s bytes — and which the archive does not carry:
+it lists `upstream/` as a gitlink and packs none of it. And the scan that reads the dump runs only
+at the desk: CI runs the dump-free `check` and the self-test with its three dump cases skipped, so
+`FLW-1`'s own reservation — that the answer is needed at every closeout, not only at a release —
+rests on `CLAUDE.md` § Closeout, which runs `digestscan scan` beside `flashwin scan --dump` from
+this commit on (ruling 11): a habit at the desk, not a gate.
+
+⚠️ **That the tag is the owner's.** It is unsigned (ruling 1): a recipient can check the commit id
+and every asset's sha256 against the notes, and nothing ties either to the owner. The signature
+that protects the device is T's, under the key compiled into `rlxboot`.
+
+⚠️ **That a recipient can use T.** It verifies, and its payload is the image; but no asset installs
+it. That takes an `rlxboot` holding the owner's key at `0x010000` and the armed image to write the
+slot, and neither is an asset (ruling 2).
+
+⚠️ **What `v1.0` discloses rather than fixes** (ruling 6). 量 every boot of the image prints `***
+BENCH PROFILE: A ROOT SHELL IS ENABLED ON /dev/console ***` (`R02-boot`, `W01`, `C01`), and 讀
+`src/init/Makefile` sets `BENCH_SHELL ?= 1`, so anyone at the serial header has a root shell with
+no password; 讀 `RLXFW-ID0` names the kernel recipe, not the image (claim ①); 推 a peer on port 0,
+the port the vendor firmware runs as its WAN, is a LAN peer to rlxfw (`NET-174`); and `iperf3`
+reproduces only at its first build's path (`SBOM-R5`). The image was not rebuilt without the
+shell: the bytes released are the bytes tested.
+
+⚠️ **One unit.** Every device reading of this image is entry 22's, on one unit with one loader
+build; none was taken for `P4b`.
+
+⚠️ **What the gate got wrong**, each found before C. A3 named seven places and the release makes
+more false (the steps' table). `docs/sbom.md`, an asset, described cell `f184a`'s image (recipe
+`0e45c61d`) until it was re-derived, with an id column of annotated-tag objects headed `commit` and
+a symbol count for busybox that no reading reproduces (ruling 4). The `CHANGELOG.md` draft for
+`v1.0` repeated the 129th segment's claim that `NET-169`'s mechanism had been measured for the
+first time, which the 130th retracted (ruling 9). `01cff02b`, `P4b`'s first commit, replaced the
+paragraphs `fdf86da4` had written about `R9` under `CHANGELOG.md`'s *Unreleased*, and no record
+said so (量 `git show 01cff02b -- CHANGELOG.md`). `tools/modrecord.py check` read red for seven
+commits from `fa36f7a2` with no CI step running it, until `33cb73a7` made it one (`FW-233`).
+`cfcensus` would have refused the commit that closes the last open gate — this one — whatever its
+rows said, until the 124th segment changed its population guard (`f071b162`). The asset paragraph
+named one `SHA256SUMS`, and the one `srcarchive.py` writes covers the archive, its manifest and the
+licence files only, so a recipient's `sha256sum -c` would have said nothing of the image, T,
+`offer.md` or `sbom.md` (ruling 3). A5 reads green only with `upstream/` initialised and
+`src-vendor` present. `NET-174` and `docs/threat-model.md` § 4 said which jack is port 0 is ⊘
+(`NET-13`), and `NET-13`'s silkscreen map had measured the jack labelled WAN as port 0 on
+2026-08-25 — only its position map is ⊘; corrected in this commit. And the 130th segment's
+record counted the scanner's prefix lines as thirteen, where its own list names fourteen and the
+hits are fifteen.
+
+⚠️ **Instruments the tree does not hold.** The rehearsal's scripts, logs and the archive of
+`28a490c7` (`$FWRE_WORK/rebuild/s130/p4b/`); the release texts' drafts and the checker that
+re-extracts every quoted line from git objects (`s130/p4b-text/`); the SBOM's derivation
+(`s130/sbom/`) and `SBOM-R5`'s rebuild (`s130/sbomr5/`); the scanner's first runs (`s130/flw1/`)
+and this segment's (`s131/`); and the records of `9bb2bec7`'s build that B1 reads, with the harness
+that wrote them (`s128/p/run/r6c/`, `s128/p/build-r6c.sh`), of which `docs/sbom.md` § 1 says none
+is committed.
+
+⚠️ **Flash.** `P4b` took no seating and no power action, and issued no `FLW`, `EW`, `EB`, non-zero
+`AUTOBURN` or `FLR`, in the five segments counted — the four whose `LOG.md` headings record it,
+and this one — or in the rehearsal, which ran at the desk. The tools that look for `H601` read the
+2026-08-16 dump by path — `srcarchive.py`'s scan, `flashwin`'s sweep and `tools/digestscan.py` —
+and none writes a byte or a digest of it. What that cannot see: two writes that cancel, every byte
+outside the units read, and `H601`, never read off the device. The `FLR` bracket stays at 1,024 of
+4,194,304 bytes = **0.0244 %**, and the last map is `R8b`'s (entry 20).
+
+### The main session's rulings in this gate, which the owner may override
+
+The owner's own — the relaxed process with the flash rules, `H601`, the power handshake and
+`NET-165` unchanged, and each act of phase C — are not listed.
+
+1. **The source travels beside the binary under GPL-2.0 § 3(a), with no written offer; GitHub
+   Issues is the only channel; `v1.0`'s tag is unsigned** — the 124th segment, under the owner's
+   delegation of 2026-10-05 (`LOG.md`, its entry).
+2. **The binaries `v1.0` is made with are the image and T, and not `rlxboot`, its rescue copy, the
+   armed image or container S** — the 130th, under the owner's delegation of 2026-10-08
+   (「用最頂的工程思維幫我決定」). A released binary must be built from the release commit or be
+   provably equal to what it builds, be checkable or usable by a recipient, and not be a trap. T
+   meets all three: its payload is the image byte for byte, its signature checks against the key
+   in the repository, and nothing installs it without the armed image, which is not released.
+   `rlxboot` meets neither the first nor the third and is of no use to a recipient: it was built at
+   `f257a848`, it trusts only the owner's key, and a third party who writes it at `0x010000` puts
+   their unit's boot at risk.
+3. **The asset list**: the image, T, everything `srcarchive.py` writes beside the archive — the
+   archive, its manifest, its `SHA256SUMS`, its `record.tsv` and the licence files — `offer.md`
+   and `sbom.md` copied from C, and **a release-level `SHA256SUMS` over every other asset**,
+   written at release time and not in C, so one `sha256sum -c` checks the whole release; and
+   `docs/offer.md` § 2 gains a row for T, whose corresponding source is the image's.
+4. **`docs/sbom.md` re-derived for `9bb2bec7`** rather than shipped as `f184a`'s with a note, with a
+   new residual, `SBOM-R5`, measured in the same segment: of the four programs copied in by digest
+   and never rebuilt for the image, three rebuild byte-identical from the committed sources, and
+   `iperf3` only at its first build's path.
+5. **`FLW-1` paid by a new tool, `tools/digestscan.py`**, which looks in a file for a sha256, sha1,
+   md5 or crc32 — whole, or a prefix or suffix of at least 8 hex digits — of the flash windows it
+   enumerates that overlap `H601` (量 on the reference dump, 166 candidate digests over 34 windows),
+   with three CI steps; and **its hits in the tracked tree exempted by name**, one row per hit, each
+   a prefix of the whole image's sha256, on the ground that a prefix of a digest published in full
+   discloses nothing more (the 130th segment): fifteen rows, 量 on 2026-10-09. Its hits in the
+   public `upstream/` are not exempted, and are the owner's to rule on.
+6. **Four known issues added to `v1.0`'s list** — the console's root shell (量), `RLXFW-ID0`
+   naming the recipe (讀), `NET-174` (推) and `SBOM-R5`'s `iperf3` path — **and the image not
+   rebuilt without the shell**, so that the bytes released are the bytes tested.
+7. **A3's set taken from a grep over the tree, not from A3's list.**
+8. **Phase B recorded as rehearsed**, with B2–B5 owed on C under the pass condition above and D2
+   as their record.
+9. **`CHANGELOG.md`'s `v1.0` section summarises `R9` rather than restoring the replaced paragraphs
+   verbatim**, and its `R6c` paragraph says no more of the switch than `NET-169`, `NET-173` and
+   `NET-174` do: with every netif slot empty the RAM path still received `rlx0`'s unicast, so the
+   netif entry is not the way in, and the unknown-unicast trap is still 推.
+10. **Actual 5**, counting the segments that worked on `P4b`'s own row or steps after the row
+    entered `~` (`01cff02b`, 2026-10-04 19:21, in the 122nd) — the 122nd, 123rd, 124th, 130th and
+    131st — entry 21's ruling 6. Not counted: the 121st, which drafted `NOTICE`, `LICENSE`,
+    `docs/offer.md` and `tools/modrecord.py` before the row entered `~`; the 126th, whose entry says
+    it did not touch `P4b`, although it made a release-level decision about `v1.0`'s image; and the
+    127th's `2f31b080` and the 129th's `23980f68`, which changed one line each of
+    `docs/release-process.md` and `docs/sbom.md` for `R6c`. Counted by every segment whose commits
+    touched `P4b`'s files or row from `01cff02b` on — the 122nd, 123rd, 124th, 127th, 129th and
+    131st; the 130th's two commits touched neither — the figure is 6.
+11. **`CLAUDE.md` § Closeout runs `digestscan scan` beside `flashwin scan --dump`**, so that
+    `FLW-1`'s reservation — the answer is needed at every closeout — has a home when the row
+    closes; one clause in the owner's rules file, which the owner may revert.
+
+### The booking: what moved to another gate, and what was declined
+
+量 `grep` at `1b13303d`: § Carried forward names `P4b` as the owner of one OPEN row, `FLW-1`, and
+`SPEC.md` § 17 names it in one open owner cell, `FW-212` 殘留's; every other row naming `P4b` was
+closed or declined before this entry.
+
+| item | to | why |
+|---|---|---|
+| `PROGRESS.md` `FLW-1` | **closed ✅ `P4b` in C**: the scanner lands with three CI steps, finds the two full digests the row's positive control names and not `FLS-24`'s complement digest, and reads the tracked tree with 0 findings and 17 exempt (`SPEC.md` `FLS-32`); its reservation goes to `CLAUDE.md` § Closeout (ruling 11) | `P4b`'s only live-owned row, and it cannot stay open: 量 2026-10-09 on `1b13303d` with this entry, `P4b` `✓` and the row left open, `cfcensus check` reads `L1 FLW-1: open, and every owner it names is a CLOSED gate (P4b)`, rc 1, and `ratchet`, a CI step, `L1` 0 → 1, rc 1; with the row closed both read rc 0, the guard reading *0 of 25 gates in progress; 12 OPEN row(s), 12 of them standing instructions* (`$FWRE_WORK/rebuild/s131/e23/cfc23.log`) |
+| `FLW-1`'s hits in the public `upstream/` | the owner's ruling, waiting since `1b13303d` (§ Now) | `FLS-22` left `upstream/` as it is for `H601`'s bytes and says nothing of digests; the archive packs none of `upstream/` |
+| `SPEC.md` § 17 `FW-212` 殘留, its `P4b` half — the disclosure timeline | its cell's own standing instruction: **any desk segment that moves `upstream/`'s pin** | `docs/release-process.md`, `docs/offer.md` and `NOTICE` hold no disclosure step (量 `grep -i disclos`: 0), and `v1.0` publishes no held item; the other half has been ⊘ since `R9` |
+| `docs/sbom.md` § 9 `SBOM-R5`, its `iperf3` half | open in § 9 beside `SBOM-3`, and stated in `v1.0`'s known issues | ruling 4: the source is complete, and the path in `.rodata` limits a reproduction, not the release |
+| `SBOM-3`, `SBOM-4` | open in `docs/sbom.md` § 9; stated in the release notes and in `v1.0`'s known issues | § 5 rows 2 and 6 allow a release that states them |
+| phases C and D | the owner's dated yes, act by act; then D1 and D2 | `docs/release-process.md` |
+| B2–B5 on C, B6, and B7's rows 1, 3, 5 and 6 | the publication record (D2), a later `LOG.md` entry | the archive contains this entry |
+| the Release clock's `v1.0` row | D2 | stale from C4 to D2 by design |
+| `flashwin scan --sweep` counting a skipped path as scanned | recorded, not owned | a fix with a control that goes red is an `H601` instrument, inside the owner's rule of 2026-09-26; no gate owns it |
+| B5's reach — licence texts that are source headers travel inside the archive | `NOTICE`'s reading | a reading, not a tool's |
+
+**Declined**: `rlxboot`, its rescue copy, the armed image and container S as assets (ruling 2); a
+build of the image without the console shell (ruling 6).
+
+---
+
+## The operating clause, re-run at twenty-three entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -4636,7 +5010,7 @@ thing make that thing the next gate.
 rather than adding to it: the old `P4a` → *(end)* boundary is now two more
 pairs, and `P4a`'s neighbour on the right changed. Re-run 2026-09-11 with `R5`
 appended, which adds exactly one pair. Re-run 2026-09-16 with `R1-pub + R2c`
-appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs. Re-run 2026-10-04 with `R9` appended, which adds exactly one pair — **and that pair FIRES on the same thing a third consecutive time**. Re-run 2026-10-08 with `R8b` appended, which adds exactly one pair, and that pair does NOT fire — `R8b` closed the thing the three pairs before it fired on, and the one item both entries still carry is a resemblance. Re-run 2026-10-08 with `P3` appended, which adds exactly one pair, and that pair does NOT fire — the one thing both entries name that the clause counts, `P3`'s power tree, was declined three times in writing, and the clause surfaces what nobody decided. Re-run 2026-10-09 with `R6c` appended, which adds exactly one pair, and that pair does NOT fire — `R6c` closed the one counted thing `P3` carried, the thing `P3` had named `R6c` to fix, and the nearest candidate, which of the writes is necessary, the owner had ruled on before any code was written.)*
+appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16 with `R1z` appended, which adds exactly one pair, and that pair does NOT fire. Re-run 2026-09-17 with `P1` appended, which adds exactly one pair, and that pair does not fire either — for a reason no previous non-firing has used, because the one item the two entries share was CLOSED rather than carried. Re-run 2026-09-22 with `R6` appended, which adds exactly one pair — **and that pair fires**. Re-run 2026-09-25 with `P2` appended, which adds exactly one pair, and that pair does not fire — the later gate had CLOSED three of the earlier one's residuals, and the nearest remaining candidate is one subject that the two entries name as two different faults. Re-run 2026-09-28 with `R6b` appended, which adds exactly one pair — **and that pair fires**, on a thing the earlier entry handed to the later gate by name; the same run decides the question the thirteen-entry run left to this entry. Re-run 2026-09-30 with `R1y` appended, which adds exactly one pair, and that pair does not fire — the later gate is about this repository's record, and it did not take on the thing the fourteen-entry run fired on. Re-run 2026-09-30 with `R8a` and `R7` appended, which adds two pairs at once because entry 16 wrote no sixteen-entry run: this run supplies both, `R1y` → `R8a` does NOT fire, and **`R8a` → `R7` FIRES**. Re-run 2026-10-04 with `R8` appended, which adds exactly one pair — **and that pair FIRES on the same thing as the pair before it**, the first time one thing has fired on two consecutive pairs. Re-run 2026-10-04 with `R9` appended, which adds exactly one pair — **and that pair FIRES on the same thing a third consecutive time**. Re-run 2026-10-08 with `R8b` appended, which adds exactly one pair, and that pair does NOT fire — `R8b` closed the thing the three pairs before it fired on, and the one item both entries still carry is a resemblance. Re-run 2026-10-08 with `P3` appended, which adds exactly one pair, and that pair does NOT fire — the one thing both entries name that the clause counts, `P3`'s power tree, was declined three times in writing, and the clause surfaces what nobody decided. Re-run 2026-10-09 with `R6c` appended, which adds exactly one pair, and that pair does NOT fire — `R6c` closed the one counted thing `P3` carried, the thing `P3` had named `R6c` to fix, and the nearest candidate, which of the writes is necessary, the owner had ruled on before any code was written. Re-run 2026-10-09 with `P4b` appended, which adds exactly one pair — **and that pair FIRES**, on `v1.0`'s release, which `R6c` named as `P4b`'s phases and `P4b`'s own row has left to the owner's dated acts since 2026-10-05: the instruction is already carried out in the only form the release process allows, and after this entry the board holds no gate for it to name.)*
 
 | pair | shared? |
 |---|---|
@@ -4661,6 +5035,7 @@ appended, which adds exactly one pair — and that pair fires. Re-run 2026-09-16
 | `R9` → `R8b` 🆕 | **no — `R8b` closed the subject the last three pairs fired on, and a second of `R9`'s residuals with it.** `R9` carries *"That `R8b` is any closer"* and *"That the flash bracket would detect a small write"*; `R8b` wrote a slot, booted it from flash and survived ten cuts (claims ① and ②), and the `cs6c` re-install changed one byte in each of two 64 KiB regions, which the 4 KiB map resolved to exactly those regions' first units — group 0 moved on `0x010000` alone, its other 31 units equal (`X-W2c-m0f` against `X-K2c-m0f`), and in group 1 the rescue region moved on `0x020000` alone (the barrier's sixteen units there moved too, because `W4b` erased them between the two maps) — a known change, which is the sensitivity control `R9` said needed a write. ⚠️ Closed for an image a provisioning boot writes, not for anything the running firmware writes — `R7`'s config store is no nearer, and that is in neither list. Both entries carry a 推 refuted inside the gate that wrote it (`FW-198`; `R8b`'s *"`W3` overwrote the rootfs at `0x130000`"*, refuted by the dump); declined as a resemblance, the ten-entry run's rule. The flash boundary is not counted, the thirteen-entry run's reason |
 | `R8b` → `P3` 🆕 | **no — the one thing both entries carry is `P3`'s power tree, and three recorded decisions declined it.** `R8b` carries *"no voltage was read, so `P3`'s power tree stays undelivered"*; `P3` carries the plan's section 2 written 讀 and 推 where 量 was asked. `S0b` and `BRD-01` are ⊘ and entry 20's ruling 2 took no voltage, and the fourteen-entry run's reason governs: *the clause surfaces what nobody decided, and a ⊘ is a decision.* ⚠️ The weakest decline in this table: the earlier entry names the later gate — the shape of `P1` → `R6`, `P2` → `R6b` and `R7` → `R8`, all three of which fired, and of `R9` → `R8b`, declined only because the later gate had closed the thing. Most of `R8b`'s other residuals are quoted in `docs/bringup.md` § 16.7, not carried; the instruments the tree does not hold are in neither the report nor `P3`'s list, and `v1.0`'s image has since booted from a slot (`FW-255`); one unit and the flash boundary are not counted |
 | `P3` → `R6c` 🆕 | **no — `R6c` closed the one counted item `P3` carried and named it to fix, and the nearest candidate was ruled on by the owner before any code.** `P3` carries *"A network on the boot the device makes by itself … the fix is `R6c`'s"*; `R6c` booted `9bb2bec7` from slot A after a watchdog reset and after a cold power-on and pinged both ways, 4 of 4 each way (`NET-173`) — the shape of `R9` → `R8b`, declined because the later gate closed the thing. ⚠️ The nearest candidate is the minimum configuration: `P3` carries *"no minimum configuration"* (`docs/bringup.md` § 16.4) and `R6c` carries which of its 17 stores is necessary; the owner's ruling O1 wrote the group as a unit, never partially, before `R6c-3` began — a decision, and the clause surfaces what nobody decided. If the owner reads O1 as a rule for the driver and not a decision about what to measure, the pair fires on the VLAN group's minimum write set. A second port against the WAN-side host probe is declined as two objects, and a harness that shares the driver's sources against *"That anything in the report is a second source"* as a resemblance; one unit and the flash boundary are not counted |
+| `R6c` → `P4b` 🆕 | **yes — that `v1.0` is released.** `R6c` carries *"That `v1.0` is released, or that rlxfw updated itself. … `P4b`'s phases are not this gate's"*; `P4b` carries it because its own row set out to establish a *complete GPL release* and, since 2026-10-05 (`f071b162`), defines its `✓` as release-ready, not released, leaving the tag, the release and the upload to the owner's dated acts — so `P4b` closed the half it took on in writing, phases A and B, and not the release. The shape of `R7` → `R8`, where the later gate's own definition moved the thing out of it and the pair fired. 🔴 **The instruction is already carried out, in the only form the process allows**: phase C follows this entry, and `docs/release-process.md` keeps every outward act out of every gate — and after this entry the board holds no gate in progress or unstarted for the clause to name. ⚠️ Declining it as decided, the fourteen-entry reason, is weaker here than wherever that reason was used: each of those decisions was not to establish the thing, and this one is to establish it next, by the owner. The build records of `9bb2bec7`, which both entries list among the instruments the tree does not hold, are declined on the thirteen-entry reason, the third subject it retires; `NET-174`, which `P4b` lists as a known issue it discloses, as quoted and not taken on, the twenty-one-entry reason; *"that rlxfw updated itself"* against T's use to a recipient, as two objects; one unit and the flash boundary are not counted |
 
 🔴🔴 **THE CLAUSE FIRES ON A NEW THING FOR THE FIRST TIME, AND IT TOOK EIGHT
 ENTRIES.** Between five entries and seven it named exactly one thing, `CPU-45`,
@@ -5723,6 +6098,115 @@ prints none (entry 20: on `T2a`, which never reached `rlxboot`, it read REFUSED)
 population, and the property it stands for — that each boot ran the image under test — was
 measured on all three. Were it inside, it would be `R3`'s `MemTotal:` shape, an artefact that
 cannot deliver the property for one of its objects, and not entry 11's *capable and idle*.
+⚠️ **The weaker class stays at two.**
+
+### 🆕 At twenty-three entries the clause FIRES, on `v1.0`'s release — and what it instructs is already carried out, in the only form the release process allows
+
+**`R6c` → `P4b` shares one counted item: that `v1.0` is released.** `R6c`'s *what it did not
+establish* carries *"That `v1.0` is released, or that rlxfw updated itself. `v1.0`'s image is
+re-pinned to `9bb2bec7` … and `P4b`'s phases are not this gate's."* `P4b`'s carries *"That `v1.0`
+is released"*: its `✓` is release-ready, and C1–C4 each wait for the owner's dated yes. The item is
+`P4b`'s own and not inherited. Its row set out to establish a *complete GPL release*; on 2026-10-05
+(`f071b162`) its evidence cell defined the `✓` as release-ready and left the tag, the release and
+the upload to phase C; and `R6c`'s residual names `P4b`'s phases in writing, which is what the
+guard written at eight entries asks for. `P4b` closed the half it took on — phases A and B — and
+not the release. That is the shape of `R7` → `R8`: the later gate's own definition moved the thing
+out of it, *"the firing was predictable from the split before the entry was written"*, and it was
+counted all the same. `R9` → `R8b` and `P3` → `R6c`, declined, had the later gate close the thing.
+
+🔴 **What the firing instructs is already being done, and cannot be done as a gate.** *That thing
+is the next gate* names the release, and the release is phase C: four acts, each waiting for the
+owner's dated yes for that exact act, which `docs/release-process.md` keeps out of every gate on
+purpose — *"Nothing in phases A, B and D is outward."* So the firing adds evidence and no
+instruction, as `R8` → `R9`'s did with `R8b` already booked as the next gate. ⚠️ And for the first
+time the clause names a thing with no gate left on the board: 量 at `1b13303d`, 24 of the board's
+25 rows are `✓` and `P4b` is the only `~`, so with this entry no row is in progress or unstarted,
+and whatever opens next is not yet on the board.
+
+⚠️ **The honest deduction.** The firing was predictable from 2026-10-05, when the row's own
+definition put the release outside the gate, so, like `R7` → `R8`, it adds no evidence of its own.
+And the fourteen-entry run's reason — *the clause surfaces what nobody decided, and a ⊘ is a
+decision* — would decline it if phase C counts as a decision of that kind. It is not counted that
+way here, because every item that reason has declined was decided against being established —
+`1472|mdev` at fourteen entries, the power tree (`S0b` and `BRD-01` ⊘, entry 20's ruling 2) at
+twenty-one, the minimum write set (the owner's O1) at twenty-two — and this one was decided to be
+established next, by the owner. **If the owner reads phase C as a decision of that kind, this pair
+does not fire**, and the last pair before an empty board closes on a decline.
+
+⚠️ **The nearest candidate after it is the build records of `9bb2bec7`.** Both entries list them
+among the instruments the tree does not hold: `R6c` as `s128/p/run/r6c/`, the evidence that the
+builds were byte-equal (`R6c-3`), and `P4b` as the records B1 reads. Declined on the thirteen-entry
+run's reason: they are outside the tree because `CLAUDE.md` sends every binary and derived artefact
+to `$FWRE_WORK/rebuild/`, so a clause that fired on them would be measuring the rule; what the tree
+holds of them is their digests (`FW-256`, `notes/reproducible-build.md` § 10). ⚠️ That makes it the
+third subject the reason retires — the flash boundary at thirteen entries, the emulator sentence at
+seventeen — and the seventeen-entry run's warning stands: *a rule that exempts every house-mandated
+sentence can exempt a real residual that happens to be one.* What it would exempt here is small:
+the byte-equality the records hold is restated by `FW-256`. The harness that wrote them,
+`s128/p/build-r6c.sh`, is in `P4b`'s list and not in `R6c`'s.
+
+⚠️ **`NET-174` is in both, and is not counted.** `R6c` carries a second port — 推 a peer on port 0,
+the port the vendor firmware runs as its WAN, is a LAN peer to rlxfw, and nothing on a port but 3
+was counted; `P4b` lists it among the known issues `v1.0` discloses. The twenty-one-entry run's
+reason governs: *a report that quotes a limit has not set out to establish its opposite*, and
+`v1.0`'s known-issues list quotes it.
+
+⚠️ **`R6c`'s *"or that rlxfw updated itself"* against `P4b`'s *"That a recipient can use T"*** is
+declined as two objects: one is the device writing its own slot, the other a recipient installing
+a release asset. They meet in the armed image, which neither the release nor mainline carries.
+
+⚠️ **What each gate got wrong at the desk** is in both lists, and it is a resemblance — different
+errors, the ten-entry run's rule. **One unit and the flash boundary** are in both and are not
+counted, for the twenty-one- and thirteen-entry runs' reasons.
+
+**What `P4b` carries that `R6c` does not** — the archive's sufficiency for a rebuild, `iperf3`'s
+path and the harness outside the repository, the two gaps, the legal readings, the scan's blind
+spots, the digests the tree and `upstream/` carry, the unsigned tag, the console's root shell,
+phase B on C — waits for the next pair, whose later entry belongs to a gate the board does not yet
+hold.
+
+### 🆕 The census re-run at twenty-three entries — unchanged, because `P4b` brings no step list
+
+量 2026-10-09, in the 131st segment, with the unchanged thirteen-entry script
+(`$FWRE_WORK/rebuild/s111/land/gate/census.py`, read only; sha256 `1e81ac1a…`), the twenty-two-entry
+run's three arms pointed at a tree built for this entry's closing — `1b13303d` with this entry in
+place, `P4b`'s board row as it closes and `FLW-1` closed, its `PROGRESS.md` and all twenty
+`docs/history/steps-*.md` (`$FWRE_WORK/rebuild/s131/e23/census23.sh`) — exit codes read inside one
+script file, and each arm's output byte-identical to the twenty-two-entry run's:
+
+* **on `PROGRESS.md` alone**, which holds no step list, it refuses, rc 1, with all eight control
+  gates reading 0;
+* **on a scratch root whose `PROGRESS.md` is that file followed by all twenty
+  `docs/history/steps-*.md`** it reproduces **44 clauses across 8 gates** and exits 0, and the
+  `D`-row form reads **66 clauses across eleven gates** with every per-gate figure unchanged;
+* **on the same root with one of `P1`'s `D` rows un-bolded** it exits 1 and names `P1: (3, 4)`.
+
+**79 clauses, unchanged.** `P4b` has no step list of its own: its steps are
+`docs/release-process.md`'s phases, a table in a process document, so it brings nothing to
+`docs/history/`, as `P3` brought nothing at twenty-one entries, and the population cannot grow. The
+one list carrying `P4b`'s name is `steps-P4b-gate.md`, `P4b-gate`'s, closed 2026-09-01 and in the
+population since the twelve-entry run with its four `D` rows. **No sixth instance**, by
+construction. ⚠️ The tree is built for the closing and is not C: C's other edits — § Now, the
+release texts, `FLW-1`'s scanner — lie outside every step list, which is all the script reads.
+
+Two candidates are recorded so a twenty-fourth entry does not find them and call them a sixth. Both
+are in `docs/release-process.md`, whose phase tables stand for `P4b`'s definition of done and are
+outside the `D`-row population:
+
+* **A3** names seven places in five files where the property it wants is every sentence the upload
+  would make false, and its check — *"reading them"* — reads the ones it names; a grep over the tree
+  found five more that the release makes false (entry 23, the steps' table). That is the class's
+  shape, a list named in place of the property it stands for, and of the kind an enforcer could
+  catch: the grep that found them is one.
+* **B5** passes on *"one file per licence text the tool finds"*, and the tool finds files whose
+  names match `COPYING`, `COPYRIGHT`, `LICENCE`, `LICENSE` or `NOTICE` (讀 `tools/srcarchive.py`,
+  `LICENCE_RX`). The RC4, MD5 and AES notices and Sun's `fdlibm` text are source headers
+  (`docs/sbom.md` `K3a`–`K3c`, `L2`), so they travel inside the archive and B5 passes without them
+  beside it: the named instrument reports truthfully while the property `docs/offer.md` § 5 row 5
+  states — the components' licence texts as assets — is short of them, if a header is a licence
+  text, which is `NOTICE`'s reading. Were it inside the population it would be `R6`'s `D6` kind,
+  one an enforcer could not have caught without knowing what the tool cannot see.
+
 ⚠️ **The weaker class stays at two.**
 
 ### Carried unchanged from the seven-entry run

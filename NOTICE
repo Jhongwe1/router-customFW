@@ -25,9 +25,12 @@ that one disagree, `docs/sbom.md` owns the component and this file is wrong.
 
 **What `LICENSE` holds.** `LICENSE` is the MIT text and nothing else, so that a
 tool matching licence texts can read it as MIT. 量 2026-10-05 (`gh api`, before
-this change) GitHub's licence detection read it as `NOASSERTION`; 推 the
-paragraph it then ended with is why, and the first read after a push settles
-it. That paragraph moved here verbatim on 2026-10-05; in it, *this file* means
+`33cb73a7`) GitHub's licence detection read it as `NOASSERTION`, and 量
+2026-10-08 (`gh api`) it reads `license.spdx_id` `MIT`; 讀 the only change to
+`LICENSE` between the two reads is `33cb73a7`'s removal of the paragraph it
+then ended with, so 推 that paragraph was why, as this file inferred on
+2026-10-05 — GitHub's detector may also have changed, and nothing here reads
+it. The paragraph moved here verbatim on 2026-10-05; in it, *this file* means
 `LICENSE`:
 
 > This file covers rlxfw's own userspace programs, tools and documents. It does
@@ -334,12 +337,14 @@ its second gap: the archive cannot supply it.
   throughout is a statement about provenance — no imported source, no
   `IMPORTED` marker, first commit in this repository — which is
   `docs/sbom.md`'s definition, not a chain of title.
-- **It does not make the image distributable.** 量 0 of the 17 `file` rows in
-  `config/rlxfw-initramfs.tsv` is a notice, and 量 0 of 5 releases has an asset,
-  so nothing has been distributed and nothing has discharged an obligation.
-  `offer.md` states what a release carrying a binary carries beside it, and the
-  two gaps (`SBOM-3`, `SBOM-4`) still open; `docs/release-process.md` is the
-  order in which such a release is made.
+- **It does not make the image distributable, and it discharges nothing.** 量
+  0 of the 17 `file` rows in `config/rlxfw-initramfs.tsv` is a notice, so the
+  image carries none. `v0.2`–`v0.6` carry no binary (量 2026-10-08, no assets);
+  the binaries `v1.0` is made with travel only with their corresponding-source
+  archive and the licence texts — this file among them — beside them, as assets
+  of the same release (`offer.md` § 0). `offer.md` also names the two gaps
+  (`SBOM-3`, `SBOM-4`) still open; `docs/release-process.md` is the order in
+  which the release is made.
 - **It does not close `SBOM-2`.** 35 Realtek-directory sources plus 3 in the
   loader stub carry no licence text; their licence is read from a `COPYING` file
   and that reading is not this project's to make authoritative.

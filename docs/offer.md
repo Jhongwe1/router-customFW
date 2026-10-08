@@ -21,25 +21,31 @@ would settle it.
 So there is no written offer under § 3(b): no three-year clock, no medium and
 no charge. The source travels with the binary, or the binary does not travel.
 
-量 2026-10-04: there are **5 releases**, `v0.2`, `v0.3`, `v0.4`, `v0.5` and
-`v0.6`, and **0 of them has an asset**, so they carry no binary and owe no
-source. 量 nothing is written to flash through `R9`, and the image is uploaded
-to `0x80500000` over TFTP and run from RAM. So the bytes a release would carry
-exist (`docs/sbom.md` § 1 names them: `nfjrom`, 1,108,992 bytes, sha256
-`9da0857a…`), and no recipient has ever received them. **Nothing is owed
-today.**
+量 2026-10-08 (`gh release view`, each release's `assets`): `v0.2`, `v0.3`,
+`v0.4`, `v0.5` and `v0.6` have no asset, so they carry no binary and owe no
+source. The binaries `v1.0` is made with are the image `mainline-9bb2bec7.img`
+— 1,110,016 bytes, sha256
+`295d4f6aec14f8b6ee21ebccec05e6b5492d8785274afe676fbfa5a070fb86bd`, `RECIPE_ID`
+`9bb2bec7` — and `T.rlxu`, the same bytes behind a 96-byte header and the
+owner's 64-byte signature (1,110,176 bytes, sha256
+`113f55427c0798ec9fbf6ecd7f6b5ddea90bc4573496f500931b9df4eacc9ba8`).
+`docs/release-process.md` phase C uploads them together with their
+corresponding-source archive and the files § 1 lists, as assets of `v1.0`, or
+uploads none of them. The archive's own sha256 is in `v1.0`'s release notes and
+not here, because the archive contains this file (`docs/release-process.md`,
+*Which records carry which digest*).
 
-量 there are **6 annotated tags** and **5 releases**: `v0.0` is a tag with no
-release at all, which is why the five above are named and the six are not. None
-of the six is signed and 量 no `user.signingkey` is configured, so a recipient
-cannot establish from a tag that it is the owner's: an archive tied to a release
-is tied to something unsigned. What a recipient can check is the commit id and
-the sha256 of every asset, which the release notes list
-(`docs/release-process.md`).
+量 2026-10-08: `v0.0` is an annotated tag with no release at all, which is why
+the releases above are named and not counted. No tag of this repository is
+signed — `docs/release-process.md` makes `v1.0`'s unsigned like the six before
+it — and 量 no `user.signingkey` is configured, so a recipient cannot establish
+from a tag that it is the owner's: an archive tied to a release is tied to
+something unsigned. What a recipient can check is the commit id and the sha256
+of every asset, which the release notes list (`docs/release-process.md`).
 
 🔴 **Before a release carrying a binary is tagged, every line of § 5 must read
 as stated, or the release must not carry the component the line is about.**
-That is a release-gate condition, not a caveat: `P4b` owns it.
+That is a release-gate condition, not a caveat: `docs/release-process.md` B7 holds it.
 
 ---
 
@@ -51,10 +57,16 @@ not sent on request, because it is already an asset of the release that carries
 the binary.
 
 **What a recipient gets.** With the release that carries the binary, as assets
-of that same release: its corresponding-source archive and the archive's
-manifest, `NOTICE`, this file, `docs/sbom.md` at that release's commit, and the
-licence texts of the components. `docs/release-process.md` lists the assets and
-the tool that produces or checks each.
+of that same release: the corresponding-source archive and every file
+`tools/srcarchive.py` writes beside it — its manifest,
+`rlxfw-src-<commit>.SHA256SUMS`, `rlxfw-src-<commit>.record.tsv` and the
+licence texts of the components, `NOTICE` and `LICENSE` among them — this file
+and `docs/sbom.md` at that release's commit, and `SHA256SUMS`, written at
+release time over every other asset, so that `sha256sum -c SHA256SUMS` checks
+the whole release. For `v1.0` the binaries are the image and `T.rlxu` (§ 2,
+row 10); the armed image, `rlxboot`, its rescue copy and container S are not
+assets. `docs/release-process.md` lists the assets and the tool that produces
+or checks each.
 
 **Building it.** 讀 The build driver refuses to build unless every `--absent`
 reference it declares is present, and one of them, `unit-kernel`, is this
@@ -92,6 +104,7 @@ from.
 | 7 | `src/lib/ed25519.c` and `src/lib/sha512.c` (`X1a`) | public domain | the two files, and the upstream file `src/rlxboot/test/mk-import.sh` regenerates them from; `check-import.sh` fails on a one-byte difference | `SOURCES.json` `tweetnacl`, checked against its sha256 and packed |
 | 8 | `/bin/iperf3` (`U9`) | LBNL three-clause BSD, with bundled MIT / BSD / NCSA / public-domain notices 讀 | the upstream tarball iperf 3.1.3, whose `LICENSE` carries every bundled notice; **see § 4, gap 1** for what it does not give | `SOURCES.json` `iperf3`, checked against its sha256 and packed |
 | 9 | `libgcc.a` of gcc 3.4.6-1.3.6, statically linked into 7 of the 11 ELFs (`L3`) | 推 GPL-2.0-or-later with the libgcc linking exception | **see § 4, gap 2** — nothing | no pinned tree holds gcc or binutils source |
+| 10 | `T.rlxu`, the signed update container: the image (rows 1–6, 8 and 9) byte for byte, behind a 96-byte header written by `tools/mkfw2.py` and the owner's 64-byte signature | the image's; the header and the signature add no component | nothing beyond the image's: T's corresponding source is the image's, in the same archive, and `tools/mkfw2.py` is in the repository at the release commit (row 1). The owner's private key, which made the signature, is not source and is not in the repository | this repository (`tools/mkfw2.py`); the signature, the owner's key |
 
 **What the archive no longer depends on, and what still does.** 讀
 `docs/sbom.md` § 2.4: `SOURCES.json` records a URL and a pin on a **third
@@ -183,8 +196,8 @@ carrying a binary says so in its notes (§ 5, row 6).**
 
 ## 5. The release gate — what must be true before a binary ships
 
-Each line is checkable and names its checker or its measurement. `P4b` owns the
-list; `docs/release-process.md` runs it.
+Each line is checkable and names its checker or its measurement. This file owns
+the list (`P4b`, closed 2026-10-09); `docs/release-process.md` B7 runs it.
 
 | # | condition | how it is checked |
 |---|---|---|
@@ -203,11 +216,13 @@ list; `docs/release-process.md` runs it.
 - **It is not legal advice** and it is not a lawyer's reading of GPL-2.0 § 3 or
   LGPL-2.1 § 6. Every 讀 above is a quotation of a licence's own words; every
   conclusion drawn from one is marked 推.
-- **Nothing is owed today.** § 0 says why: 量 0 of 5 releases has an asset, so
-  there is no distribution and no recipient.
-- **It does not establish that any release meets § 5.** No release has been
-  built to these terms; `docs/release-process.md` is the order in which one
-  would be.
+- **It discharges nothing by itself.** § 0 says which release carries which
+  binary: `v0.2`–`v0.6` carry none and owe nothing, and whatever `v1.0` owes
+  for its binaries is met, if it is, by its own assets — the archive, its
+  manifest and the licence texts beside them — and not by a sentence here.
+- **It does not establish that `v1.0` meets § 5.** `docs/release-process.md`
+  B7 reads each line of § 5 against the release commit and the release itself;
+  this file states the condition, not the reading.
 - **It does not settle `SBOM-2`** — the 35 Realtek-directory sources with no
   licence text, plus 3 in the loader stub. 推 the directory's `COPYING` governs
   them, and that is a reading of somebody else's release.
