@@ -34731,7 +34731,7 @@ J = 12:52:06.4，`boa` 在 **J+32.7 s** 起來。
 
 **下一段。** 逐行審 `R6C3.patch`（先審 C 的 1.6 區塊）→ 套進 repo，`notes/switch-driver.md` § 21.4–21.5、新 SPEC 列、把變假的陳述改掉（`NET-166`、`NET-169`、`docs/KNOWN-ISSUES.md` 的兩列、`docs/threat-model.md` 的轉送那一段）→ `build-r6c.sh` 建 mainline 與 armed 各兩次（逐位元組相同），更新 `docs/sbom.md` 與 `notes/userspace-integration.md` 的 `/init` 大小 → 擁有者簽 T（版本 5、slot A）→ `R6c-4` 上機（先 RAM 回歸，再寫入 slot A，熱冷各一次從 flash 開機、雙向 ping）。交接在 `plan/handoff-s129.md`。
 
-## 2026-10-08 — 第一百二十九段（17:03 開場，上機 20:19–21:59，收工約 23:30；**兩次電源動作**（冷開機的關與開），**一次 flash 寫入**（`I10`，擁有者 2026-10-08 有日期的 yes），零次 `FLW`／`EW`／`EB`／非零 `AUTOBURN`／`FLR`）：`R6c-3`、`R6c-4` 關了 —— 主線逐行審完 `vlan` 的 patch，自己的突變找到一個沒有案例走過的出口，補上之後進 repo（`034b5a7d`）；兩顆映像各建兩次逐位元組相同、擁有者簽 T；同一段上機：RAM 路仍通，T 裝進 slot A，從 flash 熱開機與冷開機都雙向 ping 通
+## 2026-10-08 — 第一百二十九段（17:03 開場，上機 20:19–21:59，收工約 23:00；**兩次電源動作**（冷開機的關與開），**一次 flash 寫入**（`I10`，擁有者 2026-10-08 有日期的 yes），零次 `FLW`／`EW`／`EB`／非零 `AUTOBURN`／`FLR`）：`R6c-3`、`R6c-4` 關了 —— 主線逐行審完 `vlan` 的 patch，自己的突變找到一個沒有案例走過的出口，補上之後進 repo（`034b5a7d`）；兩顆映像各建兩次逐位元組相同、擁有者簽 T；同一段上機：RAM 路仍通，T 裝進 slot A，從 flash 熱開機與冷開機都雙向 ping 通
 
 **開場量測。** HEAD `2009c4eb`、`LOG.md` 最後一則第一百二十八段、study 最新 `20261008-study3.md`，與交接相符。CI：`2009c4eb` 的 run `37753727332` 四個 job 全 success。讀了實作代理的 `REPORT.md`：它報 mdiocheck 98 → 150、81 個突變全殺、其餘套件全綠 —— 這是宣稱，放進 repo 前主線自己重跑。
 
