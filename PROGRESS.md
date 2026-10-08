@@ -14,16 +14,16 @@ the work (house rule 6).
 | | |
 |---|---|
 | **Active gate** | **`R6c`**, rlxfw's Ethernet from a flash boot, opened 2026-10-08 (127th segment) by the owner's decision after `v1.0`'s qualification seating found `rlx0` deaf from flash (`NET-171`); its step list is at the end of this file. `P3` closed 2026-10-08 (128th segment, `docs/GATE-RESULTS.md` entry 21); `P4b` stays `~`, and `v1.0` waits on `R6c` too. Each flash write is a separate dated yes for that exact payload (`FW-113`), and power actions wait for the owner's word. |
-| **Active step** | **`R6c-1`**, at the desk: what the loader's prompt-path Ethernet init writes to the switch, registers and tables, from two sources. 量 2026-10-08: the candidate `a3a75f8c…` (`6a11de02`) booted from RAM, went into slot B as container S (version 4) and was booted by `rlxboot` warm and cold (`FW-255`); from flash it receives no frame. The device runs S from slot B, with R (version 3) in slot A. |
+| **Active step** | **`R6c-3`**, at the desk: `rtl819x-switch` 1.6's `vlan` verb, its PID 1 row and its desk tests. A patch written and tested in a scratch clone is in `$FWRE_WORK/rebuild/s128/impl/` (`R6C3.patch`, `REPORT.md`), not yet reviewed, applied or built. 量 2026-10-08, read only (`NET-172`): booted from flash, port 3's discard counters count every frame from the host and the three tables are empty. The device runs S (version 4) from slot B, with R (version 3) in slot A. |
 | **Session history** | `LOG.md`, one dated entry per segment. What this table said until 2026-09-23 is archived verbatim in `docs/history/progress-now.md`. |
-| **Next after this** | 🔄 **2026-10-08 (127th)**: `R6c-2`, the takeover's design; `R6c-3`, the change and its desk tests; `R6c-4`, the seating — the owner signs the rebuilt image as version 5, one write, and ping from flash warm and cold. Then `P4b` phases A–B on the rebuilt image's release commit. |
+| **Next after this** | 🔄 **2026-10-08 (128th)**: review the `R6c-3` patch line by line, apply it with `notes/switch-driver.md` § 21.4, a `SPEC.md` row and the statements it makes false, and build the release and armed images twice each (`$FWRE_WORK/rebuild/s128/p/build-r6c.sh`); the owner signs container T (version 5, slot A); then `R6c-4`, the seating. Then `P4b` phases A–B on the rebuilt image's release commit. |
 | **Blocked on** | `R6c`'s fix, then the owner's signature on the rebuilt image and a seating to install it. 量 the shared vendor toolchain tree has three deleted tracked files (`FW-235`), so builds run against a pin-identical copy, and restoring the tree is the owner's. Also waiting, blocking no step: `FW-142`; `FW-143`; `CLK-42` 殘留; `FW-172` stays 推; the `src/` CI step is approved and unwritten; `SPEC-R8a.md`'s demotion is rehearsed, unapplied; `LA-1`'s two rungs, which need a seating. |
 
-**Step list for the active gate**: there is none — no gate is open, and every
+**Step list for the active gate**: `R6c`'s is at the **end** of this file. Every
 closed gate's list is under `docs/history/`, where `cfcensus` and `C12` read
-them as well (`R1y-4`). A list for the next gate goes at the **end** of this
-file, where a new list or row moves no line a checked file cites (`SPEC.md`
-`FW-110`), and moves verbatim out in that gate's closing commit.
+them as well (`R1y-4`). A list for the next gate goes at the end too, where a
+new list or row moves no line a checked file cites (`SPEC.md` `FW-110`), and
+moves verbatim out in that gate's closing commit.
 
 **How to read § Now.** It holds current state only: a few sentences per row,
 rewritten each segment rather than appended to. What a row used to say is in

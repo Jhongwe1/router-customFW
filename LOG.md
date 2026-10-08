@@ -34708,3 +34708,25 @@ J = 12:52:06.4，`boa` 在 **J+32.7 s** 起來。
 **做錯的事。** PowerShell 把 `\$?` 換成自己的 `$?`，印出 `rc=True`（反引號才是它的跳脫字元），`$(pgrep …)` 也被它搶走 —— 兩次都改用腳本檔；草稿把 D3 引成 `update-chain.md` § 6，提交前 grep 發現該檔沒有 D3，改引寫入路徑標頭的註解；草稿把交換器的差異寫成「7 個」—— `PVCR0`–`3` 是四列，實際 10 列（引用局部視圖，代理的報告用「10」才抓到）；以及上面「沒人放在一起」那一句。
 
 **不建立什麼。** `R6c` 的修法有效（還沒寫）；哪些暫存器或表格足夠；`rlxboot` 沒動交換器的表格（37 個暫存器裡沒有表格）；一次以上的冷開機；`6a11de02` 在負載下的行為。
+
+## 2026-10-08 — 第一百二十八段（11:05 開場，唯讀上機 11:56–11:59，收工約 17:00；**零次電源動作**，零次 flash 寫入，零次 `FLW`／`EW`／`EB`／非零 `AUTOBURN`／`FLR`）：`R6c-1`、`R6c-2` 關了 —— loader 的寫入兩個來源核過、擁有者裁決採用 loader 的 VLAN 佈局、唯讀上機證明封包死在交換器裡；`P3` 關了；`R6c-3` 的 patch 交回、主線還沒審
+
+**開場量測。** HEAD `2f31b080`、樹乾淨、`LOG.md` 最後一則第一百二十七段、study 最新 `20261008-study2.md`，與交接相符。CI：`2f31b080` 的 run `37677694900` 四個 job（lint、instruments、text、census）全 success。WSL 重開過：USB 序列埠與 USB 網卡重新 attach（先起長壽命行程）。
+
+**兩份研究報告的查核。** 上一段派出的 r6c1（loader 寫了什麼）與 r6c2（接手設計）都只讀過回報。派兩支查核代理各自回原始資料重導（`$FWRE_WORK/rebuild/s128/v1/`、`v2/`）。r6c1：30 列在 `stage2.bin` 上全部站得住；「量」欄兩格引錯；第二個進入點 `0x80408704` 不只是「沒有可開的映像」—— 掃 flash 時看到 ESC 或重設鈕也會讓掃描回傳 0。r6c2：bootbytes（開機 mark 會把 2008 推成 2032，只有擷取能重新收）、測試架構只比對字面、「讀回 bit 18 才放行」從沒量過 —— 都改了做法。主線自己抽查反組譯 11 處（第 4、5、13、14、23、28–30 列、寫表函式 `0x80404710`／`0x804049A0`、`PCRP0` 的 10 個 store 位址、`0x8040327C` 的 strap、大小陣列只有 `0x80402BC4` 一處引用）。**兩份報告在一件事上矛盾**：r6c1 說 PVID 8 有 bootcode 當第二來源，r6c2 說只有一個來源 —— 讀 `swCore.c`：「Set PVID of all ports to 8」；r6c2 只把核心樹算成 SDK。datasheet 沒有 VLAN／表格章節（`pdftotext`，控制 `PCRP` 8、`MDIO` 38）。另一個對立假設排除：loader 寫的 `IRR1` 被核心 `bsp_irq_init` 無條件重寫（讀 `irq.c:222-225`；量 81 次 `C222FA2D`）。
+
+**擁有者的裁決（2026-10-08）。** ① 8d 裁決 3 被取代（它自己的重開條件已被 `X-V08r-sw` 觸發）：採用 loader 的佈局 —— 寫 VLAN slot 8 `00807E3F`（其餘 0）、netif 全 0（RAM 路回歸決定）、`PVCR0`–`3` `00080008`、`FFCR` 3；`PVCR4`、`VCR0`、`PBVCR0`、`PLITIMR` 只驗不寫；`MACCR`、`MEMCR`、PHY patch、`QNUMCR`、`LEDCREG` 不碰。② 先做唯讀上機。③ 刪掉 repo 根目錄底下的孤兒 worktree 目錄 —— 刪前比對：15,278 個檔的內容全部可由某個 commit 到達（控制：`CLAUDE.md` 找得到、一個植入的內容找不到），刪後 `git worktree list` 只有主樹。裁決與主線的工程決定（E1–E4）在 `$FWRE_WORK/rebuild/s128/RULINGS-R6c.md`。
+
+**唯讀上機（`bench/2026-10-08b/R6C-A-CARD.md`，`NET-172`）。** 板子從 `V08` 冷開機起一直從 slot B 跑 S；`A01` uptime 32,997.09 s 對預測 32,997.3 s，同一次開機。`cardcheck` 放行這張卡、拒絕加了 `dd` 的副本。三張表全空；`PLITIMR` `07FAC688`；`QNUMCR` `00041249`。開機以來埠 3 收 1,579 個封包，`dot1dTpPortInDiscards` 也是 1,579。主機 3 個 ARP request → 埠 3 丟棄 +3、CPU 埠不動；板子 6 個 ARP request 上了線、主機回的 6 個 reply 被丟。卡片的 (a) 與 (d)：封包到了交換器、死在交換器裡；CPU 送出的封包不需要 VLAN 項。
+
+**R6c-1、R6c-2 的紀錄（`b3a32ee5`）。** `docs/loader-phy-and-switch.md` 檔尾新增一節（`LDR-47`）：30 筆寫入、每筆兩個來源、寫表協定、兩種方法的普查都說自動開機不寫交換器。就地更正：§ 7 的 `MACCR |= 0x1000`「once」、`PCRP0` 5 → 10 個 store 位址、`P0GMIICR`、`PCRP1`–`4`、630 行的 strap；`notes/switch-driver.md` § 8.9 三列在 `BOND_8196ES` 分支、不執行。`notes/switch-driver.md` § 21.1–21.3（唯讀上機、loader 的寫入、擁有者的裁決），§ 17.1 裁決 3、§ 17.4、§ 17.10、§ 20 與 `NET-171` 加指標。計數我自己重做：361 份含初始化兩行的擷取裡 19 份印 ESC 行（代理數 360／18，漏了 09-06 的 `SQ-A`）。`flashwin scan --sweep bench/2026-10-08b`：54 檔、113 個探針、CLEAN。
+
+**R6c-3。** 實作代理在 ext4 clone 寫了 `rtl819x-switch` 1.6 的 `vlan` verb（PID 1 在 `init` 與 `start` 之間打）、PID 1 與 `/init` 的修改、mdiocheck 的 TACI 模型：`$FWRE_WORK/rebuild/s128/impl/R6C3.patch`（sha256 `bb5f862d…`，10 檔 +1752／−99）、`REPORT.md`。它報的測試：mdiocheck 98 → 150（68 案、81 個突變全被指名的案殺）、其餘套件與 `ci-expected.tsv` 相符、FW-110 0 個被引用的行移動；預測 `n_writes` flash 路 23、RAM 路 18。**主線還沒審這份 patch，也沒有套進 repo、沒有建置。** 建置腳本 `$FWRE_WORK/rebuild/s128/p/build-r6c.sh`（由 `build-v10.sh` 以錨點腳本衍生：容器 T，版本 5，slot A；`armed` 進 STAGES；`verify` 對照裝置上的 S）與 ext4 clone `s128/p/clone` 已備好。
+
+**P3 關了（`docs/GATE-RESULTS.md` entry 21）。** 起草代理把 `R8b` 的讀數收進 `docs/bringup.md`（§ 11.2 抹除 4,096、§ 12.1 `rlxboot`、§ 12.3 ②、§ 12.4、§ 14.6 兩個陷阱：`cr6c` 背後的 rootfs 搜尋與 `NET-171`、§ 16.7 `R8b` 的限制），`LA-1` 改成常設指示，`FW-177` 殘留 ③ 的裝置那一半也改成常設指示（主線裁決，entry 21 ruling 4 —— P3 一關它就沒有擁有者）。另一支代理獨立稽核每一個引用：約 599 個，4 錯、1 無據、27 不精確；全部照替換文字修正。錯的兩句正是「沒讀 MIB、封包有沒有到埠 3 未知」—— 今天的唯讀上機推翻了它，改引 `NET-172`。`LA-1` 的歸屬寫成「第一百二十六段的決定」（紀錄沒寫是誰）。operating clause 在 21 則不觸發（`R8b` → `P3` 共有的只有電源樹，三次書面決定都拒絕過；擁有者可推翻）。Actual 3。
+
+**做錯的事。** grep 查 `IRR1` 的 pattern 漏掉 `BSP_IRR1`，回 0 —— 從計時器驅動的註解找到 `irq.c` 才知道；Git Bash 吃掉 `$T`、PowerShell 又吃掉 `$(…)`（記憶裡有這條），都改用腳本檔；孤兒目錄的第一版檢查每檔掃一次歷史、25 分鐘才 395 個，改成集合比對；草稿用心算寫「9 h 9 min」，改引 uptime，也刪掉一個由 `lj` 推出的錯誤事件時間；我的 `commit1.py` 先插指標（內含 `NET-172`）再檢查 id 有沒有被用過，被它自己拒絕，改了順序。
+
+**不建立什麼。** 接手有效（沒有建、沒有上機）；netif 清掉之後 RAM 路還通；`SWTCR0` 在 STOP_TLU 設起來時讀到什麼、引擎吃幾個 TCR 字；watchdog 重設之後從 flash 開機的狀態；`MACCR`、`QNUMCR` CPU 欄有沒有影響。
+
+**下一段。** 逐行審 `R6C3.patch`（先審 C 的 1.6 區塊）→ 套進 repo，`notes/switch-driver.md` § 21.4–21.5、新 SPEC 列、把變假的陳述改掉（`NET-166`、`NET-169`、`docs/KNOWN-ISSUES.md` 的兩列、`docs/threat-model.md` 的轉送那一段）→ `build-r6c.sh` 建 mainline 與 armed 各兩次（逐位元組相同），更新 `docs/sbom.md` 與 `notes/userspace-integration.md` 的 `/init` 大小 → 擁有者簽 T（版本 5、slot A）→ `R6c-4` 上機（先 RAM 回歸，再寫入 slot A，熱冷各一次從 flash 開機、雙向 ping）。交接在 `plan/handoff-s129.md`。
