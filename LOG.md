@@ -34730,3 +34730,29 @@ J = 12:52:06.4，`boa` 在 **J+32.7 s** 起來。
 **不建立什麼。** 接手有效（沒有建、沒有上機）；netif 清掉之後 RAM 路還通；`SWTCR0` 在 STOP_TLU 設起來時讀到什麼、引擎吃幾個 TCR 字；watchdog 重設之後從 flash 開機的狀態；`MACCR`、`QNUMCR` CPU 欄有沒有影響。
 
 **下一段。** 逐行審 `R6C3.patch`（先審 C 的 1.6 區塊）→ 套進 repo，`notes/switch-driver.md` § 21.4–21.5、新 SPEC 列、把變假的陳述改掉（`NET-166`、`NET-169`、`docs/KNOWN-ISSUES.md` 的兩列、`docs/threat-model.md` 的轉送那一段）→ `build-r6c.sh` 建 mainline 與 armed 各兩次（逐位元組相同），更新 `docs/sbom.md` 與 `notes/userspace-integration.md` 的 `/init` 大小 → 擁有者簽 T（版本 5、slot A）→ `R6c-4` 上機（先 RAM 回歸，再寫入 slot A，熱冷各一次從 flash 開機、雙向 ping）。交接在 `plan/handoff-s129.md`。
+
+## 2026-10-08 — 第一百二十九段（17:03 開場，收工約 19:45；桌面，**零次電源動作**，零次 flash 寫入，零次 `FLW`／`EW`／`EB`／非零 `AUTOBURN`／`FLR`）：`R6c-3` 關了 —— 主線逐行審完 `vlan` 的 patch，自己的突變找到一個沒有案例走過的出口，補上之後進 repo（`034b5a7d`）；release 與 armed 映像各建兩次逐位元組相同；擁有者簽了容器 T（版本 5、slot A），`verify` 全過
+
+**開場量測。** HEAD `2009c4eb`、`LOG.md` 最後一則第一百二十八段、study 最新 `20261008-study3.md`，與交接相符。CI：`2009c4eb` 的 run `37753727332` 四個 job 全 success。讀了實作代理的 `REPORT.md`：它報 mdiocheck 98 → 150、81 個突變全殺、其餘套件全綠 —— 這是宣稱，放進 repo 前主線自己重跑。
+
+**審查（紀錄在 `notes/switch-driver.md` § 21.4）。** C 的 1.6 區塊逐行讀：每個位址、位元、表格列舉對 B 的標頭與驅動自己的暫存器表；`00807E3F` 逐欄拆（VID 8、fid 0、成員與不加標籤埠 0–5）；寫表步驟的順序對兩個來源（`LDR-47` 的反組譯、Bb 的 `swTable_forceAddEntry`）；`rtl819x_sw_wr` 在 store 之前就拒絕，所以失敗的 store 不需要 undo；格式字串 22 個轉換對 22 個參數，279 位元組逐欄加。上鎖先拒、先驗再寫、只寫不同的、(2) 之後每個出口都清 STOP_TLU 並讀回、寫完整組讀回 —— 程式都做到。FW-110 用主線自己的 diff：前 1,865 行只有 30 行原地改（九塊，各自行數不變），1,174 個以這些檔名引用的行號裡只有 `rtl819x-switch.c:93`–`:97`（檔頭第 3 項）內容改了、沒有一行移動。
+
+**主線自己的突變找到一個測試漏洞。** 十二個突變寫在 repo 外（`$FWRE_WORK/rebuild/s129/mut.py`），沒改壞的副本全綠為控制。十個被殺；一個是我自己寫錯（無號數 `< 0`，`-Werror` 不編譯），不算數；**一個在代理的 68 個案例下全綠**：(4) 回忙時跳過 undo —— STOP_TLU 一直立著，交換器停止查表。C 程式本身是對的，漏洞在測試：沒有案例讓引擎在 (4) 忙。補 K67（引擎從 (1) 之後的下一次 `SWTACR` 讀取起連續忙 10,001 次：`-EBUSY`、停在 step 4、bit 18 在同一段關中斷區間清掉並讀回、`SWTCR0` 兩次 store、表沒被寫）與 M82（M82 只讓 K67 變紅）。mdiocheck 98 → 152，82 個突變全被指名的案殺；`tools/ci-expected.tsv` 與 `ci.yml` 的註解跟著改。
+
+**commit A `034b5a7d`（17:31）。** patch、K67／M82、§ 21.4–21.5、`SPEC.md` `NET-173`（id 先確認沒被用過），變假的陳述：`NET-166`、`NET-169` 加 🔄、`docs/KNOWN-ISSUES.md` 四處指標、`docs/threat-model.md` 的轉送段；`config/rlxfw-initramfs.tsv` 的 `/init` 列不再重述大小（大小是 `docs/sbom.md` 的，且這一段的建置會改它；`config/` 在建置之後不能再動）。放進去之前在 `2009c4eb` + patch 上重跑：mdiocheck、mkinitramfs 與其突變、`sh -n`、bootbytes、nic15check、mfginject、appletcensus、srcarchive、ci-census、config gates、`src/init` 的測試與突變、file modes，每個 rc 0（清單在 § 21.4）。CI run `37757944968` 四個 job 全 success。
+
+**建置（17:32–17:38）。** ext4 clone `s128/p/clone` 切到 `034b5a7d`，`build-r6c.sh` 的 init／userspace／mainline／armed 各兩次逐位元組相同：`/init` 75,144 B `ae1f2645`；release 映像 recipe `9bb2bec7`、1,110,016 B、sha256 `295d4f6a`；armed 映像 recipe `8dce09c5`、1,117,184 B、`9328dcf9`；解壓後 4,128,768 B，上限 5,242,880（78.8 %）。產物在 `$FWRE_WORK/rebuild/s128/p/run/r6c/`。
+
+**簽章與 verify。** 擁有者 18:41 照 `OWNER-SIGNING.txt` 簽 T（工具與 `034b5a7d` 相同、公鑰 `4a6eda72` 即 `prodkey.h` 那一把）。T 1,110,176 B、sha256 `113f5542`。`build-r6c.sh r6c verify`（18:42）rc 0：清單 64 列重算 0 不同；hdrcheck 0 欄不同；mkfw2 slot A 接受、slot B 於 `flash_match` 拒絕；instcheck slot A `OK`、slot B `HDR_FLASH_AT`；slotcheck V1 A、V2 A（B 放裝置上的 S 版本 4）、V3 HALT `A=magic B=flash_match`、V4（dev key）HALT `A=sig B=sig`。
+
+**交接的前提錯了一處。** 交接要更新 `docs/sbom.md` 與 `notes/userspace-integration.md` 的 `/init` 大小與 sha256。讀了才知道兩者都是一顆舊映像的快照（SBOM 是 `f184a` 的；`userspace-integration.md` 那一列是 `bf182de2`、`r78a` 格的）：只改一格會讓一份 SBOM 混進兩次建置。只在 SBOM U1 加 🔄 註記（`034b5a7d` 起樹建出的 `/init` 是 75,144 B `ae1f2645`），另一份不動；`notes/init.md` 的 `/proc` 指令清單五 → 六（加 `vlan`）。
+
+**做錯的事。** Git Bash 下 `wsl … bash -lc` 內嵌 `$(…)`，雜湊迴圈卡住，TaskStop 後改腳本檔（記憶裡有這條，又犯一次）；同樣原因 `${n}` 被吃、`sed` 印出整個檔（203 KB）；突變 X7 自己寫錯（見上）；心算時鐘（以為 17:45，實際 17:35），改跑 `date`；grep 印出 `docs/KNOWN-ISSUES.md` 整列超長的第 24 行。**commit A 漏改 `src/init/main.c` 檔頭第 5 項的「the five /proc verbs」**（`init.h` 的計數改了、這裡沒改）；建置之後才發現並改了，那是建置輸入在建置之後變動 —— 註解不改位元組只是推，沒驗。收工前還原：從 `034b5a7d` 到這個 commit，`src/`、`config/`、`tools/` 沒有任何差異，發行 commit 可以落在其中任一個；這個註解留給下一次重建。
+
+**不建立什麼。** 1.6 沒有一行在裝置上跑過；T 沒有安裝；從 flash 開機能不能收封包、netif 清掉之後 RAM 路還通不通、`SWTCR0`／`TCR`／`SWTASR`／輪詢次數在矽上是什麼（§ 21.5）。verify 的四種檢查都在主機上：slotcheck 編的是 rlxboot 的原始碼，不是裝置上那一份；計數器讀 0 是因為那一區今天是抹除的。
+
+**`R6c-4` 的卡片（草稿，不進 repo）。** 一支子代理從 V10 與 R6C-A 起草 `$FWRE_WORK/rebuild/s129/r6c4/R6C-4-CARD.md`：68 個擷取、49 個板上命令、唯一的 flash 寫入 `I10`、兩次電源動作都在冷開機；D1 照 B1 嚴格判，RAM 回歸不過就不寫 flash。每個數字由 `derive.py` 從 `034b5a7d` 的 clone 與 bench 紀錄重導、釘在 cardnum 列（`derive-controls.sh` 六個控制）。主線逐節讀過、自己重跑：`cardcheck commands` 只拒 `I10`（缺擁有者的 yes；帶 yes 列的 V10 卡 rc 0 是正向控制）、`numbers` 128／128、`check-predictions` 0 of 68、`cardrun --dry` 65 格。主線改了三處：熱開機補第三種可能 —— watchdog 重設清了暫存器（`V06` 的 `PVCR0` 鎖存）卻沒清 ASIC 表（晶片上的記憶體），那就不寫表、`vw 0000`、`n_writes 11`（由 `derive.py` 導出，加五列 cardnum）；`I08` 的閘門前允許三次重讀（`FW-248`：短讀之後的下一次 14／14 都齊）；`W01`／`C01` 停在 `<RealTek>` 時由擁有者選 `J BFC00000` 或關電。**代理找到、主線核實的三件事**：`cardcheck` 的 `--idle` 對 `sleep` 守門跳過不含字面 `console-capture` 的行，所以用 `CAP` 巨集的卡片（V10、R6C-A、這一張）從沒被它檢查過；V10 的 `--boot-until`（`job control turned off`）從沒比中，`V02`、`V04` 都跑滿 45 s（`V02-boot.log` 只有 `for a list of built-in commands`）；V10 的停止條件說 looprun 的 `A0a` 也會擋漏抓的提示字元，但 `--skip S4` 下 `A0a` 只讀 looprun 自己的 S4。三者都沒有讓任何寫入發生；記在這裡，工具的修正留給之後（這一段不碰 `tools/`）。審查紀錄在 `s129/r6c4/REVIEW.md`。
+
+**做錯的事（卡片階段）。** 審查時把 `FW-248` 的十四次寫成「13 of 13」，重讀 SPEC 原文改正；給子代理的交辦寫「三個未提交的文件修改」，實際是四個（含 `main.c` 的註解），而我在它工作時還原了 `main.c`、改了 `LOG.md` —— 它的事實都取自乾淨的 clone，沒受影響，是它自己指出的。
+
+**下一段。** 擁有者說上機時：卡片日期改成那天（一個字串）、當天重跑 `x05-derive.sh` 與 `cardcheck numbers`、放進 `bench/<日期>/`；B1 → D1 → 擁有者對 `I10` 那一行（T 的 sha256 `113f5542…`）給有日期的 yes，才寫進 `owner-yes`、才安裝 → 熱開機 → 冷開機（電源握手）。之後 `R6c-5`。`cardcheck` 的 `CAP` 盲點要修，附一個會變紅的控制。交接在 `plan/handoff-s130.md`。

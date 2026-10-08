@@ -49,8 +49,8 @@ A `#!/bin/sh` `/init` is a shell script in the shipped image.
    A store that is absent or invalid gives the § 4 defaults with `source = 0`,
    and one console line saying so.
 6. **`sethostname`** from `sys.hostname`, charset re-validated here.
-7. **The LAN.**  The five `/proc` verbs `config/rlxfw-init.sh` writes, in its
-   order — `unlock i-mean-it`, `init`, `start` to `/proc/rtl819x-switch`, then
+7. **The LAN.**  The six `/proc` verbs `config/rlxfw-init.sh` writes, in its
+   order — `unlock i-mean-it`, `init`, `vlan` (since `R6c`), `start` to `/proc/rtl819x-switch`, then
    `unlock`, `netdev on` to `/proc/rtl819x-nic` — each a `write(2)` of a
    compile-time literal to a compile-time path.  Switch core first, because
    B43's control shows `rlx0` carries nothing without it.  Then
