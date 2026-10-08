@@ -130,6 +130,19 @@ one value, and K9 is the term's control on the real corpus.  ⚠️ What it does
 not model: a CR sent with no ESC before it would produce a bare prompt and no
 `sh:` line (推, never captured), and would read 4 above.
 
+A CAPTURE THAT ENDS BEFORE ITS BOOT DOES
+----------------------------------------
+量 2026-10-08, `bench/2026-10-08c/R02-boot.log` reads 1751: the shell's banner
+and first prompt came before some daemons' lines (`FW-252`'s race), looprun's
+`--boot-until` matched at that prompt, and the capture stopped 0-50 ms later.
+The 257 bytes it lacks against 2008 were counted by hand against
+`I02-boot.log`, the same /init booted minutes later: the end of dnsfwd's third
+line with its CRLF (53), httpd's `uid=` line (75), udhcpd's two (94) and
+`rlxfw: init: shell started` (35).  `CUT_SHORT` names the file; K2 leaves it
+out and K10 requires it to stay what its row says.  ⚠️ K10 cannot see WHICH
+bytes are missing, only that the capture is short and that output continued
+past its first prompt.
+
 WHICH FILES ARE BOOT CAPTURES
 -----------------------------
 🔴 A file matching the glob is not necessarily one, and finding that out cost a
@@ -300,6 +313,21 @@ DECLARED_CONSTS = {
           "boots of bench/2026-10-07, which carry no console input, read "
           "2008: 2029 held ash's 21-byte reply to the capture tool's input, "
           "now `reply_excess` (K9)",
+}
+
+#: Captures that end before their boot's output does, each NAMED, with the
+#: declared constant its configuration reaches when the capture is whole.
+#: 量 2026-10-08 (`bench/2026-10-08c/R02`, the 129th segment): the shell's
+#: banner and first prompt came before httpd's line, udhcpd's two, the end of
+#: dnsfwd's third and `rlxfw: init: shell started` (`FW-252`'s race);
+#: looprun's `--boot-until` matched at that prompt and the capture stopped
+#: 0-50 ms later, 257 bytes short of 2008 -- 1751, which is no console
+#: configuration.  K2 leaves these out of the population; K10 holds each to
+#: that story and goes red the day one no longer needs its row.  🔴 A row
+#: names ONE file, never a pattern, and it is not a way to make K2 green for
+#: a constant that moved.
+CUT_SHORT = {
+    "bench/2026-10-08c/R02-boot.log": 2008,
 }
 
 #: Ash's reply to the capture tool's input, as the capture reads once the
@@ -593,8 +621,16 @@ def echo_control():
     return True, "; ".join(w for w, _g in want)
 
 
+def rel(path):
+    return os.path.relpath(path, ROOT).replace(os.sep, "/")
+
+
 def check():
     accepted, rejected = captures()
+    # The named cut-short captures leave the population here, before any case
+    # reads it, and only K10 reads them (see CUT_SHORT).
+    cut = [(p, b, m) for p, b, m in accepted if rel(p) in CUT_SHORT]
+    accepted = [(p, b, m) for p, b, m in accepted if rel(p) not in CUT_SHORT]
     consts, n, biggest = {}, 0, 0
     # K7's partition and its width histogram.  🔴 The partition is defined by
     # the PRESENCE of the vendor field, never by its width and never by the
@@ -796,13 +832,41 @@ def check():
                               % detail))
     ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
 
+    # K10: each named cut-short capture held to the story its row tells.  It
+    # must be in the accepted population (a renamed or deleted file goes red),
+    # read STRICTLY below the declared constant it names (a capture that turns
+    # out whole, or a row naming the wrong constant, goes red), and carry
+    # output after its first prompt -- the race that cut it short.
+    found = {rel(p): (b, m) for p, b, m in cut}
+    bad, seen = [], []
+    for name, want in sorted(CUT_SHORT.items()):
+        if name not in found:
+            bad.append("%s is not in the accepted population" % name)
+            continue
+        b, m = found[name]
+        c = normalised_const(b, m)
+        seen.append("%s reads %d, %d short of %d" % (name, c, want - c, want))
+        if want not in DECLARED_CONSTS or not c < want:
+            bad.append("%s reads %d, not below a declared %d" % (name, c, want))
+        i = b.find(b"\r\n# ")
+        if i < 0 or not b[i + 4:].strip():
+            bad.append("%s holds no output after its first prompt" % name)
+    good = not bad
+    print("  %s  %-10s %s" % ("ok  " if good else "FAIL", "K10",
+                              "every named cut-short capture is still cut "
+                              "short: %s" % "; ".join(seen)
+                              if good else
+                              "a named cut-short capture does not fit its row: "
+                              "%s" % "; ".join(bad)))
+    ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
+
     # Observation, deliberately carrying NO assertion.  What the gate rejected
     # in the real corpus is worth reading -- it is how a mis-named capture
     # gets noticed -- but asserting anything about it would make this tool
     # depend on which files happen to be committed, which is the defect K5 was
     # rewritten to avoid.
     print("        observed, not asserted: the gate rejected %d of %d file(s) "
-          "the glob matched" % (len(rejected), n + len(rejected)))
+          "the glob matched" % (len(rejected), n + len(cut) + len(rejected)))
     for path, blob, ms in rejected:
         print("          %-44s %5d bytes, %d mark(s), no RLXFW-%s"
               % (os.path.relpath(path, ROOT), len(blob), len(ms), BOOT_GATE))
