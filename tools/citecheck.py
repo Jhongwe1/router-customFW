@@ -10,14 +10,14 @@ below it now names a different row, in a file nobody touched, with no diff to
 review.
 
 `spec-check`'s `C11` already does this for ONE population -- the payload sources
-under `config/rlxfw-src/`, matched by basename, token-checked.  This is the same
+under `tools/rlxprobe/`, matched by basename, token-checked.  This is the same
 idea over every tracked file, and it uses an oracle C11 does not have: git.
 
 THE ORACLE, and what would prove it wrong
 -----------------------------------------
 For each citation, `git blame` the CITING line to get the commit that last wrote
 it; read the cited file AS IT WAS at that commit; take line NNN's content then;
-find where that content is NOW.
+find where that content is NOW.  A file moved since: `History`, below.
 
   STABLE   the same content is still at line NNN
   ROT      it is somewhere else, and the report says where
@@ -469,16 +469,16 @@ def scan_file(rel, text, tracked_set, idx, counts, ambig_out):
     return out
 
 
-def scan(root, rev=None):
+def scan(root, rev=None, history=None):
     """(citations, filter counts, ambiguous, how many `.md` were walked)."""
     mds = sorted(p for p in ls_files(root, "*.md", rev)
                  if not p.startswith("upstream/"))
     tracked = ls_files(root, "*", rev)
-    tracked_set = set(tracked)
-    idx = suffix_index(tracked)
-    counts = collections.Counter({k: 0 for k in FILTERS})
-    counts["exempt"] = 0
-    ambig, cites = [], []
+    history, tracked_set = history or History(root, rev), set(tracked)
+    history.tracked = tracked_set
+    counts = collections.Counter({k: 0 for k in FILTERS + ("exempt",)})
+    idx = ThroughHistory(suffix_index(tracked), history, counts)
+    ambig, cites = [], Cites(history)
     for rel in mds:
         if SC.srcref_exempt(rel):
             counts["exempt"] += 1
@@ -503,7 +503,7 @@ def digest(s):
 
 def oracle(root, cites, rev=None):
     """Classify every citation.  Returns (findings, verdict counts, blind)."""
-    blame, at, now = {}, {}, {}
+    blame, at, now, history = {}, {}, {}, _history_of(cites, root, rev)
 
     def cur(path):
         if path not in now:
@@ -538,7 +538,7 @@ def oracle(root, cites, rev=None):
             v["UNCOMMITTED"] += 1
             blind.append(("BLANK", c, "the citing line is not committed yet"))
             continue
-        old = then(sha, c.target)
+        old = then(sha, c.target) or _followed(then, history, sha, c.target, v)
         if old is None:
             v["ABSENT-THEN"] += 1
             blind.append(("BLANK", c, f"{c.target} did not exist at {sha[:8]}"))
@@ -583,6 +583,300 @@ def oracle(root, cites, rev=None):
     return findings, v, blind
 
 
+# ------------------------------------------------------------ renames, from git
+#
+# 🔴 A CITATION NAMES A FILE BY ITS PATH, AND THE ORACLE READS THAT PATH AT THE
+# CITING COMMIT.  A `git mv` rewrites no citing line, so the citation still
+# resolves at HEAD -- by suffix, or by the new path -- while `git show
+# <citing commit>:<new path>` names a path that did not exist then.  Before
+# this section every such citation fell into ABSENT-THEN, which is blind and
+# not red, and one spelled with the OLD full path left the population as
+# `unresolved` before the oracle saw it.  The gate stayed green either way.
+#
+# So history is read ONCE, with git's own rename detection -- `git log -M`,
+# its default 50 % similarity -- every add, delete and rename in the history of
+# the tip, and in a working-tree run the index against HEAD too, so a staged
+# `git mv` is followed before it is committed (T37).  Then:
+#
+#   oracle    a target absent at the citing commit S is walked BACK along its
+#             own line of descent.  A rename into it that S is on the far
+#             side of -- `git merge-base --is-ancestor` says the renaming
+#             commit is neither S nor an ancestor of S -- steps to the old
+#             name.  An ADD that S is on the far side of ends the walk: the
+#             file did not exist yet, and whatever held that path before is
+#             another file (T30).  The first event at or before S names the
+#             path S had, and S:<that path> must then read, or nothing was
+#             followed.  Counted: `followed N`.
+#   scan      a path that is not tracked and is no suffix of a tracked path is
+#             looked up among the paths a file once ENDED at -- deleted there,
+#             or renamed away -- exactly or as a suffix, the way a tracked
+#             path is, and each such file is walked FORWARD to where it is
+#             now.  Exactly one current path and no deletion: it resolves
+#             there, `renamed N`.  Two current paths, or one and a deletion,
+#             is refused and not picked, `rename-refused N` (T35).  A path
+#             only ever deleted stays `unresolved`.
+#   baseline  a row naming a path no longer tracked is read through the same
+#             forward lookup, exactly -- a row holds full paths -- and an
+#             M1/M3 row's digest, which hashes the path, is re-derived for the
+#             new path when it verifies against the old (T36).
+#
+# 🔴 DECIDED, AND T32 HOLDS IT: A MOVE AND AN EDIT IN ONE COMMIT ARE FOLLOWED
+# EXACTLY WHEN GIT PAIRS THEM.  Below git's similarity threshold git records a
+# delete and an add, and so does this: a citation by suffix stays ABSENT-THEN
+# and one by the old path stays `unresolved` -- the blindness above, back, and
+# counted where it was always counted.  Pairing below git's threshold, or by
+# basename, would invent an identity git does not see, and 量 2026-10-09 this
+# tree has 1,603 basenames shared by two or more tracked files (4,101 files;
+# seven `main.c`).  Move in one commit and edit in the next.
+#
+# ⚠️ NOT FOLLOWED, stated rather than left to be found:
+#   * a rename made by a merge commit's own diff.  `git log` shows a merge no
+#     diff; a rename on either side of a merge IS seen (T34)
+#   * a path whose file was renamed away and a DIFFERENT file later created
+#     there, cited from before the rename: the path exists at S, nothing is
+#     absent, and the new file is read as the old one -- as it always was
+#   * copies (`-C`), and text moved between two files that both stay -- a
+#     split is not a rename -- which reads CHANGED, as before
+#   * an M4 row across a move: its digest hashes the quoted token, which the
+#     row does not keep, so the row goes stale and C4 says so
+INDEX = "the index"     # no ref may hold a space, so no commit is named this
+
+
+def _name_status(blob):
+    """`--name-status -z` -> [(kind, old, new)]: an add has no old, a delete
+    no new.  The callers ask for A, D and R only; nothing else is guessed at.
+    A git that failed printed nothing here, and nothing is followed."""
+    f = [x.decode("utf-8", "replace") for x in blob.split(b"\0")]
+    out, i = [], 0
+    while i < len(f):
+        st = f[i].strip("\n")
+        if st[:1] == "R" and i + 2 < len(f):
+            out.append(("R", f[i + 1], f[i + 2]))
+            i += 3
+        elif st in ("A", "D") and i + 1 < len(f):
+            out.append((st, f[i + 1] if st == "D" else None,
+                        f[i + 1] if st == "A" else None))
+            i += 2
+        else:
+            i += 1
+    return out
+
+
+class History(object):
+    """Every add, delete and rename in the history of the tip, as git's `-M`
+    sees them, read with ONE `git log` the first time something asks -- 量
+    2026-10-09, 0.08 s over this repository's 811 commits.  Events are kept
+    newest first, as `--topo-order` gives them; `touch` indexes them by path.
+
+    `renames=False` reads no history, which is this tool as it was before a
+    move could be followed: T27b's positive control, and nothing else."""
+
+    def __init__(self, root, rev=None, renames=True):
+        self.root, self.rev, self.renames = root, rev, renames
+        self.events, self.tracked = None, set()
+        self.anc, self.at, self.fwd = {}, {}, {}
+
+    def load(self):
+        if self.events is None:
+            ev = self._index() + self._log() if self.renames else []
+            self.events = ev
+            self.touch = collections.defaultdict(list)
+            # path -> the events that ENDED a life there (a delete, or the old
+            # side of a rename); an add ends nothing, and its None key goes.
+            # Walking a life forward from its start would reach the same
+            # end, so this is an economy and not a guard, and no mutant names
+            # it: 量 2026-10-09, the mutant that dropped the guard this
+            # replaces SURVIVED, and the guard is gone.
+            self.ends = collections.defaultdict(list)
+            for i, (_c, _k, old, new) in enumerate(ev):
+                for p in {old, new} - {None}:
+                    self.touch[p].append(i)
+                self.ends[old].append(i)
+            self.ends.pop(None, None)
+            self.ended = suffix_index(sorted(self.ends))
+        return self
+
+    def _index(self):
+        """A working-tree run reads the index against HEAD as the commit after
+        HEAD.  `--rev` reads a commit's tree and has no index."""
+        if self.rev is not None:
+            return []
+        _rc, out = git(self.root, "diff", "--cached", "-M", "--name-status",
+                       "-z", "--diff-filter=ADR", "HEAD")
+        return [(INDEX,) + e for e in _name_status(out)]
+
+    def _log(self):
+        _rc, out = git(self.root, "log", "-M", "--topo-order",
+                       "--no-show-signature", "--name-status", "-z",
+                       "--diff-filter=ADR", "--format=%x01%H",
+                       self.rev or "HEAD", "--")
+        ev = []
+        for chunk in out.split(b"\x01")[1:]:
+            sha, _nul, rest = chunk.partition(b"\0")
+            ev += [(sha.decode("ascii", "replace"),) + e
+                   for e in _name_status(rest)]
+        return ev
+
+    def descends(self, a, b):
+        """Is `a` the commit `b` or an ancestor of it?  `git merge-base
+        --is-ancestor`, cached.  Every commit precedes the index; the index
+        precedes nothing, and git says so itself -- no commit has its name."""
+        if b == INDEX:
+            return True
+        if (a, b) not in self.anc:
+            self.anc[(a, b)] = git(self.root, "merge-base", "--is-ancestor",
+                                   a, b)[0] == 0
+        return self.anc[(a, b)]
+
+    def _older(self, name, i):
+        """The newest event touching `name` that is older than event i."""
+        import bisect
+        lst = self.touch.get(name, ())
+        k = bisect.bisect_right(lst, i)
+        return lst[k] if k < len(lst) else None
+
+    def _newer(self, name, i):
+        """The oldest event touching `name` that is newer than event i."""
+        import bisect
+        lst = self.touch.get(name, ())
+        k = bisect.bisect_left(lst, i)
+        return lst[k - 1] if k else None
+
+    def path_at(self, sha, target):
+        """The path `target`'s file had at commit `sha` -- or `target` itself
+        when its line of descent does not reach back to `sha`, so the caller
+        reads nothing new rather than another file's past."""
+        if (sha, target) not in self.at:
+            self.load()
+            self.at[(sha, target)] = self._back(sha, target) or target
+        return self.at[(sha, target)]
+
+    def _back(self, sha, p):
+        i, line = -1, None
+        while True:
+            j = self._older(p, i)
+            if j is None:
+                return p
+            i = j
+            c, kind, old, new = self.events[j]
+            if line is not None and not self.descends(c, line):
+                continue            # not on the line of history being walked
+            if self.descends(c, sha):
+                return p            # at or before the citing commit: its name
+            if kind == "R" and new == p:
+                p, line = old, c    # renamed into p after it: one name back
+                continue
+            return None             # created after it, or its line breaks here
+
+    def moved_to(self, path, suffix=True):
+        """(the ONE current path every file that ended at `path` is at now, or
+        None; whether history named more than one place).  `path` is one no
+        tracked path is or ends with; with `suffix` it may also be the end of
+        a longer old path, as scan_file lets it be of a tracked one."""
+        if (path, suffix) not in self.fwd:
+            self.load()
+            olds = self.ended.get(path, [])
+            dests, dead = set(), 0
+            for x in (olds if suffix else [p for p in olds if p == path]):
+                for j in self.ends[x]:
+                    q = self._forward(j)
+                    dead += q is None
+                    dests.add(q)
+            dests.discard(None)
+            one = len(dests) == 1 and not dead
+            self.fwd[(path, suffix)] = (min(dests) if one else None,
+                                        bool(dests) and not one)
+        return self.fwd[(path, suffix)]
+
+    def _forward(self, j):
+        """Where the file that event j ended at its old path is now: None when
+        j is a delete, or a delete further down its own line of history."""
+        c, _kind, _old, q = self.events[j]
+        i = j
+        while True:
+            n = self._newer(q, i)
+            if n is None:
+                return q
+            i = n
+            c2, kind, old, new = self.events[n]
+            if not self.descends(c, c2):
+                continue            # another line of history
+            if kind == "R" and old == q:
+                q, c = new, c2      # moved again
+                continue
+            return None             # deleted: this file's line ends
+
+
+class ThroughHistory(object):
+    """scan_file's suffix index, with one more answer for a path that no
+    tracked path is or ends with: the ONE current path history moved it to.
+    Counted either way, so a resolution through history is never silent."""
+
+    def __init__(self, index, history, counts):
+        self.index, self.history, self.counts = index, history, counts
+
+    def get(self, path, default=None):
+        hit = self.index.get(path)
+        if hit:
+            return hit
+        dest, refused = self.history.moved_to(path)
+        if dest:
+            self.counts["renamed"] += 1
+            return [dest]
+        self.counts["rename-refused"] += refused
+        return default
+
+
+class Cites(list):
+    """scan()'s citations, carrying the History that resolved their paths, so
+    the oracle reads them through the same one and git log runs once."""
+
+    def __init__(self, history):
+        list.__init__(self)
+        self.history = history
+
+
+def _history_of(cites, root, rev):
+    return getattr(cites, "history", None) or History(root, rev)
+
+
+def _followed(then, history, sha, target, v):
+    """The oracle's second read, for a target absent at the citing commit:
+    the same file, under the path it had then.  Counted, because every
+    verdict reached this way rests on git's rename detection."""
+    old = then(sha, history.path_at(sha, target))
+    v["FOLLOWED"] += old is not None
+    return old
+
+
+def _m1_key(path, start):
+    return f"eof:{path}"
+
+
+def _m3_key(path, start):
+    return f"m3:{path}:{start}"
+
+
+def rows_now(rows, history):
+    """Baseline rows in today's paths -> (rows, how many moved).  A citing
+    file or cited path that is no longer tracked is read through history,
+    exactly; an M1/M3 digest hashes the path, so it is re-derived for the new
+    one when it verifies against the old.  An M4 digest also hashes the
+    quoted token, which the row does not keep: such a row goes stale."""
+    def now(p):
+        return p if p in history.tracked else (
+            history.moved_to(p, suffix=False)[0] or p)
+    out, moved = [], 0
+    for r in rows:
+        src, path, dg = now(r.src), now(r.path), r.digest
+        for kind, key in (("M1", _m1_key), ("M3", _m3_key)):
+            if r.kind == kind and dg == digest(key(r.path, r.start)):
+                dg = digest(key(path, r.start))
+        moved += (src, path) != (r.src, r.path)
+        out.append(r._replace(src=src, path=path, digest=dg))
+    return out, moved
+
+
 # -------------------------------------------------- the checks that need no git
 def secondary(root, cites, rev=None):
     """M1/M2/M3/M4 -- every one of them independent of blame.
@@ -605,7 +899,8 @@ def secondary(root, cites, rev=None):
             continue
         n = len(cl)
         if c.start > n or (c.end is not None and c.end > n):
-            out.append(Finding("M1", c, "EOF", [n], digest(f"eof:{c.target}"),
+            out.append(Finding("M1", c, "EOF", [n],
+                               digest(_m1_key(c.target, c.start)),
                                f"{c.target} has {n} lines"))
             continue
         if c.end is not None and c.end < c.start:
@@ -614,7 +909,7 @@ def secondary(root, cites, rev=None):
             continue
         if not SC._norm(cl[c.start - 1]):
             out.append(Finding("M3", c, "BLANK-NOW", [],
-                               digest(f"m3:{c.target}:{c.start}"),
+                               digest(_m3_key(c.target, c.start)),
                                f"{c.target}:{c.start} is a blank line"))
         if c.token:
             want = SC._norm(decode_escapes(c.token))
@@ -758,6 +1053,7 @@ def sweep(root=ROOT, baseline_path=BASELINE, rev=None):
     findings, v, blind = oracle(root, cites, rev)
     findings += secondary(root, cites, rev)
     rows, bad = load_baseline(baseline_path)
+    rows, moved = rows_now(rows, cites.history)
     # 🔴 A baseline row whose CITING FILE is dirty cannot be judged in either
     # direction, because the oracle refused that file's modified lines.  It is
     # SUSPENDED and counted, not silently kept and not reported as repaired.
@@ -812,6 +1108,13 @@ def sweep(root=ROOT, baseline_path=BASELINE, rev=None):
     print(f"    blind      CHANGED {v['CHANGED']}  blank-at-write-time "
           f"{v['BLANK-THEN']}  uncommitted {v['UNCOMMITTED']}  "
           f"absent-then {v['ABSENT-THEN']}  past-EOF-then {v['EOF-THEN']}")
+    # Every verdict that rests on git's rename detection, so a reader can see
+    # how many there are -- and the history's own count beside them, since
+    # `followed 0` over a history with no rename in it means nothing.
+    nren = sum(1 for e in cites.history.load().events if e[1] == "R")
+    print(f"    renames    followed {v['FOLLOWED']}  renamed "
+          f"{counts['renamed']}  rename-refused {counts['rename-refused']}  "
+          f"baseline rows {moved}  -- git -M finds {nren} rename(s) here")
     if suspended & {c2.src for c2 in cites}:
         print(f"    ⚠ reading the WORKING TREE, and "
               f"{len(suspended & {c2.src for c2 in cites})} citing file(s) are "
@@ -926,6 +1229,288 @@ def _sweep_out(d, baseline=None):
 
 
 BODY = "\n".join(f"line {i}" for i in range(1, 13)) + "\n"
+
+
+def _git_ok(d, *args):
+    """A fixture's git, which must succeed: a fixture that silently failed to
+    build would leave the case below it reading nothing."""
+    rc, out = git(d, *args)
+    if rc != 0:
+        raise RuntimeError(f"fixture: `git {' '.join(args)}` exited {rc}")
+    return out.decode("utf-8", "replace").strip()
+
+
+def _commit(d, message):
+    _git_ok(d, "add", "-A")
+    _git_ok(d, "-c", "commit.gpgsign=false", "commit", "-q", "-m", message)
+    return _git_ok(d, "rev-parse", "HEAD")
+
+
+def _write(d, rel, text):
+    p = os.path.join(d, rel)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "wb") as fh:
+        fh.write(text.encode("utf-8"))
+
+
+def _put(d, rel, text, message):
+    _write(d, rel, text)
+    return _commit(d, message)
+
+
+def _mv(d, a, b, message="move", commit=True):
+    """`git mv`, committed unless told otherwise."""
+    os.makedirs(os.path.dirname(os.path.join(d, b)), exist_ok=True)
+    _git_ok(d, "mv", a, b)
+    return _commit(d, message) if commit else None
+
+
+def _says(out, *words):
+    """Every phrase occurs whole: `followed 1` is not `followed 12`."""
+    return all(re.search(r"(?<![\w-])" + re.escape(w) + r"(?![\w-])", out)
+               for w in words)
+
+
+def _rename_controls(c, d):
+    """T27-T37: a move must not blind the oracle (`renames, from git`).
+    Every fixture is built with `git mv` and real commits, and read through
+    the sweep that reads this repository."""
+    one = "The row is at `b.txt:3` and that is that.\n"
+
+    def case(label, build):
+        try:
+            good, detail = build()
+        except Exception as e:      # a control that crashes is one that fails
+            good, detail = False, f"raised {type(e).__name__}: {e}"
+        c.case(label, good, detail)
+
+    # ---- T27/T27b: the defect, and its positive control ---------------------
+    t27 = d("t27")
+
+    def t27a():
+        _repo(t27, {"a.md": one, "src/b.txt": BODY})
+        _mv(t27, "src/b.txt", "lib/b.txt", "the move, nothing else")
+        rc, o = _sweep_out(t27)
+        return (rc == 0 and _says(o, "1 citations", "STABLE 1", "followed 1",
+                                  "absent-then 0"),
+                f"rc={rc}; src/b.txt -> lib/b.txt, cited as `b.txt:3`")
+    case("T27 a `git mv` of the cited file is followed: STABLE", t27a)
+
+    def t27b():
+        # The SAME fixture with no history read: the tool before renames were
+        # followed.  Unless this reads ABSENT-THEN the fixture does not hold
+        # the defect, and T27 passing would prove nothing.
+        old = scan(t27, history=History(t27, renames=False))[0]
+        _f, was, _b = oracle(t27, old)
+        new = scan(t27)[0]
+        _f, now, _b = oracle(t27, new)
+        return (len(old) == len(new) == 1 and was["ABSENT-THEN"] == 1
+                and was["STABLE"] == 0 and now["STABLE"] == 1
+                and now["FOLLOWED"] == 1,
+                f"no history: absent-then {was['ABSENT-THEN']}, STABLE "
+                f"{was['STABLE']}; history: STABLE {now['STABLE']}")
+    case("T27b and with no history read, the same is blind", t27b)
+
+    def t28():
+        p = d("t28")
+        _repo(p, {"a.md": one, "src/b.txt": BODY})
+        _mv(p, "src/b.txt", "lib/b.txt", "the move")
+        _put(p, "lib/b.txt", "x\ny\n" + BODY, "two rows above the cited one")
+        rc, o = _sweep_out(p)
+        return (rc == 1 and "CITE-ROT" in o and "now at line 5" in o
+                and _says(o, "followed 1"),
+                f"rc={rc}; " + ("said line 5" if "now at line 5" in o
+                                else "did NOT say line 5"))
+    case("T28 rows moved after the move: ROT, and where to", t28)
+
+    def t29():
+        p = d("t29")
+        _repo(p, {"a.md": "The row is at `src/b.txt:3` and that is that.\n",
+                  "src/b.txt": BODY})
+        _mv(p, "src/b.txt", "lib/b.txt", "the move")
+        rc, o = _sweep_out(p)
+        return (rc == 0 and _says(o, "1 citations", "STABLE 1", "renamed 1",
+                                  "followed 1", "unresolved 0"),
+                f"rc={rc}; `src/b.txt` is tracked nowhere and resolves to "
+                f"lib/b.txt")
+    case("T29 a full OLD path resolves through history", t29)
+
+    def t30():
+        # Built so that a TWO-TREE comparison pairs the files and history does
+        # not: old/b.txt is renamed to src/b.txt, src/b.txt is deleted, and a
+        # different file -- similar enough for -M -- is created there later.
+        p = d("t30")
+        _repo(p, {"a.md": "Rows `b.txt:3`, `old/b.txt:4` and `old/k.txt:5`.\n",
+                  "old/b.txt": BODY, "old/k.txt": "kilo\n" * 6})
+        first = _git_ok(p, "rev-parse", "HEAD")
+        _mv(p, "old/b.txt", "src/b.txt", "a real rename")
+        _git_ok(p, "rm", "-q", "src/b.txt", "old/k.txt")
+        _commit(p, "both deleted, neither renamed")
+        _put(p, "src/b.txt", BODY.replace("line 12", "line twelve"),
+             "a different file at the old path")
+        two = _git_ok(p, "diff", "-M", "--name-status", first, "HEAD")
+        paired = re.search(r"^R\d*\told/b\.txt\tsrc/b\.txt$", two, re.M)
+        rc, o = _sweep_out(p)
+        return (rc == 0 and paired is not None
+                and _says(o, "1 citations", "absent-then 1", "followed 0",
+                          "renamed 0", "rename-refused 0", "unresolved 2"),
+                f"rc={rc}; two trees pair them: {paired is not None}; the "
+                f"history between them does not")
+    case("T30 deleted, then re-created at its path: no follow", t30)
+
+    def t31():
+        p = d("t31")
+        tree = {f"config/src-tree/linux/{q}": f"// {q}\n" + BODY
+                for q in ("drivers/a.c", "drivers/b.c", "include/c.h",
+                          "drivers/d.c")}
+        tree["config/kept.txt"] = "not moved\n"
+        tree["a.md"] = ("# a directory move\n\n"
+                        "By basename, `a.c:4`.\n\n"
+                        "By the old path, `config/src-tree/linux/drivers/b.c:4`."
+                        "\n\nBy part of the old path, "
+                        "`src-tree/linux/include/c.h:4`.\n\n"
+                        "By a suffix the move keeps, `drivers/d.c:4`.\n")
+        _repo(p, tree)
+        _mv(p, "config/src-tree", "kernel", "the move, nothing else")
+        rc, o = _sweep_out(p)
+        return (rc == 0 and _says(o, "4 citations", "STABLE 4", "followed 4",
+                                  "renamed 2", "unresolved 0"),
+                f"rc={rc}; config/src-tree -> kernel, four files, four "
+                f"spellings")
+    case("T31 a directory move: every citation into it followed", t31)
+
+    def t32():
+        p = d("t32")
+        r = [f"row {i:02d} of twenty" for i in range(1, 21)]
+        w = [f"wire {i:02d} of another twenty" for i in range(1, 21)]
+        light = [f"edited {k}" if k in (9, 11, 13, 15) else s
+                 for k, s in enumerate(r)]
+        heavy = [s if k < 6 else f"rewritten {k}, nothing like it was"
+                 for k, s in enumerate(w)]
+        _repo(p, {"a.md": "Cited `p.txt:3`, `old/p.txt:5`, `w.txt:3` and "
+                          "`old/w.txt:5`.\n",
+                  "old/p.txt": "\n".join(r) + "\n",
+                  "old/w.txt": "\n".join(w) + "\n"})
+        _mv(p, "old/p.txt", "new/p.txt", commit=False)
+        _mv(p, "old/w.txt", "new/w.txt", commit=False)
+        _write(p, "new/p.txt", "\n".join(light) + "\n")
+        _write(p, "new/w.txt", "\n".join(heavy) + "\n")
+        _commit(p, "both moved, and edited in the same commit")
+        ns = _git_ok(p, "show", "-M", "--name-status", "--format=", "HEAD")
+        lo = _git_ok(p, "show", "-M1%", "--name-status", "--format=", "HEAD")
+        light = re.search(r"^R(\d+)\told/p\.txt\tnew/p\.txt$", ns, re.M)
+        heavy = re.search(r"^R(\d+)\told/w\.txt\tnew/w\.txt$", lo, re.M)
+        split = (re.search(r"^D\told/w\.txt$", ns, re.M) is not None
+                 and re.search(r"^A\tnew/w\.txt$", ns, re.M) is not None)
+        rc, o = _sweep_out(p)
+        return (rc == 0 and light is not None and split
+                and _says(o, "3 citations", "STABLE 2", "followed 2",
+                          "renamed 1", "absent-then 1", "unresolved 1"),
+                f"rc={rc}; git pairs the light edit "
+                f"({int(light.group(1)) if light else '?'} % similar) and "
+                f"not the heavy one ({int(heavy.group(1)) if heavy else '?'} %)")
+    case("T32 a move with an edit: followed iff git pairs it", t32)
+
+    def t33():
+        p = d("t33")
+        _repo(p, {"a.md": "Cited `b.txt:3` and `p/b.txt:4`.\n",
+                  "p/b.txt": BODY})
+        _mv(p, "p/b.txt", "q/b.txt", "the first move")
+        _put(p, "c.md", "Cited between the two moves, `b.txt:5`.\n",
+             "a citation written while the file is q/b.txt")
+        _mv(p, "q/b.txt", "r/b.txt", "the second move")
+        rc, o = _sweep_out(p)
+        return (rc == 0 and _says(o, "3 citations", "STABLE 3", "followed 3",
+                                  "renamed 1"),
+                f"rc={rc}; p/ -> q/ -> r/, one citation from each side of "
+                f"the first move")
+    case("T33 two moves, cited between them: the middle name", t33)
+
+    def t34():
+        p = d("t34")
+        _repo(p, {"a.md": "Cited `b.txt:3` and `p/b.txt:4`.\n",
+                  "p/b.txt": BODY, "x.txt": "x\n"})
+        main = _git_ok(p, "rev-parse", "--abbrev-ref", "HEAD")
+        _git_ok(p, "checkout", "-q", "-b", "side")
+        _mv(p, "p/b.txt", "q/b.txt", "side: the move")
+        _git_ok(p, "checkout", "-q", main)
+        _put(p, "x.txt", "x, edited on the main line\n", "main: other work")
+        _mv(p, "p/b.txt", "q/b.txt", "main: the same move, as a cherry-pick")
+        _git_ok(p, "-c", "commit.gpgsign=false", "merge", "-q", "--no-edit",
+                "side")
+        merges = _git_ok(p, "rev-list", "--merges", "--count", "HEAD")
+        rc, o = _sweep_out(p)
+        return (rc == 0 and merges == "1"
+                and _says(o, "2 citations", "STABLE 2", "followed 2",
+                          "renamed 1"),
+                f"rc={rc}; {merges} merge, the move on both of its sides")
+    case("T34 one move on both sides of a merge: followed", t34)
+
+    def t35():
+        p = d("t35")
+        _repo(p, {"a.md": "Cited `y/a.txt:3`, `x/a.txt:3` and `x/k.txt:3`.\n",
+                  "x/a.txt": BODY, "x/k.txt": "kilo\n" * 6})
+        _mv(p, "x/a.txt", "y/a.txt", "x/a.txt's first file moves to y/")
+        _put(p, "x/a.txt", "a second file\n" + BODY, "a second x/a.txt")
+        _mv(p, "x/a.txt", "z/a.txt", "and it moves to z/")
+        _mv(p, "x/k.txt", "w/k.txt", "x/k.txt's first file moves to w/")
+        _put(p, "x/k.txt", "another kilo\n", "a second x/k.txt")
+        _git_ok(p, "rm", "-q", "x/k.txt")
+        _commit(p, "and it is deleted")
+        rc, o = _sweep_out(p)
+        return (rc == 0 and _says(o, "1 citations", "STABLE 1", "renamed 0",
+                                  "rename-refused 2", "unresolved 2"),
+                f"rc={rc}; x/a.txt went to y/ and z/, x/k.txt to w/ and to "
+                f"nothing")
+    case("T35 moved to two places, or also deleted: refused", t35)
+
+    def t36():
+        # Three rows on src/b.txt, which moves -- two ROT and an M3, whose
+        # digest hashes the path -- and one on src/c.txt, which does NOT move
+        # but whose first file once moved away from that path: a tracked path
+        # is never read through history.  The citing file moves too.
+        p = d("t36")
+        _repo(p, {"a.md": "Rows `b.txt:3` and `b.txt:9` are cited.\n",
+                  "src/b.txt": BODY, "src/c.txt": "kilo\n" * 6})
+        _mv(p, "src/c.txt", "old/c.txt", "src/c.txt's first file moves away")
+        _put(p, "src/c.txt", BODY, "and another file takes the path")
+        _put(p, "a.md", "Rows `b.txt:3` and `b.txt:9` are cited.\n"
+                        "And `src/c.txt:2`, the second file there.\n",
+             "a citation of the second src/c.txt")
+        _put(p, "src/c.txt", "x\n" + BODY, "a row above the cited one")
+        rows = BODY.split("\n")[:12]
+        _put(p, "src/b.txt", "x\ny\n" + "\n".join(rows[:6]) + "\n\n"
+             + "\n".join(rows[6:]) + "\n", "rows move; cited row 9 is blank")
+        cs = scan(p)[0]
+        fs = oracle(p, cs)[0] + secondary(p, cs)
+        bl = os.path.join(os.path.dirname(p), "t36.tsv")
+        with open(bl, "wb") as fh:
+            fh.write(baseline_text(fs).encode("utf-8"))
+        rc0, _o0 = _sweep_out(p, baseline=bl)
+        _mv(p, "src/b.txt", "lib/b.txt", commit=False)
+        _mv(p, "a.md", "docs/a.md", "the cited and the citing file both move")
+        rc1, o1 = _sweep_out(p, baseline=bl)
+        kinds = sorted(f.kind for f in fs)
+        return (rc0 == 0 and rc1 == 0 and kinds == ["M3", "ROT", "ROT", "ROT"]
+                and "0 new, 4 known" in o1
+                and _says(o1, "4 rows", "baseline rows 4", "followed 2"),
+                f"before the move rc={rc0}, after it rc={rc1}; rows "
+                f"{', '.join(kinds)}")
+    case("T36 baseline rows written before a move still hold", t36)
+
+    def t37():
+        p = d("t37")
+        _repo(p, {"a.md": "Cited `b.txt:3` and `p/b.txt:4`.\n",
+                  "p/b.txt": BODY})
+        _mv(p, "p/b.txt", "q/b.txt", "a committed move")
+        _mv(p, "q/b.txt", "r/b.txt", commit=False)
+        staged = _git_ok(p, "status", "--porcelain")
+        rc, o = _sweep_out(p)
+        return (rc == 0 and staged.startswith("R")
+                and _says(o, "2 citations", "STABLE 2", "followed 2",
+                          "renamed 1"),
+                f"rc={rc}; the index holds {staged!r}")
+    case("T37 a staged `git mv` is followed before its commit", t37)
 
 
 def self_test():
@@ -1271,6 +1856,8 @@ def self_test():
            exact == anyn and exact > 1,
            f"{exact} at two, {anyn} at any indent -- four spaces makes "
            f"ci-census read ok, fails and skips ALL as zero")
+
+    _rename_controls(c, d)
 
     c.dump()
     print()

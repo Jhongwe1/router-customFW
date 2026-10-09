@@ -923,7 +923,7 @@ jobs:
       # CITE-2. This repository cites its own files as `FILE:NNN`, and a line
       # inserted above a cited row silently re-points every citation below it.
       # `spec-check`'s C11 covers one population -- the payload sources under
-      # config/rlxfw-src/ -- by carrying a token from the line; citecheck
+      # tools/rlxprobe/ -- by carrying a token from the line; citecheck
       # covers every tracked file and uses an oracle C11 does not have: blame
       # the CITING line, read the cited file at that commit, and find where
       # that content is now. 量 2026-09-15 over HEAD: 239 live citations, 163

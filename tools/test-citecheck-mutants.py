@@ -26,6 +26,17 @@ columns and no duplicate keys -- has no mutant here.  The two properties that
 were shell-only when this was written, `--write-baseline` not touching the file
 and the two-space case-line contract, were moved INTO `--self-test` as `T24`
 and `T25` for exactly this reason, and `M22`/`M23` are their mutants.
+
+`M24`-`M50` are the rename section (`T27`-`T37`), one per branch.  Three kinds
+of line there carry none, and why is stated rather than left to be found: the
+caches (a cache that always recomputes gives the same answers, only slower);
+the parser's fall-through for a status other than A, D or R, which
+`--diff-filter=ADR` never emits; and `_back` running out of events, which
+needs a history whose root commit's adds are hidden -- every path's history
+begins with an add.  量 2026-10-09, the first run had a twenty-eighth: it
+dropped `moved_to`'s check that an event ENDED a life at the path, and it
+SURVIVED, because a life walked forward from its start reaches the same end.
+The check was an economy and not a guard; it is now an index with no branch.
 """
 import os
 import re
@@ -148,6 +159,119 @@ MUT = [
     ("M23 a case line printed at FOUR spaces               (kills T25)",
      '            self.lines.append("  ok     %-54s %s" % (label, detail))',
      '            self.lines.append("    ok     %-54s %s" % (label, detail))'),
+
+    # ---------------------------------------------------- renames (T27-T37)
+    # A move must not blind the oracle.  One row per branch of citecheck's
+    # `renames, from git`, each naming the case it must turn red.
+    ("M24 the oracle's second read, under the old name     (kills T27)",
+     '        old = then(sha, c.target) or _followed(then, history, sha, '
+     'c.target, v)',
+     '        old = then(sha, c.target)'),
+
+    ("M25 a followed verdict not counted                   (kills T27)",
+     '    v["FOLLOWED"] += old is not None',
+     '    pass'),
+
+    ("M26 renames=False reads history all the same        (kills T27b)",
+     '            ev = self._index() + self._log() if self.renames else []',
+     '            ev = self._index() + self._log()'),
+
+    ("M27 git log told to detect no renames                (kills T27)",
+     '        _rc, out = git(self.root, "log", "-M", "--topo-order",',
+     '        _rc, out = git(self.root, "log", "--no-renames", "--topo-order",'),
+
+    ("M28 a rename line of --name-status -z not parsed     (kills T27)",
+     '        if st[:1] == "R" and i + 2 < len(f):',
+     '        if False:'),
+
+    ("M29 an add or a delete line not parsed               (kills T30)",
+     '        elif st in ("A", "D") and i + 1 < len(f):',
+     '        elif False:'),
+
+    ("M30 the index not read against HEAD                  (kills T37)",
+     '        if self.rev is not None:\n            return []',
+     '        if True:\n            return []'),
+
+    ("M31 the index not younger than every commit          (kills T37)",
+     '        if b == INDEX:\n            return True',
+     '        if False:\n            return True'),
+
+    ("M32 a walk back that leaves its line of history      (kills T34)",
+     '            if line is not None and not self.descends(c, line):',
+     '            if False:'),
+
+    ("M33 an event at or before the citing commit ignored  (kills T27)",
+     '            if self.descends(c, sha):\n                return p',
+     '            if False:\n                return p'),
+
+    ("M34 a rename into the path not stepped back through  (kills T27)",
+     '            if kind == "R" and new == p:',
+     '            if False:'),
+
+    ("M35 an add after the citing commit walked past       (kills T30)",
+     '            return None             # created after it, or its line '
+     'breaks here',
+     '            continue'),
+
+    ("M36 an old path that went to two places: one picked  (kills T35)",
+     '            one = len(dests) == 1 and not dead',
+     '            one = len(dests) >= 1 and not dead'),
+
+    ("M37 a deletion beside a move ignored                 (kills T35)",
+     '            one = len(dests) == 1 and not dead',
+     '            one = len(dests) == 1'),
+
+    ("M38 an old path matched exactly, never as a suffix   (kills T31)",
+     '            for x in (olds if suffix else [p for p in olds if p == path]):',
+     '            for x in [p for p in olds if p == path]:'),
+
+    ("M39 a deleted file counted as a place it went to     (kills T30)",
+     '            dests.discard(None)',
+     '            pass'),
+
+    ("M40 a forward walk that reaches the tip finds nothing (kills T29)",
+     '            if n is None:\n                return q',
+     '            if n is None:\n                return None'),
+
+    ("M41 a forward walk that leaves its line of history   (kills T34)",
+     '            if not self.descends(c, c2):',
+     '            if False:'),
+
+    ("M42 a second move not followed forward               (kills T33)",
+     '            if kind == "R" and old == q:',
+     '            if False:'),
+
+    ("M43 a delete walked past, forward                    (kills T30)",
+     "            return None             # deleted: this file's line ends",
+     '            continue'),
+
+    ("M44 a path with a tracked candidate asks history too (kills T12)",
+     '        if hit:\n            return hit',
+     '        if False:\n            return hit'),
+
+    ("M45 an untracked path not resolved through history   (kills T29)",
+     '        if dest:\n            self.counts["renamed"] += 1',
+     '        if False:\n            self.counts["renamed"] += 1'),
+
+    ("M46 a refused rename not counted                     (kills T35)",
+     '        self.counts["rename-refused"] += refused',
+     '        pass'),
+
+    ("M47 baseline rows not read through history          (kills T36)",
+     '    rows, moved = rows_now(rows, cites.history)',
+     '    moved = 0'),
+
+    ("M48 an M3 row's digest not re-derived for its new path (kills T36)",
+     '                dg = digest(key(path, r.start))',
+     '                pass'),
+
+    ("M49 a moved CITING file not read through history     (kills T36)",
+     '        src, path, dg = now(r.src), now(r.path), r.digest',
+     '        src, path, dg = r.src, now(r.path), r.digest'),
+
+    ("M50 a TRACKED row path read through history anyway   (kills T36)",
+     '        return p if p in history.tracked else (',
+     '        return p if False else ('),
 ]
 
 

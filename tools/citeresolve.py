@@ -21,7 +21,8 @@ show`: it prints a tree's listing and exits 0).  `:N` or `:A-B` selects citing
 lines, none selects the file; `--date` selects every entry headed `## DATE`,
 up to the next level-1 or level-2 heading outside a fence -- by date, never by
 position, and ALL of them when several share the date.  `--cited PATH` keeps
-the citations whose file resolves to PATH.  Every file is read as bytes, a
+the citations whose file resolves to PATH -- the file at PATH now, under any
+name it was cited by before a rename (R23).  Every file is read as bytes, a
 leading BOM dropped, decoded as UTF-8 with bad bytes replaced, and split on
 `\n` ONLY, a final newline ending the last line (docmove's numbering, which is
 `sed -n`'s).  The grammar is citecheck's: `CITE_RX` and `scan_file` are
@@ -70,7 +71,10 @@ FOR EACH CITATION
            ASCII whitespace is one space, stripped; U+00A0 is text.  A range
            must be there INTACT, as consecutive lines.  Listed cited file
            first, then `docs/history/`, then the rest.  A match at the cited
-           file's own lines is marked `the cited line, unchanged`.
+           file's own lines is marked `the cited line, unchanged`.  The cited
+           file is the FILE: the one read at the dating commit, its renames
+           since followed forward by citecheck's `History` (R22), so a file
+           moved since keeps its mark and `read` names it `(PATH now)`.
   verdict  one | many | ambiguous -- blank when it was cited, or more than one
            match for text under docmove's 40 code points or a table
            separator | not found verbatim | refused.
@@ -107,6 +111,9 @@ WHAT IT CANNOT SEE
     neither is tracked).
   * A file holding a bare CR has no single meaning of "line N" (citecheck's
     T19); this counts `\n`, as `sed -n` does.
+  * A move git's similarity detection does not pair -- a move and a heavy
+    edit in one commit -- is a delete and an add here too: the file is not
+    followed to its new path, as citecheck's T32 decides for both tools.
 
 REFUTATION.  It is wrong if the text it reports is not line N of the cited
 file at the dating commit (R1-R3, R10 against the fixture's own lists, R11
@@ -120,8 +127,10 @@ re-date it there); if a generic line is called `one` (R5); if the prefilter
 drops a line docmove's normalisation matches (R16); if a hint fires where it
 should not or stays silent where it should (R12, R21); if --date selects by
 position (R13); or if the dating is not load-bearing -- R14 dates every
-citation at HEAD and requires R1-R3 to go red.  RE-DATED, BEFORE and HINT
-never change a verdict.
+citation at HEAD and requires R1-R3 to go red; or if a file moved since is
+not the cited file (R22, `the cited line, unchanged`; R23, `--cited` by its
+name now), each with the control that a run with no history read misses
+it.  RE-DATED, BEFORE and HINT never change a verdict.
 """
 
 import argparse
@@ -145,7 +154,7 @@ try:
 except (AttributeError, ValueError):  # a replaced or detached stdout
     pass
 
-VERSION = "1.0"
+VERSION = "1.1"     # 1.1: the cited file is followed across renames (R22, R23)
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 GIT = "git"
@@ -540,14 +549,14 @@ class Result(object):
         self.sha = self.how = self.origin = self.oline = None
         self.path = self.found = self.why = self.kind = None
         self.redated = self.first = self.query = self.verdict = None
-        self.parent = self.hint = None
+        self.parent = self.hint = self.now = None
         self.text, self.akeys, self.locs = [], [], []
 
     def refuse(self, kind, why):
         self.verdict, self.kind, self.why = "refused", kind, why
 
 
-def resolve(a, dater):
+def resolve(a, dater, renames=True):
     root = os.path.abspath(a.root)
     shallow = CC.is_shallow(root)
     if shallow is None:
@@ -576,7 +585,7 @@ def resolve(a, dater):
         rev = out.decode().strip()
     repo = Repo(root)
     try:
-        res = _resolve(a, dater, root, repo, head, rev)
+        res = _resolve(a, dater, root, repo, head, rev, renames)
     finally:
         repo.close()
     res["root"] = root
@@ -606,16 +615,70 @@ def _selection(a):
     return order, whole, ranges
 
 
-def _cited_may_be(a, written):
+def _cited_may_be(a, written, names=()):
     """Can `written` resolve to --cited PATH at some commit?  Only when it is
-    PATH or a suffix of it, so nothing else needs dating or reading."""
-    return (not a.cited or a.cited == written
-            or a.cited.endswith("/" + written))
+    PATH, or a path the file now at PATH had before a rename (`names`), or a
+    suffix of one of them -- so nothing else needs dating or reading."""
+    return not a.cited or any(n == written or n.endswith("/" + written)
+                              for n in [a.cited] + list(names))
 
 
-def _resolve(a, dater, root, repo, head, rev):
+# ------------------------------------------------------------------ renames
+#
+# 🔴 A RECORD CITES A FILE BY THE NAME IT HAD THEN.  The reading above is by
+# that name, in the dating commit's own tree, so a move since changes no
+# verdict -- 量 2026-10-09, fb5a5d17 and a bare `git mv config/rlxfw-src
+# kernel` give `SPEC.md`, `docs/GATE-RESULTS.md` and LOG.md's citations of
+# rtl819x-nic.c the same verdict counts before and after.  What a move DID
+# change is everything that asked whether a HEAD path is the cited file:
+# `--cited kernel/.../rtl819x-nic.c` kept 0 of the 14 LOG.md citations that
+# `--cited config/rlxfw-src/...` kept before the move, and "still at the
+# cited line" fell from 127 to 76 over SPEC.md.  So the cited file is now the
+# FILE: its path at HEAD is followed forward from the dating commit with
+# citecheck's `History` -- git's own rename detection, read once -- and
+# `--cited` matches the names it had before as well as the one it has.
+def _names(h, target):
+    """Every path the file now at `target` has had: its renames walked back,
+    along its own line of history, to the add that created it."""
+    h.load()
+    out, p, i, line = [target], target, -1, None
+    while True:
+        j = h._older(p, i)
+        if j is None:
+            return out
+        i = j
+        c, kind, old, new = h.events[j]
+        if line is not None and not h.descends(c, line):
+            continue                # another line of history
+        if kind != "R" or new != p:
+            return out              # created here: no older name
+        p, line = old, c
+        out.append(p)
+
+
+def _now_of(h, sha, path):
+    """Where the file at `path` in commit `sha` is at HEAD: the first event
+    after `sha`, on a line from it, that ended a life at `path`, walked
+    forward.  None when the file was deleted since; `path` when nothing ended
+    it."""
+    h.load()
+    for j in reversed(h.ends.get(path, [])):          # oldest first
+        if h.descends(sha, h.events[j][0]):
+            return h._forward(j)
+    return path
+
+
+def _here(r):
+    """The cited file's path at HEAD -- its path at the dating commit when it
+    has been deleted since, as before renames were followed."""
+    return r.now or r.path
+
+
+def _resolve(a, dater, root, repo, head, rev, renames=True):
     order, whole, ranges = _selection(a)
     results, notes, stats = [], [], collections.Counter()
+    hist = CC.History(root, "HEAD", renames=renames)
+    names = _names(hist, a.cited) if a.cited else []
     rc, out, _e = _git(root, "config", "--get-all", "blame.ignoreRevsFile")
     if rc == 0 and out.strip() and not rev:
         # Said, not cleared: git 2.43 opens a configured file before the
@@ -659,11 +722,14 @@ def _resolve(a, dater, root, repo, head, rev):
         stats["whole"] += 1 if wanted is None else 0
         for k in ("fenced", "transcript", "selfref"):
             stats[k] += counts[k]
-        kept = [e for e in els if _cited_may_be(a, e.written)]
+        kept = [e for e in els if _cited_may_be(a, e.written, names)]
         stats["cited-out"] += len(els) - len(kept)
         results.extend(_date_and_read(dater, root, repo, rel, kept, rev))
+    for r in results:
+        r.now = _now_of(hist, r.sha, r.path)
     if a.cited:
-        kept = [r for r in results if a.cited in (r.path, r.el.written)]
+        kept = [r for r in results
+                if a.cited in (r.path, r.el.written, r.now)]
         stats["cited-out"] += len(results) - len(kept)
         results = kept
     queries = []
@@ -771,7 +837,7 @@ def _redating(root, results):
 
 
 def _tier(r, path):
-    if path == r.path:
+    if path == _here(r):
         return 0
     return 1 if path.startswith(HISTORY) else 2
 
@@ -810,7 +876,7 @@ def _loc(r, path, line):
     n = len(r.text)
     where = "%s:%d" % (path, line) if n == 1 else "%s:%d-%d" % (
         path, line, line + n - 1)
-    if path == r.path and line == r.el.first:
+    if path == _here(r) and line == r.el.first:
         where += "  (the cited line, unchanged)"
     return where
 
@@ -878,10 +944,11 @@ def report(res, a, out, err):
                     r.first[:8], dates.get(r.first, "?"))
             print(line, file=out)
         if r.path:
-            print("    read     %s:%s at %s%s" % (
+            print("    read     %s:%s at %s%s%s" % (
                 r.path, _span(e), r.sha[:8],
                 "" if r.found == "exact" else "  (`%s` %s)" % (e.written,
-                                                              r.found)),
+                                                              r.found),
+                "" if r.now in (None, r.path) else "  (`%s` now)" % r.now),
                 file=out)
         if r.text:
             more = "" if len(r.text) == 1 else "   (+%d more line%s)" % (
@@ -923,7 +990,7 @@ def _summary(res, a, out):
             "%s %d" % (label, kinds[k]) for k, label in REFUSALS if kinds[k]),
             file=out)
     same = sum(1 for r in results
-               if any(p == r.path and n == r.el.first for p, n in r.locs))
+               if any(p == _here(r) and n == r.el.first for p, n in r.locs))
     red = sum(1 for r in results if r.redated)
     moved = sum(1 for r in results if _origin(r))
     print("summary  still at the cited line %d  re-dated %d  traced by blame "
@@ -960,11 +1027,12 @@ def _dates(root, shas):
     return got
 
 
-def run(argv, out, err=None, dater=None):
+def run(argv, out, err=None, dater=None, renames=True):
     """The whole command path, argument parsing included -> exit code.  The
     self-test drives THIS rather than an inner helper, so each control
     exercises what the command line exercises (docmove's `run`).  `dater` is
-    the seam R14 uses to date every citation at HEAD."""
+    the seam R14 uses to date every citation at HEAD; `renames=False` reads
+    no history, the tool before a move was followed (R22, R23)."""
     ap = argparse.ArgumentParser(prog="citeresolve.py")
     ap.add_argument("targets", nargs="*", metavar="FILE[:N|:A-B]")
     ap.add_argument("--date", metavar="YYYY-MM-DD")
@@ -978,7 +1046,7 @@ def run(argv, out, err=None, dater=None):
     except SystemExit as e:
         return 2 if e.code else 0
     try:
-        res = resolve(a, dater or blame_dater)
+        res = resolve(a, dater or blame_dater, renames)
     except Refusal as e:
         print("REFUSING: %s" % DM.shown(str(e), 2000), file=out)
         return 2
@@ -1124,11 +1192,11 @@ class _Fixture(object):
             os.environ.clear()
             os.environ.update(saved)
 
-    def run(self, argv, dater=None):
+    def run(self, argv, dater=None, renames=True):
         """In process, under the fixture's environment."""
         buf, err = io.StringIO(), io.StringIO()
         rc = self._as_fixture(lambda: run(argv + ["--root", self.dir], buf,
-                                          err, dater=dater))
+                                          err, dater=dater, renames=renames))
         return rc, buf.getvalue()
 
     def blame(self, rel, flags):
@@ -1527,6 +1595,55 @@ def r21(fx, dater=None):
                       "hint" in b[5], note in out2)
 
 
+def _moved(fx, name):
+    """A log that cites old/N.md, by its path and by its name alone; then a
+    commit that does nothing but `git mv old/N.md new/N.md`."""
+    f = _Fixture(os.path.dirname(fx.dir), name)
+    f.commit({"old/N.md": _text(N1),
+              "LOG.md": _text(["# log", "Kilo is at `old/N.md:3`.",
+                               "Lima, by its name alone: `N.md:4`."])},
+             "one: the log cites old/N.md")
+    os.makedirs(os.path.join(f.dir, "new"))
+    f.git("mv", "old/N.md", "new/N.md")
+    f.commit({}, "two: old/N.md moves to new/, nothing else")
+    return f
+
+
+def r22(fx, dater=None):
+    """A file moved since: its untouched line is the cited line, unchanged,
+    and counted so.  Read with no history -- the tool before -- it is not,
+    which is what shows this fixture holds the defect."""
+    f = _moved(fx, "moved-since")
+    got = []
+    for renames in (True, False):
+        rc, out = f.run(["LOG.md:2"], dater, renames=renames)
+        b = _blocks(out).get(2, [""])[0]
+        got.append((rc, b, out))
+    (rc1, b1, o1), (rc0, b0, o0) = got
+    mark = "    now      new/N.md:3  (the cited line, unchanged)"
+    good = (rc1 == rc0 == 0 and "    read     old/N.md:3 at " in b1
+            and "(`new/N.md` now)" in b1 and mark in b1
+            and "still at the cited line 1" in o1
+            and _verdict_of(b1) == _verdict_of(b0) == "one"
+            and mark not in b0 and "still at the cited line 0" in o0)
+    return good, "with history: marked %s; with none: marked %s" % (
+        mark in b1, mark in b0)
+
+
+def r23(fx, dater=None):
+    """--cited by the file's name NOW keeps citations written under its old
+    path and by its bare name; with no history read it keeps neither."""
+    f = _moved(fx, "moved-cited")
+    want = ("summary  --cited new/N.md kept 2 and dropped 0",
+            "summary  --cited new/N.md kept 0 and dropped 2")
+    got = [f.run(["LOG.md", "--cited", "new/N.md"], dater, renames=r)
+           for r in (True, False)]
+    good = all(rc == 0 and w in out for (rc, out), w in zip(got, want))
+    return good, "; ".join(
+        (re.search(r"kept \d+ and dropped \d+", out) or ["?"])[0]
+        for _rc, out in got)
+
+
 CASES = [
     ("R1", r1, "a citation reads the cited file at the citing commit, and "
                "finds that text where it moved"),
@@ -1568,6 +1685,10 @@ CASES = [
     ("R21", r21, "a dating commit that changed the cited lines shows their "
                  "parent; past the end names where they last were; a set "
                  "blame.ignoreRevsFile is said"),
+    ("R22", r22, "a file moved since the citation: its untouched line is the "
+                 "cited line, unchanged; with no history read, it is not"),
+    ("R23", r23, "--cited by the file's name now keeps citations of its old "
+                 "path and of its bare name; with no history read, neither"),
 ]
 
 
