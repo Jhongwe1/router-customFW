@@ -34911,3 +34911,18 @@ D2 是這一則與它的 commit：`PROGRESS.md` 的 Release clock `v1.0` 列、�
 **`P5e-0` 的前一半**（這個 commit）：步驟表放在 `PROGRESS.md` 檔尾（12,897 位元組）；看板在 `R6c` 之下加 `P5e` 一列，同時把下方 `Est.` 分析段的一對軟換行併成一行，讓那之後的每一行不動（`FW-110`）；§ Now 重寫、行數不變。DoD 的二十一列由 `tools/entrycheck.py` 讀；它在開 gate 的樹上量到的基線記在它進來的那一則。步驟表裡刻意不寫私有計畫目錄的路徑與那組框架用語，因為 E16 與 E21 數的就是非紀錄檔裡的它們，而步驟表在 `PROGRESS.md` 裡直到 gate 關閉。`docsize` 的 `PROGRESS.md` 整檔預算 105,000 → 115,000（量 這個 commit 的檔是 111,291 位元組，乘 1.03 無條件進位到三位有效數字）；`P5e-2` ④ 把檔縮到 200 行以下時在同一個 commit 降回來。
 
 `cfcensus check` 在這個 commit 的第一版拒絕了（rc 3）：看板上有一個進行中的 gate，而沒有任何一列 OPEN 的 Carried forward 由它擁有 —— 守門的意思是「gate 開著而普查讀到全部都不歸它，分不出是普查停了」。主線沒有為了讓它過而改守門，而是去找 `P5e` 真正該接的債：`NAME-1`（兩個名字比內容窄的目錄／檔案，`config/host-compat/` 與 `tools/test-kbuild-cflags.sh`）的常設指示寫的條件是「任何一段不同時改變它們做什麼的桌面段」，而 `P5e` 改名字與入口、不改行為，正是那個條件。它改由 `P5e-3` 擁有：那一步的目錄 README 要嘛改名，要嘛寫清楚它們裝什麼；`config/rlxfw-src/` 搬到 `kernel/` 不碰這兩個名字。改完 `cfcensus write` 重產普查區塊；量 `docsize` 7 of 7、`spec-check` rc 0、`cfcensus check` rc 0（25 列、0 個發現、1 列活的擁有者）、`ratchet` rc 0、`--self-test` 72/72。
+
+**`P5e-0` 的後一半**：`tools/entrycheck.py`（2,678 行）與 `tools/test-entrycheck-mutants.py`，由一支代理照事先寫死的規格寫，主線套用並在 main 上重跑核對。量：`--self-test` 125 passed、0 failed（每一列一個必須讀 PASS 的 fixture、一個必須讀 RED 的 fixture，加上 UNMEASURED、豁免、`--offline` 與退出碼兩個方向的案例）；突變 16 個全部被殺，每一個都讓它點名的那個案例變紅；`ci-census --only` 讀兩份 capture rc 0，`ci-census --self-test` 30／0。CI 的 `text` job 加兩步（`entrycheck self-test`、`test-entrycheck-mutants`），`tools/ci-expected.tsv` 加兩列，not-run-total 不動（532），說明併進第 7 行而不加行（`FW-110`）。`check` 不進 CI：gate 關之前它一定紅，而且四列要讀這個 job 之外抓的檔。
+
+**基線**（工具自己在開 gate 的樹上量，`report --offline`）：19 列 RED —— E1 1,003 行；E2 第一屏 2,159 字；E3 103 個日期；E4 86 個狀態 emoji；E5 第 28 行一格 505 字；E6 0 張圖；E7 沒有 build 節；E8 2,735,264 位元組；E9 `RUNSHEET.md` 在根目錄；E10 4,254 行、最長一節 1,799 行；E11 506 行；E14 兩組套件都沒在 CI 跑；E15 沒有 `docs/README.md`；E16 34 個檔 146 處；E17 11 支驅動全部超過 60 行、最差 409；E18 119 個 C／H 檔裡 50 個；E19 49 個檔 67 處；E20 1 處；E21 4 個檔 5 處。另外四列是線上的（E8w、E12、E13、E14w），離線不量；代理在 `fb5a5d17` 用 Windows `curl` 存下的頁面量到 E8w RED —— 七個根目錄 `.md` 裡一個不顯示，`LOG.md`，頁面資料 `"large":true`。開 gate 的 DoD（至少 8 列 RED、逐列點名）成立。
+
+計畫裡有四個數字重現不了，以工具為準：E5 是 505 字不是 541（工具的字：去掉連結網址與徽章、表格照 GitHub 的規則切儲存格；粗略的空白切分是 532）；E16 是 34 個檔 146 處，不是 55；E19 是 49 個檔，不是 11 —— 多數是工具把工作目錄的路徑寫死成預設值；E17 是 11 支驅動，不是 3。
+
+主線對代理回報「brief 哪裡錯」的裁決：
+
+- E8w 改讀 GitHub 頁面資料裡的 `blob.large`，並核對頁面的路徑與 HEAD；"Sorry about that" 只當交叉檢查。照字面寫的條件會被兩件事騙：檔案自己的文字含那句話（`PROGRESS.md` 的步驟表一旦引用它就永遠含），以及一個 404 頁面裡沒有那句話。
+- E16 與 E19 對 `CLAUDE.md` 按名豁免：它的表定義 `$FWRE_WORK` 的路徑，它的規則描述私有的計畫目錄，對讀者是資訊而不是斷掉的指標；`CLAUDE.md` 不再命中時豁免就失效、那一列讀 RED。E21 不豁免，`CLAUDE.md` 那句規則在 `P5e-5` 改寫。
+- E19 的工具預設路徑改成 `~/fwre-work`（在這台機器上行為不變），排成自己的一步，等搬檔與 `P5e-2a` 落地之後做，因為三者碰同一批工具。
+- E12 只會因為 `tools/` 的 linguist 屬性而通過，這正是計畫的設計（`tools/` 是儀器，不是產品）；所以 `tools/README.md` 要寫明 GitHub 的語言統計排除了 `tools/`。
+- E6 不算徽章；E15 只把會被 GitHub 渲染的 README 與非紀錄 `.md` 當跳板，所以 `docs/history/` 與 `docs/log/` 各要一個索引（已交給 `P5e-2b` 與 `P5e-2a`）。
+- 測試行照 `ci-census` 的解析器寫（`ok` 後面至少兩個空白）；brief 給的格式會被判成無法解析 —— brief 錯了，代理對。

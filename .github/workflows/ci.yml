@@ -793,6 +793,23 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/digestscan.py check
 
+      # P5e's definition of done, read row by row: README size and shape, the
+      # record splits, the docs index, CI that builds code, and what an outside
+      # reader trips on.  Only the instrument's controls run here: 125 cases on
+      # hermetic git fixtures, every row a fixture that must read PASS and one
+      # that must read RED, and its mutation suite (B0, A0, 16 mutants, each
+      # counted only when the case it names turns red).  `entrycheck.py check`
+      # is NOT here: it is red until the gate closes, and four of its rows read
+      # files fetched outside this job (gh's JSON, GitHub's blob pages, a CI
+      # log of the closing commit).
+      - name: entrycheck self-test
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/entrycheck.py --self-test 2>&1 | tee ci-out/entrycheck.out; exit "${PIPESTATUS[0]}"
+
+      - name: test-entrycheck-mutants
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/test-entrycheck-mutants.py --jobs 8 2>&1 | tee ci-out/test-entrycheck-mutants.out; exit "${PIPESTATUS[0]}"
+
       # `FW-70`'s instrument. Two estimators over committed .timing files; one
       # of them REFUSES on this console and the refusal is the point -- at
       # 38400 the reader is faster than the wire, so every read returns 3-4
