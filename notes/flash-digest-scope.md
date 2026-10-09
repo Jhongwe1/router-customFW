@@ -41,10 +41,10 @@ control: a rule that refused nothing would make this table meaningless.
 
 | where | form | bits |
 |---|---|---:|
-| `LOG.md:87` | full 64 hex | 256 |
+| `docs/log/2026-08.md:83` | full 64 hex | 256 |
 | `tools/leakscan.py:137` | full 64 hex, split across two literals | 256 |
-| `SPEC.md:178` (`FLS-14`) | `a800059a…10f37ea` | 60 |
-| `RUNSHEET.md:13`, `:401`, `notes/leak-surface.md:79` | `a800059a` | 32 |
+| `SPEC.md:189` (`FLS-14`) | `a800059a…10f37ea` | 60 |
+| `docs/history/runsheet-2026-09-27.md:13`, `:401`, `notes/leak-surface.md:79` | `a800059a` | 32 |
 | `bench/2026-08-24c/PREDICTIONS-block5.md:39` | `a800059a9b8c414d` | 64 |
 
 🔴 **Eliding is not mitigation.** `FLS-14`'s 60-bit form distinguishes a set of
@@ -109,7 +109,7 @@ carry that coupling.
 whether a committed file contains a *digest of* a forbidden window. `scan` reads
 bytes, `leakscan` reads address shapes, `audit-bench-log` reads topic keywords —
 all three are blind to a hash. Carried forward as `FLW-1`, with its positive
-control fixed that day: **the instrument must report `LOG.md:87` on its first
+control fixed that day: **the instrument must report `docs/log/2026-08.md:83` on its first
 run, and must not report the complement digest of §5.** 🔄 2026-10-09:
 `tools/digestscan.py` asks it, and both controls hold; its first readings are
 the last section of this file (`SPEC.md` `FLS-32`).
@@ -698,7 +698,7 @@ repository is known to hold (its docstring, *N*).
 量 2026-10-09, with the scanner staged on `1b13303d` in the main checkout:
 17,674 of 17,675 tracked files read (the submodule gitlink is not read) and 17
 hits, every one the whole-image sha256, `whole@0x000000+0x400000`: its two full
-copies, `LOG.md:87` and `tools/leakscan.py:137`–`138` — the positive control § 4
+copies, `docs/log/2026-08.md:83` and `tools/leakscan.py:137`–`138` — the positive control § 4
 fixed, covered by the 2026-09-07 ruling — and fifteen prefixes of it, 8 or 16
 digits, on fourteen lines of eight files, two of them on `SPEC.md`'s `FLS-14`
 line. § 5's complement digest is not reported (the negative control). The main
@@ -768,3 +768,24 @@ firmware). A move of the pin, which `CLAUDE.md` forbids, would void this count.
 
 What this does not establish: that these 46 are every digest of these windows in
 `upstream/` — the gaps listed above apply — or anything about copies outside it.
+
+## 🔄 2026-10-09 (132nd segment, `P5e-2`) — the exemptions follow the moved text
+
+`P5e-2` moved `LOG.md`'s August and September entries to `docs/log/` and
+`RUNSHEET.md` whole to `docs/history/runsheet-2026-09-27.md`, so six rows of
+`tools/digestscan.py`'s `EXEMPT` moved with their lines: the full digest § 2
+lists first is now `docs/log/2026-08.md:83` (line 87 of `LOG.md` until then), the
+four prefix lines at 18384–18393 of `LOG.md` are `docs/log/2026-09.md:7076`–`7085`,
+and the runsheet's two keep their numbers. Re-pointing `FLS-14`'s own citation of
+that digest changed `SPEC.md:189`, which § 2's table cited by its old number, 178:
+a rot on `citecheck`'s baseline. The table now cites 189, read back as `FLS-14`;
+the baseline row goes, and with it the eight-digit prefix that row quoted, so its
+exemption goes too. Sixteen rows remain: the two full copies, and fourteen
+prefixes on thirteen lines of seven files.
+
+量 2026-10-09 on the `P5e-2` clone with the main session's table edits applied:
+`scan` reads 0 findings, 16 exempt, 0 stale over 17,679 of 17,680 tracked files;
+`check` holds `K1` and `K2` for the 16 rows; the self-test's `R2` finds the full
+digest at `docs/log/2026-08.md:83`. What this does not establish: the reading on
+the main checkout, which the closeout's `digestscan scan` takes, or how many of
+the sixteen rows `K2`'s proxy can see leave their line — not re-measured.

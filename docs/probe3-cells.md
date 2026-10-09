@@ -322,7 +322,7 @@ code that runs between the two calls."* Entering the walk through
 `rlx_call2_uncached` makes the driver's own instruction fetch uncached, so **the
 only thing in the I-cache is the victims**. The build is `-mno-abicalls -fno-pic
 -G0`, so every address the loop forms is absolute whatever segment it runs in
-(讀; `RUNSHEET.md:974` already establishes this for `probe1`'s `flags` bit 0).
+(讀; `docs/history/runsheet-2026-09-27.md:984` already establishes this for `probe1`'s `flags` bit 0).
 
 **The victim primitive is two words, not three.**
 
@@ -1291,7 +1291,7 @@ unconditionally)`'s standing constraint.
 
 ## 7. Running order, and what survives a fault at each point
 
-**Risk order, not numeric order** — `probe1`'s rule, and `RUNSHEET.md:974`
+**Risk order, not numeric order** — `probe1`'s rule, and `docs/history/runsheet-2026-09-27.md:984`
 already warns that a reader who assumes otherwise misreads every row. **Every
 cell writes its result to the block before the next one starts**, and word 2 is
 `probe2`'s monotone progress marker, so a block recovered after a hang says

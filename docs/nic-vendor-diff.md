@@ -762,7 +762,7 @@ is a divergence to know about rather than a defect.
 ~~量 `looprun`'s `S5c`, every seating: **at the loader prompt the board answers
 ARP.**~~ 🔴 **REFUTED on the silicon 2026-09-21 (seating 36), and the correction
 is one command.** `S5c` passes *after* `S5`, the rescue, which sends
-`IPCONFIG`; 讀 `RUNSHEET.md:566` has said since 2026-08-24 that *the loader
+`IPCONFIG`; 讀 `docs/history/runsheet-2026-09-27.md:566` has said since 2026-08-24 that *the loader
 answers the network only after this*, and 量 `tools/looprun.py:582-600` puts
 the rescue before `S5c` in the plan. **So no `S5c` reading has ever been taken
 on a bare cold boot.** Measured on one: `arping` 5 transmitted / 0 received and
@@ -806,7 +806,7 @@ One cold power-on at 22:22, no image, no boot, no TFTP.
 `IPCONFIG` has been typed — see § 12.5, corrected in place. Two probes on the
 bare cold boot, one with an ESC stream up and one with the console quiet and
 nothing holding the port, both read `arping` **0 received** and `ip neigh`
-**`INCOMPLETE`**. The second is what rules out the instrument; `RUNSHEET.md:566`
+**`INCOMPLETE`**. The second is what rules out the instrument; `docs/history/runsheet-2026-09-27.md:566`
 is what named the cause.
 
 ### 13.2 🟢🟢 The loader does not stop transmitting, at 16× the dose

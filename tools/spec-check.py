@@ -563,7 +563,7 @@ SRCREF_EXEMPT = {
               'landed against these numbers, and a record silently updated to '
               'match today\'s source stops being a record',
     'LOG.md': 'the working log is a record of what was true on a date',
-    'CHANGELOG.md': 'a record',
+    'CHANGELOG.md': 'a record', 'docs/log/': 'LOG.md\'s earlier months: a record',
     'docs/rlxprobe-audit-2026-08-25.md':
         'a DATED audit.  量 2026-08-31: two of its three references have '
         'ALREADY rotted -- probe2.c:273 is now a blank line and probe1.c:299 '

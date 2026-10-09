@@ -99,7 +99,9 @@ ROOT = os.path.dirname(HERE)
 # anything else, because Python keeps the LAST of two equal keys in silence.
 BUDGET = {
     "CLAUDE.md:lines": 351,
-    "CLAUDE.md:bytes": 24200,
+    "CLAUDE.md:bytes": 25200,  # 2026-10-09, P5e-2: the monthly LOG.md move in
+    #   section Closeout and docs/log/ in four rules. 量 24,416 B after that commit;
+    #   x 1.03 = 25,148.5, three significant figures up = 25,200.
     "CLAUDE.md:maxline": 647,
     "PROGRESS.md:bytes": 115000,  # 2026-10-09, P5e's opening commit: its step
     #   list at the end of the file, the board row, section Now rewritten.

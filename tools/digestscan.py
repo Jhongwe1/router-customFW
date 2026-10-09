@@ -113,9 +113,9 @@ N, AND WHY IT IS 8
 The threat sets the ceiling.  A k-digit prefix of a digest over a window
 whose only unknown is the MAC leaves 2^24 * 16^-k false candidates standing:
 0.004 at k = 8, 1.5e-5 at k = 10.  Every k >= 8 names the MAC, so an N above
-8 lets a 32-bit abbreviation through -- and that is the form `RUNSHEET.md:13`,
-`:401` and `notes/leak-surface.md:79` carry (`notes/flash-digest-scope.md`
-§ 2).
+8 lets a 32-bit abbreviation through -- and that is the form
+`docs/history/runsheet-2026-09-27.md:13`, `:401` and `notes/leak-surface.md:79`
+carry (`notes/flash-digest-scope.md` § 2).
 
 The corpus sets the floor.  量 2026-10-09, `measure` over the tracked tree at
 28a490c7 -- 17,671 files -- against the C = 166 candidates of the reference
@@ -150,18 +150,20 @@ a dump-free proxy of the same join for CI (`K2`): each row's line still
 starts a hex chain of the row's length.  A proxy: other hex of that length on
 the line satisfies it too, so only the scan at the desk sees every removal.
 
-What `EXEMPT` holds, and why.  Seventeen rows, and every one of them is the
+What `EXEMPT` holds, and why.  Sixteen rows, and every one of them is the
 same candidate: the sha256 of the whole 4 MiB image, `whole@0x000000+0x400000`.
   * Two rows under the owner's 2026-09-07 ruling: that digest in full, at
-    `LOG.md:87` and split across two literals at `tools/leakscan.py:137`.  It
-    is printable because `FLS-22` made the MAC public, not because 4 MiB is
-    wide.
-  * Fifteen rows under the main session's 2026-10-08 ruling (`LOG.md`, 130th
+    `docs/log/2026-08.md:83` and split across two literals at
+    `tools/leakscan.py:137`.  It is printable because `FLS-22` made the MAC
+    public, not because 4 MiB is wide.
+  * Fourteen rows under the main session's 2026-10-08 ruling (`LOG.md`, 130th
     segment, `FLW-1`; the owner may override it): every PREFIX of that same
     digest in the tracked tree, 量 at `1b13303d` -- eight or sixteen digits,
     fifteen hits on fourteen lines of eight files, `SPEC.md`'s `FLS-14` line
-    holding two and so two rows.  A prefix of a digest already published in
-    full discloses nothing more.
+    holding two and so two rows.  Fourteen on thirteen lines of seven files
+    since 2026-10-09 (`P5e-2`): the `tools/citecheck-baseline.tsv` row that
+    quoted one went when the rotted citation it recorded was repaired.  A
+    prefix of a digest already published in full discloses nothing more.
 No other candidate is exempt: a digest of any other window, whole or as a
 prefix, is a finding.  The key does not say prefix or suffix, so a row would
 also take a suffix of the same length of the same digest that replaced its
@@ -311,23 +313,32 @@ PREFIX_RULING = ("RULING 2026-10-08 (LOG.md, 130th segment, FLW-1): a prefix "
                  "of the whole-dump sha256 the 2026-09-07 ruling published in "
                  "full; a prefix discloses nothing more")
 EXEMPT = [
-    ("LOG.md", 87, "whole@0x000000+0x400000", "sha256", 64,
-     "RULING 2026-09-07 (LOG.md, fortieth segment, § 八; SPEC.md FLS-14, "
-     "FLS-24): the rule stands and its scope is written down -- the whole-"
-     "image digest is printable because FLS-22 made the MAC public, not "
-     "because 4 MiB is wide"),
+    ("docs/log/2026-08.md", 83, "whole@0x000000+0x400000", "sha256", 64,
+     "RULING 2026-09-07 (docs/log/2026-09.md, fortieth segment, § 八; "
+     "SPEC.md FLS-14, FLS-24): the rule stands and its scope is written down "
+     "-- the whole-image digest is printable because FLS-22 made the MAC "
+     "public, not because 4 MiB is wide"),
     ("tools/leakscan.py", 137, "whole@0x000000+0x400000", "sha256", 64,
      "RULING 2026-09-07, the same ruling and the same digest, split across "
      "two literals (leakscan's DUMP_SHA256, its dump-identity check)"),
-    # The fifteen prefixes, 量 at 1b13303d: fourteen lines, eight files.
-    ("LOG.md", 18384, "whole@0x000000+0x400000", "sha256", 8, PREFIX_RULING),
-    ("LOG.md", 18391, "whole@0x000000+0x400000", "sha256", 8, PREFIX_RULING),
-    ("LOG.md", 18392, "whole@0x000000+0x400000", "sha256", 8, PREFIX_RULING),
-    ("LOG.md", 18393, "whole@0x000000+0x400000", "sha256", 16, PREFIX_RULING),
-    ("RUNSHEET.md", 13, "whole@0x000000+0x400000", "sha256", 8,
+    # The prefixes, 量 at 1b13303d: fifteen on fourteen lines of eight files.
+    # 2026-10-09 (P5e-2): the LOG.md and RUNSHEET.md rows moved with their
+    # text -- LOG.md:87 -> docs/log/2026-08.md:83, LOG.md:18384-18393 ->
+    # docs/log/2026-09.md:7076-7085, RUNSHEET.md -> its docs/history/ copy --
+    # and the tools/citecheck-baseline.tsv row went with the baseline row it
+    # exempted: fourteen on thirteen lines of seven files.
+    ("docs/log/2026-09.md", 7076, "whole@0x000000+0x400000", "sha256", 8,
      PREFIX_RULING),
-    ("RUNSHEET.md", 401, "whole@0x000000+0x400000", "sha256", 8,
+    ("docs/log/2026-09.md", 7083, "whole@0x000000+0x400000", "sha256", 8,
      PREFIX_RULING),
+    ("docs/log/2026-09.md", 7084, "whole@0x000000+0x400000", "sha256", 8,
+     PREFIX_RULING),
+    ("docs/log/2026-09.md", 7085, "whole@0x000000+0x400000", "sha256", 16,
+     PREFIX_RULING),
+    ("docs/history/runsheet-2026-09-27.md", 13, "whole@0x000000+0x400000",
+     "sha256", 8, PREFIX_RULING),
+    ("docs/history/runsheet-2026-09-27.md", 401, "whole@0x000000+0x400000",
+     "sha256", 8, PREFIX_RULING),
     # FLS-14's line holds the prefix twice: two hits of one name, two rows.
     ("SPEC.md", 189, "whole@0x000000+0x400000", "sha256", 8, PREFIX_RULING),
     ("SPEC.md", 189, "whole@0x000000+0x400000", "sha256", 8, PREFIX_RULING),
@@ -343,8 +354,6 @@ EXEMPT = [
      16, PREFIX_RULING),
     ("notes/leak-surface.md", 79, "whole@0x000000+0x400000", "sha256", 8,
      PREFIX_RULING),
-    ("tools/citecheck-baseline.tsv", 42, "whole@0x000000+0x400000", "sha256",
-     8, PREFIX_RULING),
 ]
 
 
@@ -1591,12 +1600,12 @@ def self_test() -> int:
         rcs = build_candidates(real, (), MIN_HEX)
         del real
         pos = {}
-        for rel in ("LOG.md", "tools/leakscan.py"):
+        for rel in ("docs/log/2026-08.md", "tools/leakscan.py"):
             t, _n = read_member(ROOT, rel)
             pos[rel] = [] if t is None else [
                 (line_of(t, a), rcs.entries[ci][1], rcs.entries[ci][2], form, k)
                 for a, _b, ci, form, k in match_text(t, rcs)]
-        need = [("LOG.md", 87), ("tools/leakscan.py", 137)]
+        need = [("docs/log/2026-08.md", 83), ("tools/leakscan.py", 137)]
         got = all(any(ln == want_ln and kind == "sha256" and k == 64
                       and "whole@0x000000+0x400000" in labs
                       for ln, kind, labs, _f, k in pos[rel])
@@ -1604,9 +1613,10 @@ def self_test() -> int:
         hits_ex = [(rel, ln, ci, f, k)
                    for rel in pos for (ln, _kd, _l, f, k) in pos[rel]]
         if got:
-            good("R2 POSITIVE: LOG.md:87 and tools/leakscan.py:137 are found -- "
-                 "the whole image's sha256, 64 of 64 digits, the second split "
-                 "across two literals")
+            good("R2 POSITIVE: docs/log/2026-08.md:83 (LOG.md:87 until "
+                 "2026-10-09) and tools/leakscan.py:137 are found -- the whole "
+                 "image's sha256, 64 of 64 digits, the second split across two "
+                 "literals")
         else:
             bad(f"R2 the two lines FLW-1 fixed in advance were not both found "
                 f"({len(hits_ex)} hit(s) in the two files)")

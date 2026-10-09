@@ -7,9 +7,9 @@ lists every source tree with its role) and one leaked draft datasheet. TOTOLINK
 never released source.
 
 **This file holds rules.** Where the project stands is `PROGRESS.md` § Now. Why a
-rule exists is in `LOG.md` under the date it was learnt, and in this file's former
-text, archived verbatim in `docs/history/claude-md-2026-09-23.md`. Where this file
-contradicts the repository, the repository wins and this file is wrong.
+rule exists is in `LOG.md` or `docs/log/` under the date it was learnt, and in this
+file's former text, archived verbatim in `docs/history/claude-md-2026-09-23.md`.
+Where this file contradicts the repository, the repository wins and this file is wrong.
 
 ## Where things are
 
@@ -20,7 +20,7 @@ contradicts the repository, the repository wins and this file is wrong.
 | `upstream/` | the reverse-engineering project, a submodule pinned at `4d3ff26`, **read-only**: the pin is the whole credibility of `R9`'s differential proof |
 | `$FWRE_WORK` | `/home/key/fwre-work` in WSL, shared with `../router`: every binary; this project's output goes under `$FWRE_WORK/rebuild/`, and `src-vendor/` is a symlink into it |
 | `SPEC.md` | every number held about the device, each with a mark for where its value came from, a mark for where its name came from, and a link to the file that owns the finding. An index, not an owner. Written in Chinese |
-| `LOG.md` | one dated entry per segment: the history of every decision |
+| `LOG.md` | one dated entry per segment: the history of every decision; earlier months are in `docs/log/` |
 | `docs/history/` | text moved verbatim out of state documents |
 
 A gate is not a session: a gate spans many segments and a session is one step of
@@ -85,13 +85,13 @@ agree: name the tool that could be lying and the second source that settles it.
   § Carried forward and the active gate's step list: what is true now. **Rewrite;
   never append.** A wrong line is fixed where it stands and the fix is recorded in
   `LOG.md`.
-- **Record** — `LOG.md`; everything under `bench/` once committed; each
-  `docs/GATE-RESULTS.md` entry; `CHANGELOG.md`; and `docs/history/`, which holds
-  `PROGRESS.md`'s closed step lists, session ladder and corrections. A closed
-  gate's step list moves to `docs/history/steps-<gate>.md` in its closing
-  commit, and a record's line citation is read with `tools/citeresolve.py`. A
-  record is never edited after the segment that wrote it; a correction is a new
-  dated entry. The record of being wrong lives here.
+- **Record** — `LOG.md` and its earlier months, `docs/log/<YYYY-MM>.md`; everything
+  under `bench/` once committed; each `docs/GATE-RESULTS.md` entry; `CHANGELOG.md`;
+  and `docs/history/`, which holds `PROGRESS.md`'s closed step lists, session ladder
+  and corrections. A closed gate's step list moves to `docs/history/steps-<gate>.md`
+  in its closing commit, and a record's line citation is read with
+  `tools/citeresolve.py`. A record is never edited after the segment that wrote it;
+  a correction is a new dated entry. The record of being wrong lives here.
 - **Finding** — `SPEC.md` rows and the rest of `notes/` and `docs/`: the current
   value and where it came from. A superseded value keeps one line pointing at the
   file that owns the correction; the story of the correction lives there or in
@@ -103,7 +103,7 @@ agree: name the tool that could be lying and the second source that settles it.
 - **Cite a row by its id** (`NET-102`, `P2-3`, `D5`), not by line number. A line
   number in a record resolves against the file as it was at the record's commit.
   `citecheck` checks line citations in every tracked `.md` except under `bench/`,
-  `LOG.md`, `CHANGELOG.md` and `docs/history/`; `docs/GATE-RESULTS.md` is checked.
+  `docs/log/`, `LOG.md`, `CHANGELOG.md` and `docs/history/`; `docs/GATE-RESULTS.md` is checked.
 - Keep the line count above cited lines: new step lists go at the **end** of
   `PROGRESS.md`, new `SPEC.md` rows at the end of § 19, and a rewrite of § Now
   keeps its line count. An insertion or deletion that cannot be avoided — a § 17
@@ -312,7 +312,9 @@ agree: name the tool that could be lying and the second source that settles it.
 
 - Before stopping: rewrite `PROGRESS.md` § Now to the current state; append a dated
   `LOG.md` entry, desk-only days included; land every finding and number change in
-  its owner file and in `SPEC.md` in the same commit.
+  its owner file and in `SPEC.md` in the same commit. At a month's first closeout,
+  move the previous month's `LOG.md` entries verbatim to `docs/log/<YYYY-MM>.md`,
+  selected by the date in each entry's heading, and add its row to `docs/log/README.md`.
 - `git add -N` every new `.md` that will be tracked before running `spec-check`,
   which sweeps `git ls-files`.
 - Run `spec-check`, `citecheck`, `cfcensus` (`--self-test`, `ratchet`, `check`),
