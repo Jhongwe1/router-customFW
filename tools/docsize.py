@@ -101,28 +101,18 @@ BUDGET = {
     "CLAUDE.md:lines": 351,
     "CLAUDE.md:bytes": 24200,
     "CLAUDE.md:maxline": 647,
-    "PROGRESS.md:bytes": 105000,  # 2026-10-05, R8b's opening commit: R9's
+    "PROGRESS.md:bytes": 115000,  # 2026-10-09, P5e's opening commit: its step
+    #   list at the end of the file, the board row, section Now rewritten.
+    #   量 111,291 B after this commit; x 1.03 = 114,630, three significant figures up
+    #   = 115,000.  P5e-2 (4) brings the file under 200 lines and lowers this in
+    #   that commit.  The previous budget's reasoning, kept as it was:
+    #   2026-10-05, R8b's opening commit: R9's
     #   comment below said the next gate's step list raises this, and it does.
     #   量 101,746 B after this commit (R8b's list at the end of the file, the
     #   board row's opening clause, section Now rewritten); x 1.03 = 104,798,
     #   three significant figures up = 105,000 (3.2 % headroom; the floor,
     #   52,500, is far below).  R8b's closing commit moves the list to
-    #   docs/history/steps-R8b.md and lowers this again.  The previous
-    #   budget's reasoning, kept as it was:
-    #   2026-10-04, R9's closing commit: the step
-    #   list moved verbatim to docs/history/steps-R9.md, which is the
-    #   ratchet-down the 106,000 comment promised and the 2026-09-30 closings
-    #   owed.  量 97,100 B after this commit (12,706 B of step list out; section
-    #   Now, the board row, three re-owned debts and the census in).
-    #   🔴 ONE DEPARTURE, STATED RATHER THAN HIDDEN: 97,100 x 1.03 = 100,013.00,
-    #   and three significant figures rounded UP is 101,000, not 100,000 --
-    #   because the 3-s.f. grid coarsens from 100 to 1,000 at 10^5 and the
-    #   product lands 13 B past it.  101,000 would give 4.0 % of headroom
-    #   where the convention asks for 3 %; 100,000 gives 2.99 %, clears the
-    #   measure, and is the tighter of the two numbers on that grid, which is
-    #   what a ratchet is for.  The floor is 50,000 against 97,100, so this is
-    #   safe both ways.  The commit that opens the next gate's step list raises
-    #   it again -- that is the mechanism working, not a defect.
+    #   docs/history/steps-R8b.md and lowers this again.
     "PROGRESS.md:maxline": 9870,
     "PROGRESS.md#Now:bytes": 6000,
     "PROGRESS.md#Now:maxline": 1000,

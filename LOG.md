@@ -34876,3 +34876,38 @@ J = 12:52:06.4，`boa` 在 **J+32.7 s** 起來。
 D2 是這一則與它的 commit：`PROGRESS.md` 的 Release clock `v1.0` 列、§ Now、看板 `P4b` 列，`CHANGELOG.md` 的 `## Unreleased`，加上 `upstream/` 的裁決（上面）與 `CLAUDE.md` § Closeout 的 sweep 時間。**這一則沒有建立的**：第三方能從封存重建出同一顆映像（`docs/release-process.md` 的 *What this process does not establish*）；發布的檔案在 GitHub 那一側以後不會被換掉（immutable releases 沒開，`docs/offer.md` § 0 要封存跟著二進位一直留著，靠的是不去動它）；WSL 的 DNS 為什麼壞（只量到它壞，沒修）。
 
 **做錯的事。** 從 Git Bash 叫 `wsl … -- bash ~/…`：`~` 被 Git Bash 展開成 `/c/Users/Key20`，rc 127，什麼都沒跑（06:23）；之後一律把路徑放進引號裡的 `bash -c`。一個帶反引號的 grep 放在 wsl 參數裡，反引號被吃掉，樣式退化成配到 `SPEC.md` 每一張表的每一列（1.6 MB 輸出，唯讀，沒有副作用）。`$(…)` 放在 wsl 參數裡又被吃掉兩次（sweep 與 phase B 的 `rc=` 讀成空的；改讀檔）。Phase B 的兩個潛伏錯：我把第一百三十段的 `phaseb.sh` 當成跑過的東西照抄，沒有先對著工具真正的輸出格式讀一遍 —— 第一個是跑了才撞到，第二個是重跑前讀才看到。`fill.py` 的循環檢查。給擁有者的 `upstream/` 選項說明（06:47）有兩處說過頭：寫「`H601` 146 個非零位元組約 101 個從 `upstream/` 還原不了」—— 45 是收集器的下界，所以 101 是上界，不是量到的拿不到；也沒說 `block64k` 涵蓋 `COMPDS`／`COMPCS`。兩處都是寫進 notes 之前對 `FLS-22` 與 `FLM-03`／`FLM-05` 重讀才看出來，紀錄用的是改過的說法；裁決本身不受影響（理由（一）不靠這兩個數）。C3 第一次把 notes 的路徑寫成單引號裡的 `\\wsl.localhost\…` 就直接下對外的命令，沒先量 Git Bash 怎麼把它交給 Windows 程式 —— 沒造成東西（`gh` 在呼叫 API 之前就開檔失敗），但量法（Windows Python 印 `sys.argv`）應該在對外命令之前做；C4 與 D1 用的路徑形式都先量過。為了找 `LOG.md:87` 的位置，我用 `sed` 不經遮罩印了 `LOG.md` 第 80–90 行，那一行是整片 dump 的 sha256 —— 2026-09-07 起裁定可以公開、本來就在 repo 裡，沒有寫到任何新地方，但這一段看帶摘要的輸出一律經 `vmask.py` 的做法被我跳過一次。
+
+## 2026-10-09 — 第一百三十二段（17:40 開場，桌面；零次電源動作，零次 flash 寫入，零次 `FLW`／`EW`／`EB`／非零 `AUTOBURN`／`FLR`）：開 `P5e`
+
+**先補第一百三十一段之二的尾巴**（發生在那一段最後一個 commit `fb5a5d17` 之後，所以那一段的紀錄寫不到；時刻抄自那一段的交接，是當時工具印的鐘）：
+
+- D2 推送：擁有者回「Yes」，14:17:55 推 `2eb1a3d6..fb5a5d17`，14:18:03 讀回遠端 `main` ＝ `fb5a5d17`。CI run `37892816517` 14:49:48 結束，`lint`、`text`、`instruments`、`census` 四個 job 都 success —— 量 這一段開場用 `gh run view` 再讀一次，同樣四個 success、`updatedAt` 06:49:48Z。
+- 擁有者問整個專案是不是做完了。主線對照交付物清單、看板、Carried forward 與 `docs/KNOWN-ISSUES.md`：看板的 gate 全部關了；沒交的是 demo 影片（`R9` 時 ⊘、等擁有者錄）、一個被外部專案接受的修改、`make run`（沒有 ⊘ 紀錄）、`REPRODUCE.md` 加建置容器、一頁長的 `docs/FINDINGS.md`（現在 259,878 位元組），以及 `docs/disclosure.md`（`R9` 時決定要寫、沒寫；量 `PROGRESS.md` 與 `SOURCES.json` 各有一處指向這個不存在的檔）。
+- 擁有者把剩下的事包成兩個 gate，`P5e` 與 `P6r`，寫在私有的計畫裡，當時都沒開；兩個 id 量過沒被用過。
+- 擁有者的規則：對外的文字（`LOG.md`、推上 GitHub 的檔、commit 訊息、release notes）只寫工程 —— 發現、產物、量測。
+
+**這一段**
+
+17:40 開場（第一次讀鐘 17:40:06）。擁有者依一份外部評審擴大了 `P5e` 的範圍 —— 那份評審站在一個沒有先備脈絡的讀者那一邊，量這個 repo 讀起來的樣子 —— 然後開了它：「讓我們開始把 P5e 收了吧」。評審與計畫不一致的地方以計畫為準：`SPEC.md` 不拆、只給英文入口；`LOG.md` 留當月、其餘歸檔；`docs/GATE-RESULTS.md` 不拆、只加索引；`PROGRESS.md` 留在根目錄、縮到 200 行以下。四個的理由都是被引用的數量。
+
+**開 gate 時的三個決定**（寫進 § Now）：
+
+- **一、搬不搬目錄** —— 擁有者交給主線決定。**裁決：只把 `config/rlxfw-src/` 搬到 `kernel/`，`src/` 不動。** 理由，各附來源：
+  - 讀 `src/rlxboot/Makefile` 編的是 `src/lib/` 的 `ed25519.c`、`sha256.c`、`sha512.c`，同一個目錄的其餘檔給六支使用者空間程式用。計畫原本把 `src/` 拆成 `boot/` 與 `userspace/`，那會讓開機程式依賴 `userspace/lib/`。
+  - 量 用 `citecheck` 自己的 `scan()`（`fb5a5d17`）：535 個受檢的行號引用裡 135 個指向會搬的檔（125 個在驅動那棵樹、10 個在 `src/`），其中 131 個是後綴寫法（例如 `rtl819x-nic.c:123`）。搬檔不會改到那些行，`oracle()` 去讀引用寫下時那個 commit 裡的新路徑、讀不到，判 ABSENT-THEN —— 變盲，不是變紅。所以不管搬哪一種，`citecheck` 都要先學會跟著 rename 走，否則 gate 會在四分之一的母體不再被檢查時保持綠。
+  - 讀 `tools/rlxfw-kbuild.sh`：`RECIPE_ID` 是 `find config -type f` 的 sha256（相對路徑），編進映像、開機時印成 `RLXFW-ID0`。驅動搬出 `config/` 之後若不把 `kernel/` 加進輸入，改驅動就不再移動 `RECIPE_ID`。加進去之後它的值會變（雜湊的路徑變了），所以搬之後的映像不可能跟搬之前逐位元組相同；控制改成 `FW-254` 的方法 —— `vmlinux` 只差 `RECIPE_ID` 的位元組、`System.map` 相同 —— 另加「改 `kernel/` 一個位元組，`RECIPE_ID` 會動」。
+  - 量 代價：非紀錄檔 58 個、156 處字面路徑，加上 8 支工具裡 10 處用 `os.path.join` 拆開拼的路徑（grep 字面看不到它們）；連 `src/` 一起搬要再多 138 個檔、445 處，138 個檔裡 102 個在 `src/` 自己裡面。
+  - 讀者要找的是驅動，而驅動在一個叫 `config` 的目錄下沒有人會去找。搬完之後 `config/` 只放宣告（delta、marks、patches、initramfs、cflags），`kernel/` 與 `src/` 放這個專案自己寫的碼。
+- **二、要不要加 `README.zh-TW.md`** —— 擁有者：不加。
+- **三、`bench/` 怎麼處理** —— 主線：只做輕量版（`.gitattributes` 的 `linguist-generated`）。打包成 release asset 的正式版不排程：它要改 `citecheck`、`capdate`、`check-predictions` 的母體，而它解決的只有 clone 的時間與檔案數，不在任何 DoD 裡。
+
+推送：擁有者選擇留在 auto mode；要推的時候主線停下來給確切的命令，由擁有者打 `! git push origin main`。
+
+**寫 DoD 之前，量了兩件計畫沒量到的事：**
+
+- GitHub 怎麼顯示大的 `.md`（`curl` 讀 `fb5a5d17` 的 blob 頁，看有沒有 `markdown-body` 與 "Sorry about that"）：`PROGRESS.md`（97,386 位元組）與 `docs/KNOWN-ISSUES.md`（259,455）渲染成 markdown；`RUNSHEET.md`（399,770）、`docs/GATE-RESULTS.md`（521,519）、`SPEC.md`（1,686,021）以原始碼顯示，沒有被拒；`LOG.md`（2,727,345）被拒（"Sorry about that, but we can’t show files that are this big right now"，頁面資料 `"large":true`）。所以「根目錄每個 `.md` 都顯示得出來」照計畫自己的量法（沒有被拒）做得到；`SPEC.md` 照舊以原始碼顯示，讀者從英文入口進去。`LOG.md` 從第一個 `## 2026-10` 標題（第 33,715 行）到檔尾是 208,013 位元組。
+- `P5e-2` 搬檔時要重指的受檢引用（`citecheck` 的 `scan()`）：指進 `LOG.md` 的 12 個（`SPEC.md` 5、`docs/blind-write-ledger.md` 3、`notes/flash-digest-scope.md` 3、`PROGRESS.md` 1；8 個落在八月、4 個在九月，全部會搬走）、`RUNSHEET.md` 7、`docs/KNOWN-ISSUES.md` 3、`docs/FINDINGS.md` 3、`PROGRESS.md` 1；`README.md`、`CHANGELOG.md`、`docs/GATE-RESULTS.md` 0。計畫的數字（`PROGRESS.md` 20、`RUNSHEET.md` 10、`README.md` 2）是整個樹的正規式命中，含紀錄與不受檢的檔，而且沒算 `LOG.md`。
+
+**`P5e-0` 的前一半**（這個 commit）：步驟表放在 `PROGRESS.md` 檔尾（12,897 位元組）；看板在 `R6c` 之下加 `P5e` 一列，同時把下方 `Est.` 分析段的一對軟換行併成一行，讓那之後的每一行不動（`FW-110`）；§ Now 重寫、行數不變。DoD 的二十一列由 `tools/entrycheck.py` 讀；它在開 gate 的樹上量到的基線記在它進來的那一則。步驟表裡刻意不寫私有計畫目錄的路徑與那組框架用語，因為 E16 與 E21 數的就是非紀錄檔裡的它們，而步驟表在 `PROGRESS.md` 裡直到 gate 關閉。`docsize` 的 `PROGRESS.md` 整檔預算 105,000 → 115,000（量 這個 commit 的檔是 111,291 位元組，乘 1.03 無條件進位到三位有效數字）；`P5e-2` ④ 把檔縮到 200 行以下時在同一個 commit 降回來。
+
+`cfcensus check` 在這個 commit 的第一版拒絕了（rc 3）：看板上有一個進行中的 gate，而沒有任何一列 OPEN 的 Carried forward 由它擁有 —— 守門的意思是「gate 開著而普查讀到全部都不歸它，分不出是普查停了」。主線沒有為了讓它過而改守門，而是去找 `P5e` 真正該接的債：`NAME-1`（兩個名字比內容窄的目錄／檔案，`config/host-compat/` 與 `tools/test-kbuild-cflags.sh`）的常設指示寫的條件是「任何一段不同時改變它們做什麼的桌面段」，而 `P5e` 改名字與入口、不改行為，正是那個條件。它改由 `P5e-3` 擁有：那一步的目錄 README 要嘛改名，要嘛寫清楚它們裝什麼；`config/rlxfw-src/` 搬到 `kernel/` 不碰這兩個名字。改完 `cfcensus write` 重產普查區塊；量 `docsize` 7 of 7、`spec-check` rc 0、`cfcensus check` rc 0（25 列、0 個發現、1 列活的擁有者）、`ratchet` rc 0、`--self-test` 72/72。
