@@ -1478,7 +1478,7 @@ Tags mark where the outside world can check the work, not where a feature landed
 
 ## Unreleased
 
-Nothing since `v1.0`.
+2026-10-09, after the tag: the 46 hits in the public `upstream/` ruled known and accepted (`SPEC.md` `FLS-32`).
 
 ---
 

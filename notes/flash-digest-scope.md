@@ -707,8 +707,8 @@ nothing more, and each of the fifteen is exempted by name, one row per hit; with
 the rows the scan reads 0 findings, 17 exempt, 0 stale, and an exempted line
 copied to another file is a finding. The 130th segment's record counted the
 prefix lines as thirteen; its own list names fourteen. The public `upstream/` at
-its pin reads 46 hits, none exempted: the owner's to rule on (`FLS-22` left
-`upstream/` as it is for `H601`'s bytes, and said nothing of digests).
+its pin reads 46 hits, none exempted; on 2026-10-09 they were ruled known and
+accepted (the next section).
 
 What this does not establish: a digest shorter than 8 digits — `FLS-14`'s own
 7-digit suffix among them — a fragment from the middle of one, any encoding but
@@ -717,3 +717,54 @@ does not read. The verdict needs the dump and runs only at the desk
 (`CLAUDE.md` § Closeout); CI runs the tool's controls, its mutation suite and
 the dump-free `check`, whose `K2` sees a row's digest leave its line for 14 of
 the 17 rows and not for the other three. `SPEC.md` `FLS-32`.
+
+## 🔄 2026-10-09 (131st segment) — `upstream/`'s 46 hits, ruled known and accepted
+
+The owner left this ruling to the main session on 2026-10-09, and it extends
+`FLS-22`'s decision to these digests: `upstream/` stays as it is.
+
+量, from the scan at the pin (`$FWRE_WORK/rebuild/s131/rn/up46.py`, which reads
+only the tool's labels and counts): 30 of the 46 are the whole image's sha256 —
+16 in full, 13 as 8-digit prefixes and one as a 16-digit prefix — the value this
+repository prints in full under the 2026-09-07 ruling. The other 16 are sha256
+prefixes over windows that contain `H601`, on which nothing had ruled:
+`H601@0x006000+0x2000` at 16 digits, 4 hits (`BENCH-LOG.md:1137`,
+`runsheet.md:1804` twice, `poc/03-flash-evidence.md:46`);
+`sector@0x006000+0x1000` at 24 digits, 10 hits (`BENCH-LOG.md:2580`–`2586` and
+`2736`–`2738`); `block64k@0x000000+0x10000` at 8 digits, 2 hits
+(`BENCH-LOG.md:541`, `runsheet.md:1118`). The paths are `upstream/`'s, at
+`4d3ff26`.
+
+Why accepted rather than removed:
+
+* Nothing done now withdraws them. They are in the pinned commit, which must stay
+  fetchable for `R9`'s differential proof (`CLAUDE.md`, *Never*). Deleting them at
+  `upstream/`'s tip is the mitigation the 2026-09-02 ruling declined for `H601`'s
+  bytes, and making `upstream/` private gives up the outside check of `R9` that
+  the same ruling kept.
+* A digest discloses no byte of its window. 推: it tests a complete guess of the
+  window, so it helps only someone who already knows every other byte of it.
+  `FLS-22`'s harvester recovered 45 of `H601`'s 146 non-zero bytes from
+  `upstream/`; it reads three encodings, so how many of the other 101 a reader
+  could recover is not measured.
+* The credential `FLS-22` names inside `H601` is `HW_WLAN0_WSC_PIN`
+  (`0x00648A`–`0x006491`), in all three windows. 推: were the rest of the sector
+  known — another unit's identical calibration block published, say — the
+  24-digit prefix would confirm the PIN offline among about 10^7 candidates, and
+  the 16-digit one would too. The PIN admits only someone in radio range of
+  vendor firmware with WPS on.
+* `block64k` also covers `COMPDS` and `COMPCS` (`FLM-03`, `FLM-05`), the factory
+  and current settings. 推: at 8 digits it can single out at most one guess in
+  about 4 × 10^9, and it needs the loader, `H601` and both settings blocks known
+  besides; what those blocks hold is the question `FLS-24` owns for the whole
+  image, whose full digest the 2026-09-07 ruling already accepted.
+
+殘留: whether the sector's other non-zero bytes can be recovered from public
+sources. A harvester that reads the encodings `FLS-22`'s does not, run over
+`upstream/` and any public dump of this model, would settle it. It is not
+scheduled: no answer changes what can be done here — the pin stays — and the
+answer that matters would be acted on outside the repository (WPS off on vendor
+firmware). A move of the pin, which `CLAUDE.md` forbids, would void this count.
+
+What this does not establish: that these 46 are every digest of these windows in
+`upstream/` — the gaps listed above apply — or anything about copies outside it.

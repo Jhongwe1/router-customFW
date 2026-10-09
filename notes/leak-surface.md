@@ -195,6 +195,11 @@ later reader does not read it as an oversight.
 * removing it from `HEAD` would not un-publish it either: it has been public
   since 2026-08-17 (`915e675`, `01da319`), and public repositories are mirrored
   and indexed.
+* 🔄 **2026-10-09: the decision covers digests too.** `upstream/` at its pin also
+  holds 16 sha256 prefixes of flash windows that contain `H601`, besides 30 of
+  the whole image (`tools/digestscan.py`, `SPEC.md` `FLS-32`). The owner left the
+  ruling to the main session, which extended this decision to them; the reasoning
+  and what stays open are in `notes/flash-digest-scope.md`'s last section.
 
 **What follows from the decision, mechanically:**
 
@@ -204,8 +209,8 @@ later reader does not read it as an oversight.
   more so when the finding is being left in place deliberately.
 * what CI runs is `--self-test` (17 controls, 16 on a runner) and
   `tools/test-leakscan-mutants.py` (23 mutants, 20 on a runner).
-* the rule in `SPEC.md` §18 stands for **rlxfw**: this repository is private
-  today, and nothing identifying this unit goes into it regardless.
+* the rule in `SPEC.md` §18 stands for **rlxfw**: this repository is public
+  (量 2026-10-09, `gh repo view`), and nothing identifying this unit goes into it.
 
 ## 5b. 🔴 Four near-misses over two sessions — three by the person writing about them, and one by an instrument doing what it was told
 

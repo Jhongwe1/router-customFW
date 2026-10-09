@@ -326,7 +326,7 @@ agree: name the tool that could be lying and the second source that settles it.
   is never renumbered; no tool can see that, so read each line's prose before
   accepting an automatic repair.
 - Run `tools/desk-sweep.py` over every declared step before closing, with `--dest`
-  on ext4 under `$FWRE_WORK/rebuild/`, never under `/mnt/c` (~31 min). Targeted
+  on ext4 under `$FWRE_WORK/rebuild/`, never under `/mnt/c` (~75–90 min). Targeted
   runs are no substitute. It parses `ci.yml` — never rebuild a step's command by
   hand, pass `--only` names exactly as declared, and read the ran count: a `--only`
   that selects nothing prints `0 ran` and exits 0, and a sweep's own count is not
