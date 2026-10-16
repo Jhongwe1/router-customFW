@@ -398,7 +398,7 @@ cost, and it is not `NET-78`.**
 | ④ | The vendor's `eth4` carries the same load without failing | — | `ifconfig rlx0 down` (讀 `rtl819x-nic.c:1699-1712`: it `free_irq`s), then `ifconfig eth4 … up` (讀 `rtl_nic.c:4192-4210`: first open calls `rtl865x_init_hw()`), then the same `iperf3` | rides an existing boot |
 
 ⚠️ **④ is recorded in this repository as impossible and it is not.**
-`docs/KNOWN-ISSUES.md:870` and `:941` say the contrast cannot be taken because
+`docs/history/known-issues-segment-limits.md:213` and `:284` say the contrast cannot be taken because
 `ifconfig eth4 up` returns `SIOCSIFFLAGS: Device or resource busy`. 量, the
 capture that reading comes from — `bench/2026-09-20/X9-eth4.log` — sends
 `ifconfig eth4 10.1.1.4 up` with **`rlx0` still up**, which

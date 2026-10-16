@@ -14,9 +14,9 @@ the work (house rule 6).
 | | |
 |---|---|
 | **Active gate** | **`P5e`**, opened 2026-10-09 (132nd segment) by the owner: the repository made readable and checkable by a reader with no context — the README, entry pages, CI that builds code, a video, one external report. Its step list is at the end of this file. The three decisions taken at opening: ① only `config/rlxfw-src/` moves, to `kernel/`; `src/` stays, since `src/rlxboot` compiles `src/lib`'s crypto; ② no `README.zh-TW.md`; ③ `bench/` is marked `linguist-generated`, and archiving it as a release asset is not scheduled. `v1.0` was released 2026-10-09 from `2eb1a3d6` (§ Release clock). Each flash write is a separate dated yes for that exact payload (`FW-113`), and power actions wait for the owner's word. |
-| **Active step** | **`P5e-2`** ④⑤, then **`P5e-1`**. Landed: `P5e-0` (`tools/entrycheck.py`), `citecheck` following renames, and `P5e-2` ①②③ (`LOG.md` by month in `docs/log/`, `RUNSHEET.md` and the old `CHANGELOG.md` in `docs/history/`). Prepared outside the tree and not applied: ④⑤ (`PROGRESS.md` cut to its state, `docs/KNOWN-ISSUES.md` as an index of pages under `docs/known-issues/`) and the move of `config/rlxfw-src/` to `kernel/`, whose two builds and `vmlinux` comparison are measured; it is re-derived on the base ④⑤ leave. |
+| **Active step** | **`P5e-1`**, re-derived on the base `P5e-2` ④⑤ left. Landed: `P5e-0` (`tools/entrycheck.py`), `citecheck` following renames, and `P5e-2` ①–⑤ — `LOG.md` by month in `docs/log/`; `RUNSHEET.md` and the old `CHANGELOG.md` in `docs/history/`; this file cut to its state; `docs/KNOWN-ISSUES.md` an index of pages under `docs/known-issues/`. Prepared outside the tree and not applied: the move of `config/rlxfw-src/` to `kernel/`, whose two builds and `vmlinux` comparison are measured. |
 | **Session history** | `LOG.md`, one dated entry per segment. What this table said until 2026-09-23 is archived verbatim in `docs/history/progress-now.md`. |
-| **Next after this** | 🔄 **2026-10-10 (132nd)**: `P5e-2` ④⑤, then `P5e-1` on their base, then `P5e-3`, `P5e-4` and `P5e-5`. |
+| **Next after this** | 🔄 **2026-10-17 (133rd)**: `P5e-1`, the full desk-sweep and a push, then `P5e-2` ⑥⑦⑧, `P5e-3`, `P5e-4` and `P5e-5`. |
 | **Blocked on** | Nothing in `P5e`'s path. Its outward acts wait for the owner's yes, each: every push, the GitHub topics and About URL, the video upload, the report to `shibajee/linux-rtl8196e`. Waiting, blocking no step: 量 the shared vendor toolchain tree has three deleted tracked files (`FW-235`), so builds run against a pin-identical copy and the desk-sweep's `T13` reads red; restoring the tree is the owner's. Also `FW-142`; `FW-143`; `CLK-42` 殘留; `FW-172` stays 推; `SPEC-R8a.md`'s demotion is rehearsed, unapplied; `LA-1`'s two rungs, which need a seating. |
 
 **Step list for the active gate**: `P5e`'s, at the end of this file, where it moves
@@ -25,76 +25,10 @@ no line a checked file cites (`SPEC.md` `FW-110`); it moves verbatim to
 steps are `docs/release-process.md`'s phases. Every closed gate's list is under
 `docs/history/`, where `cfcensus` and `C12` read them as well (`R1y-4`).
 
-**How to read § Now.** It holds current state only: a few sentences per row,
-rewritten each segment rather than appended to. What a row used to say is in
-`docs/history/progress-now.md` and in `LOG.md`. A wrong row is corrected by
-fixing the row and recording the fix in `LOG.md`; the record of being wrong
-belongs in the record, not in the state.
-
-Below § Now, § Records moved out of this file says where the records went; the
-rest is state — § Gate board, § Release clock, § Carried forward, the census.
-
-### The four things this file tracks, because they are not the same thing
-
-This line existed to name one of them and was read as naming all four. **Active
-step above is a bench session, which is not one of `DAY-ZERO` items 0–8** — that
-is not an error, but nothing said so.
-
-| | what it is | where it lives | answers |
-|---|---|---|---|
-| **Gates** `S0`, `R0`…`R9`, `P1`…`P4` | the fifteen milestones | the board below | *how far is the project* |
-| **`DAY-ZERO` items 0–8** | 🔄 **the instruments that had to exist before *any* gate could run** — not "the desk step list for the gate that is active now", which is what this row said until 2026-08-25 and which made it a **second owner** of the state § *Step list* owns. `item 7` had already drawn the line the row missed: `hazlint` is `DAY-ZERO`'s, the hazard verdicts it enables are `R1b`'s | `plan/DAY-ZERO.md` | *what had to exist before the first gate* |
-| **§ Step list** 🆕 | the session-sized steps of the gate that is active now, written on entering it (`plan/SESSIONS.md` §0b) | at the end of **this file** | *what do I do next at the desk* |
-| **Runsheet sessions** ~~`B1`…`B18`~~ 🔄 **`B1`…`B8`, 2026-09-16 (`R1z-2`)** | what gets typed at the bench. 🔄 **Not "one power cycle each", which is what this row said until 2026-08-24**: `B1` and `B2` share one; `B3` costs **two of its own**, because `G6`'s and `G7`'s jumps each end with a kernel running and the loader gone; and a session outlives a seating — `B1` has now been typed across three power cycles, one directory each | `RUNSHEET.md` | *what do I do next at the device* |
-| **`C-n`** | open questions that outlive one session, each owned by a gate | Carried forward, below | *what is still unanswered* |
-
-**Runsheet sessions are not plan items and never were.** They exist because
-`DAY-ZERO` items 2c and 4 produced a large number of claims read out of a flash
-dump, a datasheet and four vendors' source, and **no number in this repository
-has been measured on the device**. A session appears when enough desk claims
-have piled up to be worth one power cycle. `B1` and `B2` are the first, and
-`B3` is the one that closes the gate that is active.
-
-A `C-n` is *not* extra work appearing from nowhere either: it is the mechanism
-for **not** doing work now. When a session turns up a question it cannot close,
-the choice is to chase it (and lose the thread) or to write it down with the
-gate that owns it. The list is long because the desk work has been productive,
-and every row names where it gets settled.
-
----
-
-## Records moved out of this file
-
-These records were moved verbatim to `docs/history/`: by `R1y-4` on 2026-09-30
-from `PROGRESS.md` at `e274ccb`, and each closed gate's step list since in its
-closing commit. A record is never edited; a record's line citation is read with `tools/citeresolve.py`.
-
-| What | File |
-|---|---|
-| `R6`'s step list | `docs/history/steps-R6.md` |
-| `P1`'s step list | `docs/history/steps-P1.md` |
-| `R1z`'s step list | `docs/history/steps-R1z.md` |
-| `R1-pub + R2c`'s step list | `docs/history/steps-R1-pub-R2c.md` |
-| `R5`'s step list | `docs/history/steps-R5.md` |
-| `R4`'s step list | `docs/history/steps-R4.md` |
-| `P4b-gate`'s step list | `docs/history/steps-P4b-gate.md` |
-| `P4a`'s step list | `docs/history/steps-P4a.md` |
-| `R3`'s step list | `docs/history/steps-R3.md` |
-| `R1h`'s step list | `docs/history/steps-R1h.md` |
-| `R2a/b/d`'s step list | `docs/history/steps-R2a-b-d.md` |
-| `R1-gate`'s step list | `docs/history/steps-R1-gate.md` |
-| `P2`'s step list | `docs/history/steps-P2.md` |
-| `R6b`'s step list | `docs/history/steps-R6b.md` |
-| `R1y`'s step list | `docs/history/steps-R1y.md` |
-| `R8a`'s step list | `docs/history/steps-R8a.md` |
-| `R7`'s step list | `docs/history/steps-R7.md` |
-| `R9`'s step list | `docs/history/steps-R9.md` |
-| `R8b`'s step list | `docs/history/steps-R8b.md` |
-| `R6c`'s step list | `docs/history/steps-R6c.md` |
-| § Session ladder | `docs/history/progress-ladder.md` |
-| § Corrections | `docs/history/progress-corrections.md` |
-| § Carried forward's closed and declined rows | `docs/history/progress-carried-forward.md` |
-| § Gate board's closed rows as they stood before `R1y-5` | `docs/history/progress-gate-board.md` |
+§ Now holds current state only, a few sentences per row, rewritten each segment and never
+appended to; what a row used to say is in `LOG.md`. Everything moved out of this file —
+closed step lists, earlier states of its sections, closed rows — is indexed in
+`docs/history/README.md`.
 
 ---
 
@@ -102,118 +36,42 @@ closing commit. A record is never edited; a record's line citation is read with 
 
 Status: `·` not started · `~` in progress · `✓` closed (needs an evidence link) · `⊘` deliberately not done (needs a reason and a category — plan §17)
 
-| Gate | What closing it means | Est. | Actual | Status | Evidence |
-|---|---|---:|---:|:---:|---|
-| **S0** | backup restored and verified. `S0b`, three power experiments written up, is `⊘`, so the definition is the backup alone. | 1 | 1 | **`✓`** | `S0a`: `LOG.md` 2026-08-23 — copy ② restored with zero diff on 7,770 paths, copy ③ read back 19/19 (`C-10`, `tools/verify-backup-copy.sh`) · `S0b` `⊘`: `notes/power-and-programmer.md` §4 |
-| **R0** | vendor kernel booted from RAM, no flash-write command issued, and the loader head and the `cr6c` header unchanged over 512 of 4,194,304 bytes. The criterion is not *"0 flash bytes written"*, which no instrument here can establish. | 5 | **7** | **`✓`** | `RUNSHEET.md` Results — seating 2 part three · `bench/2026-08-24c`–`f`, 81 captures, 18 prediction blocks (`G5`, `G7`, `G8-pre`/`G8a`/`G8b`) |
-| **R1-gate** 🆕 | cache-management model settled on silicon, and the CP0 census read — `PRId`, `Config`, `Config1`, `Status.BEV`, `Count`/`Compare`. Three of the four downstream decisions it unlocks have a reading; the fourth, ② — whether `R6`'s descriptor rings need an uncached window — is recorded as not met and moved to `R1h`. | 5 | **9½** | **`✓`** | `docs/GATE-RESULTS.md` entry 1 (2026-08-26) · step list `docs/history/steps-R1-gate.md` · `docs/rlx-cache-and-cp0.md` · `RUNSHEET.md` § Results B4 (`R1g-4a`, `R1g-4b`) |
-| **R1h** ✅ | what `R1-gate` closed without, on one payload and one seating: cache geometry measured (`CPU-25`), the D side of coherence (`R1-gate`'s decision ②, `CPU-45`), whether this core retires the `cache` instruction (`CPU-44`), and write-through versus write-back-without-write-allocate (`CPU-19` 殘留). Three came back with readings; the D side closed without a measurement. | **—** —— **deliberately not costed into this column**, whose own analysis below says it is not a quantity. The gate’s budget lives in its step list: **4 segments, 猜, uncalibrated** | **5½** | **`✓`** | `docs/GATE-RESULTS.md` entry 3 (2026-08-29) · step list `docs/history/steps-R1h.md` · `notes/cache-model.md` |
-| **R2a/b/d** 🆕 ✓ | which GPL drop this firmware was built from (structural similarity against six real builds), and the two greps for what the vendor kernel emulates. It closed on its stop-loss outcome: `TC-02` stays 推 because the metric measures the toolchain rather than the drop (`TC-18`), the emulation question is answered (`CPU-47`), and no container was needed. | 5 | 5 | `✓` | `docs/GATE-RESULTS.md` entry 2 (2026-08-28) · step list `docs/history/steps-R2a-b-d.md` · `notes/rebuild-vs-shipped.md` · `notes/vendor-toolchains.md` · `SPEC.md` `TC-11`…`TC-20` |
-| **R3** 🆕 | my kernel boots to a shell and pings, as five claims: D1 delivered and entered, D2 my kernel entered (not the vendor's), D3 early bring-up, D4 a shell that accepts typing, D5 ping both directions. All five held on one boot. | 12 | **18** | **`✓`** | `docs/GATE-RESULTS.md` entry 4 (2026-08-31) · step list `docs/history/steps-R3.md` · `bench/2026-08-30b`–`d` and `bench/2026-08-31`–`c`, seatings 5–8 · `config/r3-11-reel.tsv`, v0.2's reel |
-| **R4** 🆕 | edit → result in < 90 s; scripted reset via WDT. | 5 · **plan 8** | **4** | **`✓`** | `docs/GATE-RESULTS.md` entry 7 (2026-09-02) · step list `docs/history/steps-R4.md` · `notes/dev-loop.md` §7 · `bench/2026-09-01/` (`Y-r02`…`Y-r20`) · `bench/2026-09-02/`, seating 10 |
-| **R5** 🆕 | six drivers in-tree, each accepted, 10 boots without an oops, each with a compile-tested DT binding marked *not probed on hardware*; and `docs/driver-diff.md`, written blind, then diffed against the two public RTL8196E trees in two layers scored separately (fact / decision), every disagreement decided on the silicon or recorded undetermined. `D4` was met as a ratio, not a frequency. | 24 | **32** | **`✓`** | `docs/GATE-RESULTS.md` entry 8 (2026-09-11) · step list `docs/history/steps-R5.md` |
-| **R1-pub** | instruction / hazard / Lexra-ASE census + the vendor-kernel emulation column + the three-toolchain silicon comparison (`R2c`) — the first independently publishable artefact, `docs/rlx-isa.md`. | 14 | **20** | **`✓`** | `docs/GATE-RESULTS.md` entry 9 (2026-09-16) · step list `docs/history/steps-R1-pub-R2c.md` |
-| **R1z** 🆕 | paying the debts this repository's own record names, with the population derived from § Carried forward rather than hand-picked. `tools/cfcensus.py check` went from 29 findings to 0, and it is a gate now. | 3 | **3** | **`✓`** | `docs/GATE-RESULTS.md` entry 10 (2026-09-16) · step list `docs/history/steps-R1z.md` |
-| **R6** | my Ethernet driver: `ping`, an `iperf3` number, 30 min flood clean. `D1`–`D3`, `D5` and `D6` met and `D4` met in part; the named stretch, per-port VLAN (`R6-6`), not met. | 37 | **18** | **`✓`** | `docs/GATE-RESULTS.md` entry 12 (2026-09-22) · step list `docs/history/steps-R6.md` · `notes/switch-driver.md` § 8 · `SPEC.md` `NET-43`–`NET-45`, `NET-48`–`NET-54` |
-| **R7** ✅ | my userspace, six programs of mine plus busybox rebuilt from the drop's source, running on the silicon — and a pass condition that had to be **re-specified before anything could count**: both sources named on 2026-08-25 read 0 on a static binary by construction (a `PT_DYNAMIC` walk finds no such segment; `system` is *defined*, not undefined, in a static link), and 0 was the passing answer, so the gate's own instrument could not fail. `tools/uspacescan.py` replaces both and refuses rather than reporting 0 when it cannot decide; over the image, 0 forbidden imports from both sources on all six. The baseline was corrected in the same pass, including that the published method could have missed `system` itself | 34 | **1** | **`✓`** | `docs/GATE-RESULTS.md` entry 17 (2026-09-30) · step list `docs/history/steps-R7.md` · `notes/userspace-integration.md` · `notes/entropy.md` · `notes/rootfs-census.md` · `docs/KNOWN-ISSUES.md` (two device-only defects, both since fixed and shown on the device) · `SPEC.md` `FW-160`–`FW-184` |
-| **R8** ✅ | signed update accepted, one flipped bit rejected, and a version below the anti-rollback counter rejected — the three clauses `R8a` read on the silicon, from RAM, with no flash-write command issued. 🔄 **Closed 2026-10-04 by splitting the row, which is not a claim of completion**: until then the row also read *10 power-cuts survived*, and that clause, with the persistence it implies, is an interrupted flash write by construction, so it is `R8b`'s own row below, behind `R9` | 18 | **2** | **`✓`** | `docs/GATE-RESULTS.md` entries 16 (2026-09-30) and 18 (2026-10-04) · `R8a`'s and `R8b`'s rows below |
-| **R8a** ✅ | the half of `R8` that needs no flash write: a signed container staged in RAM, verified by `rlxboot` — ① a correct signature accepted and the image boots, ② one flipped bit anywhere refused, ③ a version below the anti-rollback counter refused. All three held on the silicon in four rounds. It is not `R8`: it establishes nothing about writing flash, about surviving a power cut, or about key management, and it is not secure boot on a part with no evidence of a key-hash fuse | **—** —— uncosted for `R1h`'s reason: the budget lives in its own step list, and `R8`'s 18 already carries this work | **1** | **`✓`** | `docs/GATE-RESULTS.md` entry 16 (2026-09-30) · step list `docs/history/steps-R8a.md` · `notes/rlxboot.md` · `notes/update-chain.md` · `SPEC.md` `FW-166`–`FW-172` |
-| **R9** | 🔄 **Re-specified 2026-10-04 before opening, because the clause it had could not fail.** It read *three-column differential table, third column not empty*, and seven rows of that column were committed in `plan/` § 8.2 **before `R9` existed** — the `R7` defect in this same table. It closes now on a four-column table in which **every published row** carries a mechanism class from the closed set ⟨架構性／有界化／服務不存在／平台限制／不適用⟩, a vendor cell that is a reading from one of four evidence tiers or `⊘ Structural` naming the committed finding, an rlxfw cell **from the same instrument**, and **a check that would have detected the opposite of the row's claim, together with that check's reading** — a row without that reading publishes 未定, never as a win. The vendor firmware has no shell, so its column is static, network-facing or boot-console evidence and never a test run on it; a row whose tier carries no executable refutation may not claim absence at all 🟢 **Closed 2026-10-04 on 16 published rows standing for 141 register rows, with the live column speaking for 21 of 89 `V-A` rows and the table saying so** | 16 | **3** | **`✓`** | `docs/GATE-RESULTS.md` entry 19 (2026-10-04) · step list `docs/history/steps-R9.md` · `docs/differential.md` · `notes/vendor-differential.md` · `docs/threat-model.md`, `docs/hardening-matrix.md`, `docs/sbom.md` · `config/fix-cases.toml`, `config/r9-probes.toml` · `SPEC.md` `FW-196`–`FW-206` and `FW-211`/`FW-212` in § 17 · the re-specification's reasoning is in the archived list and in `LOG.md` 2026-10-04 |
-| **R8b** ✅ | persistence and the ten power cuts: an update written to a flash slot and booted from it through `rlxboot`, and ten physical power pulls during a write, each followed by a boot from the other slot. A row of its own since `R8` closed on 2026-10-04, and **not open**: it waits behind `R9`, whose vendor column needs the vendor firmware still bootable from flash while slot A's first write destroys 921,618 of its kernel's 987,154 bytes (`FW-167`), and behind the owner's dated yes for each flash write 🔄 **Opened 2026-10-05 (124th segment)**: `R9` closed the day before, and the owner set the segment's goal as `R8b` + `P3` + `P4b`; every flash write is still a separate dated yes for that exact payload 🟢 **Closed 2026-10-08 on one seating (2026-10-07)**: an update in a slot booted through `rlxboot`, ten pulls each booted the other slot (10/10 by `tools/bootslot.py`), and `rlxboot` went to `cs6c` after the gate failed once (`FW-241`); every reading is on mainline `f9adc9e8` | **—** —— uncosted for `R1h`'s reason: `R8`'s 18 already carries this work | **3** | **`✓`** | `docs/GATE-RESULTS.md` entry 20 (2026-10-08) · step list `docs/history/steps-R8b.md` · `bench/2026-10-07` · `notes/update-chain.md` § 6 · `SPEC.md` `FW-241`–`FW-253`; its booking: entry 16 § `R8b`, the split: entry 18 |
-| **P1** ✅ | `mfgtest` passes on a good unit, and every check has been made to FAIL once | 8 | **4** | **`✓`** | `docs/GATE-RESULTS.md` entry 11 (2026-09-17) · step list `docs/history/steps-P1.md` |
-| **P2** ✅ | boot-time breakdown + throughput, both firmwares, same script. `D1`, `D2`, `D4` and `D6`–`D8` met, `D3` under its closing rule, and `D5` for ICMP and the vendor's driver, while rlxfw's own driver's reading is a failure handed to `R6b` (`NET-116`); the stretch, `P2-6`, carried to `P3` as `LA-1`. | 6 | **10** | **`✓`** | `docs/GATE-RESULTS.md` entry 13 (2026-09-25) · step list `docs/history/steps-P2.md` · `SPEC.md` `NET-116`–`NET-121`, `FW-135`–`FW-141` |
-| **P3** ✅ | bring-up report — grows every gate, and closes on `R8b`'s readings 🟢 **Closed 2026-10-08 (128th segment) on those readings, with those of `v1.0`'s qualification seating and `R6c`'s seating A that bear on them (`FW-255`, `NET-171`, `NET-172`), folded into `docs/bringup.md`**: the boot from flash through `rlxboot` (§ 12.1), the bad-image branch measured on the die (§ 12.3 ②, `C-4`), the erase size (§ 11.2, `FW-244`), two traps of the flash boot (§ 14.6, `FW-241`, `NET-171`, `NET-172`) and `R8b`'s limits (§ 16.7). § 7's power tree stays 讀 and 推, by decision (`S0b` and `BRD-01` ⊘), and `LA-1` became a standing instruction | 5 | **3** | **`✓`** | `docs/GATE-RESULTS.md` entry 21 (2026-10-08) · `docs/bringup.md` — the ten sections the plan names for `P3` are its §§ 6–15, written 2026-10-04; §§ 1–5 and the `### 3a` anchor are byte-identical to the `R5` file and `docmove` reads them so. `v1.0` is the tag made once all six of its gates are `✓` — `README.md` names them, `R6c` + `R8` + `R8b` + `R9` + `P3` + `P4b` — so it follows this row's close and does not gate it |
-| **P4a** ✅ | reproducible build: same tree built twice → same image sha256, with the positive control that changing one source byte changes it. Closed at Level 1, one machine, with Level 2 — a third party rebuilding the published recipe to the same sha256 — not closed, and the control refuted as worded: a comment byte is a source byte and does not change the image. | 1 | **1** | **`✓`** | `docs/GATE-RESULTS.md` entry 5 (2026-09-01) · step list `docs/history/steps-P4a.md` · `notes/reproducible-build.md` §7 · `SPEC.md` `TC-38`/`TC-39` |
-| **P4b-gate** 🆕 | the part of `P4b` that blocks tagging, pulled forward: closing it means each of `CHARTER.md` §110's four release obligations has a committed owner, not that all four are done — version → contents (`README.md`), the per-gate ledger (`docs/GATE-RESULTS.md`), the known-issues list (`docs/KNOWN-ISSUES.md`) and the take's home. Tagging is not in this gate. | 2 | **2** | **`✓`** | `docs/GATE-RESULTS.md` entry 6 (2026-09-01) · step list `docs/history/steps-P4b-gate.md` · <https://github.com/Jhongwe1/router-customFW/releases/tag/v0.2> |
-| **P4b** ✅ | complete GPL release (corresponding source, per-file modification record) + release process 🔄 **2026-10-05: the source ships as an asset beside the binary (GPLv2 § 3(a)), in place of a written offer** 🟢 **Closed 2026-10-09 (131st segment); `v1.0` released the same day**: phase A reads as stated on the release commit `2eb1a3d6` — A6, CI on it, read after the push — and phase B re-ran on it in an ext4 clone before the tag, under the pass condition entry 23 writes. `v1.0` is made with `mainline-9bb2bec7.img` (sha256 `295d4f6a…86bd`, `FW-256`) and `T.rlxu`, the same bytes signed by the owner, uploaded with the corresponding-source archive `tools/srcarchive.py` built from that commit — its manifest, sums and record, the licence texts, `offer.md`, `sbom.md` and a release-level `SHA256SUMS` — and every asset, downloaded back from the public release page, re-hashed to the notes' sha256 (D1). Two gaps are stated, not closed (`SBOM-3`, `SBOM-4`); whether any of it discharges an obligation is `NOTICE`'s reading; the tag, the release and the upload were the owner's acts, each after a yes for that act (phase C) | 2 | **5** | **`✓`** | `docs/GATE-RESULTS.md` entry 23 (2026-10-09) · `docs/release-process.md` · `docs/offer.md` · `NOTICE`, `LICENSE`, `config/rlxfw-src/LICENSE` (`SPEC.md` `LIC-01`) · `docs/vendor-modifications.md` (`tools/modrecord.py`) · `tools/srcarchive.py` · `tools/digestscan.py` (`FLW-1`) · `docs/sbom.md` · `CHANGELOG.md` and `docs/KNOWN-ISSUES.md`, their `v1.0` sections |
-| **R6b** ✅ | `rlx0`'s TX loss fixed first, then what `R6` left without an owner. The loss was the descriptor lengths, and `rtl819x-nic` 1.6 makes the vendor's convention the default; `rlx0` pings both ways on a `SWCORE=n` image, the mainline's configuration since 8g. | — | **7** | **`✓`** | `docs/GATE-RESULTS.md` entry 14 (2026-09-28) · step list `docs/history/steps-R6b.md` · `docs/nic-vendor-diff.md` § 16 · `SPEC.md` `NET-119`–`NET-169`, `CLK-49`, `FW-142`–`FW-157` |
-| **R1y** ✅ | the record's maintainability: `PROGRESS.md` split into state and record — closed step lists, history and closed rows moved verbatim to `docs/history/`, with a resolver for the line citations records keep; `TOOL-2`'s three instrument defects; `SPEC.md` § 17's owner column repaired once. The four enforcers the booking named are ⊘ by the owner's rule of 2026-09-26 | — | **1** | **`✓`** | `docs/GATE-RESULTS.md` entry 15 (2026-09-30) · step list `docs/history/steps-R1y.md` · `notes/record-integrity.md` § 5.7–5.8 · `SPEC.md` `FW-137`–`FW-139`, `FW-158`, `FW-159` |
-| **R6c** ✅ | rlxfw's Ethernet from a flash boot: an image booted from a slot through `rlxboot` pings both ways after a watchdog reset and after a cold power-on, and a RAM boot through the loader's prompt still does. Opened 2026-10-08 (127th segment) when `v1.0`'s qualification seating found `rlx0` deaf from flash (`NET-171`); `v1.0` waits on it by the owner's decision of that day 🟢 **Closed 2026-10-09 (130th segment) on one seating (2026-10-08, `bench/2026-10-08c`)**: `rtl819x-switch` 1.6's `vlan`, typed by PID 1, writes the loader's VLAN layout wherever the switch differs from it (the owner's ruling O1, `NET-173`); booted from slot A, `9bb2bec7` pinged both ways, 4 of 4, after a watchdog reset and after a cold power-on, and booted from RAM through the prompt it still did. `v1.0` ships `9bb2bec7` (`FW-256`). Shown sufficient as a unit, on one boot of each kind; which of the writes is necessary, and which switch rule discarded the frames before, are not established | — | **4** | **`✓`** | `docs/GATE-RESULTS.md` entry 22 (2026-10-09) · step list `docs/history/steps-R6c.md` · `bench/2026-10-08b` (seating A), `bench/2026-10-08c` (`R6c-4`) · `notes/switch-driver.md` §§ 20–21 · `docs/loader-phy-and-switch.md` § 2026-10-08 · `SPEC.md` `NET-171`–`NET-173`, `LDR-47`, `FW-256` · `docs/KNOWN-ISSUES.md`, the entry of 2026-10-08, closed |
-| **P5e** 🆕 | the repository readable and checkable by a reader with no context: a first screen that answers what this is, what it runs on, how far it got, what is proven and what is not, and how someone else checks it; entry pages for `docs/` and the drivers; CI that builds and tests the code; a video; one defect reported to an external project. It closes on `tools/entrycheck.py` reading green and on one outside reader answering those five within two minutes | **—** —— uncosted for `R1h`'s reason: the estimate, 11–14 segments, a guess, lives in the step list | **1** | **`~`** | the step list at the end of this file |
-| | | **200** | | | |
+| Gate | What closing it means | Actual | Status | Evidence |
+|---|---|---:|:---:|---|
+| **S0** | backup restored and verified; `S0b`, three power experiments written up, is ⊘ | 1 | ✓ | no entry, deliberately (`docs/GATE-RESULTS.md` § *Two gates are missing from the top of this file*); the full row: `docs/history/progress-gate-board-2026-10-09.md` |
+| **R0** | the vendor kernel booted from RAM, no flash-write command issued, the loader head and the `cr6c` header unchanged over 512 bytes | 7 | ✓ | no entry, deliberately (`docs/GATE-RESULTS.md` § *Two gates are missing from the top of this file*); the full row: `docs/history/progress-gate-board-2026-10-09.md` |
+| **R1-gate** | the cache-management model settled on silicon, and the CP0 census read | 9½ | ✓ | `docs/GATE-RESULTS.md` entry 1 |
+| **R1h** | what `R1-gate` closed without: cache geometry, the D side of coherence, the `cache` instruction's retirement and the write policy, on one seating | 5½ | ✓ | `docs/GATE-RESULTS.md` entry 3 |
+| **R2a/b/d** | which GPL drop built the shipped firmware, and the two greps for what the vendor kernel emulates | 5 | ✓ | `docs/GATE-RESULTS.md` entry 2 |
+| **R3** | my kernel boots to a shell and pings both ways, five claims held on one boot | 18 | ✓ | `docs/GATE-RESULTS.md` entry 4 |
+| **R4** | edit to result in under 90 s, with a scripted reset by the watchdog | 4 | ✓ | `docs/GATE-RESULTS.md` entry 7 |
+| **R5** | six drivers in-tree, each accepted, ten boots without an oops, DT bindings compile-tested, and the blind driver diff decided | 32 | ✓ | `docs/GATE-RESULTS.md` entry 8 |
+| **R1-pub** | the instruction, hazard and Lexra-ASE census with the three-toolchain comparison, published as `docs/rlx-isa.md` | 20 | ✓ | `docs/GATE-RESULTS.md` entry 9 |
+| **R1z** | the debts the record names, paid from a population derived from § Carried forward, with `cfcensus check` made a gate | 3 | ✓ | `docs/GATE-RESULTS.md` entry 10 |
+| **R6** | my Ethernet driver: `ping`, an `iperf3` number and 30 minutes of flood clean | 18 | ✓ | `docs/GATE-RESULTS.md` entry 12 |
+| **R7** | my userspace, six programs and busybox rebuilt from the drop, running on the silicon with no forbidden import | 1 | ✓ | `docs/GATE-RESULTS.md` entry 17 |
+| **R8** | signed update accepted, one flipped bit and a lower version refused; closed by splitting the power cuts out as `R8b` | 2 | ✓ | `docs/GATE-RESULTS.md` entries 16 and 18 |
+| **R8a** | the half of `R8` with no flash write: a signed container in RAM verified by `rlxboot`, all three clauses held on silicon | 1 | ✓ | `docs/GATE-RESULTS.md` entry 16 |
+| **R9** | a differential table whose every published row carries a mechanism class, both firmwares' readings and a check that could refute it | 3 | ✓ | `docs/GATE-RESULTS.md` entry 19 |
+| **R8b** | an update written to a flash slot boots through `rlxboot`, and ten power cuts during writes each boot the other slot | 3 | ✓ | `docs/GATE-RESULTS.md` entry 20 |
+| **P1** | `mfgtest` passes on a good unit, and every check has been made to fail once | 4 | ✓ | `docs/GATE-RESULTS.md` entry 11 |
+| **P2** | boot-time breakdown and throughput for both firmwares, from the same script | 10 | ✓ | `docs/GATE-RESULTS.md` entry 13 |
+| **P3** | the bring-up report, grown every gate and closed on `R8b`'s readings | 3 | ✓ | `docs/GATE-RESULTS.md` entry 21 |
+| **P4a** | the same tree built twice gives the same image sha256, closed at Level 1 on one machine | 1 | ✓ | `docs/GATE-RESULTS.md` entry 5 |
+| **P4b-gate** | each of the four release obligations has a committed owner; tagging is not in this gate | 2 | ✓ | `docs/GATE-RESULTS.md` entry 6 |
+| **P4b** | the complete GPL release, with the corresponding source beside the binary, and the release process; `v1.0` released | 5 | ✓ | `docs/GATE-RESULTS.md` entry 23 |
+| **R6b** | `rlx0`'s TX loss fixed first, then what `R6` left without an owner | 7 | ✓ | `docs/GATE-RESULTS.md` entry 14 |
+| **R1y** | `PROGRESS.md` split into state and record, with a resolver for the line citations records keep | 1 | ✓ | `docs/GATE-RESULTS.md` entry 15 |
+| **R6c** | an image booted from a flash slot pings both ways after a watchdog reset and after a cold power-on | 4 | ✓ | `docs/GATE-RESULTS.md` entry 22 |
+| **P5e** | the repository readable and checkable by a reader with no context; closes on `entrycheck` green and one outside reader | 1 | ~ | the step list at the end of this file |
 
-🔄 **198 → 200 on 2026-09-01**, and the ORDER matters: the number was written as 198+2 and then CHECKED by summing the column, which is backwards and is recorded that way. The sum is **200 over 18 rows**, with `R1h` deliberately uncosted (its budget lives in its own step list) and, since 2026-09-30, `R8a` too — it is a split of `R8`'s work, not work added to it, so costing it would double-count the 18 beside `R8`. The paragraphs below say why this column is not a quantity; that is a reason to delete it, not a reason to let its arithmetic drift.
-
-🟢 **Est. is CALIBRATED now — 2026-09-11, `R5-11` — and what came out is a band, not a ratio.** This note said *the calibration point is the first driver
-(R5); when it lands, multiply every remaining row by the measured ratio and say so here.* `R5` landed. 量, against the **plan's 小計**, which the paragraphs below establish is the only estimate carrying `Actual`'s definition:
-
-| gate | actual | plan 小計 | ratio |
-|---|---:|---:|---:|
-| `S0` | 1 | 3 | 0.33× |
-| `R0` | 7 | 11 | 0.64× |
-| `R1-gate` | 9 | 8 | 1.12× |
-| `R1h` | 5 | 4 | 1.25× |
-| `R2a/b/d` | 5 | 6 | 0.83× |
-| `R3` | 18 | 13 | 1.38× |
-| `P4a` | 1 | 2 | 0.50× |
-| `R4` | 4 | 8 | 0.50× |
-| `R5` | **32** | **31** | **1.03×** |
-
-**n = 9 · min 0.33× · max 1.38× · spread 4.15× · mean 0.844× · median 0.833×.**
-
-🔴 **So the instruction cannot be carried out as written, and that is the result rather than a failure to produce one.** The 170 planned segments still
-ahead come to **142** at the median, **57** at the minimum and **235** at the
-maximum. A single multiplier is not in this data, and publishing one would give
-this column a third owner of a quantity it has already had two of.
-🔴 **The prior carried into `R5` is refuted.** Pooled, `S0` 1/3 plus `R0` 7/11
-is 8/14 = **0.571×**, n = 2 — it predicts **17.7** segments for `R5` against an
-actual of **32**, low by **1.81×**. ⚠️ `P4b-gate` is not among the nine: it was
-split out of `P4b` on 2026-09-01 and has no row in the plan, so it has no
-denominator with the right definition.
-⚠️ **What this does not say.** `Actual` counts segments between one gate
-closing and the next, so it includes instrument days and desk days spent on
-other things; nine gates is nine points from one person on one project, and the
-spread is wide enough that the mean and the median are not usefully different
-from each other. The recommendation two paragraphs down — delete the `Est.`
-column and keep one line for the measured ratio — is unchanged by this, and is
-still not done, because deleting a column is a decision.
-
-🔴 **This column had a second owner, and reconciling the two on 2026-08-25
-produced a worse answer than "they disagree": neither of them is a quantity.**
-
-The planning material carries a finer accounting — desk, bench and instrument
-time as three columns — and totals **252**. This column totals **198**. Both add
-up correctly against themselves: every row of the plan's table equals its own
-desk+bench+instrument, its cumulative column is consistent, and the seventeen
-rows here sum to 198. **So the arithmetic was never the problem.**
-
-**What the difference is not.** The plan's instrument column totals 44, so
-252 − 44 = **208** is its desk+bench. This column is 198, not 208. Ten of its
-seventeen rows agree with the plan's desk+bench exactly; **seven disagree, and
-not all in the same direction** — `R5` is 4 low, `R1-pub` 2 low, `R7` is 1
-**high**. Net −10.
-
-🔴 **So 198 is not the total, not desk+bench, and not any consistent subset of
-the plan. No rule reproduces it.** It is not a stale copy either: a stale copy
-names a revision you can point at. It is a third number that accreted row by row.
-
-**Which one a decision should be made against, and why it is the plan's.** The
-column beside this one is `Actual`, and `Actual` counts segments consumed in
-`LOG.md` between one gate closing and the next — **which includes instrument
-days**. The only estimate with the same definition is the plan's 小計. Against
-the two closed gates: `S0` actual 1 against plan 3, `R0` actual 7 against plan
-11 — **8 consumed against 14 planned, 0.57×, n=2**, and that ratio is the thing
-worth carrying rather than either total. Against this column (1 and 5) the same
-two gates read 1.0× and 1.4×, which looks better and means less: it is a number
-compared against a number with no definition.
-
-**The house-rule-1 defect is sharper than two owners.** An estimate is a planning
-artefact; this file is the owner of *where I am*, which is a fact about work
-done. `Actual`, `Status` and `Evidence` belong here. **`Est.` does not**, and the
-recommended repair is to delete the column rather than reconcile it, keeping one
-line under the board for the measured ratio — which IS a fact about work done and
-which is what "multiply every remaining row by the measured ratio" needs. **Not
-done today**, because deleting a column from the gate board is a decision and
-this entry is the analysis it should be made from.
+The `Est.` column is deleted (2026-10-09, `P5e-2`), as its own analysis recommended: an estimate is planning material, not state. What it measured stays: on 2026-09-11 (`R5-11`), actual segments against the plan's 小計 over nine gates, **n = 9 · min 0.33× · max 1.38× · spread 4.15× · mean 0.844× · median 0.833×** — a band, not a ratio. The analysis: `docs/history/progress-est-analysis-2026-10-09.md`; the column: `docs/history/progress-gate-board-2026-10-09.md`.
 
 ---
 
 ## Release clock
 
-**This table owns ONE thing: which versions have actually shipped.** What a
-version *contains* moved to `README.md` § *Which gates make which version* on
-2026-09-01 (`P4b-1`); the week estimates are planning material and stay in
-`plan/`. The note below records why, because the repair is the finding.
+This table owns which versions have shipped; what each one contains is `CHANGELOG.md`'s and `README.md`'s. Its notes until 2026-10-09: `docs/history/progress-release-clock-2026-10-09.md`.
 
 | version | Shipped |
 |---|---|
@@ -225,108 +83,6 @@ version *contains* moved to `README.md` § *Which gates make which version* on
 | `v0.5` | 🟢 **2026-09-29** |
 | `v0.6` | 🟢 **2026-10-04** |
 | `v1.0` | 🟢 **2026-10-09** |
-
-**Public from v0.1.** Held disclosure items stay out until `docs/disclosure.md`
-says otherwise — `plan/` §15 holds the policy.
-
-🟢 **`v0.2` SHIPPED 2026-09-01** — tag `v0.2` at `6cb9bf3`, and the release at
-<https://github.com/Jhongwe1/router-customFW/releases/tag/v0.2>.
-🔴 **It is this repository's FIRST release.** 量: `gh release list` was empty
-before it, so `v0.0` was tagged on 2026-08-25 and never released either —
-`CHARTER.md` §110 rule 2 has been unsatisfied since the project's first tag,
-which is wider than `REL-0` recorded. 🟢 **2026-09-01, the owner took it: no retrospective `v0.0` release, and the rule
-is followed from `v0.3`.** 量 the same day, because the sentence above is a claim
-about GitHub and not about this repository: `gh release list` returns **one** row,
-`v0.2`, so `v0.0` is tagged and unreleased and nothing else has ever been released.
-The reason for not backfilling is that a release note written now would describe a
-version by hindsight, which is the same objection that kept `S0` and `R0` out of
-`docs/GATE-RESULTS.md`. **`CHARTER.md` §110 rule 2 is therefore unsatisfied for
-`v0.0` and `v0.1` by decision rather than by omission**, and satisfied from `v0.3`.
-
-🟢 **`v0.3` SHIPPED 2026-09-11** — tag `v0.3` at `8f42644`, and the release at
-<https://github.com/Jhongwe1/router-customFW/releases/tag/v0.3>.
-
-🟢 **`v0.4` SHIPPED 2026-09-17** — tag `v0.4` at `b24abfb`, and the release at
-<https://github.com/Jhongwe1/router-customFW/releases/tag/v0.4>.
-🔴🔴 **AND THE OWNER HAD TO ASK AGAIN, WHICH MAKES `REL-4`'s GAP A SECOND INSTANCE SIX DAYS AFTER THE FIRST.** The `v0.3` paragraph directly above records that the release *became due without anything here noticing* and that **what found it was the owner asking, not a check**. 🔴 `REL-4` was then closed as ✅ — correctly, because the task *make the v0.3 release* was done — **and the finding inside it was left as a sentence rather than turned into an instrument.** 量 2026-09-17: the tag was pushed at 02:0x and the **release did not exist**; `gh release list` returned `v0.3` and `v0.2` only, and the owner said *我在 github 上沒看到你 release*. Same trigger, same person, six days apart.
-🔴 **The closeout audit could not have caught it, and that is the transferable half.** Method 8 enumerates *what this segment produced* and asks *which FILE owns it* — and a GitHub Release is **not a file in this repository**. Every gate was green and every owner file was correct; the missing artefact lived outside the tree entirely. **The method has a blind spot for outward-facing artefacts**, and this is its first measured instance.
-⚠️ **What a check would need, written down rather than built.** `README.md` owns version → contents; the gate board owns which gates are `✓`. A release is DUE the moment every gate in a version's row is closed, so the check is a join over two committed tables plus one question `gh release list` answers — which means it cannot be a pure repository check and belongs in CI, where a token exists. **It is not built here**: two instances is a rate, not a target, and building it inside the segment that hit it is fitting an instrument to its own occasion. **The re-open condition is a third instance.**
-🟢 Order taken from the precedent again: tag and release first, record second, so no sentence here is written before the thing it describes exists.
-
-🟢 **It is the first release this project has made UNDER that rule rather than in
-spite of it**: `v0.0` was tagged and never released, `v0.1` was never tagged, and
-`v0.2` was released on the day the rule was written down. 🔴 **And it became due
-without anything here noticing.** `README.md` owns version → contents and says `v0.3`
-is `R4` + `R5`; `R4` closed 2026-09-02 and `R5` closed 2026-09-11, so it was due the
-moment the gate closed — and what found it was the owner asking *I have not seen
-a tag release*, not a check. `REL-4` is the record of that gap. ⚠️ **The order was
-taken from the precedent rather than chosen**: 量, `v0.2`'s tag points at `6cb9bf3`
-and the `SHIPPED` claim landed in `04dc0ef` **three minutes and forty seconds
-later** — tag and release first, record second, so no sentence is written before
-it is true.
-
----
-
-### 🟢 `P4b-1`: the second owner is gone, 2026-09-01 — and the column that was NOT flagged was also a copy
-
-**What this table looked like until today**: four columns — `version`,
-`Contents`, `Target (optimistic / ×1.8)`, `Shipped` — of which only `Shipped`
-was ever this file's own. The other two restated `plan/CHARTER.md` §88, which
-is **gitignored**, so house rule 1's usual repair (replace the content with a
-pointer) produced a pointer no public reader could follow. `P4b-1` decided the
-owner has to be a committed file, and it is `README.md`.
-
-**量 2026-08-31 (twentieth), the `Contents` column, read side by side against
-CHARTER §88 — six of six shared rows disagreed:**
-
-| version | `CHARTER.md` §88 | the deleted `Contents` column |
-|---|---|---|
-| v0.1 | `R0` + `rlxprobe` segment 0 on silicon + **`R1-gate`** | S0 + R0 + **`R1`** + `rlxprobe` + first write-up |
-| v0.2 | `R3` (60-second take) + **`P4a`** | **`R2`** + `R3` |
-| v0.3 | `R4` + `R5`, **six** drivers + DT binding + `driver-diff` | `R4` + `R5`, **five** drivers |
-| v0.4 | **`R1-pub`** + `P1` | **`R6`** |
-| v0.5 | **`R6`** + `P2` | **`R7`** |
-| v1.0 | `R8` + `R9` + `P3`/`P4b` | `R8` + `R9` + **`P1`–`P4`** |
-
-CHARTER also has `v0.0` and `v0.6` rows; that table had neither, which is what
-shifted its tail by one version from `v0.4` down. **It bit twice in one
-morning.** Read there, `v0.2` did not need `P4a` and could have been tagged
-before that session started; and `v0.1` needed `R1` **whole**, of which
-`R1-pub` is `·`, so under that table v0.1 could never be tagged at all —
-while `REL-2` says its contents completed on 2026-08-26, which is true under
-CHARTER and false under the file `REL-2` lives in.
-
-🔴 **量 2026-09-01 (twenty-second): the `Target` column was a restatement
-too, and nothing had ever said so.** The note above singled out `Contents` as
-*the* wrong column and left `Target` beside it unflagged. But `×1.8` is
-CHARTER's own multiplier, defined in CHARTER, so that column was never this
-file's quantity either. Read against §88 by version label:
-
-| version | CHARTER §88 樂觀 / 務實 | the deleted `Target` column |
-|---|---|---|
-| v0.1 | 2.5 / 4.5 週 | wk 3 / wk 5 — agrees under rounding |
-| v0.2 | 4.9 / 8.9 | **wk 7 / wk 12** |
-| v0.3 | 9.4 / 16.9 | **wk 12 / wk 21** |
-| v0.4 | 12.9 / 23.3 | **wk 17 / wk 30** |
-| v0.5 | 18.5 / 33.3 | **wk 23 / wk 41** |
-| v1.0 | 28.8 / 51.8 | wk 29 / wk 52 — agrees under rounding |
-
-**Two of six agree and four do not** — and a partly-agreeing copy is worse
-than a wholly stale one, because it reads as maintained. ⚠️ The `v0.4`
-comparison is by version *label* only: the two tables put different work under
-that label, so those two cells were never measuring the same thing.
-
-**Why both columns were deleted rather than reconciled.** The gate board's
-`Est.` column analysis below already made this argument and this is the second
-instance of it: *an estimate is a planning artefact; this file is the owner of
-where I am, which is a fact about work done.* `Shipped` is a fact about work
-done and stays. `Target` is an estimate and goes to `plan/`. `Contents` is a
-decision about the future, it has to be visible to a public reader, and it goes
-to `README.md`. 🔴 **And `CHANGELOG.md`'s `v0.2` section carried the dangling
-pointer into the release itself** — its first line read *Contents, against
-`plan/CHARTER.md` §88* — which is the defect this gate exists for, shipped.
-Repaired in the same commit.
----
 
 ---
 
@@ -340,26 +96,15 @@ Open questions that outlive a single session. Each one names the gate that will 
 | `CENS-1` 🆕 | 🔴 **沒有任何東西把一次擷取接回它填的普查列,而這個缺口已經讓一句安全警告引用了一個板子早就填掉的空白。** 量 2026-09-14(第六十八段):`tools/isacensus.py` 的四個模式都不開 `bench/` 下的任何檔;`isapay verdict` 算得出判決卻不寫回;`isacensus write` 由 **tsv** 重新產生文件區塊,而 tsv 的路線旗標只能手改。後果是 `tools/isa-census.tsv` 從 `2ee0c6d`(2026-09-13)之後就沒有被重新導出,`bench/2026-09-14/C1-P4j.log` 在 **05:57:21** 進了 repo,而 `docs/isa-prior-art.md` § 9 的安全警告在 **16:20:41** 寫下時引用 § 10 ③ 的空白當理由 —— **早 10 小時 23 分、12 個 commit**。這一段把 45 列全部重新導出(路線 ① **3 → 42**),但那是**手做的 join**,下一次一樣會過期。⚠️ 收它要一支「讀擷取 → 提議路線旗標」的工具,而它的正控制是**把一列改成過期並要求被報出來**。 | ~~`R1-pub-7`~~,或任何一段動 `isacensus` 的桌面段 🔄 **2026-09-16（第八十段）：那個具名 gate 劃掉，常設指示留下。** 它在 2026-09-16 走完它自己的步驟而沒有做它，把它留在這一格是讓一列**看起來**有擁有者。這不是改派：常設指示自己就是一個擁有者，而它一直在那裡 |
 | `CORR-1` 🆕 | ⚠️ **上電前的更正檔第一次早於它自己的擷取進 git,而那是判例還是一次性,沒有任何東西決定。** 量 2026-09-14:十八份 `CORRECTIONS-block*.md` **零份**在自己目錄第一個 `.log` 之前 commit(十七份同一個 commit、一份更晚),正控制是 33 個 bench 目錄裡有 17 個的 `PREDICTIONS-*` 做到了,所以「BEFORE」是說得出口的判決。這一段的兩份(`f9fffa4`,17:28:45,上機 19:00)做到了。🔴 **但沒有任何檢查器要求它** —— `check-predictions` 讀的是卡片與擷取的 mtime,更正檔完全在它的視野外,而 `RUNSHEET` 的生命週期規則只說「更正寫進新檔」,沒說何時。⚠️ 收它的兩個選項各有代價:① 加一條檢查(要先決定「更正檔必須早於擷取」是不是真的普遍成立 —— 上電後才發現的缺陷本來就不可能早於);② 只把它寫成判例,像 `BRD-README-1` 選 ② 的理由。**這一列不替擁有者做決定。** 🔄 **2026-09-14 晚,收工稽核補一個觀察而不是一個決定**:`RUNSHEET.md` § *Four rules about the card's lifecycle*(`:3798`)對「更正檔什麼時候 commit」**一個字都沒說**,它最接近的一句是 `:3855` —— *"`CORRECTIONS-block14.md`, which is written **after** the seating, is not a card, and therefore had nothing telling anyone to check it."* 而這一段的頭條宣稱(更正檔早於擷取)目前只活在一則 commit 訊息、`LOG.md` 與 `PROGRESS.md:17` 裡,**而那三個地方未來的卡片作者都不會讀**。⚠️ **一條沒有家的規則讀起來像一個缺席而不是一個決定** —— 所以選項 ② 若成立,`RUNSHEET` 仍然要有一句話說「這是判例不是規則」,否則兩個選項在檔案裡長得一模一樣。 | 任何一段動 `check-predictions` 或 `RUNSHEET` 的桌面段 |
 | `BRD-2` 🆕 | ⚠️ **`bench/README.md` 的 captures 欄對一個還沒跑的目錄是一個預測,而四個檢查沒有一個看得到。** 量 2026-09-14(收工稽核):`:87`／`:88` 對 `2026-09-14b`／`-14c` 寫 **7** 與 **27**,而磁碟上兩個目錄各只有兩個 `.md`、**零個 `.log`**;`:44` 自己定義那一欄是 *"counts `*.log`"*。`capdate` 的 `D4` 依設計是對**目錄名**的集合比對(`tools/capdate.py:328-330`),`D1`／`D2`／`D3` 只對**持有擷取的**目錄發火,所以一個零擷取的目錄落在四個檢查之外。🟢 **今晚跑完它們就會變成對的**,所以這不是一個錯誤而是一個**沒有守衛的視窗** —— 而收工稽核那句「`bench/README.md` 的索引已經寫著兩份更正檔」比它讀起來窄:索引欄對了,計數欄沒有被任何東西看過。⚠️ 收它是一個 `capdate` 案例(captures 欄非零而目錄沒有 `.log` → 報出來),而它的正控制是這個 repo 要求的那一種:**把一列改成不符,必須被報出來**。 | 任何一段動 `capdate` 的桌面段 |
-| `CHLOG-1` ✅ | 🟢 **收了 2026-10-05（第一百二十四段）：這是一個決定，不是一個修補。** 原問題：`CHANGELOG.md` 的逐段條目全部在 `## Unreleased` 標題之上，所以那個標題不再包含它宣稱包含的東西，而「多久寫一則」沒有答案。**答案取兩層讀法，並把兩層各自的角色寫死：** `## Unreleased` 之上是 2026-09-16（第七十七段）為止的逐段條目 —— 量 2026-10-05，那一塊裡最新的日期就是 2026-09-16 —— 它們**凍結成紀錄，不再增加，也不被改寫**。從那天起逐段歷史只在 `LOG.md`；這個檔只寫**每個 tag 含什麼**：`## Unreleased` 累積下一個 tag 的內容，打 tag 的那個提交把它剪成 `## vX.Y — 日期`（`v0.3` 到 `v0.6` 都是這樣剪出來的；`docs/release-process.md` 階段 A4 把它寫成發行步驟：每個發行一個 CHANGELOG 段與一個 KNOWN-ISSUES 段，兩者都以 sha256 指名那顆映像）。理由是兩個已提交的檔案本來就這樣說：`README.md` 說這個檔 *says what each tag contains*，`docs/GATE-RESULTS.md` 說版本內容由 `CHANGELOG.md` 擁有，而逐段的擁有者是 `LOG.md`。**證據：** `CHANGELOG.md` 檔頭有一則有日期的註記說了上面這些（它是紀錄，所以是新增一則，不是改舊的）。⚠️ **這沒有回答**：那一大塊舊條目該不該有一天搬進 `docs/history/` —— 搬動要走 `tools/docmove.py`，而沒有人需要它們被搬 | ✅ `P4b`（原本 ~~`R5-11`~~） |
-| `FLW-1` ✅ | 🟢 **Closed 2026-10-09 (131st segment): a tracked file's digest of a flash window that overlaps `H601` is now looked for, by `tools/digestscan.py`.** It computes sha256, sha1, md5 and crc32 in memory from the reference dump over the windows it enumerates that overlap `H601` — 166 candidates over 34 windows — and reports a whole digest, or a prefix or suffix of at least 8 hex digits (`N` = 8, measured by its own `measure` over the tracked tree), by file, line, window label, kind and digit count, and never the digits. The controls this row fixed in advance hold: it finds `LOG.md:87` and `tools/leakscan.py:137`, the whole image's sha256 in full, which the 2026-09-07 ruling covers, and it does not report `FLS-24`'s complement digest. Every other hit it makes in the tracked tree is a prefix of that digest, exempted by name, one row each, on the main session's ruling of 2026-10-08 (`LOG.md`, the 130th segment's entry): fifteen prefixes on fourteen lines of eight files, and 量 2026-10-09 the scan reads 0 findings, 17 exempt and 0 stale (`SPEC.md` `FLS-32`). CI runs its self-test with the three dump cases skipped, its mutation suite and the dump-free `check`; the scan itself needs the dump and runs at the desk, where `CLAUDE.md` § Closeout now runs it beside `flashwin scan --dump`, which is where the row's reservation — the answer is needed at every closeout — now lives. Its 46 hits in the public `upstream/` were ruled known and accepted on 2026-10-09 (`FLS-32`) | ✅ `P4b`（原本 ~~`R9`~~） |
-| `README-1` ✅ | 🟢 **收了 2026-10-05（第一百二十四段）：答案是「策展」，而且 README 自己早就這樣說了。** 原問題：`README.md` 有三份清單（`tools/` 非 `test-*` 的程式、`test-*`、`notes/*.md`），三份都不完整，而「這是策展還是漏掉」沒有任何地方寫。**答案：三份都是挑選過的，不是普查** —— 清單上是讀者要追論點所需的程式與筆記，**普查是目錄本身**：`tools/` 與 `notes/` 列出全部，控制數的普查是 `tools/ci-expected.tsv`。理由有兩個，都可檢：`README.md` 的 *How to check it* 從 2026-09-02（`28ab9d2b`）起就寫著 *This is a selection, not a census*，所以補齊是改變它的性質，不是補洞；而補齊會把 README 變成第二份普查 —— `CI-4` 量到的正是那樣的第二份每一次都過期。**證據：** `README.md` 在 *What is in here* 的開頭有一句把這個答案說給三份清單聽，而 *How to check it* 開頭那一長段（逐次重新導出的程式數）改寫成不帶計數的短段 —— 舊段逐字搬進 `docs/history/`，由 `tools/docmove.py` 證明。⚠️ **這一列沒有把任何工具或筆記補進清單**，正是因為補一個就是以暗中的方式回答了這個問題 | ✅ `P4b`（原本 ~~`R5-11`~~） |
 | `TCHK-1` 🆕 | ⚠️ **`tools/tcheck.py` recomputes the fields version 2.0 printed, and 3.0 prints twenty-two more that nothing recomputes.** 量 2026-09-06: the new `/proc` keys are `mode`, `ce_reload`, `ce_reload_hz`, `ce_reload_writes`, `ce_rating`, `ce_rating_probe`, `ce_rating_vendor`, `ce_registered`, `ce_probe_registered`, `ce_live`, `ce_mode`, `ce_mode_calls`, `ce_probe_mode`, `ce_probe_mode_calls`, `ce_next_calls`, `ce_badmode`, `ce_hw_bad`, `ce_cycles`, `ce_check_dc`, `ce_check_dj`, `ce_handler`, `ce_handler_is_noop`, `irq_preacked`. 🔴 **Two of them are recomputable and that is what makes this a gap rather than a wish**: `ce_check_dc / ce_check_dj` is a ratio the tool could check against 1 within the driver's own tolerance, and `Δce_cycles / hz_used` against `Δwall` is the whole of `cereload`'s causal test — a number this repository's discipline says a tool must re-derive rather than a reader transcribe. ⚠️ **It is not done now on purpose**: `tcheck` reads captures and there are none, so every case would be written against a fixture rather than against the artefact it exists to read | **the seating that produces block 10's captures** —— `tools/tcheck.py`、`bench/2026-09-06/PREDICTIONS-B11-block10.md` §5.5 |
-| `LEDGER-1` ⊘ | ⊘ **放棄 2026-10-05（第一百二十四段）—— 類別：「出於自願的範圍外」。** 測試是 `docs/GATE-RESULTS.md` 第 19 則對 `R9-11` 用過的那一個：**擋住它的東西，撐得過擁有者一句帶日期的 yes 嗎？** 擋住它的是擁有者 2026-09-26 的規則 —— 新檢查器只准擋磚、擋 `H601` 洩漏、擋誤判的結果（`cvewatch` 在同一則裡以同一個理由、同一個類別放棄）—— 一句 yes 就改掉它，所以不是「卡在儀器上」。這一列要的是 `ledgerscan history`：把「歷史有而 `HEAD` 沒有」的路徑掃出來的動作；帳本是**污染的下界**（它自己的 §0 ①），不是那三樣。**另外三個事實各自可檢：** ① 量過了 —— 2026-09-02 的一次性掃描（167 個 commit、`git log --all -p` 24,797,072 位元組）歷史 92 條路徑、`HEAD` 95 條，只在歷史裡的 2 條（`arch/rlx/include/asm/processor.h`、`lib/decompress_inflate.c`）都是 out-of-scope，所以只掃 `HEAD` 在範圍內一條都沒漏；② 它的設計自我推翻（把那兩條路徑寫進帳本，就把它們放進了 `HEAD`，同一個掃描立刻讀 0），所以它從來就只能是一次有基準 commit 的量測，不是常駐的檢查；③ **這一列當初改派給 `P4b` 的理由指名的是錯的文件**（帳本記的是**讀了什麼**，`docs/vendor-modifications.md` 記的是**改了什麼**），所以 `P4b` 結案既不帶走它，也不需要它。🟢 **「紅還是只報告」的答案：** 只報告 —— 帳本記的是 `HEAD` 的文字說讀過什麼，一條只存在於歷史的引用定義上已經被拿出了文字，帳本沒有東西可以涵蓋它。**重新打開的條件，寫死：** 任何一份發行說明、`README.md` 或 `docs/GATE-RESULTS.md` 的條目把 `docs/blind-write-ledger.md` 的下界寫成**「沒讀過」的主張**（而不是下界）；到那天，2026-09-02 那次一次性掃描用基準 commit 重做一次，結果寫進帳本，**不做成動作** | ⊘（原本 ~~`R5` 的準備~~ → ~~`R9`~~ → ~~`P4b`~~） |
-| `CI-4` ✅ | 🟢 **收了 2026-10-05（第一百二十四段），兩半一起。** **第二半**（那份清單該不該完整）隨 `README-1` 定為「策展」。**第一半**（`README.md` 的工具清單帶著控制數，而沒有任何東西比對它們）**不建檢查器，而是把計數從 README 拿掉：** 擁有者 2026-09-26 的規則只准新檢查器擋磚、擋 `H601` 洩漏、擋誤判的結果，一個 README 計數檢查器三樣都不是；而同一個形狀在 2026-10-05 已經用同一個辦法收過兩次 —— `NOTICE` 現在不記 `config/rlxfw-src/` 的檔案數（它在加了一個標頭的那天就過期了），`config/rlxfw-src/LICENSE` 把 23 這個數拿掉 —— 一個放在第二處的計數，下一次改動就過期。控制數的擁有者是 `tools/ci-expected.tsv`（`ci-census` 從執行結果重新導出它）。**量 2026-10-05 它又過期了：** README 的 `tools/cardcheck.py` 段寫 63 個控制，`tools/ci-expected.tsv` 是 78。**證據：** `README.md` 裡描述現況的控制數、case 數與 mutant 數全部拿掉，阿拉伯數字與英文數詞兩種寫法都算，只留有日期或綁在一件過去事件上的歷史陳述（例如 *Two survived the 23 controls that existed when they were written*）；改寫前的每一段逐字搬進 `docs/history/readme-2026-10-05.md`，由 `tools/docmove.py` 證明。量 2026-10-05，`grep -n -E '[0-9]+ controls' README.md` 只剩那一句 | ✅ `P4b`（原本 ~~`R5` 的準備~~） |
-| `P4A-1` ⊘ | ⊘ **Declined 2026-10-05 (124th segment). Category: 刻意換掉 (prerequisites met, not worth it).** The row said Level 2 — a third party rebuilding the published recipe to the same sha256 — was one open item. 讀 it is one mark and one measurement: a row of `config/rlxfw-marks.tsv` declaring `KBUILD_BUILD_USER`/`_HOST` on this drop's `scripts/mkcompile_h`, which writes `(key@K)` from `whoami`/`hostname`, and `L2-7`, kbuild's link order against `readdir`, the one candidate of seven never measured (`notes/reproducible-build.md` § 6). **Not taken, for three reasons that can each be checked:** ① it is a vendor-source change under `config/`, so it moves `RECIPE_ID` and the banner of every image, and `R8b-3` builds its payloads on the release recipe — taken after them it voids the tested bytes; ② `P4a`'s own definition is Level 1, the same tree built twice (the board row and `docs/GATE-RESULTS.md` entry 5), which `R8b-3` repeats on the release recipe, its DoD being two builds byte-equal; ③ nobody has asked to rebuild a published binary. **What the release says instead:** `docs/offer.md` § 3 states that a third party's rebuild differs at least in the `(key@K)` banner, so what a recipient can check is the commit id and each asset's sha256, not a rebuild. ⚠️ **The cost is real and stated:** a published binary cannot be checked against the published source by rebuilding it — the reason `IMG-1` ③ once gave for not publishing one. `v1.0` is published on that footing and says so. **Re-open when** a recipient asks to verify a published binary by rebuilding it, or when a release after `v1.0` is allowed to move the recipe; then take it first in that release, before any payload is built | ⊘（原本 `P4b`） |
 | `NAME-1` 🆕 | ⚠️ **Two directories/files now have names narrower than their contents, and both were left that way DELIBERATELY on 2026-09-01.** `config/host-compat/` holds `0002`, which is about build determinism and not about host compatibility; `tools/test-kbuild-cflags.sh` now also tests the build-stamp guard. 🔴 **The reason for not renaming either is specific, not laziness**: `host-compat` has nine references across six files, and renaming the suite would move BOTH its row in `ci-expected.tsv` and its allowed-skip label in `ci.yml` — an allowed-skip label edited in one place and not the other is exactly what put three commits red on 2026-08-31 (run 33410057391), and this machine is structurally unable to see that class. **A rename belongs in a commit that does nothing else** | ~~**none yet.**~~ Renaming is not a gate's work; it is a session's, and it needs a session that is not also changing what the things do 🔄 **2026-09-16 (第八十段): this becomes a STANDING INSTRUCTION, which is an owner and not a deferral.** *Any desk segment that is not also changing what these things do* — which is this row’s own stated condition, quoted rather than invented. 🔴 **This segment does not qualify and that is measured, not modest**: it renamed `CFG-2`→`CFG-3` and moved `RECIPE_ID`, so a directory rename on top of it would put two unrelated changes in one `RECIPE_ID` move. The table’s rule that a row with no owning gate is a bug is satisfied: a standing instruction is an owner, and `CENS-1` and `REGIMM-1` carry the same shape; ~~**any desk segment that is not also changing what these things do**~~ 🔄 **2026-10-09 (132nd segment): owned by `P5e-3`.** `P5e` renames and adds entry points and changes no behaviour, which is this row's own condition; `P5e-3`'s directory READMEs either rename these two or say what they hold, and the move of `config/rlxfw-src/` to `kernel/` leaves both names as they are. |
 | `CI-2` 🆕 | 🔴 **`spec-check`'s table sweep walks `git ls-files`, so a file that is not yet staged is outside the population it reports on — and the natural order (write, run the gate, commit) guarantees every NEW file is outside it.** 量 2026-09-01: `09e1a23` was pushed with two `C8` defects in `docs/KNOWN-ISSUES.md` after a local gate run that was genuinely green, because the file was untracked when it ran. CI's `text` job caught it (run 33434417629). ⚠️ **This is NOT the class `CI-1` describes**: `CI-1` is a check this machine cannot make, and this is a check it can make and was asked at the wrong moment. The fixes are different. 🟢 **The repair is one line and it is a habit, not a checker**: `git add -A && spec-check && git commit`. Nothing verifies that ordering, which is the same shape as the note above about numbers | ~~**none.**~~ A checker for *were the gates run after staging* would have to run in the commit hook, and this repository has deliberately kept its gates as commands a reader can run rather than as hooks a clone inherits 🔄 **2026-09-16 (第八十段): a STANDING INSTRUCTION, and the row’s own question is answered in the other direction.** It said a checker for *were the gates run after staging* would need a commit hook. 量 2026-09-16: the PROCEDURE landed instead — `CLAUDE.md` now carries *`git add -N` every NEW `.md` file before running that gate*, added the same day by the seventy-eighth segment after CI caught two `C8` defects in a file five local runs had reported clean. 🟢 **And an INSTRUMENT is possible without a hook, which this row assumed it was not**: `spec-check` can report untracked, non-ignored `.md` files as OUTSIDE its population, which is a scope statement rather than a hook. Its strictness fixture is written here so the next segment does not have to derive it: *a tree with an untracked `.md` carrying a `C8` defect — the old version reports clean, the new one reports the file is unswept.* **Owner**; **any desk segment that edits `spec-check`’s population** |
-| `IMG-1` ✅ | ✅ **Closed 2026-10-05 (124th segment), by decision and not by a discharge.** The row weighed three reasons the `v0.2` release ships no image. ① **GPL corresponding source** is now a rule with a tool and an order: `docs/offer.md` § 0 says a release that carries a binary carries its corresponding-source archive as an asset of the same release (GPL-2.0 § 3(a)); `tools/srcarchive.py` builds it; `docs/release-process.md` orders the steps and leaves the tag, the release and the upload to the owner's dated yes each. **The discharge is that upload, and it is not this row's.** ② **Withdrawn** (量 2026-10-04: 17 `file` rows in `config/rlxfw-initramfs.tsv`, none `owner=unit`; `docs/sbom.md` § 6 owns what survives). ③ **Declined with `P4A-1`**: a third party cannot rebuild the published binary to the same sha256, and the release says so (`docs/offer.md` § 3). So none of the three stands between the project and publishing an image; what does is `docs/offer.md` § 5, read on the release commit by `docs/release-process.md` phase B. ⚠️ This closes a question about `v0.2`'s reasons; it does not say any release has carried an image (量 2026-10-04: 5 releases, 0 assets) | ✅ (was `P4b` for ①, `R7` for ②, `P4A-1` for ③) |
 | `CNT-1` 🔄 | 🔴 **Four numbers this repository states about itself were found wrong in one morning, and no instrument here can see the class.** 量 2026-09-01, all four caught by re-deriving a figure against the artefact it counts: `P4b-3` said `docs/KNOWN-ISSUES.md` had **25** entries when it had 28 (true at `09e1a23`, broken by three later commits the same session); `docs/KNOWN-ISSUES.md` said **17 of 59** CI runs were red when its own population was 18 of 59; `notes/reproducible-build.md` §6 said **five of seven** Level-2 rows were settled when three were, **and its own decomposition left one row in no category at all**; `docs/KNOWN-ISSUES.md` copied that fifth number and then listed four things under it. **The shape is constant and it is why nobody re-checks**: the number carries no weight in the sentence around it. ⚠️ **The next step is a measurement, not a tool** — the population of such numbers in committed files is unknown, and building a checker before counting the population is building an instrument with no evidence it has anything to find, which this project's own rule forbids  🔴 **2026-09-07（第四十一段）：這個類別又一個實例，而它比前四個都難看見 —— 因為那個數字是**儀器算出來的**，不是手打的。** 量：`ci.yml` 里真正的 `run:` 步驟是 **61** 個；`grep -cE '^\s*run:'` 只看到 **59**；`grep -c 'run:'` 讀到 **62**。差別是：① `:358` 是一行**以 `run:` 結尾的註解**；② **`:728` 與 `:733` 用的是行內 `- run:` 形式**，而任何以 `^\s*run:` 定錨的選擇器都看不到它們。 🔴 **而那兩步從 `970f041`（2026-08-25，`apt` 進 `ci.yml` 的同一個 commit）就在了**（`git log -S`），所以**這個專案每一次桌面全套 sweep 都静静地跳過了它們**，而每一句「all N 個 `run:` 步驟」都差了兩個。`shellcheck --severity=error tools/*.sh` **從來沒在這張桌子上跑過**，只在 CI 上跑過。 🟢 **形狀與 `CLAUDE.md` 已經記了兩次的那個同類**（一個選 `run:` **行**的 sweep 看不見 `run:` **區塊**，`verify-backup-copy` 因此掉了兩次），這是第三個變體：**定錨在行首的選擇器看不見行內清單形式**。 ⚠️ **所以 `CNT-1` 要改的不是數字而是它自己的下一步**：這一列寫著「下一步是量測不是工具」，而今天這個實例說的是**就算有工具，工具自己的選擇器也是一個沒人檢查的數字**。治它的不是第二個計數器，是讓儀器**把它數到的總數印出來並且跟一個宣告值比對** —— 這一段的 sweep 現在就這樣做，數不到 61 就印 `WARNING`。  🔴 **同一天第二個實例，而它是這個類別至今最銳利的一個 —— 因為那個「第二個地方」是一張凍結的卡片，而那個數字是**板子自己會印出來檢查的**。** `RECIPE_ID` 是對 **`config/` 底下每一個檔**的 sha256，**連註解都算**。映像建好、staged、數字寫進卡片之後，我在 `config/rlxfw-src/…/rtl819x-spi.c` 改了**一行註解**，recipe 就從 `e0028cc8` 變成 `3b589390`。**沒有任何東西警告** —— `rlxfw-kbuild.sh` 自己的註解知道`config/` 的編輯會移動 `RECIPE_ID`，但它把那件事寫成**重建成本**；沒人寫下來它也會讓一張凍結卡片的身分斷言失效。🟢 **抓到它的是收工稽核重新導一次 recipe，而不是重讀卡片**；修法是**重建**（`r55a` → `r55b`，`RECIPE_ID` `fce0af22`）而不是改卡片上的數。⚠️ **而這一列的「下一步是量測不是工具」現在有了一個很具體的候選**：卡片凍結前重新導一次 `RECIPE_ID` 並跟卡片上的值比對 —— 今天只把它寫進卡片的凍結順序，而**寫在散文裡的規則不是規則**，所以檢查器是 carried-forward。 | ~~**none, and the row says so.**~~ `spec-check` does this one file wide, for `SPEC.md`'s rows against their owner files; whether the idea generalises to prose is the owner's call  🟢 **2026-09-01, later the same day: the class now has a measured backing instead of an intuition, and it came from the CI history.** 量, all eighteen red CI runs read from their own logs: **sixteen of the eighteen** are the same shape — a count or a label about the repository's own contents, kept in a second place, invalidated by a change somewhere else. Seven are `tools/ci-expected.tsv`'s per-suite counts against the suites, four are one hardcoded *N cold, M warm* inside `test-boot-timeline`'s `B2` against the captures under `bench/`, five are that table's allowed-skip labels against what a tool actually prints. 🔴 **So the question is no longer whether the class is real. It is why the machine-readable half has an instrument and the prose half has none** — `ci-census` makes this class fail loudly on a push; in prose the identical mistake sits there silently, which is how four of them reached committed files. ⚠️ **The population of prose counts is still unmeasured** and that is still the next step; what changed is that the class is now this repository's single largest recorded source of CI failure.  🔄 **2026-09-07（第三十九段）：一個第五個實例，而它在 `CLAUDE.md` 裡，被四條獨立的規則量出來，而且這個 repo 自己早就寫下了會抓到它的那條規則。** `CLAUDE.md` 的環境段寫「a full sweep of all **60** `run:` steps（🔄 **61** from the thirty-seventh segment，when `citime self-test` was added）」。量 2026-09-07，`.github/workflows/` 只有一個檔案，而它有 **59** 個 `run:` step —— 四條互相獨立的算法一致：`grep -cE '^[[:space:]]+run:'` **59**、`grep -cE '^ +run:'` **59**、`- name:` 的步驟數 **59**、以及 **GitHub 自己的逐 job step 清單**（`instruments` 16、`lint` 6、`text` 51、`census` 7，各扣掉 5 個框架 step ＝ 11＋2＋44＋2）**59**。🔴 **而它在 `f82c704` 當下就是 59** —— 也就是 `CLAUDE.md` 說「把它從 60 變成 61」的那一個 commit —— 所以這不是後來掉了兩步。⚠️ **差在哪裡未定**：產生 61 的那支 sweep 腳本不在這個 repo 裡（`CLAUDE.md` 記的是它的行為不是它的原始碼），所以無法判定它多算了什麼。**決定它的實驗**：下次跑 sweep 讓它逐一印出它實際叫起來的指令，然後與 `ci.yml` 對名字。🟢 **而這一列最有價值的地方是：`CLAUDE.md` 同一段裡已經寫著會抓到它的那句話** ——「**never read a sweep's own count as coverage**」，而 61 正是一支 sweep 自己報的數。**規則寫下來了，套用到自己身上的那一次沒有做。** `CLAUDE.md` 沒有被這一段改動：它自己的規則是「where this contradicts the repo, the repo wins and this file is wrong」，而改那個檔案是擁有者的事。 🟢 **2026-09-07（第四十二段）：這一列自己指定的實驗跑了，而它把「差在哪裡未定」關掉了。** 這一列寫著「下次跑 sweep 讓它逐一印出它實際叫起來的指令，然後與 `ci.yml` 對名字」。`tools/desk-sweep.py enumerate` 就是那件事，而且那支腳本**現在在這個 repo 裡**（上一版的 ⚠️ 說它不在，所以判不了它多算了什麼）。量：用 PyYAML 讀，`run:` 步驟是 **61** 個 —— **59 個行首形式 ＋ 2 個行內 `- run:`** —— 所以 **61 是對的、59 是選擇器的盲點**，而 `grep -c 'run:'` 的 62 多算的是 `:358` 那行以 `run:` 結尾的註解。那兩步是 `lint` 的：`#1` 是 `sudo apt-get install shellcheck`（在桌面被拒），`#2` 是 `shellcheck --severity=error tools/*.sh`，**量：rc 0，綠，這張桌子上的第一次**。🟢 **而「never read a sweep's own count as coverage」現在有執行器**：`C9` 要求活的 `ci.yml` 解得開且步驟數 ≥ 40，`C10` 要求每一個宣告的名字仍然存在、且安全規則仍然至少命中一步，`C10b` 要求它命中的數目非零。 🔴 **同一天這個類別又來一個實例，而它是被 CI 抓到的不是被重讀抓到的**：`tools/ci-expected.tsv` 說 `test-config-gates` 的 `bench_total` 是 **58**，而 `aca873d`（第四十一段）給那支 suite 加了兩個 case 沒有動這個數字。**兩層盲點疊起來才讓它活下來**：`census` 是桌面跑不了的兩支之一（它要 GitHub 的 artifact 目錄），而在 CI 上它 `needs: [text, instruments]` —— `text` 因為 `C8` 紅掉，所以 `census` 被 **skipped**，紅的那一句從來沒有印出來。**第一次 `text` 綠，`census` 就紅了**，而那是它第一次真的跑。 🔄 **2026-09-16 (第八十段): the row’s OWN next step is paid, and the rest is a standing instruction.** This cell said *the population of prose counts is still unmeasured and that is still the next step*. 量 2026-09-16, with the rule stated first because a different rule gives a different number: over **146** tracked `.md`, a **bold** number immediately followed by one of ten repository nouns gives **33** sites — `files` 15, `controls` 8, `entries` 3, `rows` 2, and one each of `suites`, `steps`, `mutants`, `cases`, `captures`. 🟢 **33 is small enough for a checker**, which is the thing the row wanted to know. ⚠️ The rule is narrow on purpose and its blindness is stated: an unbolded count and any other noun are outside it — but bolding is what does the identifier-exclusion work that `XNUM-1` measured as the first job. **Owner**; **any desk segment that adds a count about this repository to prose** |
-| `REEL-1` ⊘ | ⊘ **Declined 2026-10-05 (124th segment). Category: 刻意換掉 (prerequisites met, not worth it).** The gap stays as measured: 量 2026-09-01, three end-to-end runs, **62.246 / 62.235 / 62.310 s** against a computed 59.749 s and the plan's 60 s — ~0.065-0.14 s of fixed cost per segment plus **1.461 s in `K-J` alone**, whose 2,339 timing records each pay ~0.62 ms of `sleep` granularity, so the gap grows with records and not with duration. **It is not fixed because each way out this row listed is refused by a rule the repository already holds:** `config/r3-11-reel.tsv`'s own rule forbids fitting the pause column to the ceiling; moving the ceiling widens a tolerance to make a result pass (`CLAUDE.md`), the same shape if not the same word; and a wall-clock `R16` makes a CI case depend on the host. **What stands instead:** `docs/KNOWN-ISSUES.md` states the 62.2 s against the 60 s spec in the take's own row, and the take is `v0.2`'s — 讀 `docs/release-process.md` lists no take among the assets of a release. **Re-open when** the take is re-cut or re-recorded (any change to `config/r3-11-reel.tsv`): `R16` is then decided once, on the new reel, as either the model or the wall clock | ⊘（原本 `P4b`，接手自 ~~`P4b-gate`~~ ④） |
 | `PRED-1` 🆕 | 🔴 **`check-predictions` reports three different causes with one sentence, and the third one is not "a seating that stopped".** 量 2026-09-01, the diagnostic line owed since the eighteenth segment: of the **34** cells with no capture, **9** are a seating that never happened (`bench/2026-08-26` holds a prediction block and not one capture), **11** are seatings that stopped part-way, and **14** were VOIDED at the bench and re-run under a new prefix — `X-flr0` became `X2-flr0`, `K-rb` became `K2-rb`. Ten of those fourteen have a replacement block (`block3d`) that is green; four (`K2-rb`, `K2-rbp` and their re-runs) have no prediction block at all, because the fourth power cycle of seating 8 was unplanned. **Nothing links a superseded cell to its replacement**, so the tool cannot separate the three and its one sentence is wrong for the third. ⚠️ The sweep itself is correct and green: 0 out of order over 47 files and 333 cells 🆕 **2026-09-01: the `superseded-by:` line this row proposes now exists, once.** `bench/2026-09-01/CORRECTIONS-block6.md` §1 carries it for `Y0-A` → `Y-A`, in the format named here. ⚠️ **It does not close the row**: the fourteen earlier superseded cells still have none, and **no tool reads the line** — `check-predictions` still cannot separate its three causes. 🔄 **2026-09-03 (twenty-ninth): there is a FOURTH cause and it was found by re-deriving this row's own total.** The sweep now reports **45** cells with no capture; `R5-2`'s card contributes 10, so the baseline is **35** against the 34 recorded here. The one that moved is `bench/2026-09-02/LP-3`, and its seating **completed** — `looprun`'s `S7` writes `LP-boot`, which block 7's own §4 says in advance. **So the fourth cause is: the capture exists, under a name a TOOL chose, while the card's hand-typed column names another.** It is the least alarming of the four and the most misleading, because nothing distinguishes it from a seating that stopped, and it will recur every time `looprun` drives a carded cell. ⚠️ **The count 34 was not wrong when it was written**; it is the class this row exists for arriving in the row itself | ~~**none yet.**~~ A `superseded-by:` line in a corrections file would do it, and it is a format change to blocks that are already frozen — which is the same shape as the `written:` line `check-predictions.py`'s own docstring carries forward 🔄 **2026-09-16 (第八十段): a STANDING INSTRUCTION — *any segment that writes a corrections file*.** That is this row’s own proposal (`a superseded-by: line in a corrections file would do it`) turned into an owner, and it is the right shape because the change is a FORMAT change to blocks that are frozen: it can only be made by the segment that writes the next one, never retroactively; **any segment that writes a corrections file** |
-| TC-e ⊘ | ⊘ **放棄 2026-09-30（第一百一十八段，`R7` 關的那一個提交）—— 類別：「真的缺陷，但沒有任何活的 gate 會碰到它」。** 缺陷本身仍然成立：**`tc-smoke` 的 L1 分不出十個壊掉的 binutils 與一個。** `NEED` 列了十個程式而只有 `as` 有控制（`S2`）；`ar ranlib nm objdump size strip` 在工具裡沒有任何別的地方被呼叫，所以把 `NEED` 缩到只剩 `as` 也每一例都過。修法也還是那一個：一個 `deadobjdump` stub 旋鈕加三條斷言的例。🔴 **放棄的理由就寫在它自己原本的擁有者格裡** ——「只有引進新工具銀時才會咬人」，而 `R7` 沒有引進：它用 `R5` 選定的同一把 `rsdk-1.3.6-4181` 建了六支程式與一顆 busybox。而還開着的 gate 那一個都不引進：`R8b` 寫 flash、`R9` 是差分証明、`P3` 是報告、`P4b` 是 GPL 釋出。把它強按到其中任何一個上面，正好是 `R1y-6` 在修的那個缺陷 —— 一列被按在一道不會量它的閘上。🟢 **重新打開的條件，寫死**：第四把工具銀、或一組不同的 binutils、或任何一次改 `tc-smoke` 的 `NEED` 表進入建置的那一天。到那一天之前，這一列報 0 是因為沒有母體，不是因為它被修好了 | ⊘（原本 `R7`，接手自 ~~`R2a`~~） |
-| C-1 ✅ | ✅ **Closed 2026-10-08 (126th segment), on `R8b`'s seating: the loader scans, the lowest valid candidate wins, and a refused one hands the scan on — and the sentence this row carried about `R8`'s layout was half wrong.** 量 `bench/2026-10-07`: `T1a`, `rlxboot`'s first boot from flash, printed `RLXBOOT-FROM 05010000` while `0x060000`'s vendor `cr6c` was still intact, so of two candidates the stock loader accepts the lower booted; `RD05`, with `0x010000` erased (`RD07a`, `FFFFFFFF` ×4), printed `RLXBOOT-FROM 05020000`. `rlxboot` prints the loader's word at `0x8040DD3C` and `tools/bootslot.py` checks it. The two `DW`s this row named could not settle it on an ESC-stopped boot (`L02`, `REG-24`); without ESC they read what `docs/loader-command-semantics.md` § 8 rows 1–2 predict — `X-T2-dd3c`: `05010000`, and that candidate's `startAddr` `81800000`. 🔴 **The corrected half** (`FW-241`): *the A/B layout needs no loader change* holds for `cs6c` only — behind a `cr6c` hit the locator searches eleven rootfs candidates `0x0E0000`–`0x180000`, all inside slot A, and returns 0 when none holds one — so `rlxboot` and its rescue copy are `cs6c`. ⚠️ Not established: the four barrier candidates one by one (erased since `W4b`), or any loader build but this one | ✅ `R8b`（原本 ~~R8~~，A/B layout） |
-| C-3 ⊘ | ⊘ **Declined 2026-10-08 (126th segment). Category: 刻意換掉 (prerequisites met, not worth it).** What the row read stands as it was read (the text is in `docs/history/progress-carried-forward.md`): `burn()` is the image parser and dispatcher, bounded only at the top, against a capacity that is correct for this device by coincidence. What it left open — which of `burn()`'s four callees erases and which programs — is a desk reading of `stage2.bin` that nothing rlxfw does depends on: 量 `bench/2026-10-07`, `R8b`'s seating sent no `FLW`, `EW`, `EB` or non-zero `AUTOBURN`, `0x8040D4A0` read `00000000` before each of 20 uploads, and all 33 of its flash-write verbs went through `rtl819x-spi`'s own install path, which is plan precondition ④ met. **Re-open when** an rlxfw procedure writes flash through the loader (`FLW`, a non-zero `AUTOBURN`, a recovery that does either), or a flash difference appears that rlxfw's own writes do not explain and `burn()` is a candidate (`FLS-26`'s class) | ⊘（原本 ~~R5b~~ → ~~R8~~ → `R8b`） |
-| C-4 ✅ | ✅ **Closed 2026-10-08 (126th segment), on `R8b`'s seating: an invalid kernel-region candidate is refused and the scan moves on, and a loader that finds nothing it will boot stops at its own prompt with no ESC and no message — both on this die.** 量 `bench/2026-10-07`. **Refusal**: `RD03`, a `pace=30000` install of `rlxboot`, was cut after `RLXFW-SI E 00 370 paced=30000`; `RD07a` read `0x010000` as `FFFFFFFF` ×4; the next power-on with no ESC (`RD05`) printed `RLXBOOT-FROM 05020000` and booted slot B. **Prompt**: `T2a`, `busybox reboot -f` with no ESC after slot A's first write, printed the banner, `P0phymode=01, embedded phy`, `---Ethernet init Okay!` and `<RealTek>` 0.34 s later — no `Jump to image`, no `---Escape booting by user` — with `0x8040DBA4` reading `00000000` (`X-T2-dba4`): `doBooting()`'s zero branch (`LDR-20`), reached on the die; `AR3` then RAM-booted the armed image from that prompt, so the rescue path worked in practice. ⚠️ Not established: the locator returned 0 because its rootfs search behind a `cr6c` hit found nothing (`FW-241`), not because six content-invalid candidates exhausted the scan — that joint stays 讀 (§ a's scan code, with the barrier candidates measured erased). The runsheet's extension that would have shown it end to end — tear `rlxboot` and its rescue copy both, then power on (`CE01`–`CE04`) — is declined, 刻意換掉: it costs two power actions and two more writes of the only regions the loader boots, for a link between two halves already measured. **Re-open when** a layout or loader change makes the scan end on content refusals alone, or a corrupted image is ever booted | ✅ `R8b` precondition ⑤（原本 ~~R8 precondition ⑤~~） |
-| C-13 ✅ | ✅ **Closed 2026-10-08 (126th segment), on `R8b`'s seating: the flag is the ESC path, not a hazard — it reads `1` after ESC and `0` without it, and ESC reached the prompt on every boot that streamed it — but it does not make the loader refuse a `cs6c` image.** 量 `bench/2026-10-07`: `0x8040DBA4` read `00000001` after two ESC-stopped cold boots (`L01`, `T1e`) and `00000000` after a boot with no ESC (`X-T2-dba4`); `T1d` stopped at `<RealTek>` under ESC with no message while `0x010000` held an image `T1a` had booted without it. 🔴 **With `rlxboot` as `cs6c`, ESC is caught in `doBooting()`'s window instead**: all 16 ESC-streamed reboots after the re-install printed `---Escape booting by user`, which none of the 238 ESC-streamed reboots before `R8b` did (ten of them at the same 20 ms period), and banner to `Jump to image` fell from 4.97 s (`T1a`, `cr6c`) to 2.02 s (six `cs6c` boots) — `docs/FINDINGS.md`'s `C-16` reading, that the ESC poll setting this flag runs inside the rootfs scan only a `cr6c` hit reaches, predicts both (`SPEC.md` `FW-249`). All 19 ESC-streamed boots of the seating reached the prompt. ⚠️ Not established, and moved to `SPEC.md` `LDR-21`'s § 17 row as a standing instruction: the register identities against the datasheet, the writer's callers, and the flag's value on a `cs6c` boot — one `DW 8040DBA4 4` after the next ESC-stopped boot reads it | ✅ `R8b`（原本 ~~R8~~） |
 | `REGIMM-1` 🆕 | 🔴 **`teqi` 家族在每一支儀器之外，而發現它的是一次不相干的安全問題。** 上一段把「21 個未向量 cause」的危害量成空清單，而那個結論的位址是母體 —— 75 條裡沒有任何一條 REGIMM trap。量：零命中。收它需要一列 payload 加一行 `hazlint` 的 `ISA_TRAPS`，而 `SPEC.md` `CPU-60` 是它的家。🔄 **2026-09-15(第七十一段):成本的更正終於傳回擁有者檔了。** 這一列在第六十九段就判定它**不是**「搭現有卡片零增量上機成本」——需要帶例外處理器的 payload,而每一顆這樣的 payload 都把列表編譯進去、被卡片 sha256 釘死 —— 但 `SPEC.md` `CPU-60` 與 `docs/isa-payload.md` §7 兩處**同日寫著相反的話而沒有被改**,直到今晚才就地更正。⚠️ 這是一次「同一天內部翻案沒有傳回擁有者檔」的案例,而抓到它的不是任何閘門,是一次列舉式的稽核 | ~~`R1-pub-4`~~，或任何一段動 `isa-payload.tsv` 的桌面段 🔄 **2026-09-16（第八十段）：那個具名 gate 劃掉，常設指示留下。** 它在 2026-09-16 走完它自己的步驟。⚠️ 而這一列自己第六十九段就判定它**不是**零增量上機成本，所以常設指示是它真正的擁有者而不是一個方便的說法 |
 | `VDR-1` 🆕 | 🔴 **進入廠商 userspace 的每一條路都以一次 flash 寫入開場，而這件事之前沒有任何一個檔案說過。** 主控台沒 shell／沒 getty／沒 login（`/etc/inittab` 全注解）、loader 沒有 `init=`／`bootargs` 機制（13 針 0 命中）、`TELNET_ENABLED` = 0；唯一實證的入口 `formSysCmd` 觸發後會把 `SYSCMD_SELECT` 寫進 `0x00C000` 的 `COMPCS`（量 `P10-10`，在兩個禁區之外且 blast radius 有界，但它是寫入）。⚠️ 而還有兩個未量的環節：沒有 `chmod` applet （下載下來是 0644，`execve` 給 `EACCES`），以及 payload 的 stdout 到底落在 UART 還是要轉到 `/var/web` 再用 HTTP 拿。**最便宜的決定性實驗不花 flash 也不花電源**：在 `qemu-mips-static -L squashfs-root` 下演練整條鏈 | ~~`R9`~~ 🔄 **2026-09-16（第八十段）**，接手自 ~~`R1-pub-4`~~（`docs/isa-prior-art.md` § 9.5）；而寫 flash 這一步永遠是擁有者的明確 yes：its subject is the vendor firmware's own behaviour, which was that gate's third column 🔄 **2026-10-04（第一百二十二段）：那道閘劃掉了，而這一列刻意不是整列 ⊘。** ⊘ 2026-10-04（第一百二十二段；裁決記在 `docs/GATE-RESULTS.md` entry 19；計畫 § 17「出於自願的範圍外」）：**只有矽片半邊** —— 進廠商 userspace 的唯一實證入口寫 flash（左格的量測），那道閘的標題是零 flash 寫入，擁有者 2026-10-04 的決定又把順序定成嚴格串行（它全關之後才寫 flash）。⚠️ **這一格刻意不拼出那道閘的代號，也不拼出左格那個量測的 id**：這一列還是 OPEN，所以 `cfcensus` 真的讀這一格 —— `L12` 就是為了「一個常設指示旁邊坐著一道收完尾的閘」而存在，`L2` 會把一個步驟 id 讀成不存在的閘，而 `L8` 的 `CLOSURE` 集合會把「已＋關」這兩個字讀成這一列自己收了（我第一次寫就踩到這一條）。閘名在紀錄裡，擁有者在這一格。🔴 攤出來的是一個**選擇**而不是一具缺的儀器：`CLAUDE.md` 把一次 flash 寫入定義成擁有者的明確 yes，而那個 yes 隨時給得出來，所以它填「出於自願的範圍外」而不是「卡在儀器上」。**重新打開**：一張凍結卡片帶著擁有者對一個寫 `0x00C000` 的 payload 的 `owner-yes` 列（`FW-113`），而且在第一次寫 slot **之前** —— 那一次寫之後這台就沒有廠商欄了。🔄 2026-10-08：那一次寫發生在 2026-10-07（`bench/2026-10-07` 的 `W3`），所以這個條件在這一台上不會再成立，矽片半邊的 ⊘ 在這台上是永久的；換一台才重新打開（計畫 § 17 第 8 項）。🟢 **沒有 ⊘ 的那一半是這一列自己寫的那一半**：qemu-user 演練不花 flash 也不花電源，而它沒有排進任何一段；它受兩條界限 —— 廠商二進位只在 `tools/vendor-tripwire.sh` 底下、從一個 scratch 目錄跑（讀 `CLAUDE.md`），而 `docs/emulation-surface.md` § 8.1 量到 75 列裡 34 列在矽片與 `qemu-mips-static` 之間不一致，所以它定得了鏈的管路、定不了指令的行為；**任何一段在 `tools/vendor-tripwire.sh` 底下跑廠商二進位的桌面段** |
+
+Closed (✅) and declined (⊘) rows are records: the thirteen moved on 2026-10-09 are in `docs/history/progress-carried-forward-2026-10-09.md`, earlier ones in `docs/history/progress-carried-forward.md`.
 
 ---
 
@@ -369,27 +114,7 @@ Open questions that outlive a single session. Each one names the gate that will 
 hand** — `cfcensus write` regenerates them and a hand edit here is overwritten
 without warning. Nothing checks that they are current (`FW-111`).
 
-`R1z-0`'s deliverable, first written 2026-09-16. § Carried forward above is the
-owner of *what each debt asks*; this section owns only the join that table
-cannot state about itself — **which gate each row named, and whether that gate
-still exists**. No question text is reproduced and no line number is cited: a
-second copy of a debt is a second owner of it, and `CITE-2` is a row of this
-very table about the second of those two mistakes.
-
-**The population is derived, not chosen.** Every row of § Carried forward, every
-gate of § Gate board, every `## …step list` header, and every step id through
-`spec-check`'s own `progress_step_state`. So a row added to the table after this
-block was written cannot be missing from it, and **a row cannot be added to the
-census without moving its source, where `git log` sees it** — which a
-hand-written list cannot promise. That property is what separated `tccensus`
-from the four checkers the seventy-seventh segment found broken.
-
-⚠️ **What it cannot see.** Both populations come from one file. This is the
-record auditing itself, and it is blind to a debt this project incurred and
-never wrote down — the class the seventy-seventh segment's closeout found by
-hand, four owner files that no checker could reach. `U6` keeps that testable:
-with a gate in progress an open row must be live-owned, and with none some row
-must be open and every open row a standing instruction, or the census refuses.
+What the census reads, and the debt it cannot see, are described in `tools/cfcensus.py`'s docstring; this section's notes until 2026-10-09 are in `docs/history/progress-notes-2026-10-09.md`.
 
 <!-- cfcensus:counts begin -->
 | what | n | meaning |
@@ -400,20 +125,13 @@ must be open and every open row a standing instruction, or the census refuses.
 | ORPHAN? | 0 | open by its first cell, owner closed, and a ✅ sits in the owning-gate cell or opens the question — probably an `L8` row that is finished and never marked |
 | DEAD | 0 | 🔴 names a gate that exists nowhere in this file |
 | NONE | 0 | open and names no gate at all |
-| CLOSED | 8 | first cell says ✅ |
-| DECLINED | 5 | first cell says ⊘ |
-| **total** | **25** | rows parsed, reconciled against 27 raw table lines minus 2 header lines |
+| CLOSED | 0 | first cell says ✅ |
+| DECLINED | 0 | first cell says ⊘ |
+| **total** | **12** | rows parsed, reconciled against 14 raw table lines minus 2 header lines |
 | `L8` | 0 | closure recorded somewhere this table does not declare — the owning-gate cell, or the head of the question; 0 exempted by name |
 <!-- cfcensus:counts end -->
 
 ### The rows with no live owner
-
-Every open row whose owner is not a gate that is still open. `ORPHAN` is the
-population `R1z` exists for; `ORPHAN?` was a row *probably* finished and never
-marked, and the two were counted apart because folding them would have inflated
-the debt by fourteen. 🟢 **`R1z-2` read all fourteen one at a time and every
-one of them was.** The bucket is empty, and that is the label's own claim
-measured rather than repeated.
 
 <!-- cfcensus:debt begin -->
 | # | kind | owner named |

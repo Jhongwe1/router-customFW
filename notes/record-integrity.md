@@ -358,7 +358,7 @@ five instances of it in one desk pass.
 | # | citing | says | actually | state |
 |---|---|---|---|---|
 | ① | `docs/history/steps-R6.md:69` | `notes/nic-driver.md:2042` **逐字** *The three-run figure may not be quoted without the fourth* | that sentence is at **`:2038`** in every commit since it was written; `:2042` is the parenthetical about the first normalisation | repaired |
-| ② | `docs/KNOWN-ISSUES.md:1057` | the same, 逐字 | the same | repaired |
+| ② | `docs/history/known-issues-segment-limits.md:364` | the same, 逐字 | the same | repaired |
 | ③ | `bench/README.md:101` | the same, 逐字 | the same | repaired |
 | ④ | `bench/2026-09-21/PREDICTIONS-B35-block33.md:369` | `rtl819x-switch.c:88-92` — the VLAN table is reached through `TACI` | that is at **`:93-97`**; `:88-92` says the driver writes nothing at boot | **frozen card, not repaired** |
 | ⑤ | `SPEC.md` `NET-61` | `rtl819x-nic.c:891,895,898-900,908` are the harvest path | they were in `nic_wr()` and `nic_dw()` at the commit that published them (§ 5.1a) | repaired |

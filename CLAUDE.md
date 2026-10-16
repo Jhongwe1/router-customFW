@@ -113,7 +113,7 @@ agree: name the tool that could be lying and the second source that settles it.
 - Text moved between files moves verbatim; `tools/docmove.py` proves it.
 - One piece of state has one owner. Never copy here what another file owns: the
   active gate is `PROGRESS.md`'s; what depends on rlxfw's drivers is
-  `docs/KNOWN-ISSUES.md`'s.
+  `docs/KNOWN-ISSUES.md`'s, and its pages under `docs/known-issues/`.
 - `SPEC.md`: a value mark, a separate name mark and an owner link for every number.
   A finding lands in its owning file first and in `SPEC.md` in the same commit, and
   any number produced, changed or refuted changes `SPEC.md` in that commit. Check

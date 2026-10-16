@@ -331,7 +331,7 @@ the other.
 ~~⚠️ **Eight of those nine registers have no prior reading on this die at
 all**~~ 🔴 **Wrong by a factor of four when it was written, and zero now.**
 量 2026-09-19 (`bench/2026-09-19/CORRECTIONS-block27.md` F3, which found the
-same error in `docs/KNOWN-ISSUES.md:777` and traced this line to it):
+same error in `docs/history/known-issues-segment-limits.md:120` and traced this line to it):
 `SWTCR1` = `00000200` and `PVCR1`/`2`/`3` = `00080008` were already in
 `bench/2026-09-17b` and in `SPEC.md`, so it was **two of nine** — `MSCR` and
 `VCR0` — and after this seating's `X3`/`X4` it is **zero of nine**. 推 the

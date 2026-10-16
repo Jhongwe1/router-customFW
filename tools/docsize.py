@@ -103,7 +103,15 @@ BUDGET = {
     #   section Closeout and docs/log/ in four rules. 量 24,416 B after that commit;
     #   x 1.03 = 25,148.5, three significant figures up = 25,200.
     "CLAUDE.md:maxline": 647,
-    "PROGRESS.md:bytes": 115000,  # 2026-10-09, P5e's opening commit: its step
+    "PROGRESS.md:bytes": 62300,  # 2026-10-17, P5e-2 (4): the file cut to its
+    #   state -- the board one line per gate with its Est. column deleted,
+    #   section Release clock to its table, section Carried forward to its
+    #   open rows, the rest moved verbatim to docs/history/ -- with P5e's step
+    #   list still at the end.  量 60,444 B after this commit; x 1.03 = 62,257.32,
+    #   three significant figures up = 62,300; the floor, 31,150, is below the
+    #   file.  量 at 530dce4c this tool read 111,573 B, not the 111,291 B
+    #   recorded next.  The previous budget's reasoning, kept as it was:
+    #   2026-10-09, P5e's opening commit: its step
     #   list at the end of the file, the board row, section Now rewritten.
     #   量 111,291 B after this commit; x 1.03 = 114,630, three significant figures up
     #   = 115,000.  P5e-2 (4) brings the file under 200 lines and lowers this in
@@ -115,7 +123,9 @@ BUDGET = {
     #   three significant figures up = 105,000 (3.2 % headroom; the floor,
     #   52,500, is far below).  R8b's closing commit moves the list to
     #   docs/history/steps-R8b.md and lowers this again.
-    "PROGRESS.md:maxline": 9870,
+    "PROGRESS.md:maxline": 9870,  # 2026-10-09, P5e-2 (4): re-derived -- the
+    #   longest line is still CNT-1's carried-forward row, 9,575 B (line 102
+    #   now); x 1.03 = 9,862.25, three significant figures up = 9,870.
     "PROGRESS.md#Now:bytes": 6000,
     "PROGRESS.md#Now:maxline": 1000,
 }
