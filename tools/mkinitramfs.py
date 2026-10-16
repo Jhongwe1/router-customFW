@@ -28,7 +28,7 @@ WHAT IT REFUSES TO DO, and each refusal is a control:
   * An entry tagged `unit` whose source is not inside the unit tree is an ERROR.
     That tag is the traceability claim; it is checked, not trusted.
   * `--init FILE` replaces the source of the one `/init` row and nothing else,
-    and refuses a FILE that is not tracked under config/, not 100755 in the
+    and refuses a FILE not tracked under config/ or kernel/, not 100755 in the
     index, or whose first command is not the rung-1 echo (override_init).
 
 Usage
@@ -550,9 +550,9 @@ def check_required(entries, decl_path):
 # checks the declared one.
 #
 # WHAT IT REFUSES, and why:
-#   * a FILE not under config/.  RECIPE_ID is `find config -type f` hashed
-#     (tools/rlxfw-kbuild.sh), so a file there moves the id the board prints
-#     and a file anywhere else does not.
+#   * a FILE under neither config/ nor kernel/.  RECIPE_ID is `find config kernel
+#     -type f` hashed (tools/rlxfw-kbuild.sh), so a file there moves the id the
+#     board prints and a file anywhere else does not.
 #   * a FILE git does not track, or whose bytes differ from the index: either
 #     moves RECIPE_ID to a value no commit reproduces.
 #   * a FILE the index does not record as 100755.  The index and not the file
@@ -571,7 +571,7 @@ def check_required(entries, decl_path):
 #     line: it is how a capture says /init started, and tools/bootbytes.py
 #     counts on it being byte-identical.
 #
-# WHAT IT DOES NOT ESTABLISH.  RECIPE_ID hashes every file under config/,
+# WHAT IT DOES NOT ESTABLISH.  RECIPE_ID hashes every file under config/ and kernel/,
 # the /init that was not chosen included, so two images built from one tree,
 # one with --init and one without, print the SAME RLXFW-ID0.  The boot capture
 # tells them apart (the declared /init prints two LAN lines), and so does the
@@ -646,9 +646,9 @@ def override_init(entries, init, repo, decl_path):
             "the index of %s), so the index checked would not be this "
             "repository's" % (repo, top))
     rel = os.path.relpath(os.path.realpath(init), real_repo).replace(os.sep, "/")
-    if not rel.startswith("config/"):
-        die("--init %s is %s from the repository root, not under config/. "
-            "RECIPE_ID is `find config -type f` hashed (tools/rlxfw-kbuild.sh), "
+    if not rel.startswith(("config/", "kernel/")):
+        die("--init %s is %s from the repository root, not under config/ or kernel/. "
+            "RECIPE_ID is `find config kernel -type f` hashed (tools/rlxfw-kbuild.sh), "
             "so an /init from anywhere else changes the image and not the id "
             "the board prints" % (init, rel))
     listed = [ln.split()[:2] for ln

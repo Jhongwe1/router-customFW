@@ -99,7 +99,7 @@ program, which is not a step anyone else can reproduce.
 [`rlxfw-marks.tsv`](config/rlxfw-marks.tsv) is **every line rlxfw inserts into
 Realtek's source**, one row each with a reason, applied by
 `tools/rlxfw-marks.py` to a staged copy and never to the pinned clones; the
-files rlxfw adds outright live in `config/rlxfw-src/`, mirroring the staged
+files rlxfw adds outright live in `kernel/`, mirroring the staged
 layout. Since 2026-09-03 that is where the first driver lives —
 `drivers/clocksource/rtl819x-timer.c`, on the SoC's Timer 1 — 🔄 **as of
 4.1 (2026-09-06) a clocksource **or** a clockevent, in two exclusive
@@ -912,7 +912,7 @@ The flash dump is not here either. It contains this unit's MAC addresses and
 radio calibration; it identifies one physical device rather than a model.
 
 **Licences.** [`LICENSE`](LICENSE) is the MIT text and covers rlxfw's own
-userspace, tools and documents; [`config/rlxfw-src/LICENSE`](config/rlxfw-src/LICENSE)
+userspace, tools and documents; [`kernel/LICENSE`](kernel/LICENSE)
 covers rlxfw's own kernel files, which are `GPL-2.0-only` because provenance
 forces it. [`NOTICE`](NOTICE) says what is under which licence and why, by
 provenance, and [`docs/offer.md`](docs/offer.md) says how corresponding source

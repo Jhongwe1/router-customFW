@@ -320,7 +320,7 @@ case-folding reasons it is a hard failure rather than a silent one --
 `TC-56` says that too.
 
 **Where the product goes, and why it is not under `config/`.** `RECIPE_ID` is
-`find config -type f` with **no exclusions and no consultation of
+`find config kernel -type f` with **no exclusions and no consultation of
 `.gitignore`** — a filesystem walk. An object file left under `config/`
 therefore moves the id the board prints, silently. The source lives in
 `config/rlxfw-user/isaprobe/` so that `RECIPE_ID` **does** cover it (which is

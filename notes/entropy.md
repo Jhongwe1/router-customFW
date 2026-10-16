@@ -81,7 +81,7 @@ every experiment on this file.
 | `add_disk_randomness` | gated on `disk->random`, which `rand_initialize_disk()` sets **unconditionally** in `alloc_disk_node()` (`block/genhd.c:1157`) — there is no rotational test in this tree | **live but idle.** Any mtdblock request completion samples (`drivers/mtd/mtd_blkdevs.c:122` → `end_request` → `block/blk-core.c:2011`), with `CONFIG_BLOCK=y` and `CONFIG_MTD_BLOCK=y`. The image is quiet only because nothing issues mtdblock I/O; `/dev/mtdN` through mtdchar does not use the block layer |
 | `add_interrupt_randomness` | `kernel/irq/handle.c:429`, gated at `:428` on `IRQF_SAMPLE_RANDOM` in `handle_IRQ_event()`; gated **again** in the callee on `desc->timer_rand_state`, which only `rand_initialize_irq()` allocates — from `kernel/irq/manage.c:542`, inside the same flag test in `__setup_irq()`. So setting the bit on an already-registered `irqaction` would not create the state | **dead. No handler in this image registers that flag** |
 
-量, rlxfw's own drivers (`config/rlxfw-src/linux-2.6.30/`), every
+量, rlxfw's own drivers (`kernel/linux-2.6.30/`), every
 `request_irq`/`setup_irq`/`request_threaded_irq` call site and its flags — 3
 live sites, 0 `struct irqaction`:
 
@@ -208,12 +208,12 @@ an existing rlxfw driver. **No new kernel config symbol** — so
 
 | file | what |
 |---|---|
-| `config/rlxfw-src/linux-2.6.30/drivers/char/rlxfw-entropy.c` | the source, the probe and the credit policy; `/proc/rlxfw-entropy` |
-| `config/rlxfw-src/linux-2.6.30/include/linux/rlxfw-entropy.h` | the interface, and the mechanism above in short |
+| `kernel/linux-2.6.30/drivers/char/rlxfw-entropy.c` | the source, the probe and the credit policy; `/proc/rlxfw-entropy` |
+| `kernel/linux-2.6.30/include/linux/rlxfw-entropy.h` | the interface, and the mechanism above in short |
 | `config/rlxfw-marks.tsv` `MK13` | `obj-y += rlxfw-entropy.o` into `drivers/char/Makefile`, anchored on the line that builds `random.o` |
 | `config/host-compat/0009-random-rlxfw-input.patch` | adds `rlxfw_random_add()` to `random.c`; changes no existing line |
-| `config/rlxfw-src/…/drivers/net/rtl819x-nic.c` | one call in `nic_isr()`, **replacing a blank line** so no line that other files cite moves (`FW-110`; § 2.2 gives the count the first version moved) |
-| `config/rlxfw-src/…/drivers/net/rtl819x-nic-tx.h` | the `#include`, which lives here because no file cites this header by line |
+| `kernel/…/drivers/net/rtl819x-nic.c` | one call in `nic_isr()`, **replacing a blank line** so no line that other files cite moves (`FW-110`; § 2.2 gives the count the first version moved) |
+| `kernel/…/drivers/net/rtl819x-nic-tx.h` | the `#include`, which lives here because no file cites this header by line |
 
 ### 3.1 The clock
 

@@ -513,7 +513,7 @@ cannot all be true.**
 `rtl819x-timer` is a file of **mine**. It reaches a staged tree through
 `config/rlxfw-marks.tsv`'s `MK2` row, and its `/proc` entry is created by
 `create_proc_entry(RTL819X_PROC_NAME, ...)` in
-`config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c`.
+`kernel/linux-2.6.30/drivers/clocksource/rtl819x-timer.c`.
 **It cannot exist in the vendor kernel.** A and C cannot both hold.
 
 ⚠️ **A 量 mark is carrying an inference.** `PROGRESS.md`'s inherited-state

@@ -199,7 +199,7 @@ pressed+lit.
 
 ## 5. The operator protocol, which is already written down
 
-`config/rlxfw-src/.../rtl819x-keys.c:114-117`, in the driver itself:
+`kernel/.../rtl819x-keys.c:114-117`, in the driver itself:
 
 > *The bench protocol for a button is a TIMED PHYSICAL ACTION — press, hold,
 > release — and it cannot be timed by conversation turns. The instrument has to

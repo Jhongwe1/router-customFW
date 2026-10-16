@@ -2,7 +2,7 @@
  * rtl819x-gpio -- a gpiolib gpio_chip on the RTL8196E's PABCD port.
  *
  * THIS FILE IS NOT REALTEK'S.  R5-4, 2026-09-06, thirty-seventh segment.  It
- * is staged into drivers/gpio/ by tools/rlxfw-marks.py from config/rlxfw-src/;
+ * is staged into drivers/gpio/ by tools/rlxfw-marks.py from kernel/;
  * config/rlxfw-marks.tsv carries the one Kbuild line that links it, and
  * config/host-compat/0005 is what makes CONFIG_GPIOLIB reachable on this arch
  * at all.

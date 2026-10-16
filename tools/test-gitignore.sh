@@ -127,7 +127,7 @@ rm -f src-vendor
 echo
 echo "=== rlxfw's own source mirror is NOT swallowed by linux-*/ ==="
 # 2026-08-28: `linux-*/` is there to keep vendor kernel trees out, and it also
-# matched config/rlxfw-src/linux-2.6.30/ -- rlxfw's own two files, laid out the
+# matched kernel/linux-2.6.30/ -- rlxfw's own two files, laid out the
 # way the staged tree is laid out so tools/rlxfw-marks.py needs no path mapping.
 # MEASURED: `git add -A` staged every other file of that session and left these
 # two out in silence, which would have committed a build driver and a
@@ -137,8 +137,8 @@ echo "=== rlxfw's own source mirror is NOT swallowed by linux-*/ ==="
 # un-ignored first: git does not descend into an excluded directory, so a
 # `!.../**` on its own does nothing and this case would pass on a .gitignore
 # that still drops the files.
-for f in config/rlxfw-src/linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c \
-         config/rlxfw-src/linux-2.6.30/include/linux/rlxfw-mark.h; do
+for f in kernel/linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c \
+         kernel/linux-2.6.30/include/linux/rlxfw-mark.h; do
     # This suite runs inside a throwaway repository, so the paths are created
     # here rather than read out of the real tree: what is under test is the
     # PATTERN, and a case that depended on the real files existing would go red

@@ -62,7 +62,7 @@ vendor file, and a disagreement is a refusal:
     plans it for a recipient;
   * no `$REPO/` source `config/rlxfw-initramfs.tsv` puts in the image lies
     under an exclusion, no `file` row reads `$UNIT/` (this unit's own flash),
-    and config/ is never excluded (RECIPE_ID digests all of it);
+    and neither config/ nor kernel/ is excluded (RECIPE_ID digests both);
   * with --cell, every drop file a kernel build read (its kbuild .cmd
     records) lies under a declared path, and no left-out blob is named there.
 
@@ -333,13 +333,27 @@ class DiskView(object):
 # the declarations
 # --------------------------------------------------------------------------
 
+#: The roots tools/rlxfw-kbuild.sh's RECIPE_ID digests (P5e-1: rlxfw's own
+#: kernel files moved out of config/ into kernel/).
+RECIPE_ROOTS = ("config", "kernel")
+
+
 def recipe_id(view):
-    """tools/rlxfw-kbuild.sh's RECIPE_ID: `find config -type f -print0 |
-    LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -c1-8`.  The
-    self-test runs that script's own --dry-run as the second source."""
+    """tools/rlxfw-kbuild.sh's RECIPE_ID: `find config kernel -type f -print0
+    | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -c1-8`.  The
+    self-test runs that script's own --dry-run as the second source, on a
+    fixture holding both roots.
+
+    A root absent at --rev contributes nothing rather than being refused: the
+    driver refuses a tree without both, but this reads any revision, and at a
+    revision from before kernel/ existed the files were under config/, so the
+    digest over the roots that exist is the id that revision's own driver
+    computed."""
     lines = []
-    for p in sorted(view.regular_under("config"),
-                    key=lambda s: s.encode("utf-8")):
+    paths = []
+    for root in RECIPE_ROOTS:
+        paths.extend(view.regular_under(root))
+    for p in sorted(paths, key=lambda s: s.encode("utf-8")):
         lines.append("%s  %s\n" % (hashlib.sha256(view.read(p)).hexdigest(), p))
     return hashlib.sha256("".join(lines).encode("utf-8")).hexdigest()[:8]
 
@@ -450,10 +464,11 @@ def read_decl(view, cfgdir):
     d["stamp"] = stamp_epoch(view)
     d["recipe"] = recipe_id(view)
     for ex in d["exclude"]:
-        if ex == "config" or ex.startswith("config/"):
+        root = ex.split("/", 1)[0]
+        if root in RECIPE_ROOTS:
             prob("repository.exclude names %s, but RECIPE_ID digests every file "
-                 "under config/, so the image's identity could not be "
-                 "recomputed from the archive" % ex)
+                 "under %s/, so the image's identity could not be "
+                 "recomputed from the archive" % (ex, root))
 
     # -- the four declarations, through modrecord's own derivation
     modrecord = _load("modrecord")
@@ -779,7 +794,7 @@ def cell_check(celldir, d, left_out, allow_other):
     if man.get("recipe_id") != d["recipe"]:
         if not allow_other:
             refuse("--cell %s was built from recipe %s and this archive is "
-                   "recipe %s: it is not a build of this config/. Say "
+                   "recipe %s: it is not a build of this config/ and kernel/. Say "
                    "--cell-other-recipe to read it anyway"
                    % (name, man.get("recipe_id"), d["recipe"]))
         note = "; NOT this archive's recipe %s" % d["recipe"]
@@ -1059,7 +1074,7 @@ def manifest_text(view, d, kept, left, gitlinks, exc, scan, cellnote):
              "--archive FILE` checks an archive against it.\n" % VERSION)
     w.append("# format\t%d\n" % FORMAT)
     w.append("# rev\t%s\n" % view.rev)
-    w.append("# recipe_id\t%s\tsha256 over config/ at rev, the value "
+    w.append("# recipe_id\t%s\tsha256 over config/ and kernel/ at rev, the value "
              "tools/rlxfw-kbuild.sh compiles in as RLXFW_SRC_ID\n"
              % d["recipe"])
     w.append("# mtime\t%d\tconfig/rlxfw-build-stamp\n" % d["stamp"])
@@ -1472,6 +1487,9 @@ def _fixture(tmp, m=()):
     if "unit-source" in m:
         irfs += "file\t/bin/v\t$UNIT/bin/v\t0755\tunit\tplanted\n"
     _put(repo, "config/rlxfw-initramfs.tsv", irfs)
+    # RECIPE_ID's second root, so S11 compares the two implementations over
+    # both and not over config/ alone.
+    _put(repo, "kernel/linux-2.6.30/drivers/x/own.c", C)
     _put(repo, "srv/x", "served\n")
     _put(repo, "LICENSE", "MIT, the fixture's\n")
     _put(repo, "NOTICE", "notice, the fixture's\n")
@@ -1571,6 +1589,7 @@ def self_test():
                 "config/host-compat/0001-x.patch", "config/rlxfw-build-stamp",
                 "config/rlxfw-cflags", "config/rlxfw-initramfs.tsv",
                 "config/rlxfw-kernel.delta", "config/rlxfw-marks.tsv",
+                "kernel/linux-2.6.30/drivers/x/own.c",
                 "refs/README.md", "refs/imp-1.0.tar.gz", "refs/one.c",
                 "served-link", "srv/x", "tools/build.sh"] + [
                 "src-vendor/fakedrop/" + p for p in (

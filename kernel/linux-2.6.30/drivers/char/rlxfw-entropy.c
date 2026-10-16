@@ -2,7 +2,7 @@
  * rlxfw-entropy -- an entropy source for the RTL8196E, and its credit policy.
  *
  * R7, 2026-09-30.  rlxfw's own file.  It is staged into the kernel tree's
- * drivers/char/ by tools/rlxfw-marks.py from config/rlxfw-src/; it is never
+ * drivers/char/ by tools/rlxfw-marks.py from kernel/; it is never
  * edited inside src-vendor/, and the Kbuild line that compiles it is a row of
  * config/rlxfw-marks.tsv (MK13), not a hand edit.
  *

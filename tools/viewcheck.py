@@ -3,7 +3,7 @@
 
 WHAT IT CHECKS, AND WHY IT CAN
 ------------------------------
-`R6b-8` 8c adds config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-view.c, a
+`R6b-8` 8c adds kernel/linux-2.6.30/drivers/net/rtl819x-view.c, a
 /proc node that only loads: `mib`, `tbl vlan|netif`, `peek A [n]`; 8d's 1.1
 adds `tbl l2` and thirteen words to `peek`.  This tool cuts that file below
 its includes UNCHANGED and compiles it with the host's gcc in the kernel's
@@ -136,7 +136,7 @@ import tempfile
 sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOURCE = os.path.join(ROOT, "config", "rlxfw-src", "linux-2.6.30", "drivers",
+SOURCE = os.path.join(ROOT, "kernel", "linux-2.6.30", "drivers",
                       "net", "rtl819x-view.c")
 CFLAGS = ["-std=gnu89", "-O1", "-Wall", "-Wextra", "-Wno-unused-parameter",
           "-Wdeclaration-after-statement", "-Wstrict-prototypes", "-Werror"]

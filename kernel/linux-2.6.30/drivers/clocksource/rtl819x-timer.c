@@ -2,7 +2,7 @@
  * rtl819x-timer -- a Linux clocksource on the RTL8196E's Timer/Counter 1.
  *
  * THIS FILE IS NOT REALTEK'S.  R5-1, 2026-09-03.  It is staged into
- * drivers/clocksource/ by tools/rlxfw-marks.py from config/rlxfw-src/;
+ * drivers/clocksource/ by tools/rlxfw-marks.py from kernel/;
  * config/rlxfw-marks.tsv carries the one Kbuild line that links it.
  *
  * WRITTEN BLIND, AND THAT WORD HAS A LEDGER -- AND A DATE.

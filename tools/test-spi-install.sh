@@ -32,7 +32,7 @@ set -u
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo=$(dirname -- "$here")
-dev="$repo/config/rlxfw-src/linux-2.6.30/drivers/mtd/devices"
+dev="$repo/kernel/linux-2.6.30/drivers/mtd/devices"
 drv="$dev/rtl819x-spi.c"
 wtu="$dev/rtl819x-spi-write.c"
 ihdr="$dev/rtl819x-spi-install.h"

@@ -9,7 +9,7 @@ where the gate is; `docs/blind-write-ledger.md` owns what was read.
 
 ## 0. What is here, and the one sentence it is written to defend
 
-`config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c` — 642 lines,
+`kernel/linux-2.6.30/drivers/clocksource/rtl819x-timer.c` — 642 lines,
 of which about **309 are code** — plus one row (`MK2`) in
 `config/rlxfw-marks.tsv`, which is the Kbuild line that links it. Nothing else
 in the vendor tree is touched.
@@ -21,12 +21,12 @@ that is worth rests on `docs/blind-write-ledger.md` § 4.3, frozen and committed
 ```
 git log --diff-filter=A -- docs/blind-write-ledger.md
   aa89317  2026-09-03   (the ledger)
-git log --diff-filter=A -- config/rlxfw-src/linux-2.6.30/drivers/
+git log --diff-filter=A -- kernel/linux-2.6.30/drivers/
   bfd624c  2026-09-03   (this driver)
 ```
 
 ⚠️ **The command has to name the driver path, and the ledger's own § 8 says
-`config/rlxfw-src/` instead — which is one directory too wide.** That
+`kernel/` instead — which is one directory too wide.** That
 directory already held `rlxfw_mark.c` and `rlxfw-mark.h` from **2026-08-29**,
 months of segments before the ledger; run as written, the check shows a file
 of mine added *before* it and looks like a failure. Those two are the boot
@@ -1397,7 +1397,7 @@ leaves one that resets itself. Neither is good and the first is better.
 2. **`CFG-2`**: the driver's own comment said *"What is NOT established is what
    Linux leaves in `GIMR`"*, and seating 12 established it
    (`gimr_at_init = 00209100`, `00209300` after `request_irq`). It could not be
-   changed in that segment because `RECIPE_ID` is a digest of `config/` and one
+   changed in that segment because `RECIPE_ID` is a digest of `config/` (and, since P5e-1, `kernel/`) and one
    character would have detached the pinned image from its record. This segment
    rebuilds anyway, so it is fixed here — with the decode, and with the
    `bsp_ictl_irq_dispatch()` consequence § 12.11 draws from bit 12.

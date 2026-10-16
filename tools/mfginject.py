@@ -74,7 +74,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPT = os.path.join(ROOT, "config", "mfgtest.sh")
-DRIVER = os.path.join(ROOT, "config", "rlxfw-src", "linux-2.6.30",
+DRIVER = os.path.join(ROOT, "kernel", "linux-2.6.30",
                       "drivers", "mtd", "devices", "rtl819x-spi.c")
 CENSUS = os.path.join(ROOT, "config", "image-commands.tsv")
 
@@ -619,7 +619,7 @@ DRIVERS = {
     # R6b-6: MT-PORT's file is rlxfw's own switch driver since 1.2.
     "P_PORT": "drivers/net/rtl819x-switch.c",
 }
-SRCROOT = os.path.join(ROOT, "config", "rlxfw-src", "linux-2.6.30")
+SRCROOT = os.path.join(ROOT, "kernel", "linux-2.6.30")
 
 
 def driver_fields(relpath):

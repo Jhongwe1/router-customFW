@@ -255,11 +255,11 @@ esac
 # anti-DoD's build-stamp leg loses its "WHICH of my builds" role the moment the
 # stamp is frozen; this replaces it with a string computed from the declaration
 # files themselves, so it moves when the recipe moves and needs no remembering.
-#
-# Paths are hashed RELATIVE to the repository root.  `sha256sum` prints the
-# path beside the digest, and an absolute path would make the id a function of
-# where the clone happens to live.
-RECIPE_ID="$(cd "$REPO" && find config -type f -print0 | LC_ALL=C sort -z \
+# Paths are hashed RELATIVE to the repository root: an absolute one would make
+# the id depend on where the clone lives.  Two roots: the P5e-1 note, by `make`.
+for d in config kernel; do [ -d "$REPO/$d" ] || { echo "$CELL: no $d/ under $REPO:" \
+    "RECIPE_ID digests config/ and kernel/ together, never one of them alone" >&2; exit 3; }; done
+RECIPE_ID="$(cd "$REPO" && find config kernel -type f -print0 | LC_ALL=C sort -z \
              | xargs -0 sha256sum | sha256sum | cut -c1-8)"
 
 # 🔴 THE RENDERING HAPPENS HERE, ABOVE THE STAGE, AND THE PLACEMENT IS PART OF
@@ -408,8 +408,8 @@ DELTA_FILE="$REPO/config/rlxfw-kernel.delta"
 KDELTA="$REPO/tools/kconfig-delta.py"
 # MARKS_DECL and MARKSPY are set above --dry-run, where the --expect-present
 # probe reads them first: still one variable each, not a second spelling.
-# `verify`'s --absent inputs.  Under tools/, not config/: config/ is what
-# RECIPE_ID digests, and this list changes no byte of any image (its header).
+# `verify`'s --absent inputs.  Under tools/, not config/: config/ and kernel/
+# are what RECIPE_ID digests; this list changes no byte of any image (its header).
 ABSENT_DECL="$REPO/tools/rlxfw-marks-absent.tsv"
 ABSENT_FILES=(); ABSENT_SHAS=(); ABSENT_NAMES=()
 
@@ -595,7 +595,7 @@ if [ "$MARKS" = 1 ]; then
     [ "$KEEP" = 1 ] && MARKS_IF_NEEDED="--if-needed"
     if ! "$PY" "$MARKSPY" apply \
             --decl "$MARKS_DECL" \
-            --tree "$top" --src "$REPO/config/rlxfw-src" $MARKS_IF_NEEDED \
+            --tree "$top" --src "$REPO/kernel" $MARKS_IF_NEEDED \
             > "$log.marks.log" 2>&1
     then
         echo "$CELL: rlxfw-marks apply FAILED" >&2
@@ -747,9 +747,10 @@ run() {          # run() <logsuffix> <cmd...>
 }
 
 # ------------------------------------------------------------- the manifest
-# RECIPE-1, 2026-09-04.  `RLXFW-ID0` is a digest over `config/` and NOTHING
-# ELSE, so two images built from one frozen `config/` with different `--config`
-# print the same id.  量 the same day: `r51quiet` and `r51loud`, both
+# RECIPE-1, 2026-09-04.  `RLXFW-ID0` is a digest over `config/` and (since
+# P5e-1) `kernel/` and NOTHING ELSE, so two images built from one frozen
+# recipe with different `--config` print the same id.  量 the same day:
+# `r51quiet` and `r51loud`, both
 # `229d2983`, `.config-installed` e6cdc47d… against a49c254d…, `vmlinux`
 # 2b0d1618… against 271ad13e….  (The pair this repository named until today
 # was `r51a`/`r51quiet`, and that pair does NOT collide -- `r51a` compiled
@@ -1065,10 +1066,21 @@ set -- make -C "$DIR_LINUX" -j"$JOBS" "$TARGET"
 #
 # 🔴 AND REACHING EVERY OBJECT IS WHAT MAKES AN INCREMENTAL R5 ITERATION COST
 # A FULL BUILD.  量 2026-09-02 (INC-1, R5-0): editing one file under
-# config/rlxfw-src/ moves RECIPE_ID, which moves 592 command lines, and
+# kernel/ moves RECIPE_ID, which moves 592 command lines, and
 # kbuild's arg-check -- working since 0004 -- rebuilds all of them: 592 CC /
 # 32.58 s against 3 CC / 11.75 s for the SAME edit made where RECIPE_ID does
 # not move.  The identity string, not the build system, is the cost.
+#
+# 🔄 P5e-1, 2026-10-09: TWO ROOTS.  rlxfw's own kernel files moved out of
+# config/ into kernel/ (the INC-1 measurement above was taken while they were
+# under config/), so RECIPE_ID's `find` names both roots: with `find config`
+# alone a driver edit would stop moving the id the board prints.  The two are
+# one sorted list and one digest; the id's value changed with the move because
+# the hashed paths did (量 9bb2bec7 -> b396cb53 over the same sources, the
+# vmlinux differing only in the id's 8 bytes).  A missing root is refused where
+# the id is computed, not digested around.  tools/srcarchive.py's recipe_id()
+# is the second implementation, and its S11 holds the two equal on a fixture
+# that has both roots.
 #
 # --id-scope main passes it to init/main.o alone, which is where the sole
 # consumer lives (grep over the staged tree: one hit, init/main.c:576).

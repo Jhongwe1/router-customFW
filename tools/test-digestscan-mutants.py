@@ -60,7 +60,7 @@ SRC = os.path.join(ROOT, "tools", "digestscan.py")
 FIXTURES = [
     "tools/flashwin.py",
     "tools/ci-expected.tsv",
-    "config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c",
+    "kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c",
 ]
 
 MUT = [

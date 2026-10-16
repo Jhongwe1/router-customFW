@@ -15,7 +15,7 @@ set -e
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo=$(dirname -- "$here")
-hdr="$repo/config/rlxfw-src/linux-2.6.30/drivers/mtd/devices"
+hdr="$repo/kernel/linux-2.6.30/drivers/mtd/devices"
 out=${TMPDIR:-/tmp}/rlxfw-wrpolicy.$$
 
 if [ ! -f "$hdr/rtl819x-spi-wrpolicy.h" ]; then

@@ -177,7 +177,7 @@ own architecture, read out of the vendor's own Kconfig and Makefile.
 | | |
 |---|---|
 | one extra image in the build matrix | the same tree, the same six drivers, a different `/init` |
-| `RECIPE_ID` differs from the shipped image | it is a digest over `config/`, so the boot-capture byte count must be **re-derived, not copied** |
+| `RECIPE_ID` differs from the shipped image | it is a digest over `config/` and `kernel/`, so the boot-capture byte count must be **re-derived, not copied** |
 | the port checks run the vendor's NIC driver | so `mfgtest`'s output must record **which driver is running** — the plan's own v7 note, and it is load bearing once `R6` lands |
 | zero flash writes, zero new loader mechanisms, zero power cycles to establish | — |
 
@@ -556,8 +556,8 @@ proved nothing. It is a **`NO-TAKE`**, which is a different finding from a
 
 ### 9.2 `MT-ID` compared two cases of one number
 
-`rtl819x-spi.c` prints `recipe_id %08X`; `rlxfw-kbuild.sh:262` computes
-`sha256sum | cut -c1-8`. `mfgtest auto <lower-case id>` — the spelling
+`rtl819x-spi.c` prints `recipe_id %08X`; `rlxfw-kbuild.sh:262` digests `config/`
+and `kernel/` into `sha256sum | cut -c1-8`. `mfgtest auto <lower-case id>` — the spelling
 `PROGRESS.md` carried — would have turned `MT-ID` red with the right image on
 the board. It is the only comparand in the script that comes from outside it.
 

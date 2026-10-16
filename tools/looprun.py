@@ -34,7 +34,7 @@ Nobody types that value.  It is read out of the driver's stdout at S2 and
 required at S8, and if `config/` changed between them the run goes red for the
 right reason.
 
-⚠️ Its weakness, stated: `RLXFW_SRC_ID` is a digest of `config/` **only**.  A
+⚠️ Its weakness, stated: `RLXFW_SRC_ID` is a digest of `config/` and `kernel/` **only**.  A
 change to `src-vendor/`, to the toolchain, or to the `.config` passed with
 `--config` does not move it.  It attributes the DECLARATION, not the whole
 build.  `notes/reproducible-build.md` owns the rest.
@@ -991,8 +991,8 @@ def loop_once(a, out=sys.stdout):
             raise Refused("--image %r cannot be read: %s" % (img, exc))
         if os.path.getsize(img) == 0:
             raise Refused("--image %r is zero bytes" % img)
-    # 🔴 RECIPE-1: `RLXFW-ID0` is a digest over `config/` and nothing else, so
-    # A3 cannot tell two images built from one frozen `config/` apart -- 量
+    # 🔴 RECIPE-1: `RLXFW-ID0` is a digest over `config/` and `kernel/` and nothing
+    # else, so A3 cannot tell two images built from one frozen recipe apart -- 量
     # 2026-09-04, `r51quiet` and `r51loud` both compile 229d2983.  S6b's
     # `assert_staged` IS a discriminator, but it derives its expectation from
     # the file `--image` names, so it says "the board holds THIS file", not
@@ -1845,7 +1845,7 @@ def selftest(out=sys.stdout):
            "StageFailed@S2", outcome(mode="bench", skip="S6,S6b", image=""))
 
         # ---- M12: RECIPE-1.  A3 compares the id the board printed against the
-        # id the build computed, and RECIPE_ID is a digest over config/ ONLY --
+        # id the build computed, and RECIPE_ID is a digest over config/ and kernel/ ONLY --
         # 量 2026-09-04, r51quiet and r51loud both compile 229d2983 from
         # different .config files.  S6b's assert_staged derives its expectation
         # from the file --image names, so it cannot notice that the file is the
@@ -2829,8 +2829,8 @@ def build_parser():
     ap.add_argument("--image", default="")
     ap.add_argument("--image-sha256", default=None,
                     help="the sha256 the card names for --image. RLXFW-ID0 is "
-                         "a digest over config/ only, so it cannot tell two "
-                         "images built from one frozen config/ apart; this can")
+                         "a digest over config/ and kernel/ only, so it cannot "
+                         "tell two images built from one frozen recipe apart; this can")
     ap.add_argument("--vmlinux", default=None)
     ap.add_argument("--cell-top", default=PLACEHOLDER_TOP,
                     help="the staged tree rtkimage builds against")

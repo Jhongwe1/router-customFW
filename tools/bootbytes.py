@@ -226,7 +226,7 @@ import tempfile
 sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "config", "rlxfw-src", "linux-2.6.30")
+SRC = os.path.join(ROOT, "kernel", "linux-2.6.30")
 
 MARK_LINE = re.compile(rb"^RLXFW-([A-Za-z0-9_-]+?)(=([0-9A-F]{8}))?\r\n$")
 MARK_CALL = re.compile(r'rlxfw_(mark|markx)\(\s*"([A-Za-z0-9_-]+)"')

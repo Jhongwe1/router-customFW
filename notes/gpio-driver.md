@@ -658,7 +658,7 @@ this project's first.
 
 ### 9.1 Where it lives — decided 2026-09-10, and the decision is three measurements
 
-**`config/rlxfw-src/linux-2.6.30/arch/rlx/kernel/rlxfw-devices.c`**, linked by
+**`kernel/linux-2.6.30/arch/rlx/kernel/rlxfw-devices.c`**, linked by
 one `obj-y += rlxfw-devices.o` row in `config/rlxfw-marks.tsv` against
 `arch/rlx/kernel/Makefile`.
 

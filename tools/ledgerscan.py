@@ -143,12 +143,12 @@ FIXTURE_PATHS = frozenset({
 })
 
 
-# Files that are MINE, living at vendor-shaped paths inside a staged tree.
-# Derived from config/rlxfw-src/ rather than listed, so a new file of mine is
-# excluded the moment it exists -- and P5 removes the directory to prove the
-# exclusion comes from there and is not hardcoded.
+# MINE, at vendor-shaped paths in a staged tree: derived from OWN_ROOT, not listed
+# (P5 removes it to prove that).  Spelled from the root (`kernel/linux-...`, or
+# `kernel/.../x.c`) a path of mine matches PATH_RX, whose `kernel` is 2.6.30's.
+OWN_ROOT, OWN_TREE = "kernel", ("kernel/linux-", "kernel/.")
 def own_sources(root):
-    base = os.path.join(root, "config", "rlxfw-src")
+    base = os.path.join(root, OWN_ROOT)
     out = set()
     for dp, _dn, fn in os.walk(base):
         for f in fn:
@@ -302,7 +302,7 @@ def scan_population(root, paths, exclude, fixtures=None):
         for lineno, line in enumerate(txt.splitlines(), 1):
             for m in PATH_RX.finditer(line):
                 norm = strip_tree_prefix(m.group(1))
-                if norm in exclude or norm in fixtures:
+                if norm in exclude or norm in fixtures or m.group(1).startswith(OWN_TREE):
                     continue
                 ln = bool(LINENO_RX.match(line[m.end():]))
                 hits[norm].append(Citation(norm, rel, lineno, ln))
@@ -497,7 +497,7 @@ def render_scan(root, only=None, show_topics=False, out=sys.stdout):
           file=out)
     print("  population: %d tracked (excl upstream/), %d in upstream/"
           % (len(tf), len(uf)), file=out)
-    print("  excluded as mine (from config/rlxfw-src/): %s"
+    print("  excluded as mine (from kernel/): %s"
           % (", ".join(sorted(own)) or "(none)"), file=out)
     print(file=out)
 
@@ -798,7 +798,7 @@ def render_quarantine(root, out=sys.stdout, table=None):
 
 def _tmp_root(tmp, files):
     """A synthetic repository: a git tree with the given {rel: text}."""
-    os.makedirs(os.path.join(tmp, "config", "rlxfw-src"), exist_ok=True)
+    os.makedirs(os.path.join(tmp, OWN_ROOT), exist_ok=True)
     for rel, txt in files.items():
         p = os.path.join(tmp, rel)
         os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -859,26 +859,32 @@ def self_test():
        str(len(tracked_files(ROOT))))
     ck("P4b citations were found at all", len(mine) > 20, str(len(mine)))
 
-    # ---- P5: the exclusion comes from config/rlxfw-src/, not from a list.
+    # ---- P5: the exclusion comes from kernel/, not from a list.
     # Remove the directory in a synthetic tree and my own file must REAPPEAR
     # as an external citation.
     with tempfile.TemporaryDirectory() as tmp:
         r = _tmp_root(tmp, {
             "notes/x.md": "see `arch/rlx/kernel/rlxfw_mark.c` and "
-                          "`arch/rlx/kernel/rlx-cevt.c:139`\n",
-            "config/rlxfw-src/linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c":
+                          "`arch/rlx/kernel/rlx-cevt.c:139`\n"
+                          # P5e-1: paths of mine spelled from the root, in
+                          # full and elided, where `kernel/` is also one of
+                          # PATH_RX's vendor directories
+                          "and `kernel/linux-2.6.30/drivers/clocksource/"
+                          "rtl819x-timer.c` and `kernel/.../rtl819x-spi.c`\n",
+            "kernel/linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c":
                 "/* mine */\n",
         })
         with_own = scan_population(r, tracked_files(r), own_sources(r))
         ck("P5  a file of mine is excluded",
-           "arch/rlx/kernel/rlxfw_mark.c" not in with_own,
+           "arch/rlx/kernel/rlxfw_mark.c" not in with_own
+           and not [k for k in with_own if k.startswith(OWN_ROOT + "/")],
            str(sorted(with_own)))
         ck("P5b a vendor file beside it is NOT excluded",
            "arch/rlx/kernel/rlx-cevt.c" in with_own, str(sorted(with_own)))
         without = scan_population(r, tracked_files(r), set())
         ck("P5c with the exclusion set empty it reappears",
            "arch/rlx/kernel/rlxfw_mark.c" in without,
-           "the exclusion must come from config/rlxfw-src/, not a constant")
+           "the exclusion must come from kernel/, not a constant")
 
     # ---- P6: domain assignment, including the over-inclusive bsp rule that
     # exists because a timer is initialised in a file whose path says `setup`.

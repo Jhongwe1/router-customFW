@@ -134,7 +134,7 @@ changes is only whether the resulting *header* is rewritten when its content
 did not move.
 
 ⚠️ **It changes `RECIPE_ID`, by design.** `rlxfw-kbuild.sh` computes
-`RLXFW_SRC_ID` as a sha256 over every file under `config/`, so adding a file
+`RLXFW_SRC_ID` as a sha256 over every file under `config/` and `kernel/`, so adding a file
 there moves it. `notes/dev-loop.md` §4 and `SPEC.md` `TC-40` name
 `d31f60bd` as the recipe id of a measurement dated 2026-09-01; those are
 historical readings and stay true. Any build after this patch has a different
@@ -354,7 +354,7 @@ differing bytes: 4 of 3968240  (0.000101 %)
 ```
 
 🔄 **2026-09-08: seen a second time, on a different image and by accident.**
-A **comment** in `config/rlxfw-src/…/rtl819x-spi.c` was corrected between two
+A **comment** in `kernel/…/rtl819x-spi.c` was corrected between two
 compile checks of the same cell. `RECIPE_ID` moved `44c38c7a` -> `9155dad0`,
 `vmlinux` stayed **4,047,318 bytes** — byte-for-byte the same size — and its
 sha256-16 moved `d2d157595ec31803` -> `5e40cf36e56232ca`. Same-width id, so
@@ -498,8 +498,8 @@ Two things had to exist before it could be run at all:
 
 ### 7.1 The hypothesis, written before the run
 
-`R5`'s drivers live under `config/rlxfw-src/`. 🔄 **2026-09-16: `config/` now holds a SECOND source tree, `config/rlxfw-user/`, which
-`rlxfw-kbuild.sh` never stages (讀 `:469` stages `config/rlxfw-src` alone) and which compiles into no kernel object — and it is
+`R5`'s drivers live under `kernel/`. 🔄 **2026-09-16: `config/` now holds a SECOND source tree, `config/rlxfw-user/`, which
+`rlxfw-kbuild.sh` never stages (讀 `:469` stages `kernel` alone) and which compiles into no kernel object — and it is
 inside the digest anyway, so § 7.5's fourth bullet is where that goes.** `RECIPE_ID` is a sha256 over **every file under
 `config/`**, and `rlxfw-kbuild.sh` passes it as `KCPPFLAGS=-DRLXFW_SRC_ID=0x<id>`, which `Makefile:572` appends to `KBUILD_CPPFLAGS`
 — so it reaches **every C object's command line**. Since `0004` fixed the truncated `.cmd` files, kbuild's arg-check works.
@@ -519,7 +519,7 @@ inside the digest anyway, so § 7.5's fourth bullet is where that goes.** `RECIP
 |---|---|---:|---:|---:|---|
 | `S0` | fresh stage + full build, `--marks` | 42.56 | 592 | 118 | `6664f2f5` |
 | `S1` | `--keep --marks`, nothing changed | 11.98 | **2** | 8 | `6664f2f5` |
-| `S2` | **edit `config/rlxfw-src/…/rlxfw_mark.c`**, `--keep --marks` | **32.58** | **592** | 77 | **`449cd25e`** |
+| `S2` | **edit `kernel/…/rlxfw_mark.c`**, `--keep --marks` | **32.58** | **592** | 77 | **`449cd25e`** |
 | `S3` | revert `config/`, `--keep --marks` | 40.90 | 592 | 77 | `6664f2f5` |
 | `S4` | **edit the STAGED copy**, `--keep`, no `--marks` | **11.75** | **3** | 9 | `6664f2f5` |
 | `S5` | `--keep`, no `--marks`, nothing changed | 11.69 | 2 | 8 | `6664f2f5` |
@@ -607,7 +607,7 @@ same commit or it does not arrive — the same condition `P4a`'s `L2-6` put on
 * ⚠️ **One file, in `arch/rlx/kernel/`.** A driver under `drivers/` sits one
   `built-in.o` aggregation deeper. Same order of magnitude, 推, not measured.
   🔄 **2026-09-03: that file now exists** —
-  `config/rlxfw-src/linux-2.6.30/drivers/clocksource/rtl819x-timer.c`, `R5-1` —
+  `kernel/linux-2.6.30/drivers/clocksource/rtl819x-timer.c`, `R5-1` —
   **and the measurement still has not been taken.** `R5-1` ran fresh stages
   only (593 / 595 / 596 / 597 `CC`); no `--keep` incremental cycle was run on
   it, so this row stays 推 with its subject now available rather than
@@ -617,12 +617,12 @@ same commit or it does not arrive — the same condition `P4a`'s `L2-6` put on
   fresh-stage claim and stays one.
 * 🔴 **A file that compiles into NO kernel object moves it too.** 量
   2026-09-16, on a copy of `config/` outside the repository, running
-  `rlxfw-kbuild.sh:262-263`'s own pipeline: one comment line appended to
+  `rlxfw-kbuild.sh:262-263`'s own pipeline (over `config/` then; over `config/` and `kernel/` since P5e-1): one comment line appended to
   `config/rlxfw-user/isaprobe/uprobe.c` — a Linux userspace program that
   `rlxfw-kbuild.sh` never stages (讀 `:469`) — moves `RECIPE_ID`, so it buys
   § 7.2's 592 `CC`. § 7.1's *drivers* is narrower than the mechanism. ⚠️ The
   before/after pair is deliberately not quoted: it is a digest over the whole
-  of `config/` and is not the same pair on any two days.
+  of `config/` (`config/` and `kernel/` since P5e-1) and is not the same pair on any two days.
 
 
 ---

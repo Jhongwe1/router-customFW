@@ -662,7 +662,7 @@ row and a seating.
   instruction retiring — and `lwu2`'s slope against its `lw` twin on the same
   payload. `BadVAddr` = base + 2 is readable only if `exc.S` also records CP0
   `$8`, which no probe does.
-* **Why it is not run.** 讀 `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic.c`
+* **Why it is not run.** 讀 `kernel/linux-2.6.30/drivers/net/rtl819x-nic.c`
   1.4: `nic_xmit`, the `tx` verb and the RX harvest copy frames one byte at a
   time. 讀, GNU objdump 2.42 (Ubuntu `mips-linux-gnu`, not the vendor's
   toolchain) over the image `R6b-1` boots (`p2q`, `vmlinux` sha256

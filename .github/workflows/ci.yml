@@ -518,7 +518,7 @@ jobs:
 
       # looprun is R4-3's D3: the whole edit->result iteration as one command.
       # Its assertion is DERIVED, not typed -- `rlxfw-kbuild.sh` computes
-      # RLXFW_SRC_ID as a sha256 over config/, `ID0` prints it on the board, and
+      # RLXFW_SRC_ID as a sha256 over config/ and kernel/, `ID0` prints it on the board, and
       # the run requires the console to say the id the build just computed. So a
       # stale image, the vendor's firmware, and the loader's own re-staging of
       # flash after a watchdog reset are all red for the same reason.
@@ -1586,7 +1586,7 @@ jobs:
         run: DTCHECK_VENV=/tmp/dtvenv /usr/bin/python3 tools/dtcheck.py 2>&1 | tee ci-out/dtcheck.out; exit "${PIPESTATUS[0]}"
 
       # nic15check (R6b-2) compiles rtl819x-nic's pure half -- the header
-      # config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic-tx.h, UNCHANGED --
+      # kernel/linux-2.6.30/drivers/net/rtl819x-nic-tx.h, UNCHANGED --
       # with the host's gcc in the kernel's dialect, warnings as errors, and
       # drives its parsers, refusal table, length policy, identification,
       # classifier, the sweep's bookkeeping and the owner's wire bound,
@@ -1629,7 +1629,7 @@ jobs:
         run: /usr/bin/python3 tools/linkprobecheck.py 2>&1 | tee ci-out/linkprobecheck.out; exit "${PIPESTATUS[0]}"
 
       # mdiocheck (R6b-7) cuts rtl819x-switch 1.3's MDIO block, 1.4's phyif,
-      # 1.5's init and reset guard and 1.6's vlan out of config/rlxfw-src/
+      # 1.5's init and reset guard and 1.6's vlan out of kernel/
       # linux-2.6.30/drivers/net/rtl819x-switch.c, UNCHANGED, and compiles them
       # with the HOST gcc (-std=gnu89 -Werror), twice for 1.6's SWCORE=y arm,
       # against a scripted MDIO controller, phylib's path from the staged tree,
@@ -1663,7 +1663,7 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-ethcensus.sh 2>&1 | tee ci-out/test-ethcensus.out; exit "${PIPESTATUS[0]}"
 
-      # viewcheck (R6b-8 8c; 1.1 is 8d's) cuts config/rlxfw-src/linux-2.6.30/
+      # viewcheck (R6b-8 8c; 1.1 is 8d's) cuts kernel/linux-2.6.30/
       # drivers/net/rtl819x-view.c below its includes, UNCHANGED, and compiles
       # it with the HOST gcc in the kernel's dialect (-std=gnu89 -Werror)
       # against a sparse MMIO model: the 311 words the admission tables admit,

@@ -34,7 +34,7 @@ net/rtl/features/rtl_features.o first.
 
 WHAT IT DOES NOT DO.  It defines no storage: rtl865x_getWanDev() reads
 rtl865x_curOpMode, which at SWCORE=n is the seam's
-(config/rlxfw-src/linux-2.6.30/drivers/net/rlxfw-seam.c, the vendor's
+(kernel/linux-2.6.30/drivers/net/rlxfw-seam.c, the vendor's
 GATEWAY_MODE, 0).  With no vendor netdev it finds neither ppp0 nor eth1 and
 returns NULL; its one caller in the fast path (net/rtl/fastpath/96E/
 fastpath_core.S:785) is in the NAPT-entry path, which no rlxfw image

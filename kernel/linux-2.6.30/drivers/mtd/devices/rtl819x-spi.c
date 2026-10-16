@@ -4,7 +4,7 @@
  *
  * THIS FILE IS NOT REALTEK'S.  R5-5, 2026-09-07, forty-first segment.  It is
  * staged into drivers/mtd/devices/ by tools/rlxfw-marks.py from
- * config/rlxfw-src/; config/rlxfw-marks.tsv carries the two Kbuild lines --
+ * kernel/; config/rlxfw-marks.tsv carries the two Kbuild lines --
  * the one that links this file, and the CONDITIONAL one that declares the
  * write translation unit and deliberately does not build it.
  *

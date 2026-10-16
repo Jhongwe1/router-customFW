@@ -4,7 +4,7 @@ asicCounter text from them, and bracket them between two counter readings.
 
 WHAT IT READS
 -------------
-`R6b-8` 8c's node, config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-view.c
+`R6b-8` 8c's node, kernel/linux-2.6.30/drivers/net/rtl819x-view.c
 (`rtl819x-view 1.1`, and the 1.0 pages committed before it), prints raw words
 and nothing else: no register name, no meaning, no 64-bit byte count.  Those
 three are this tool's, and they come from B -- the header the build compiles,
@@ -226,7 +226,7 @@ sys.dont_write_bytecode = True
 
 TOOL_VERSION = "1.1"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOURCE_PARTS = ("config", "rlxfw-src", "linux-2.6.30", "drivers", "net",
+SOURCE_PARTS = ("kernel", "linux-2.6.30", "drivers", "net",
                 "rtl819x-view.c")
 
 # ------------------------------------------------------------------------

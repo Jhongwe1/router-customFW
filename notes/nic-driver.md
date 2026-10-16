@@ -2473,7 +2473,7 @@ stranded `TEST_END`.
 
 ### 19.3 `recover` cannot see this loss (`NET-113`)
 
-讀, `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic.c` 1.4: `recover` is armed
+讀, `kernel/linux-2.6.30/drivers/net/rtl819x-nic.c` 1.4: `recover` is armed
 only on `nic_xmit`'s stop path — all 4 TX descriptors engine-owned and a fifth
 frame offered — and `nic_recov_fn` fires 100 jiffies later if that state still
 holds. Its re-arm rewrites the TX ring without OWN, discarding up to 4 queued

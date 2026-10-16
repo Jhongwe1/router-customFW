@@ -132,7 +132,7 @@ not alternatives and neither is a draft of the other.
 | | model A — `platform_device` | model B — device tree |
 |---|---|---|
 | kernel | Linux **2.6.30**, the vendor tree this project builds and boots | a modern tree; 6.8 is what the tooling here is checked against |
-| where it lives | `config/rlxfw-src/linux-2.6.30/drivers/` | `dt/` |
+| where it lives | `kernel/linux-2.6.30/drivers/` | `dt/` |
 | how the driver finds its registers | a compiled-in physical address through `CKSEG1ADDR` | a `reg` cell, `ioremap`ed at probe |
 | **has it run on the silicon** | 🟢 **yes** — timer, GPIO, SPI+MTD and watchdog have all executed on this die | 🔴 **no, and it cannot**: 2.6.30 has no device tree |
 | what it proves | that the register map, the arming order and the failure modes are right, because the part did what the driver said it would | that the hardware has been *described* in the form the rest of Linux expects, and that the description is machine-checkable |

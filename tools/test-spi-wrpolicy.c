@@ -4,7 +4,7 @@
  * R8b item 4, 2026-10-04.  It #includes the DRIVER's own header, not a copy
  * of its arithmetic:
  *
- *   config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h
+ *   kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h
  *
  * which has no #include of its own for exactly this reason.  A harness holding
  * its own bounds test would be the shape where a guard and its test agree with

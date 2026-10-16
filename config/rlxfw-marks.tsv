@@ -125,7 +125,7 @@ ID0	linux-2.6.30/init/main.c	after	printk(KERN_NOTICE "%s", linux_banner);	rlxfw
 #
 # MK reaches arch/rlx/kernel/Makefile because rlxfw_mark.c has to be linked.
 # This one reaches drivers/clocksource/Makefile for the same structural
-# reason and nothing else: config/rlxfw-src/ carries a file of mine and a
+# reason and nothing else: kernel/ carries a file of mine and a
 # staged copy that no Makefile names is a file that does not build.
 #
 # THE FILE'S OWN RULE FOR ADDING A ROW DOES NOT APPLY, the same way it does

@@ -2,7 +2,7 @@
 
 `R5`'s Definition of Done asks every driver for **two** binding models, and
 this directory is the second one. The first is the `platform_device` binding
-under `config/rlxfw-src/linux-2.6.30/`, and that one **has run on the
+under `kernel/linux-2.6.30/`, and that one **has run on the
 silicon**.
 
 > 🔴 **NOTHING IN THIS DIRECTORY HAS BEEN PROBED ON HARDWARE, AND NOTHING IN

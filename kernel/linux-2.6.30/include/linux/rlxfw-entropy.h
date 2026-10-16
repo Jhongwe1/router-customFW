@@ -3,7 +3,7 @@
  * entropy accounting.   R7.
  *
  * This header is rlxfw's own file.  It is staged into the kernel tree's
- * include/linux/ by tools/rlxfw-marks.py from config/rlxfw-src/; it is never
+ * include/linux/ by tools/rlxfw-marks.py from kernel/; it is never
  * edited inside src-vendor/.
  *
  * WHY THIS EXISTS AT ALL.  量 2026-09-30 on image r6b8i (recipe 3685a3a4),

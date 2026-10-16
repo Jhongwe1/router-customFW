@@ -3,8 +3,8 @@
  *
  * It #includes the DRIVER's own headers, not copies of their arithmetic:
  *
- *   config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h
- *   config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h
+ *   kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h
+ *   kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h
  *
  * and, with -DWITH_CONTAINER_H, src/rlxboot/container.h -- the second source
  * for the RLXU offsets the install header restates (it cannot include it: that

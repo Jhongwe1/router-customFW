@@ -2534,9 +2534,9 @@ def self_test() -> int:
                      without("kernel/linux-2.6.30/drivers/net/rtl819x-nic.c",
                              "kernel/linux-2.6.30/drivers/char/rlxfw-entropy.c"))
         f = without("kernel/linux-2.6.30/drivers/net/rtl819x-nic.c")
-        f["config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic.c"] = (
+        f["config/linux-2.6.30/drivers/net/rtl819x-nic.c"] = (
             "".join("/* */\n" for _ in range(70)) + "#include <x.h>\n")
-        verdict_case("E17k", "a driver under config/rlxfw-src/ is found too",
+        verdict_case("E17k", "a driver under config/ is found too",
                      "E17", RED, f)
         verdict_case("E18r", "a 量 in a header under the kernel root", "E18", RED,
                      files_with("kernel/linux-2.6.30/include/rlxfw.h",

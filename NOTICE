@@ -62,7 +62,7 @@ is not this file's to settle; MIT was chosen so that nothing turns on it.
 
 ## 2. rlxfw's own kernel files — `GPL-2.0-only`, and the choice is forced
 
-**Covered:** every file under `config/rlxfw-src/`: the compiled sources, the
+**Covered:** every file under `kernel/`: the compiled sources, the
 ones declared and not built (`rtl819x-spi-write.c`, behind
 `CONFIG_MTD_RTL819X_WRITE`, which the mainline configuration does not set) and
 the headers. The directory is the unit, and no count of it is kept here: one
@@ -107,15 +107,15 @@ so both checkers would go red. The rest of the 213 are in `LOG.md` and in frozen
 (讀 `CLAUDE.md`).
 
 So the per-file statement is made where it moves no line: a licence comment at
-the **end** of each file, or one `config/rlxfw-src/LICENSE` naming the directory.
+the **end** of each file, or one `kernel/LICENSE` naming the directory.
 `SPDX-License-Identifier` wants line 1 by convention, and that convention
 postdates this 2.6.30 tree by eight years and is not enforced anywhere in this
 build — so the convention is what gives way, and this paragraph is why.
 
 **What this costs and where.** 🔴 讀 `tools/rlxfw-kbuild.sh` computes
-`RECIPE_ID` as a sha256 over **every file under `config/`**, comments included,
+`RECIPE_ID` as a sha256 over **every file under `config/` and `kernel/`**, comments included,
 and compiles it into the kernel as `-DRLXFW_SRC_ID`. Adding an SPDX line to a
-file under `config/rlxfw-src/` therefore moves `RECIPE_ID` and invalidates the
+file under `kernel/` therefore moves `RECIPE_ID` and invalidates the
 identity assertion of any card that quotes the old value. 量 2026-10-04 it has
 **already moved** this gate — `bb0f1a5f`, against the `0e45c61d` that
 `docs/sbom.md` records for cell `f184a` — because `config/fix-cases.toml` and

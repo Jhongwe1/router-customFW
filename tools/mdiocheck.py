@@ -248,7 +248,7 @@ import tempfile
 sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOURCE = os.path.join(ROOT, "config", "rlxfw-src", "linux-2.6.30", "drivers",
+SOURCE = os.path.join(ROOT, "kernel", "linux-2.6.30", "drivers",
                       "net", "rtl819x-switch.c")
 CFLAGS = ["-std=gnu89", "-O1", "-Wall", "-Wextra", "-Wno-unused-parameter",
           "-Wdeclaration-after-statement", "-Wstrict-prototypes", "-Werror"]

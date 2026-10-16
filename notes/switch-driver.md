@@ -291,7 +291,7 @@ the other.
 
 ## 6. What `rtl819x-switch.c` is, and what it refuses to claim
 
-`config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-switch.c`, `subsys_initcall`,
+`kernel/linux-2.6.30/drivers/net/rtl819x-switch.c`, `subsys_initcall`,
 `/proc/rtl819x-switch`. Built by `MK9` in `config/rlxfw-marks.tsv`.
 
 **Four states, not two**, which is what makes `D2` a measurement:
@@ -1453,7 +1453,7 @@ the WLAN driver (`drivers/net/wireless/rtl8192cd/`, 42) and
 printout is the owner's four, not every vendor leaf the census does not read:
 `spi_probe.o`, `spi_cmd.o`, `spi_common.o` and `spi_flash.o` under
 `drivers/mtd/chips/rtl819x/`, and `drivers/mtd/maps/rtl819x_flash.o`, are
-vendor sources with no counterpart in `config/rlxfw-src/`, outside the scope
+vendor sources with no counterpart in `kernel/`, outside the scope
 and not printed (the review's A10).
 
 ## 11.2 The numbers on `r6b6q2`, and how each was derived
@@ -1615,7 +1615,7 @@ row asks for each instrument to be shown refusing and permitting before it
 runs. rlxfw has to do those reads without writing anything. The page-0 MDIO
 read needs no new code: 1.3's `pread a 0 r` is one read and no write, with
 IRQs off, behind `mdio-i-mean-it` and `bound 10000` (讀, `mdiocheck` K10, K8
-and K2). Everything else is `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-view.c`,
+and K2). Everything else is `kernel/linux-2.6.30/drivers/net/rtl819x-view.c`,
 `rtl819x-view` 1.0, 709 lines. `SPEC.md` `NET-138`.
 
 It is a file of its own and not a 1.4 of `rtl819x-switch.c` (decision D1).
@@ -2096,7 +2096,7 @@ and none of the forty is.
 
 ## 13.5 The seam, and the one write it makes
 
-`config/rlxfw-src/linux-2.6.30/drivers/net/rlxfw-seam.c`, linked by
+`kernel/linux-2.6.30/drivers/net/rlxfw-seam.c`, linked by
 `config/rlxfw-marks.tsv` `MK12` (`obj-y += rlxfw-seam.o` after MK11's line) — the path
 `tools/ethcensus.py` already named as its placeholder (§ 11.6). Its body is under
 `#ifndef CONFIG_RTL_819X_SWCORE`; outside it, `const char rlxfw_seam_id[] = "rlxfw-seam
@@ -3334,7 +3334,7 @@ store and `RLXFW-SW-INIT=0000001F`.
 `tbl l2`, the L2 table read by the existing table protocol, printing only slots whose words are not
 all zero, under a page budget, with a count line (ruling 6 of the night gave arm I's card the L2
 path, § 16.7); and `peek` admitting the 13 words § 16.4 lists as having B and 量, with `0x4D48` still
-refused. The file is `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-view.c`, 709 → 994 lines,
+refused. The file is `kernel/linux-2.6.30/drivers/net/rtl819x-view.c`, 709 → 994 lines,
 sha256 `68ec4f21…` → `03109a3c…`; the main session accepted it as written. Marks as in § 17; 量 on
 the host is a desk tool's measurement. `SPEC.md` `FW-156`.
 
@@ -3919,7 +3919,7 @@ same files read as they did before the flip: `r6b10n` green as `quiet-noswcore`,
 (rc 1), so it reads list-tagged rows; `emueq --self-test` passes 19 of 19. A dry run of
 `rlxfw-kbuild.sh` takes `quiet`, `loud` and `quiet-swcore` (rc 0) and refuses `quiet-noswcore` and
 `quiett` (rc 3), without reaching a vendor binary or staging a cell. The recipe the default builds
-from, a digest over `config/`, moves from `3685a3a4` to `8b5ae480`. `test-config-gates`' E5 is red
+from, a digest over `config/` (`config/` and `kernel/` since P5e-1), moves from `3685a3a4` to `8b5ae480`. `test-config-gates`' E5 is red
 at the desk before and after, for one reason: a gitignored build product the initramfs declaration
 names is missing (`isaprobe/uprobe` in the worktree these ran in, `linkprobe` in the main tree).
 
@@ -4120,7 +4120,7 @@ symbol-table entries and 6 references. 推 that the 40 was § 19.2's kconfig cou
 ELF-symbol count; the sentence it supported — the WLAN driver is the same source and not the same
 object — stands and is now a number instead of an estimate.
 
-**rlxfw's own drivers.** For each of the 13 `.c` files under `config/rlxfw-src/linux-2.6.30/`:
+**rlxfw's own drivers.** For each of the 13 `.c` files under `kernel/linux-2.6.30/`:
 `drivers/net/rtl819x-nic.o` and `drivers/net/rlxfw-seam.o` **differ** across the flip;
 `drivers/mtd/devices/rtl819x-spi-write.o` is absent from both trees; and the other **10** —
 `rlxfw-devices`, `rlxfw_mark`, `rlxfw-entropy`, `rtl819x-timer`, `rtl819x-gpio`, `rtl819x-keys`,
@@ -4415,7 +4415,7 @@ here.
 
 ### 21.4 The code: `rtl819x-switch` 1.6's `vlan` (`R6c-3`, `NET-173`)
 
-讀 A block appended to `config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-switch.c` as 1.6
+讀 A block appended to `kernel/linux-2.6.30/drivers/net/rtl819x-switch.c` as 1.6
 (ruling E1). 1.5's handler hands it every write none of 1.5's forms took. PID 1 types `vlan`
 between `init` and `start` (`src/init/main.c`'s `lan_verbs[]`; `config/rlxfw-init.sh` at the same
 place), and a failure is printed and `start` still runs. The driver still writes nothing at boot

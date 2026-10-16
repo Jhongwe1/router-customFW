@@ -165,7 +165,7 @@ FALSE POSITIVES, each with a control
                              `ledgerscan` went red exactly this way.  Any prose
                              line carrying a `CITE-*` token is skipped; `T11`
   8  basename ambiguity      181 citations resolve by SUFFIX, 48 of them into
-                             `config/rlxfw-src/`, which mirrors the vendor
+                             `kernel/`, which mirrors the vendor
                              layout.  A path matching more than one tracked file
                              is REFUSED, never resolved -- `rlxfw-marks.py`'s
                              rule that an anchor occurs exactly once or the tool

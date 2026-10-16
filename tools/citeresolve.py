@@ -627,12 +627,12 @@ def _cited_may_be(a, written, names=()):
 #
 # 🔴 A RECORD CITES A FILE BY THE NAME IT HAD THEN.  The reading above is by
 # that name, in the dating commit's own tree, so a move since changes no
-# verdict -- 量 2026-10-09, fb5a5d17 and a bare `git mv config/rlxfw-src
-# kernel` give `SPEC.md`, `docs/GATE-RESULTS.md` and LOG.md's citations of
+# verdict -- 量 2026-10-09, fb5a5d17 and a bare `git mv` of rlxfw's own tree
+# to kernel/ give `SPEC.md`, `docs/GATE-RESULTS.md` and LOG.md's citations of
 # rtl819x-nic.c the same verdict counts before and after.  What a move DID
 # change is everything that asked whether a HEAD path is the cited file:
 # `--cited kernel/.../rtl819x-nic.c` kept 0 of the 14 LOG.md citations that
-# `--cited config/rlxfw-src/...` kept before the move, and "still at the
+# `--cited` with its config/ path kept before the move, and "still at the
 # cited line" fell from 127 to 76 over SPEC.md.  So the cited file is now the
 # FILE: its path at HEAD is followed forward from the dating commit with
 # citecheck's `History` -- git's own rename detection, read once -- and

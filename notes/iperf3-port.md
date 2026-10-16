@@ -223,7 +223,7 @@ measurement. Decompressed image **3,943,424** of 5,242,880 = **75.2 %**, margin
 1,299,456 — and that figure was predicted from a `gen_init_cpio` delta before the build
 and matched exactly. `nfjrom` **1,152,000** bytes, sha256 `89051d6a396c305b`.
 
-⚠️ **`RECIPE_ID` cannot see the binary.** The id is a digest over `config/` and the
+⚠️ **`RECIPE_ID` cannot see the binary.** The id is a digest over `config/` and `kernel/`, and the
 product lives under `build/`, so two different builds of `iperf3` give two images with
 the **same** `RLXFW-ID0`. What pins the artefact is the assembled image's own sha256.
 

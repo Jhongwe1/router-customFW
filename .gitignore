@@ -71,8 +71,8 @@ linux-*/
 # The DIRECTORY has to be un-ignored before its contents can be: git does
 # not descend into an excluded directory, so a `!.../**` on its own does
 # nothing.
-!config/rlxfw-src/linux-*/
-!config/rlxfw-src/linux-*/**
+!kernel/linux-*/
+!kernel/linux-*/**
 squashfs-root/
 *.o
 *.ko

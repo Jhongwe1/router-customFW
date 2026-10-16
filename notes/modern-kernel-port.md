@@ -275,7 +275,7 @@ tree.  It is elided here on purpose: `ledgerscan check` reads a path shaped
 like a driver tree as a CITATION that the blind-write ledger has to cover, and
 it is right to — it cannot tell a scratch copy from a path this project has
 read.  The line is `rtl819x-timer.c:409`,
-`config/rlxfw-src/linux-2.6.30/drivers/clocksource/`.)*
+`kernel/linux-2.6.30/drivers/clocksource/`.)*
 
 量: that header exists only at
 `arch/rlx/include/asm/rlxregs.h` (with a copy under `arch/mips/include/asm/` in
@@ -355,8 +355,8 @@ unmeasured — and this segment must not upgrade that into "it was hard".
   diagnostic counts; none has a ladder, so none has a *root-cause* count, and
   none has a port.  `rtl819x-timer`'s is not even a lower bound — its one
   diagnostic is fatal and masks whatever is behind it.
-* **`config/rlxfw-src/` is untouched.**  Editing it would move `RECIPE_ID`,
-  which is a digest over `config/`, and invalidate the image that has run on
+* **`kernel/` is untouched.**  Editing it would move `RECIPE_ID`,
+  which is a digest over `config/` and `kernel/`, and invalidate the image that has run on
   the silicon.  The port lives here as a diff and nowhere else.
 
 ---
@@ -364,7 +364,7 @@ unmeasured — and this segment must not upgrade that into "it was hard".
 ## 7.  The port (`rtl819x-wdt` only)
 
 ```diff
---- rtl819x-wdt.c	(2.6.30, config/rlxfw-src/linux-2.6.30/drivers/watchdog/)
+--- rtl819x-wdt.c	(2.6.30, kernel/linux-2.6.30/drivers/watchdog/)
 +++ rtl819x-wdt.c	(6.18.50)
 @@ -416,6 +416,7 @@
  #include <linux/proc_fs.h>
@@ -458,8 +458,8 @@ make malta_defconfig
 ./scripts/config --enable CONFIG_WATCHDOG --enable CONFIG_PROC_FS \
                  --enable CONFIG_CPU_BIG_ENDIAN --disable CONFIG_CPU_LITTLE_ENDIAN
 make olddefconfig && make -j4 prepare scripts
-cp .../config/rlxfw-src/linux-2.6.30/include/linux/rlxfw-mark.h include/linux/
-cp .../config/rlxfw-src/linux-2.6.30/drivers/watchdog/rtl819x-wdt.c drivers/watchdog/
+cp .../kernel/linux-2.6.30/include/linux/rlxfw-mark.h include/linux/
+cp .../kernel/linux-2.6.30/drivers/watchdog/rtl819x-wdt.c drivers/watchdog/
 #  ... apply § 6 ...
 make drivers/watchdog/rtl819x-wdt.o
 ```
@@ -642,7 +642,7 @@ the same two objections apply to the three new ports (hand-rolled `/proc`
 instrumentation, and — new — `rtl819x-gpio` registers a `gpio_chip` with no
 `of_node`/`fwnode` where a modern driver would be a `platform_driver` bound
 through the `dt/` bindings this project already wrote);
-**`config/rlxfw-src/` is untouched**, so `RECIPE_ID` has not moved and the
+**`kernel/` is untouched**, so `RECIPE_ID` has not moved and the
 image that ran on the silicon is still the image that ran on the silicon.
 🔴 **The port lives here as a diff and nowhere else**, which is § 6's own rule
 and is why the three new diffs are summarised rather than committed as source.

@@ -229,7 +229,7 @@ DUMP_REL = os.path.join("dumps", "flash-n150rt-console-2.bin")
 #: 2026-09-07 ... by two independent routes"), so the dump and that constant
 #: are two sources that must agree.  A wrong dump would make every candidate
 #: wrong and every scan CLEAN; this is the refusal that prevents that.
-IDENTITY_SRC = os.path.join("config", "rlxfw-src", "linux-2.6.30", "drivers",
+IDENTITY_SRC = os.path.join("kernel", "linux-2.6.30", "drivers",
                             "mtd", "devices", "rtl819x-spi.c")
 IDENTITY_SYM = "rtl819x_spi_expect_d1"
 

@@ -68,7 +68,7 @@ own 300-jiffy pre-check wait (`CLK-27`, `IRQ-13`): about 3 s from image `EA6EE53
 `rlxfw: init running`, and the vendor's on `init started: BusyBox v1.13.4` or its
 WLAN build string; both or neither is `?`, named and not timed. rlxfw is `loud`
 when the WLAN, NIC and FastPath lines carry a printk time prefix; the image is its
-`RLXFW-ID0=` (a digest of `config/`), or `none` before that mark existed.
+`RLXFW-ID0=` (a digest of `config/` and `kernel/`), or `none` before that mark existed.
 
 **Cold or warm, for a kernel boot.** `C-8`'s line decides, read from the capture
 itself when the loader's boot is in it (`K-J` warm, `X8-WAIT` cold). Otherwise the
@@ -273,7 +273,7 @@ kernels with and without the 3 s wait and predict no image):
 | `84385D91` (2026-09-21c) | loud | 12 (cold 3, warm 9) | 10.5784–11.2612 | 11.7886–12.5573 |
 | `82724C8F` (2026-09-22b) | loud | 2 (warm 2) | 10.9370–11.0416 | 12.2186–12.3265 |
 
-`F179CF21` is one recipe built both ways (`RLXFW-ID0` digests `config/` only), so
+`F179CF21` is one recipe built both ways (`RLXFW-ID0` digests `config/` and `kernel/` only), so
 its two rows are the corpus's only quiet/loud pair of one recipe — the shape `D7`
 compares.
 

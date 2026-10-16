@@ -500,7 +500,7 @@ what it could and could not say is the record of what the instrument was for.
 digest finds the first difference and nothing past it.  1.1 is the instrument
 for the rest.  **No card is frozen and no image is staged for a seating**: the
 scope decision this segment made is that these verbs ride on `R5-6`'s image,
-because `RECIPE_ID` is a digest over `config/` and anything built today goes
+because `RECIPE_ID` is a digest over `config/` (and, since P5e-1, `kernel/`) and anything built today goes
 stale the moment `R5-6`'s first `.c` lands.
 🔄 **2026-09-08: it landed, and the id is `b417a3e7`** -- cell `r56c`,
 `vmlinux` 4,049,497 bytes, carrying 1.1 and `rtl819x-wdt` together, which is
@@ -935,7 +935,7 @@ forever.
 
 🆕 2026-09-26, desk, found while landing block 46's P14 (`R6b-1`). 讀 `git log --follow`
 lists three committed versions of
-`config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c`: 1.0 (`eac2070`), 1.1
+`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c`: 1.0 (`eac2070`), 1.1
 (`a62342c`) and 1.2 (`46e6df7`, still the text at `873a471`). In each,
 `rtl819x_spi_n_writes` is named on exactly four lines — its `static` declaration (1.0 `:428`,
 1.1 `:474`, 1.2 `:526`), the `/proc` print (`:1021`, `:1268`, `:1348`) and two reads in
@@ -1304,7 +1304,7 @@ minor of it succeeding.
 ### 12.4 The erase granularity — one line, and why it stays 未定
 
 ```
-config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h
+kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h
 #define RLXFW_SPI_WR_ERASE_GRAIN	0x00001000u	/* 未定 FW-187/FW-191 */
 ```
 

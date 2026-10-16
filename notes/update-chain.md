@@ -706,7 +706,7 @@ update path on one seating, `bench/2026-10-08/V10-CARD.md`, with one flash write
 * **The boots.** 量 `rlxboot` booted S after a watchdog reset (`V06`; `bootslot` `V07`
   PASS) and from a cold power-on (`V08`; `V09` PASS): both slots verified, A at version 3
   and B at version 4, B chosen, `RLXFW-ID0=6A11DE02`. Every boot read `ctr=0`: the install
-  path writes no state (讀 `config/rlxfw-src/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h`:
+  path writes no state (讀 `kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h`:
   *"D3: R8b writes no state, so no region may reach it"*), so S was accepted against a
   counter of 0, and so would P, Q or R be.
 

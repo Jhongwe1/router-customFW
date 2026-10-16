@@ -2,7 +2,7 @@
  * rtl819x-wdt -- a /dev/watchdog for the RTL8196E's WDTCNR.
  *
  * THIS FILE IS NOT REALTEK'S.  R5-6, 2026-09-08, forty-fifth segment.  It is
- * staged into drivers/watchdog/ by tools/rlxfw-marks.py from config/rlxfw-src/;
+ * staged into drivers/watchdog/ by tools/rlxfw-marks.py from kernel/;
  * config/rlxfw-marks.tsv `MK6` carries the one Kbuild line that links it, and
  * config/rlxfw-kernel.delta carries the two config lines that make it reachable
  * (CONFIG_WATCHDOG=y, so drivers/Makefile:79 descends here at all) and the one

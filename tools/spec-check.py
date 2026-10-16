@@ -219,7 +219,7 @@ REDACTION_ALLOWLIST = {
         "the loader's compiled-in TFTP address, read out of stage2.bin. Not this unit's configuration",
     ('MAC, colon form', '02:52:4C:58:46:57'):
         "rtl819x-nic's OWN address, a constant compiled into "
-        "config/rlxfw-src/.../rtl819x-nic.c. It is locally administered "
+        "kernel/.../rtl819x-nic.c. It is locally administered "
         "(0x02) plus ASCII RLXFW, and it exists PRECISELY SO THAT this "
         "unit's real address -- which lives in H601 and may not be "
         "published -- never has to be read. Redacting it would hide a "

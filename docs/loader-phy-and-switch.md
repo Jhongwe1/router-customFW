@@ -1199,7 +1199,7 @@ names the CPU port's MAC-side state (`SPEC.md` § 17 `NET-41` 殘留).** Each re
   two WLAN structure offsets of 17920 in `rtl8192cd_init_sw`, and a branch
   label). ⚠️ An address computed at run time is invisible to this census —
   `0x4140`, `PSRP6`, is one the image reads and the census does not see.
-* **rlxfw's own source never names it** (`config/rlxfw-src/`, no `4600`, no
+* **rlxfw's own source never names it** (`kernel/`, no `4600`, no
   `PSRP6_RW`), and D has no `0xBB8046xx` table (controls: D's `0x4000`,
   `0x4100` and `0x4300` maps and `PSRP0`–`PSRP4` are found); the RTL8196E-CG 1.0
   and RTL8197B-CG 1.1 datasheets on hand have no such page either.

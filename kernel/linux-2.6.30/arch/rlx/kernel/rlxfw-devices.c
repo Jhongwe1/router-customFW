@@ -3,7 +3,7 @@
  *
  * THIS FILE IS NOT REALTEK'S.  R5-7, 2026-09-10, fifty-third segment; R5-8
  * added the button on 2026-09-10, fifty-fourth segment.  It is staged into
- * arch/rlx/kernel/ by tools/rlxfw-marks.py from config/rlxfw-src/;
+ * arch/rlx/kernel/ by tools/rlxfw-marks.py from kernel/;
  * config/rlxfw-marks.tsv carries the one Kbuild line that links it.
  *
  * ------------------------------------------------------------------------

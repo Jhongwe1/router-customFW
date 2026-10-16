@@ -8,7 +8,7 @@ that macro, K10 and K22 assert it, and M26 reverts it.
 WHAT IT CHECKS, AND WHY IT CAN
 ------------------------------
 `R6b-2` put every part of driver 1.5 that DECIDES something into
-`config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic-tx.h`, with its inputs
+`kernel/linux-2.6.30/drivers/net/rtl819x-nic-tx.h`, with its inputs
 as arguments: the verb parsers, the refusal table, the TX length policy, the
 loopback identification and classifier, the sweep's bookkeeping (delta0's
 registration, the retry rule, the record key, the map codes, the mark
@@ -105,7 +105,7 @@ import tempfile
 sys.stdout.reconfigure(encoding="utf-8")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HEADER = os.path.join(ROOT, "config", "rlxfw-src", "linux-2.6.30", "drivers",
+HEADER = os.path.join(ROOT, "kernel", "linux-2.6.30", "drivers",
                       "net", "rtl819x-nic-tx.h")
 CFLAGS = ["-std=gnu89", "-O1", "-Wall", "-Wextra", "-Wno-unused-parameter",
           "-Wdeclaration-after-statement", "-Wstrict-prototypes", "-Werror"]
@@ -509,7 +509,7 @@ int main(void)
 # The kernel headers the header includes with NIC15_HOST defined, which no host
 # has.  build() writes each into the harness's own include directory, holding
 # what the header and the driver above use from the real one (under
-# config/rlxfw-src/linux-2.6.30/include/) and nothing else: a use a stub lacks
+# kernel/linux-2.6.30/include/) and nothing else: a use a stub lacks
 # fails K0, never passes.
 STUBS = {
     # R7-7: the header includes it for rtl819x-nic.c's rlxfw_entropy_event()

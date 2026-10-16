@@ -1284,7 +1284,7 @@ return code that explains it living in a register nobody reads.
 
 ### 11.3 The instrument: `rlxfw_mark`, and the two defects the tool found in it
 
-`config/rlxfw-src/linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c` (mine) calls
+`kernel/linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c` (mine) calls
 `prom_putchar`. `<linux/rlxfw-mark.h>` supplies two macros so each mark is **one
 contiguous literal** in `.rodata`.
 
@@ -4652,7 +4652,7 @@ matched exactly one row before the flip and exactly one `y` row after.
 `66ec2abe` changed `config/rlxfw-kernel.delta` (one row) and
 `config/rlxfw-marks.tsv` (fourteen lines), which is why the id moved between
 `c8980fd6` and `c7716fbe`; `a6add876` adds `rtl819x-spi-install.h` under
-`config/rlxfw-src/`, which is why it moved again. The last row's mainline value
+`kernel/`, which is why it moved again. The last row's mainline value
 was then built: `s124/p`'s trial 4 built the mainline image from a clone at
 `a6add876`, and its kbuild manifest says `recipe_id` `4be284c6` (`vmlinux`
 4,588,247 B, `rlxfw-marks verify` green with one witness ABSENT), so that value

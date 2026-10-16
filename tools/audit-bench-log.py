@@ -282,7 +282,7 @@ ALLOW = [
      "`h601_rc 0` (22 lines)"),
     ("match", "02:52:4C:58:46:57",
      "rtl819x-nic's OWN address, a constant compiled into "
-     "config/rlxfw-src/.../rtl819x-nic.c: locally administered (0x02) plus "
+     "kernel/.../rtl819x-nic.c: locally administered (0x02) plus "
      "ASCII RLXFW -- \u91cf, `printf '\\x52\\x4c\\x58\\x46\\x57' | od -c` is `R L X F W`. "
      "It exists PRECISELY SO THAT this unit's real address, which lives in "
      "H601 and may not be published, never has to be read, so redacting it "

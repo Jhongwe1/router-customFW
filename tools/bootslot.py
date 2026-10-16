@@ -505,7 +505,7 @@ def self_test():
         case("S3", "the slot layout and the dot step are rlxboot.h/slots.h's",
              all(defs.get(k) == v for k, v in want.items()),
              "source %s" % {k: hex(defs[k]) for k in want if k in defs})
-        with open(os.path.join(REPO, "config", "rlxfw-src", "linux-2.6.30", "arch",
+        with open(os.path.join(REPO, "kernel", "linux-2.6.30", "arch",
                                "rlx", "kernel", "rlxfw_mark.c"), encoding="utf-8") as fh:
             mk = fh.read()
         with open(os.path.join(REPO, "config", "rlxfw-marks.tsv"), encoding="utf-8") as fh:

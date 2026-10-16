@@ -280,7 +280,7 @@ fi
 
 echo
 echo "=== C8-C11: the build manifest (RECIPE-1, 2026-09-04) ==="
-# WHY.  RLXFW-ID0 is a digest over config/ and NOTHING else, so `--config` and
+# WHY.  RLXFW-ID0 is a digest over config/ and kernel/ and NOTHING else, so `--config` and
 # `--initramfs` -- the two inputs that decide what the image IS -- are outside
 # it.  量 2026-09-04: `r51quiet` and `r51loud` both compile 229d2983 from
 # different .config files and produce different vmlinux.  write_manifest is the
@@ -370,7 +370,7 @@ echo "=== A1-A10: the declared --absent inputs, checked above the stage (CFG-3) 
 # what A7 asserts, the way C6 asserts on a later message.
 AT="$(mktemp -d)"
 FW="$AT/work"; RP="$AT/repo"
-mkdir -p "$FW/rebuild/ref" "$RP/config" "$RP/tools"
+mkdir -p "$FW/rebuild/ref" "$RP/config" "$RP/kernel" "$RP/tools"
 cp "$CF" "$RP/config/rlxfw-cflags"
 cp "$SF" "$RP/config/rlxfw-build-stamp"
 AD="$RP/tools/rlxfw-marks-absent.tsv"
@@ -738,7 +738,7 @@ echo "=== Y1-Y7b: --recipient above the stage (GPL-2.0 § 3) -- only UNIT_REFS i
 # and Z1/Z2/Z3/Z4 through the gate below.
 YT="$(mktemp -d)"
 YW="$YT/work"; YR="$YT/repo"; YD="$YR/tools/rlxfw-marks-absent.tsv"
-mkdir -p "$YW/rebuild/desk" "$YW/rebuild/src-vendor/drop" "$YR/config" "$YR/tools" "$YT/empty"
+mkdir -p "$YW/rebuild/desk" "$YW/rebuild/src-vendor/drop" "$YR/config" "$YR/kernel" "$YR/tools" "$YT/empty"
 cp "$CF" "$YR/config/rlxfw-cflags"; cp "$SF" "$YR/config/rlxfw-build-stamp"
 printf 'a synthetic unit kernel\n' > "$YW/rebuild/desk/unit.bin"
 printf 'a synthetic drop kernel\n' > "$YW/rebuild/src-vendor/drop/vmlinux_img"
@@ -983,7 +983,7 @@ ck "I9 identical spec text, different contents: only the content digest moves" \
 FWI="$IT/work"; RPI="$IT/repo"
 DRI="$FWI/rebuild/src-vendor/rtl819x-toolchain"
 mkdir -p "$DRI/linux-2.6.30/usr" "$DRI/boards/rtl8196e" \
-         "$DRI/toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/bin" "$RPI/config"
+         "$DRI/toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/bin" "$RPI/config" "$RPI/kernel"
 printf '# a fake board template\n' > "$DRI/boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW"
 printf '#!/bin/sh\nexit 1\n' > "$DRI/toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/bin/rsdk-linux-gcc"
 chmod +x "$DRI/toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/bin/rsdk-linux-gcc"

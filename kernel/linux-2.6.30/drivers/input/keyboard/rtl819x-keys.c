@@ -3,7 +3,7 @@
  *
  * THIS FILE IS NOT REALTEK'S.  R5-8, 2026-09-10, fifty-fourth segment.  It is
  * staged into drivers/input/keyboard/ by tools/rlxfw-marks.py from
- * config/rlxfw-src/; config/rlxfw-marks.tsv row MK8 carries the one Kbuild
+ * kernel/; config/rlxfw-marks.tsv row MK8 carries the one Kbuild
  * line that links it.
  *
  * Version 1.0.

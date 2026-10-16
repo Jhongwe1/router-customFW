@@ -144,8 +144,8 @@ repository applied **4** patches with recipe id **`b1434383`** on that date.
 🔴 **And that correction was itself written in the present tense, so it went
 stale in turn**: `R5-4` added `host-compat/0005` on 2026-09-06 and a build from
 this repository now applies **5**. The recipe id is not quoted here at all any
-more — it is a digest over `config/`, so it moves whenever anything under that
-directory does, and a file that names one is a file that goes stale on a
+more — it is a digest over `config/` and `kernel/`, so it moves whenever anything
+under them does, and a file that names one is a file that goes stale on a
 schedule nobody controls. `ID0` reports it from the board, which is the point of
 it. The
 numbers above are not corrected, because they describe what THIS measurement
@@ -861,7 +861,7 @@ four stages of a power cycle already spent.
   `M11`/`M11b`/`M11c`, one edge each.
 * **The identity pin** (`RECIPE-1`) is `--image-sha256`. `A3` compares the id
   the board printed against the id the build computed, and `RECIPE_ID` is a
-  digest over `config/` **only** — 量 2026-09-04, `r51quiet` and `r51loud` both
+  digest over `config/` and `kernel/` **only** — 量 2026-09-04, `r51quiet` and `r51loud` both
   compile `229d2983` from different `.config` files. `S6b`'s `assert_staged` is
   a discriminator, but it derives its expectation **from the file `--image`
   names**, so it says *the board holds this file*, not *the board holds the

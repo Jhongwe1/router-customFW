@@ -257,7 +257,7 @@ something the build does not emit.
 Read literally that is false, and this pair is what says so.**
 
 * **`PC-1` — a byte that reaches the image.** One character of the string
-  literal `"0123456789ABCDEF"` in `config/rlxfw-src/…/rlxfw_mark.c`.
+  literal `"0123456789ABCDEF"` in `kernel/…/rlxfw_mark.c`.
   **Prediction: the sha256 CHANGES.** Refuted by an identical image, which would
   mean the build is not reading my staged source at all.
 * **`PC-2` — a byte that does not.** One character inside a **comment** in the
@@ -522,3 +522,46 @@ in between, `tools/bootbytes.py` and `tools/ci-expected.tsv`, are not build inpu
 
 ⚠️ **What this does not establish**: that a third party rebuilds `295d4f6a…` (`P4a` closed at Level 1;
 `P4A-1`); anything about images built from a later `config/`. `SPEC.md` `FW-256`.
+
+## 11. 🆕 2026-10-17: rlxfw's kernel sources move to `kernel/` — the recipe id changes, and nothing else in `vmlinux`
+
+**Why the id moves.** `P5e-1` moves rlxfw's own kernel sources out of `config/` into `kernel/`.
+`RECIPE_ID` was a digest of `find config -type f`; it is now one of `find config kernel -type f`
+(`tools/rlxfw-kbuild.sh:262`), so a driver edit still moves the id the board prints. The digest
+hashes relative paths, so the same sources under new paths give a new id: mainline `9bb2bec7`
+becomes `b396cb53`. An image built after the move therefore cannot equal `v1.0`'s byte for byte,
+and the control is § 9's: `vmlinux` differs in the id's bytes only, and `System.map` is equal.
+
+**What was built.** 量 2026-10-09 (the 132nd segment), `$FWRE_WORK/rebuild/s132/p5e1/bld.sh`, every
+build `--variant quiet --marks --initramfs` with `v1.0`'s userspace, products and their sha256 under
+`p5e1/art/`:
+
+| | `nfjrom` (the image) | `vmlinux` | `System.map` |
+|---|---|---|---|
+| before the move, `9bb2bec7`, two builds equal | 1,110,016 B, `295d4f6a…` (`v1.0`'s, § 10) | 4,621,952 B, `3bc8f1ba…` | `0a024a01…` |
+| after the move, `b396cb53`, six builds equal | 1,110,016 B, `a5dd9cab3b099e3927a1a0855bdd31d0af5ee5a9ede7b1de24aba4d564d7e25c` | 4,621,952 B, `5beec535…` | `0a024a01…` |
+| control: one byte under `kernel/` changed, `c11b9656` | 1,110,016 B, `55c49516…` | 4,621,952 B, `7557466a…` | `0a024a01…` |
+
+**The comparison** (`p5e1/cmp/`, § 9's `repdiff` method). Before against after: 8 bytes of
+`vmlinux` differ, in 3 runs, and each is a halfword of the recipe id — `9bb2` → `b396` at
+`0x1916f6` and `0x2a75e6`, `bec7` → `cb53` at `0x191706` and `0x2a75ee` — with 0 unexplained;
+`System.map` is identical, 364,914 bytes. Its controls: after against the control reads the same 8
+bytes plus 1 unexplained (`0x270f33`, `.rodata`, the changed byte), so not recipe-only; a planted
+one-byte change reads not recipe-only; the two builds before the move read identical, and the first
+of them is identical to § 10's `9bb2bec7` build.
+
+**Every build's own checks.** The same products: `rlxfw-marks check` reads 28 marks at their anchors
+and `verify` 12 marks once in the image, before the move and after it; `kconfig-delta check` reads
+every difference from the vendor template on its list.
+
+**The tree that lands is the tree that was built.** 量 2026-10-17 (the 133rd segment): in the
+commit, `config/`, `kernel/` and `src/`, `tools/rlxfw-kbuild.sh` and `tools/rtkimage.py` are byte
+for byte the tree the six builds came from (`diff -r`, `cmp`). `tools/mkinitramfs.py` differs in
+its `--init` rule alone: the prefix check admits `kernel/` as well as `config/`, and its message and
+comments say so. The build's `--init` is under `config/`, so 推 the image is unchanged; no build of
+the landed commit was made. `--dry-run` on the commit prints `recipe=b396cb53`; with one byte
+appended to `kernel/LICENSE` it prints `83f02e20`, and with the byte removed `b396cb53` again.
+
+⚠️ **What this does not establish**: that the moved image boots — no seating has run `a5dd9cab…`,
+and `v1.0` is still `295d4f6a…`; a build of the landed commit itself; anything about `--variant
+loud` or the armed recipe. `SPEC.md` `FW-258`.

@@ -28,7 +28,7 @@ happens when it is not (`TX 1024 / RX 512` is the `CONFIG_RTL_8198` branch and
 was quoted for this board for one segment).
 
 **rlxfw side**, all 讀, from
-`config/rlxfw-src/linux-2.6.30/drivers/net/rtl819x-nic.c`.
+`kernel/linux-2.6.30/drivers/net/rtl819x-nic.c`.
 
 **A third side where it exists**: this die's own loader, 量, from the TX and RX
 descriptor templates read at the loader prompt before any driver ran
