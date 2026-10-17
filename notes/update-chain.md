@@ -180,7 +180,7 @@ Restating the ranges in a second file is how one of them drifts.
 |---|---|---|
 | `0x000000`–`0x005FFF` | loader | The boot loader. `burn()` at `0x80401318` has **no lower bound** at all (`docs/loader-flash-write.md` § 1) and `boot` is one of the eight section signatures it accepts, so the vendor's own upgrade path will write offset 0 if a section header asks it to. A partial write here is an unrecoverable brick and there is no spare unit. |
 | `0x006000`–`0x007FFF` | `H601` | This unit's MAC and radio calibration, which no reset restores. **Delegated**, not restated: `flashguard` asks `flashwin.overlaps_forbidden`, and `F3` is the case that goes red if that delegation is ever replaced by a copy. |
-| `0x020000`–`0x02FFFF` | rescue | The read-only rescue slot (plan § D6). The stock loader scans `0x020000`, so this is the one image that still boots when `0x010000` is broken; the update path never writes it. **LICENSABLE** since 2026-10-04 — see below. |
+| `0x020000`–`0x02FFFF` | rescue | The read-only rescue slot (the plan's `D6`, [`docs/flash.md`](../docs/flash.md) § *`rlxboot`*). The stock loader scans `0x020000`, so this is the one image that still boots when `0x010000` is broken; the update path never writes it. **LICENSABLE** since 2026-10-04 — see below. |
 | `0x400000`– | off-chip | Not a region but the same class of hazard: `burn()`'s only bound is the chip capacity and it **truncates** at it rather than refusing, so a destination running past the end is a silently short write. |
 
 ### The ruling of 2026-10-04 — the rescue slot became licensable
@@ -299,7 +299,7 @@ hand-built `cr6c` header and about a `boot` section, or it is a function that
 says "not an image" about everything.
 
 ⚠️ **`upstream/tools/loader-unpack.py` does not reproduce `check_image()`.** Both
-`SPEC-R8a.md` § 2 and § 5 and plan § D6 say it does; `grep -c check_image` over
+`SPEC-R8a.md` § 2 and § 5 and the plan's `D6` (unpublished) say it does; `grep -c check_image` over
 it returns **0**. What it reproduces is the LZMA unpack of the loader's second
 stage, its command table, its chip table and its IRQ wiring. The reproduction of
 `check_image()` that does exist is `tools/rtkimage.py`'s `sum16` plus its
@@ -368,7 +368,7 @@ slot may contain a scan candidate, the lowest usable slot base is `0x070000`, an
 which is neither `cs6c` nor `cr6c`, so an erased barrier is provably unbootable
 rather than merely unlikely to boot. ⚠️ That is a reading of `check_image()`'s
 acceptance rule, not a measurement: the experiment that settles it is
-`check_image()`'s `bank_offset` argument, which plan § D5 records as never having
+`check_image()`'s `bank_offset` argument, which the plan's `D5` (unpublished) records as never having
 been read for this build. If it is not 0 the whole candidate table shifts and
 this barrier moves with it. 🔄 2026-10-08: 量 `bench/2026-10-07`, the candidate
 the loader accepted read `05010000` and `05020000` at `0x8040DD3C`, so
@@ -689,7 +689,7 @@ update path on one seating, `bench/2026-10-08/V10-CARD.md`, with one flash write
 
 * **Container S.** Version 4, slot B at `0x190000`, form whole, recipe `6a11de02`, signed
   with the owner's production key (`4a6eda72…3096e`): 1,109,152 bytes, sha256 `3f728d56…`.
-  The owner signed it through `plan/s127/sign-S.bat`, which checks the payload's digest and
+  The owner signed it through `sign-S.bat`, a private script kept with the plan, which checks the payload's digest and
   the seed's public key before signing and refuses an existing output; 量 its four guards
   were shown refusing and, with the development seed, permitting, before the real run. 量
   `build-v10.sh verify` on the host: the header as declared; `mkfw2 verify` accepts S for
