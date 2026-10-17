@@ -14,7 +14,7 @@ this file was taken for `P2`.
 ## 1. What `P2` compares
 
 The plan's segmentation runs from power-on to a usable device, both firmwares,
-one script (`plan/router-rebuild-plan.md`, `P2`). Its confound is stated there:
+one script (the plan's `P2` block, unpublished; the gate as opened is [`docs/history/steps-P2.md`](../docs/history/steps-P2.md)). Its confound is stated there:
 the vendor runs WiFi, UPnP, DNS forwarding and a whole MIB bring-up that rlxfw
 does not, so the two totals are not comparable, and the comparison is made per
 segment. Each segment carries one of three classes, and the class is part of the
