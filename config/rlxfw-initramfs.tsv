@@ -78,7 +78,7 @@ file	/init	$REPO/build/rlxfw-user/init/init	0755	rlxfw	R7's COMPILED PID 1, stat
 # --- and the two binaries of mine, which nothing at boot runs ---
 #
 # Their source is config/rlxfw-user/isaprobe/ and their PRODUCT is under
-# build/, deliberately outside config/: RECIPE_ID is `find config -type f`
+# build/, deliberately outside config/: RECIPE_ID is `find config kernel -type f`
 # with no exclusions and does not consult .gitignore, so an object file
 # left under config/ would silently move the id the board prints.
 #
@@ -349,7 +349,7 @@ nod	/dev/input/event0	c:13:64	0600	rlxfw	R5-8: evdev's node for the first regist
 #
 # 🔴 APPENDED AT THE END ON PURPOSE.  Four committed citations point into this
 # file by line number -- config/image-commands.tsv:3 and tools/appletcensus.py
-# cite the busybox row, docs/mfgtest.md cites it too, RUNSHEET.md cites the
+# cite the busybox row, docs/mfgtest.md cites it too, docs/history/runsheet-2026-09-27.md cites the
 # header block -- so an insertion beside /bin/mfgtest would shift every one of
 # them.  `citecheck` is the only thing in this repository that can see that,
 # and appending costs nothing.
@@ -377,7 +377,7 @@ nod	/dev/input/event0	c:13:64	0600	rlxfw	R5-8: evdev's node for the first regist
 # so.  If iperf3 fails on the device with "unable to create a new stream", THIS
 # is the suspect and not the driver.
 #
-# ⚠️ RECIPE_ID CANNOT SEE THIS BINARY.  The id is a digest over config/ and the
+# ⚠️ RECIPE_ID CANNOT SEE THIS BINARY.  The id is a digest over config/ and kernel/, and the
 # product lives under build/, so two different builds of iperf3 give two
 # different images with the SAME RLXFW-ID0.  What pins it is the assembled
 # image's own sha256 (looprun --image-sha256), not the id the board prints.
@@ -401,7 +401,7 @@ file	/bin/iperf3	$REPO/build/rlxfw-user/iperf3/iperf3	0755	rlxfw	R6-5's throughp
 # tools/vendor-tripwire.sh; its INSTALL is $(REPO)/build/rlxfw-user/linkprobe,
 # which is where the path below comes from, and it is the owner of the gates.
 # Like uprobe, ucost and iperf3 the product lives under build/, outside
-# config/, so RECIPE_ID cannot see it: two builds of linkprobe give two images
+# config/ and kernel/, so RECIPE_ID cannot see it: two builds of linkprobe give two images
 # with one RLXFW-ID0.  What pins it is the assembled image's sha256 (looprun
 # --image-sha256) and the digest the program prints on its LP0 line, which is
 # its source and its Makefile.

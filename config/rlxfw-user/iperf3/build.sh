@@ -2,9 +2,9 @@
 # a7-iperf-build.sh -- stage the hand-written config/Makefile and build.
 # Runs from its own scratch directory: the rsdk wrappers write offset.tmp into
 # cwd, and on 2026-08-28 one landed in the repository root.
-SP=/mnt/c/Users/Key20/AppData/Local/Temp/claude/C--Users-Key20-Desktop-router-rebuild/8c694d3a-f929-49fa-b994-b400fb59e14d/scratchpad
-W=/home/key/fwre-work/iperf3-port
-TC=/home/key/fwre-work/rebuild/r2ab/tc/rsdk-1.3.6-4181-EB-2.6.30-0.9.30
+SP=${SP:?SP must name the directory holding a7-iperf-config.h and a7-iperf-Makefile}
+W=${FWRE_WORK:-$HOME/fwre-work}/iperf3-port
+TC=${FWRE_WORK:-$HOME/fwre-work}/rebuild/r2ab/tc/rsdk-1.3.6-4181-EB-2.6.30-0.9.30
 SRC=$W/src313/src
 
 set -u

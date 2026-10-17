@@ -36,7 +36,7 @@
  * `00000000` at `late_initcall` after it (量: 63 such lines in the committed
  * bench files at 95dabac, and no other value of N1 in any of them).  With
  * SWCORE=n nothing does, and `rtl819x-nic.c`'s own header says
- * why that is the dangerous state (`docs/KNOWN-ISSUES.md`, `R6-4`'s `D4`
+ * why that is the dangerous state (`docs/history/known-issues-segment-limits.md`, `R6-4`'s `D4`
  * row: "Remove the driver and something else must do that first").
  *
  * So the seam's `bsp_swcore_init()` makes the vendor's two writes, in the

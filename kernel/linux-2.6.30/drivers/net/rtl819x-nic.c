@@ -1769,7 +1769,7 @@ static void nic_ndo_tx_timeout(struct net_device *dev)
  * 🔴 `get_link` is deliberately NOT `ethtool_op_get_link`.  That helper
  * is `netif_carrier_ok()` = `!test_bit(__LINK_STATE_NOCARRIER)`; this
  * driver never calls `netif_carrier_off()`, so the bit is never set and
- * the helper could only ever return 1.  `RUNSHEET.md:317` is the house
+ * the helper could only ever return 1.  `docs/history/runsheet-2026-09-27.md:317` is the house
  * rule -- *a tool that always says 1 cannot fail* -- and a field that
  * cannot fail is not an observable.
  *

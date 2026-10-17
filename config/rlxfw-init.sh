@@ -9,7 +9,7 @@
 # The string below is the seating's rung-1 discriminator.  It is emitted by
 # code, at a point in the boot, from a file that exists only in this tree --
 # `strings` over this unit's own kernel and rootfs does not contain it, and
-# that is checked at the desk before the seating (RUNSHEET.md B5, P6).  It is
+# that is checked at the desk before the seating (docs/history/runsheet-2026-09-27.md B5, P6).  It is
 # also byte-identical across every committed rlxfw boot, which
 # tools/bootbytes.py relies on, so it does not change.
 echo "rlxfw: init running, RLXFW-R3-RUNG1-OK"

@@ -156,7 +156,7 @@
  * The middle one is the one to watch.  "The correction makes an older
  * measurement worth more" is the shape of sentence that gets quoted onward
  * without being re-derived, and it WAS quoted onward -- into
- * docs/FINDINGS.md and notes/watchdog-driver.md -- before anything
+ * docs/FINDINGS.md (docs/history/findings-2026-10-17.md now) and notes/watchdog-driver.md -- before anything
  * re-derived it.
  *
  * ⚠️ THE DECISION IS UNCHANGED, and writing that out is the point.

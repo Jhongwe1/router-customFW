@@ -1,8 +1,8 @@
 #!/bin/bash
 # a7-iperf-probe.sh -- measure, do not assume.
 # Every line of the hand-written config.h has to come from one of these probes.
-W=/home/key/fwre-work/iperf3-port
-TC=/home/key/fwre-work/rebuild/r2ab/tc/rsdk-1.3.6-4181-EB-2.6.30-0.9.30
+W=${FWRE_WORK:-$HOME/fwre-work}/iperf3-port
+TC=${FWRE_WORK:-$HOME/fwre-work}/rebuild/r2ab/tc/rsdk-1.3.6-4181-EB-2.6.30-0.9.30
 CC=$TC/bin/mips-linux-gcc
 NM=$TC/bin/mips-linux-nm
 SYSINC=$TC/mips-linux/include

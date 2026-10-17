@@ -23,14 +23,14 @@
 # every gate stayed green.  The flag removes 98.8 % of the conditional moves.
 # Build the control with EXTRA_CFLAGS= to see the difference.
 
-TC           ?= /home/key/fwre-work/rebuild/r2ab/tc/rsdk-1.3.6-4181-EB-2.6.30-0.9.30
+TC           ?= $(FWRE_WORK)/rebuild/r2ab/tc/rsdk-1.3.6-4181-EB-2.6.30-0.9.30
 CROSS        := $(TC)/bin/mips-linux-
 CC           := $(CROSS)gcc
 STRIP        := $(CROSS)strip
 READELF      := $(CROSS)readelf
 
 # WHERE THINGS GO, AND WHY NOT HERE.
-# `RECIPE_ID` is `find config -type f` with no exclusions and does not consult
+# `RECIPE_ID` is `find config kernel -type f`, no exclusions, and does not consult
 # .gitignore (讀 tools/rlxfw-kbuild.sh:262-263), so a single .o left beside this
 # Makefile would silently move the id the board prints.  Objects therefore go
 # under $FWRE_WORK and the product goes to $REPO/build/, which is gitignored --
@@ -38,7 +38,7 @@ READELF      := $(CROSS)readelf
 # reason config/rlxfw-initramfs.tsv gives for uprobe and ucost.
 HERE         := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 REPO         := $(abspath $(HERE)../../..)
-FWRE_WORK    ?= /home/key/fwre-work
+FWRE_WORK    ?= $(HOME)/fwre-work
 STAGE        ?= $(FWRE_WORK)/rebuild/rlxfw-user/iperf3
 OBJDIR       := $(STAGE)/build
 INSTALL      ?= $(REPO)/build/rlxfw-user/iperf3

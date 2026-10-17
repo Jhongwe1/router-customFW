@@ -301,7 +301,7 @@ static int rtl819x_sw_wr(unsigned int off, u32 v)
  * any useful sense -- it has no PHY, so its fabric link is up by
  * construction and `PSRP6` bit 4 has read set in every reading this
  * project has taken.  Reporting that would be reporting a constant, and
- * `RUNSHEET.md:317`'s house rule is that a tool which always says 1
+ * `docs/history/runsheet-2026-09-27.md:317`'s house rule is that a tool which always says 1
  * cannot fail.
  *
  * So this answers the question a user of `rlx0` actually has: is any
