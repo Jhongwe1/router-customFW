@@ -3,7 +3,8 @@
 Source: [`rtl819x-keys.c`](../../kernel/linux-2.6.30/drivers/input/keyboard/rtl819x-keys.c), version 1.0 ·
 reasoning and every reading: [`notes/gpio-driver.md`](../../notes/gpio-driver.md) § 10, § 12
 and § 13 · the board's description of the button:
-[`rlxfw-devices.c`](../../kernel/linux-2.6.30/arch/rlx/kernel/rlxfw-devices.c)
+[`rlxfw-devices.c`](../../kernel/linux-2.6.30/arch/rlx/kernel/rlxfw-devices.c) ·
+the file head until 2026-10-18, verbatim: [`rtl819x-keys.c`](keys-history.md)
 
 ## What it does
 

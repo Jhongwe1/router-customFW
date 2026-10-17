@@ -544,7 +544,7 @@ the thing under test.
 
 `mt_button` read `n_poll` either side of a bare `sleep 4`. `n_poll` advances
 only while `/dev/input/event0` is open, and nothing in the check opened it. 讀
-`rtl819x-keys.c:91-103`: *"with no handler that opens, poll() is NEVER CALLED …
+`rtl819x-keys.c:23-35`: *"with no handler that opens, poll() is NEVER CALLED …
 every counter reads 0 for ever"*; 量 `p11d.config-built:769`,
 `# CONFIG_INPUT_EVBUG is not set`. `bench/2026-09-10`'s card had already typed
 `sleep 3 < /dev/input/event0` with the note *"the open is what is needed"*.
