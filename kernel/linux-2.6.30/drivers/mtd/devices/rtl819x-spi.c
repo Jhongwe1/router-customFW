@@ -8,308 +8,44 @@
  * the one that links this file, and the CONDITIONAL one that declares the
  * write translation unit and deliberately does not build it.
  *
- * ------------------------------------------------------------------------
- * WHAT IS DIFFERENT ABOUT THIS DRIVER, AND IT IS NOT A GOOD THING
- * ------------------------------------------------------------------------
+ * It shares the controller with the vendor's drivers/mtd/chips/rtl819x/,
+ * which drives the same four registers with no lock (MEASURED, the r54
+ * vmlinux).  Every transaction here is the consequence of a /proc write, and
+ * each restores SFCR, SFCR2 and SFCSR and reads them back; n_state_foreign
+ * and n_state_bad count what it finds changed.  NOT WRITTEN BLIND:
+ * docs/blind-write-ledger.md 4.5 -- the transaction order is the vendor's.
  *
- * Every other driver in this gate had the peripheral to itself.  This one
- * does not.  量 2026-09-07, on the baseline config and on the r54 vmlinux:
- *
- *   CONFIG_RTL819X_SPI_FLASH=y, so drivers/mtd/chips/rtl819x/ IS in this
- *   image, and it drives the SAME four registers.  Its mtd->read is
- *   mtd_spi_read -> do_spi_read -> spi_flash_info[chip].pfRead ->
- *   SpiRead_11110B -> ComSrlCmd_ComRead, which is PROGRAMMED I/O, not the
- *   memory-mapped window.  Its mtd->write and mtd->erase exist.  There is
- *   no lock anywhere on that path.
- *
- * 🔴 THAT CORRECTS A ROW OF OUR OWN.  SPEC.md FW-34 states the chain as
- * `mtd_read -> part_read -> rtl819x_flash` and spends its whole exclusion
- * argument on rtl8196_map_copy_from's 1024-byte short read.  The conclusion
- * (a truncated read is excluded) survives and gets STRONGER; the mechanism
- * named is wrong.  The map's copy_from is not merely bypassed by a macro --
- * it is never installed and never called.  量, one scan of the r54 vmlinux
- * with the counters printed side by side:
- *
- *     jal -> rtl8196_map_copy_from   0        <- the claim
- *     jal -> ComSrlCmd_ComRead       1        <- the control
- *     jal -> SFCSR_CS_L             17        <- the control
- *     .data words == 801a482c        0        (its address is never stored)
- *     .data words == bd000000        2        (so the scan CAN see .data)
- *
- * ⚠️ AND A TRAP THAT SCAN WALKED INTO, kept because the next census will
- * meet it too: `jal -> mtd_spi_read` and `jal -> SpiRead_11110B` are BOTH 0,
- * and both functions are live.  They are reached through function pointers
- * (`jalr v0` on chip_info->read; `jalr v1` on +0x3C of spi_flash_info +
- * chip*72).  A `jal` census cannot see an indirect call, so a 0 from one is
- * not "dead code".  FW-39's technique is unaffected -- it counts `sw` to an
- * ADDRESS, which is a different question.
- *
- * ------------------------------------------------------------------------
- * SO THE COEXISTENCE RULE IS A MEASUREMENT, NOT AN ASSUMPTION
- * ------------------------------------------------------------------------
- *
- * Three things make sharing the controller survivable, and the fourth is
- * what this driver adds:
- *
- *  1. Nothing here happens on its own.  Registration reads three registers
- *     and stops.  Every transaction is the direct consequence of a write to
- *     /proc, the same shape rtl819x-timer and rtl819x-gpio use.
- *  2. The vendor's own entry points re-establish the controller on every
- *     call -- SFCSR_CS_L spins for RDY and then writes SFCSR whole, and
- *     ComSrlCmd_RDID rewrites SFCR.  讀, from its disassembly.  So a vendor
- *     transaction after one of mine does not inherit my state.
- *  3. Mine restores what it found: SFCR, SFCR2, SFCSR, then reads them back.
- *  4. 🔴 AND THE READ-BACK IS THE POINT.  "Nothing else touched the
- *     controller" is otherwise an assumption, and this project does not
- *     accept those.  n_state_foreign counts transactions that BEGAN with
- *     SFCR/SFCR2 different from the values latched at registration;
- *     n_state_bad counts restores that did not take.  A zero in either is a
- *     reading, because the `wedge` verb is the positive control that makes
- *     them able to move.
- *
- * 🔴 SFDR IS NEVER RESTORED, AND THAT IS THE SUBTLE ONE.  It is the command
+ * NOTE: SFDR IS NEVER RESTORED, AND THAT IS THE SUBTLE ONE.  It is the command
  * port: writing it ISSUES an SPI command.  A generic "save and restore all
  * four registers" loop -- which is what one writes without thinking -- would
  * end every transaction by clocking whatever byte happened to be in the save
  * slot out to the flash chip.  Three registers are saved.  Four would be a
  * bug that looks like tidiness.
  *
- * ------------------------------------------------------------------------
- * THE REGISTERS, AND WHERE EACH NUMBER CAME FROM
- * ------------------------------------------------------------------------
+ * On the mainline a write is refused three ways: the write TU,
+ * rtl819x-spi-write.c, is in no committed image; mtd->write and mtd->erase
+ * are stubs that refuse with -EOPNOTSUPP and count; and mtd->flags is
+ * MTD_CAP_ROM.  n_writes counts writes to the FLASH CHIP.  Register writes to
+ * the controller are counted separately in n_reg_writes, which is NOT zero
+ * and must not be confused with it: this driver writes SFCSR and SFDR on every
+ * read, because that is what issuing a read command IS on this controller.
  *
- *   SPEC.md REG-13   SFCR 0xB8001200, SFCR2 ...04, SFCSR ...08, SFDR ...0C,
- *                    SFDR2 ...10.  量 on this board 2026-08-25b, and three
- *                    independent sources agree on the map: this unit's own
- *                    loader (A), the vendor bootcode header (B), and the
- *                    RTL8196E datasheet (D).
- *   SPEC.md REG-14   SFCSR bit 27 is SPI_RDY, 0 busy and 1 ready.  讀+, and
- *                    the strongest form of it: this unit's own
- *                    ComSrlCmd_RDID at 0x804058BC spins on exactly that bit
- *                    before touching SFDR.  Code that has booted this board
- *                    since 2018 depends on the semantics.
- *   SPEC.md LDR-42   The loader's FLR reads flash through SFDR programmed
- *                    I/O and NOT through the window; it supplies Fast Read
- *                    0x0B, and its data loop does not touch SFCSR between
- *                    words, so the pacing is the controller's.
- *   SPEC.md FLS-11   The memory-mapped window is 0xBD000000, KSEG1,
- *   SPEC.md MAP-12   uncached.
- *   SPEC.md FLS-14   The flash is 4,194,304 bytes and two committed copies
- *                    of a dump of it are byte-identical over all of it.
+ * THE H601 GUARD IS A PROPERTY OF THE COMPUTED VALUE.  `verify` counts
+ * h601_hashed, the bytes inside [0x006000,0x008000) that reached either
+ * digest, and /proc prints the digests ONLY when that count is 0.
  *
- * SFCSR's fields, from D table 10, every one matching B's shift macros:
- *
- *   31 SPI_CSB0   chip select 0.  0 ACTIVE, 1 not active.  Reset 1.
- *   30 SPI_CSB1   chip select 1, same encoding.  Reset 1.
- *   29:28 LEN     bytes in this phase minus one: 00=1 .. 11=4.  Reset 11.
- *   27 SPI_RDY    read-only.  0 busy, 1 ready.
- *   26:25 IO_WIDTH  00 serial, 01 dual.
- *   24 CHIP_SEL   0 = CS0#.
- *   23:16 CMD_BYTE  D marks this "Only Used in MMIO Mode", and the serial
- *                   path puts the command in SFDR instead -- which is what
- *                   the loader's RDID does.  This driver never writes it.
- *
- * ------------------------------------------------------------------------
- * WHAT WAS READ TO WRITE THIS, AND THE HONEST VERDICT ON IT
- * ------------------------------------------------------------------------
- *
- * docs/blind-write-ledger.md 4.5 already says it, before this file existed:
- * 🔴 **R5-5 cannot be claimed as blind against the vendor.**  Eleven paths,
- * three of them decision-layer.  This segment added more -- spi_flash.c,
- * spi_probe.c's mtd_info, ComSrlCmd_ComRead, ComSrlCmd_InputCommand,
- * SFCSR_CS_L, spi_regist, setFSCR -- and they are in the ledger with their
- * depth.  The transaction ORDER below is the vendor's, because it is the
- * order that is known to work on this die, and pretending otherwise would be
- * a worse driver told as a better story.
- *
- * 🟢 What IS this file's own, and what docs/driver-diff.md will score:
- *
- *   - EVERY SPIN IS BOUNDED.  The vendor's SFCSR_CS_L, SFCSR_CS_H,
- *     spiFlashReady and ComSrlCmd_RDID all spin on a hardware bit with an
- *     unconditional back-branch and no counter (`j 801a29ac`, 讀 from the
- *     artefact).  量: this board arms a watchdog -- bsp_timer_init writes
- *     WDTCNR = 0x00600000 and rlx_timer_interrupt does WDTCNR |= 1<<23 on
- *     every TC0 interrupt -- and CLK-08 puts its window at roughly a second.
- *     So on the vendor's driver a controller that never raises RDY reboots
- *     the router.  Here it returns -ETIMEDOUT and counts.
- *   - The byte order is written out explicitly instead of memcpy'ing a u32,
- *     so the result does not depend on the host's endianness.  The vendor's
- *     `memcpy(puc, &ui, 4)` is correct only because this core is big-endian.
- *   - The save/restore/read-back guard above.
- *   - The three-layer write refusal below.
- *
- * ------------------------------------------------------------------------
- * THREE LAYERS REFUSE A WRITE -- AND THE FIRST DRAFT OF THIS PARAGRAPH WAS
- * WRONG ABOUT ONE OF THEM, WHICH IS WHY THE CODE BELOW LOOKS AS IT DOES
- * ------------------------------------------------------------------------
- *
- *  L1  The write path is a SEPARATE TRANSLATION UNIT that is not compiled.
- *      config/rlxfw-marks.tsv declares it as
- *      `obj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o`, and that
- *      CONFIG_ is not declared to kconfig at all -- an undeclared CONFIG_
- *      expands to empty in GNU Make, so no menu, no defconfig and no
- *      `oldconfig` can turn it on.  Proved by symbol absence in System.map
- *      and `nm vmlinux`, and rlxfw-marks.py's `absent:` witness is what
- *      checks it.  Positive control: `make CONFIG_MTD_RTL819X_WRITE=y` in a
- *      DISCARDED tree makes the symbols appear and makes that row go red.
- *  L2  mtd->write and mtd->erase are STUBS THAT REFUSE with -EOPNOTSUPP and
- *      count the attempt.
- *  L3  mtd->flags is MTD_CAP_ROM, which is 0 -- MTD_WRITEABLE is not set --
- *      so mtdchar's mtd_open refuses an open for writing with -EACCES
- *      before L2 is ever consulted.
- *
- * 🔄 R8b ITEM 4, 2026-10-04 (122nd segment).  ALL THREE LAYERS WERE RE-DECIDED
- * AND THE SHAPE CHANGED, SO THE PARAGRAPHS ABOVE DESCRIBE THE MAINLINE AND NOT
- * THE WHOLE RULE.  The four decisions are W1-W4 in rtl819x-spi-write.c's
- * header; what they do to the three layers here:
- *
- *  L1  CONFIG_MTD_RTL819X_WRITE is now DECLARED to kconfig -- `bool`,
- *      `default n`, config/host-compat/0010 -- so "no menu, no defconfig and
- *      no oldconfig can turn it on" is NO LONGER TRUE and must not be quoted.
- *      What replaces it is weaker and reviewable: the symbol is `n` in
- *      config/rlxfw-kernel.delta, so the TU is in no committed image, and
- *      kconfig-delta check is the instrument that says so about the .config
- *      the compiler actually saw.  MK5's `absent:` witness still covers the
- *      artefact.  A make-command-line override is no longer the only route,
- *      and that is the point: an override leaves no trace in .config.
- *  L2  The stubs still refuse in a mainline image, with -EOPNOTSUPP and the
- *      same counter, and MT-FLASH-2 is untouched.  They now also take
- *      rtl819x_spi_lock and ROUTE to the write TU when it is linked, where an
- *      unarmed request refuses with -EACCES.  So no card may carry the errno
- *      as a typed constant: `unarmed_rc` is printed below for that.
- *  L3  UNCHANGED, and that is W4's decision rather than an omission.  See the
- *      mtd_info below.
- *
- * ⚠️ AND THE HONEST SENTENCE ABOUT ALL OF IT: not one line of the write path
- * has run anywhere.  It is not in any committed image and has never been on
- * this die.  What was exercised at the desk is the POLICY's refusals, on the
- * host, through tools/test-spi-wrpolicy.sh -- which says nothing about the
- * silicon.
- *
- * 🔴 L2 WAS ORIGINALLY "leave the pointers NULL, the core returns
- * -EOPNOTSUPP".  That is FALSE on this kernel, and checking it rather than
- * asserting it is the only reason this file does not ship a latent oops.
- * 讀 drivers/mtd/mtdchar.c in this drop:
- *
- *      case MEMERASE:                                         :419
- *          if (!(file->f_mode & FMODE_WRITE)) return -EPERM;   :423
- *          ...
- *          ret = mtd->erase(mtd, erase);                       :457
- *
- * There is no NULL check.  A NULL .erase is a null-pointer call, not a
- * refusal.  So the three layers were NOT independent: L3 was the only thing
- * standing between a NULL pointer and a dereference, and "defence in depth"
- * would have described a single point of failure.
- *
- * 🟢 With stubs they ARE independent, and each fails differently: L1 is a
- * link-time absence, L2 an errno from this file, L3 an errno from the MTD
- * core at open().  L3's own basis is measured too -- mtd_open at :94,
- * `if ((file->f_mode & FMODE_WRITE) && !(mtd->flags & MTD_WRITEABLE))
- * return -EACCES`, which is SEPARATE from the odd-minor rule at :73.  That
- * matters: the vendor's /dev/mtd0 is an even minor and CAN be opened for
- * writing; this device cannot be, on either minor.  mtdblock.c:421 reads the
- * same flag and marks /dev/mtdblockN read-only.
- *
- * ⚠️ AND L3 HAS NEVER BEEN OBSERVED FIRING, HERE OR ANYWHERE IN THIS PROJECT.
- * :94 is skipped on every vendor partition, because the vendor's map sets
- * MTD_CAP_NORFLASH and MTD_WRITEABLE with it.  Observing it needs an EVEN char
- * minor over THIS device, and tools/mkinitramfs.py refuses to declare one --
- * correctly, since it can check the odd-minor rule from a declaration and
- * cannot check mtd->flags.  So L3 is 讀 and stays 讀; the `trywrite` verb
- * observes L2, the layer behind it, on the die.
- *
- *  and a counter, n_writes, which counts writes to the FLASH CHIP and is 0.
- *  It is not a fourth layer; it is the instrument that says the other three
- *  held.  Register writes to the controller are counted separately in
- *  n_reg_writes, which is NOT zero and must not be confused with it: this
- *  driver writes SFCSR and SFDR on every read, because that is what issuing
- *  a read command IS on this controller.
- *
- * ------------------------------------------------------------------------
- * THE EXPERIMENT: D1 AND D3 IN ONE TRAVERSAL
- * ------------------------------------------------------------------------
- *
- * PROGRESS.md's R5-5 row freezes four rows.  D1 and D3 are both done by
- * rtl819x_spi_verify(), one pass, two 4 KiB buffers:
- *
- *   D1  sha256 over H601's COMPLEMENT -- [0x000000,0x006000) united with
- *       [0x008000,0x400000), 4,186,112 bytes = 99.8047 % -- computed in this
- *       kernel by crypto/sha256_generic.c, and compared against a constant
- *       re-derived from FLS-14's dump.  The rootfs is not touched and the
- *       name `mtd_debug` does not appear, which is what the rewritten DoD
- *       was for.
- *   D2  The 8,192 bytes left out are a RULE, not a failure.  flashwin
- *       refuses to print a digest of any window overlapping H601 (量,
- *       FLS-24), and that refusal was not overturned.  Their verification
- *       stays in the FLR bracket, which compares without printing.
- *   D3  The SAME bytes read again through 0xBD000000 and compared IN THE
- *       KERNEL, printing only `equal` or the first differing offset.  A
- *       verdict is not a digest, so D3 spans the FULL 4,194,304 bytes --
- *       H601 included -- because an offset reveals no content.  The digest
- *       does not, because a digest would.
- *
- * 🔴 THE CITATION IN THE FROZEN DoD WAS THE WRONG HALF OF THE RIGHT ROW, and
- * this is the finding that most changes what D3 means.  D3 cited FW-34 as
- * having measured the 0xBD000000 path over all 4,194,304 bytes.  It did not:
- * that reading is `busybox wc -lc < /dev/mtd0ro`, which goes through
- * mtd_spi_read -- the PIO path -- as the census above shows.  Nothing in
- * this project has ever read the window past probe3's 1,024 words.
- *
- * 🟢 The right half of the same row is FW-34's Group F: 1,024 uncached loads
- * through 0xBD000000 at stride 4 and at stride 1,024 took the SAME 30,354
- * ticks, R = 1.0000, so the window serves a single-word read as its own
- * transaction and does NOT buffer.  That is what makes D3 two paths rather
- * than one path read twice -- an independence at the CONTROLLER, not merely
- * in the source.  Without it, `equal` would be compatible with a controller
- * returning the same buffered data twice.
- *
- * 🟢 AND D3 IS ALSO THE CONTROL ON D1's OWN PATH.  The MMIO read of a chunk
- * happens after the PIO read of the same chunk.  If a transaction of mine
- * left the controller unusable, the window read that follows would differ.
- *
- * 🟢 THE NEGATIVE CONTROL IS ONE VERB AND IT MOVES BOTH HALVES.  `corrupt
- * <off>` flips a byte in the PIO buffer AFTER the read and BEFORE the hash.
- * D1 must then give a different digest and D3 must report exactly that
- * offset.  Without it, `equal` and `match` are what a tool that cannot fail
- * also prints.
- *
- * ------------------------------------------------------------------------
- * THE H601 GUARD IS A PROPERTY OF THE COMPUTED VALUE
- * ------------------------------------------------------------------------
- *
- * The traversal counts h601_hashed: bytes inside [0x006000,0x008000) that
- * reached either digest.  /proc prints the digests ONLY when that count is
- * 0.  So the digest is printable because the arithmetic came out H601-free,
- * not because the author believed the skip was right.  H601 = exactly two
- * 4 KiB chunks, aligned, so the skip needs no partial-chunk arithmetic --
- * chunk 6 and chunk 7 and nothing else.
- *
- * ⚠️ H601's bytes DO enter DRAM: D3 compares them.  That is the same thing
+ * CAUTION: H601's bytes DO enter DRAM: D3 compares them.  That is the same thing
  * the FLR bracket does and it is not a capture.  What keeps it safe is that
  * this driver has NO verb and NO /proc field that emits a flash byte -- not
  * a hexdump, not a sample, not a first-differing-VALUE.  Only digests over
  * the complement, an offset, counters and controller registers.  Adding a
  * hexdump verb here would defeat every paragraph above.
  *
- * ------------------------------------------------------------------------
- * WHAT THIS FILE DOES NOT ESTABLISH
- * ------------------------------------------------------------------------
- *
- *  1. THAT THE FLASH CONTENT MATCHES THE DUMP.  D1 says the complement
- *     hashes to what the 2026-08-16 dump hashes to.  It says nothing about
- *     H601, by construction, and the 0.0244 % flash bracket does not move.
- *  2. ANY WRITE OR ERASE BEHAVIOUR.  L1 means that code is not here.  The
- *     write TU compiles in the control build and has never run anywhere.
- *  3. THAT MY TRANSACTION IS OPTIMAL.  It is the vendor's order at the
- *     vendor's Fast Read with one dummy byte.  Faster shapes exist in
- *     spi_common.c (dual IO, 0x3B/0xBB) and none of them has been measured
- *     on this die, so none is used.
- *  4. THE SPI CLOCK.  量 from the r54 artefact, ComSrlCmd_RDID writes
- *     SFCR = 0xFFC00000, SPI_CLK_DIV = 7 -> divisor 16, and spi_regist
- *     calls it twice at device_initcall -- where REG-13 read 0x3FC00000,
- *     divisor 4, at the LOADER prompt.  That is 讀, from code; S1 below is
- *     the reading that would make it 量.  This driver does not set the
- *     divider and does not depend on its value.
+ * The driver page: docs/drivers/spi.md.  The coexistence measurement, the
+ * registers and their sources, what was read, the three write layers and
+ * their R8b re-decision, the D1/D3 experiment and what this file does not
+ * establish: the head it carried until 2026-10-18, verbatim in
+ * docs/drivers/spi-history.md.
  */
 
 #include <linux/init.h>
@@ -364,7 +100,7 @@
 						 * board -- REG-13 */
 #define RTL819X_SPI_FASTREAD_DUMMY 1		/* DUMMYCOUNT_1 */
 
-/* JEDEC Read ID.  `MT-FLASH-1`.  讀 from this unit's own loader, whose
+/* JEDEC Read ID.  `MT-FLASH-1`.  READ from this unit's own loader, whose
  * ComSrlCmd_RDID at 0x804058BC issues exactly this opcode; D's own example
  * names 0x9F for this part.  Two sources, REG-14's rule satisfied. */
 #define RTL819X_SPI_CMD_RDID	0x9Fu
@@ -372,7 +108,7 @@
  * at 0x8040FBD4 holds the same three bytes two ways (001C7016 / 1C701600).
  * It identifies the PART, not this UNIT -- see the alphabet note above. */
 #define RTL819X_SPI_RDID_EXPECT	0x001C7016u
-/* The loader reads FOUR bytes and takes the top three: 量 from the fresh
+/* The loader reads FOUR bytes and takes the top three: MEASURED from the fresh
  * disassembly, both callers at 0x80405050 and 0x8040505C pass a1 = 4, and
  * 0x80405064 is `srl s1,v0,0x8`.  This driver reuses that width rather than
  * asking for three, because a 4-byte phase is the one shape this controller
@@ -382,9 +118,9 @@
 #define RTL819X_SPI_SIZE	0x00400000u	/* FLS-14 */
 #define RTL819X_SPI_ERASESIZE	0x00001000u	/* sector, from the loader's
 						 * fallback descriptor */
-/* 🔴 THAT NUMBER IS 未定 AS A FACT ABOUT THIS PART, and this is the only place
+/* NOTE: THAT NUMBER IS 未定 AS A FACT ABOUT THIS PART, and this is the only place
  * in this file that says so.  SPEC.md `FW-187` 殘留 / `FW-191` 殘留: it is what
- * /proc/mtd reports (量 2026-10-04) and what the vendor's UNKNOWN fallback
+ * /proc/mtd reports (MEASURED 2026-10-04) and what the vendor's UNKNOWN fallback
  * assumes, which are two readings of SOFTWARE and no reading of the chip.  The
  * write path's own granularity is RLXFW_SPI_WR_ERASE_GRAIN in
  * rtl819x-spi-wrpolicy.h -- ONE line, which is where item 1's settled value is
@@ -398,7 +134,7 @@
 #define RTL819X_SPI_H601_HI	0x00008000u
 #define RTL819X_SPI_H601_SIZE	(RTL819X_SPI_H601_HI - RTL819X_SPI_H601_LO)
 
-/* The `h601` verb's structure constants.  讀, from the vendor's own source;
+/* The `h601` verb's structure constants.  READ, from the vendor's own source;
  * every one is a layout fact of this SoC family, not a fact about this unit.
  *
  *   HDR   sizeof(PARAM_HEADER_T) -- signature[4] + len, __attribute__((packed)),
@@ -414,10 +150,10 @@
 #define RTL819X_SPI_H601_HDR	6u
 #define RTL819X_SPI_H601_NIC0	1u
 
-/* The clamp.  🔴 NEITHER BOUND IS THE VENDOR'S -- see the verb's comment.
+/* The clamp.  NOTE: NEITHER BOUND IS THE VENDOR'S -- see the verb's comment.
  * MIN is the smallest body this parser actually touches: boardVer(1) +
  * nic0Addr(6) + nic1Addr(6) + the checksum byte(1).  It is deliberately NOT
- * sizeof(HW_SETTING_T)+1 = 1166: that number is 推, computed from the drop's
+ * sizeof(HW_SETTING_T)+1 = 1166: that number is INFERRED, computed from the drop's
  * headers and never compiled, and 980 of its bytes are a 5 GHz channel table
  * on a 2.4 GHz-only board -- so gating on it would refuse a good unit if this
  * drop is not the drop this unit shipped with.  `hw_len` is printed instead,
@@ -434,7 +170,7 @@
  * THE MAP, AND WHY IT IS TWO LEVELS OF 32 RATHER THAN ONE LIST OF 1,024
  * ------------------------------------------------------------------------
  *
- * FLS-26, 量 2026-09-08: verify() found the first difference between this
+ * FLS-26, MEASURED 2026-09-08: verify() found the first difference between this
  * flash and the 2026-08-16 dump at [0x9000,0xA000) and could find nothing
  * past it, because a PREFIX digest stops at the first difference.  4,153,344
  * bytes -- 99.02 % -- are undetermined.
@@ -478,7 +214,7 @@
 #define RTL819X_SPI_PROC_BUDGET		3584
 #define RTL819X_SPI_PROC_RESERVE	512
 
-/* 🔴 The bound the vendor's driver does not have.  A read of SFCSR is an
+/* NOTE: The bound the vendor's driver does not have.  A read of SFCSR is an
  * uncached KSEG1 load; FW-34 Group F measured an uncached word through the
  * flash window at 2.075 us, which is the slowest access on this bus, so
  * 200,000 spins is under 0.42 s even at that rate -- inside the watchdog
@@ -618,7 +354,7 @@ static int  rtl819x_spi_h601_sum_ok;
 static int  rtl819x_spi_h601_mac_not_zero;
 static int  rtl819x_spi_h601_mac_not_ff;
 static int  rtl819x_spi_h601_mac_group_bit;
-/* 🔴 THERE IS NO mac_local_bit AND THAT IS DELIBERATE.  The first draft had
+/* NOTE: THERE IS NO mac_local_bit AND THAT IS DELIBERATE.  The first draft had
  * one.  docs/mfgtest.md §4 declares exactly four MAC booleans and states
  * that they leak four bits per run; a fifth would widen a containment
  * decision this file does not own, so it was removed rather than argued
@@ -644,7 +380,7 @@ static long rtl819x_spi_corrupt_at = -1;	/* negative control */
 static u32  rtl819x_spi_v_start;
 static u32  rtl819x_spi_v_len;
 
-/* 🔴 1.1: the traversal timed IN THE KERNEL, against the tick this project
+/* NOTE: 1.1: the traversal timed IN THE KERNEL, against the tick this project
  * owns (R5-3b-2 registered the rating-300 clock_event_device, so jiffies is
  * driven by rtl819x-timer).  FW-48 stands as a bounded question because a
  * .timing row cannot separate *data arrived* from *the tool began waiting*
@@ -742,7 +478,7 @@ static int rtl819x_spi_claim(struct rtl819x_spi_state *s)
 }
 
 /*
- * 🔴 THE POSITIVE CONTROL FOR THE GUARD BELOW, AND WHERE IT HAD TO GO.
+ * NOTE: THE POSITIVE CONTROL FOR THE GUARD BELOW, AND WHERE IT HAD TO GO.
  *
  * The first version of `wedge` corrupted the SAVED value and let release()
  * write it: `s.sfcr = ~real`.  That does not test anything -- release()
@@ -883,14 +619,14 @@ static void rtl819x_spi_read_mmio(u32 addr, u32 len, u8 *buf)
  * owner of the one invariant that makes this driver survivable beside the
  * vendor's.  So the policy is over there and the registers are here.
  *
- * THE ORDER IS THE VENDOR'S, 讀 from spi_common.c in the tree that builds, and
+ * THE ORDER IS THE VENDOR'S, READ from spi_common.c in the tree that builds, and
  * docs/blind-write-ledger.md § 9.14 records every path.  What is NOT the
  * vendor's: both spins below are BOUNDED.  spiFlashReady() (:728-742) is
  * `while (1)` on the WIP bit with no ceiling and no counter, so a part that
  * never clears WIP reboots this router through the watchdog; here it returns
  * -ETIMEDOUT and counts.
  *
- * ⚠️ A VENDOR ODDITY THAT IS NOT COPIED.  SeqCmd_Order (:786-792) calls
+ * CAUTION: A VENDOR ODDITY THAT IS NOT COPIED.  SeqCmd_Order (:786-792) calls
  * `SFCSR_CS_L(ucChip, ucIOWidth, IOWIDTH_SINGLE)` -- the io-width in the
  * LENGTH argument and the length in the io-width argument, i.e. the two are
  * swapped.  It is inert only because DATA_LENTH1 and IOWIDTH_SINGLE are both
@@ -906,7 +642,7 @@ static void rtl819x_spi_read_mmio(u32 addr, u32 len, u8 *buf)
 #define RTL819X_SPI_SR_WIP	0x01u	/* bit SPI_STATUS_WIP, :165 */
 
 /* The WIP ceiling.  Each spin is a full RDSR transaction, so this is NOT
- * comparable with RTL819X_SPI_RDY_SPINS, which counts register reads.  推, and
+ * comparable with RTL819X_SPI_RDY_SPINS, which counts register reads.  INFERRED, and
  * labelled as a guess: a 4 KiB sector erase on this part family is tens of
  * milliseconds and a page program hundreds of microseconds, but this part's
  * datasheet is not on hand (`FW-191`: the draft here is the SoC's).  At the
@@ -963,7 +699,7 @@ static int rtl819x_spi_wait_wip(void)
 }
 
 /* n_writes, incremented from one place so the counter CLAUDE.md § Flash quotes
- * has one owner.  🔴 IT IS BLIND TO A VENDOR-SIDE WRITE: spi_probe.c:101-103
+ * has one owner.  NOTE: IT IS BLIND TO A VENDOR-SIDE WRITE: spi_probe.c:101-103
  * installs mtd_spi_write / mtd_spi_erase on the vendor's partitions
  * unconditionally and nothing here counts those.  The breakdown into programs
  * and erases is the write TU's wr_n_prog / wr_n_erase. */
@@ -1083,7 +819,7 @@ out:
  * sha256, and the known-answer test that makes it an instrument.
  *
  * CONFIG_CRYPTO_MANAGER is not set on this board, so the crypto core runs NO
- * self-test on registration -- 讀 crypto/algapi.c crypto_wait_for_test(): with
+ * self-test on registration -- READ crypto/algapi.c crypto_wait_for_test(): with
  * no notifier to consume it, crypto_probing_notify returns NOTIFY_DONE and
  * crypto_alg_tested() is called directly, which completes the larval WITHOUT
  * testing anything.  That is also why crypto_alloc_shash works here at all,
@@ -1516,14 +1252,14 @@ static int rtl819x_spi_mtd_read(struct mtd_info *mtd, loff_t from, size_t len,
  * TU; they are the errno that a NULL would have been if the MTD core had
  * checked.
  *
- * 🔄 R8b item 4.  TWO THINGS CHANGED AND BOTH ARE VISIBLE FROM OUTSIDE.
+ * UPDATE: R8b item 4.  TWO THINGS CHANGED AND BOTH ARE VISIBLE FROM OUTSIDE.
  *
  *  1. THEY TAKE THE LOCK.  In a CONFIG_MTD_RTL819X_WRITE image they issue a
- *     transaction, so they have to.  🔴 AND THAT IS WHY `trywrite` BELOW NO
+ *     transaction, so they have to.  NOTE: AND THAT IS WHY `trywrite` BELOW NO
  *     LONGER HOLDS IT: rtl819x_spi_lock is not recursive, so the old shape --
  *     verb takes the lock, then calls through the pointers -- would have
  *     DEADLOCKED on the first boot of the first write image, inside the one
- *     verb whose job is to show the refusal works.  量 is impossible here (no
+ *     verb whose job is to show the refusal works.  MEASURED is impossible here (no
  *     committed image links the TU), so this is a defect only reading finds,
  *     and it is recorded rather than quietly fixed.
  *  2. THE ATTEMPT AND THE REFUSAL ARE COUNTED SEPARATELY.  n_write_refused
@@ -1581,8 +1317,8 @@ static struct mtd_info rtl819x_spi_mtd = {
 	 * separately from the odd-minor rule at :73, and mtdblock.c:421 reads
 	 * the same flag to mark the block device read-only.
 	 *
-	 * 🔄 R8b item 4's W4 RE-DECIDED THIS AND KEPT IT, WHICH IS A DECISION
-	 * AND NOT AN OMISSION.  量 from the tree that builds: MTD_CAP_ROM is 0
+	 * UPDATE: R8b item 4's W4 RE-DECIDED THIS AND KEPT IT, WHICH IS A DECISION
+	 * AND NOT AN OMISSION.  MEASURED from the tree that builds: MTD_CAP_ROM is 0
 	 * and MTD_WRITEABLE is 0x400 (include/mtd/mtd-abi.h:35, :29), and the
 	 * vendor's own spi_chip_setup sets MTD_CAP_NORFLASH =
 	 * MTD_WRITEABLE|MTD_BIT_WRITEABLE on ITS partitions (spi_probe.c:94).
@@ -1595,18 +1331,18 @@ static struct mtd_info rtl819x_spi_mtd = {
 	 * through this file's own verbs, and mtdchar and mtdblock stay outside
 	 * the trust boundary entirely.
 	 *
-	 * ⚠️ THE OTHER ALTERNATIVE REJECTED: flipping the flag at run time
+	 * CAUTION: THE OTHER ALTERNATIVE REJECTED: flipping the flag at run time
 	 * inside the arm verb.  mtd_open reads it ONCE, at open(), and
 	 * mtdblock.c:421 caches it into dev->readonly at add time -- so a
 	 * descriptor opened while armed would stay writable after the disarm,
 	 * and whether the refusal held would depend on WHEN the open happened.
 	 * A guard whose answer depends on timing is not a guard.
 	 *
-	 * 🔴 L3 STILL HAS NEVER BEEN OBSERVED FIRING, here or anywhere in this
+	 * NOTE: L3 STILL HAS NEVER BEEN OBSERVED FIRING, here or anywhere in this
 	 * project, and W4 does not change that: observing :94 needs an even
 	 * char minor over THIS device, which mkinitramfs refuses -- correctly,
 	 * since it can check the odd-minor rule from a declaration and cannot
-	 * check mtd->flags.  So L3 is 讀 and stays 讀. */
+	 * check mtd->flags.  So L3 is READ and stays READ. */
 	.flags		= MTD_CAP_ROM,
 	.size		= RTL819X_SPI_SIZE,
 	.erasesize	= RTL819X_SPI_ERASESIZE,
@@ -1753,7 +1489,7 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 		       rtl819x_spi_map_jiffies);
 
 	/* ---------------------------------------------------------------
-	 * 🔴 THE BUDGET, AND IT ARRIVES WITH THE FIRST FIELDS THAT NEEDED IT.
+	 * NOTE: THE BUDGET, AND IT ARRIVES WITH THE FIRST FIELDS THAT NEEDED IT.
 	 *
 	 * This handler is a 2.6.30 read_proc_t: it sprintf()s into ONE page
 	 * and there is no bounds check in that interface.  The header has
@@ -1763,7 +1499,7 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 	 * grows with a loop.  This file's output grows when someone adds a
 	 * field, which is slower and just as unbounded.
 	 *
-	 * 量, before the fields below were written: the worst case this
+	 * MEASURED, before the fields below were written: the worst case this
 	 * handler could already produce is 1,101 bytes -- every %lu at ten
 	 * digits, every %d at -2147483648, and the printed-digest branch
 	 * taken, which is the widest of its three.  The SIXTEEN fields below
@@ -1779,7 +1515,7 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 	 *
 	 * It guards what FOLLOWS it and nothing above, which is stated
 	 * rather than left to be discovered: retro-fitting a check to 48
-	 * existing sprintf()s would be a large edit to code that is 量 to
+	 * existing sprintf()s would be a large edit to code that is MEASURED to
 	 * fit, and a large edit to working code is its own risk. */
 	if (len + RTL819X_SPI_PROC_RESERVE <= RTL819X_SPI_PROC_BUDGET) {
 		/* `MT-ID`, and putting it here turns a host-side check into a
@@ -1847,7 +1583,7 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 		 * is the discriminator; `unarmed_rc` is what MT-FLASH-2 and any
 		 * trywrite gate compare against.  They are inside the budget's
 		 * guarded block, so RESERVE covers them: four lines at under 32
-		 * bytes is 128 against 512 - 380 = 132 of slack, which is 量 by
+		 * bytes is 128 against 512 - 380 = 132 of slack, which is MEASURED by
 		 * proc_bytes_before_this_line and not by this arithmetic. */
 #ifdef CONFIG_MTD_RTL819X_WRITE
 		len += sprintf(page + len, "wr_linked 1\n");
@@ -1866,7 +1602,7 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 #ifdef CONFIG_MTD_RTL819X_WRITE
 	/* The write TU's own fields, behind a SECOND budget check with the TU's
 	 * own declared maximum.  A separate `if` and not folded into the one
-	 * above on purpose: that block is 量 to fit and this one is in no image
+	 * above on purpose: that block is MEASURED to fit and this one is in no image
 	 * yet, so a reader can see which of the two ran out of room.  Its
 	 * wr_truncated, like the install block's inst_truncated, prints either
 	 * way: a short answer must never be ambiguous ("no room"/"nothing"). */
@@ -1892,7 +1628,7 @@ static int rtl819x_spi_read_proc(char *page, char **start, off_t off,
 /* ------------------------------------------------------------------------
  * The map's own /proc file.
  *
- * 🔴 A SECOND file rather than more lines in the first one, and that is a
+ * NOTE: A SECOND file rather than more lines in the first one, and that is a
  * decision with a measured reason.  Every card in this project predicts the
  * BYTE COUNT of its captures -- seating 16's ten boot captures were 1,318
  * bytes against a prediction of 1,318 -- and every one of the seating's
@@ -1955,7 +1691,7 @@ static int rtl819x_spi_map_read_proc(char *page, char **start, off_t off,
 	 * diff two captures line for line.
 	 *
 	 * 80 is the terminal width and that is safe here, measured rather than
-	 * assumed: FW-49 (量 2026-09-08, over 762 committed captures) found
+	 * assumed: FW-49 (MEASURED 2026-09-08, over 762 committed captures) found
 	 * that only the ECHO of a typed line is wrapped -- by busybox ash's
 	 * line editor, 33 times, always with len(sent) >= 80 -- while OUTPUT
 	 * is not, an 88-character /proc/version line arriving whole in five
@@ -2025,7 +1761,7 @@ static int rtl819x_spi_verb_probe(void)
  * ComSrlCmd_RDID does.  Both halves of that sentence were wrong, and the
  * second one was wrong in a way that hid the answer.
  *
- *  1. 🔴 THIS DRIVER HAS NEVER HAD SUCH A CONTRACT.  It writes SFCR on
+ *  1. NOTE: THIS DRIVER HAS NEVER HAD SUCH A CONTRACT.  It writes SFCR on
  *     every transaction, at rtl819x_spi_release().  The only "never writes
  *     it" in this file is about SFCSR's CMD_BYTE field.  The true invariant
  *     is narrower and stronger: SFCR is only ever written back with the
@@ -2033,7 +1769,7 @@ static int rtl819x_spi_verb_probe(void)
  *     driver's own choosing -- and release()'s read-back is what enforces
  *     it rather than asserts it.  This verb keeps that invariant exactly.
  *
- *  2. 🔴 THE LOADER'S SFCR WRITE IS NOT PART OF THE TRANSACTION.  讀, from
+ *  2. NOTE: THE LOADER'S SFCR WRITE IS NOT PART OF THE TRANSACTION.  READ, from
  *     a fresh disassembly of the FULL routine -- the excerpt quoted in
  *     `docs/loader-flash-write.md` begins at 0x8040591C, which is 96 bytes
  *     and 24 instructions into a routine that starts at 0x804058BC, and
@@ -2052,7 +1788,7 @@ static int rtl819x_spi_verb_probe(void)
  *     write.  So the SFCR write is bus setup performed at probe time, when
  *     the divider is unknown -- not a step the opcode needs.
  *
- *  3. AND UNDER LINUX THE DIVIDER IS ALREADY THAT VALUE.  量, seating 16:
+ *  3. AND UNDER LINUX THE DIVIDER IS ALREADY THAT VALUE.  MEASURED, seating 16:
  *     boot_sfcr reads FFC00000, which is the exact word ComSrlCmd_RDID
  *     writes, because spi_regist calls it twice at device_initcall and it
  *     is the only function in the whole image that writes that register.
@@ -2151,7 +1887,7 @@ out:
  * nothing, and it would not be written.
  *
  * ------------------------------------------------------------------------
- * THE STRUCTURE, 讀 FROM THE VENDOR'S OWN SOURCE, AND THE FOUR PLACES THE
+ * THE STRUCTURE, READ FROM THE VENDOR'S OWN SOURCE, AND THE FOUR PLACES THE
  * DESIGN DOCUMENT WAS WRONG OR SILENT
  * ------------------------------------------------------------------------
  *
@@ -2160,7 +1896,7 @@ out:
  *   +0x0006  .  body      -- boardVer(1), nic0Addr[6], nic1Addr[6], ...
  *   +0x0006+len-1  1      -- the checksum byte
  *
- *  1. 🔴 `len` IS BIG-ENDIAN AND §4 DOES NOT SAY SO.  The device stores it
+ *  1. NOTE: `len` IS BIG-ENDIAN AND §4 DOES NOT SAY SO.  The device stores it
  *     in native order and this part is big-endian; the proof is the x86
  *     HOST builder, which swaps on the way in -- `cvcfg.c:635`,
  *     `Header.len = WORD_SWAP(Header.len);//important!`, and again at :1794,
@@ -2168,7 +1904,7 @@ out:
  *     length that runs off the end of the window.  This reads it byte by
  *     byte so the order is written down rather than inherited.
  *
- *  2. 🔴 THE VENDOR BOUNDS `len` FROM BELOW ONLY.  `apmib.c:469` refuses
+ *  2. NOTE: THE VENDOR BOUNDS `len` FROM BELOW ONLY.  `apmib.c:469` refuses
  *     `len < sizeof(HW_SETTING_T)+1` and compares it against nothing else;
  *     `HW_SETTING_SECTOR_LEN` appears only on the COMPRESSED path
  *     (`apmib.c:369`, `:1626`).  So a corrupt length makes the vendor read
@@ -2176,7 +1912,7 @@ out:
  *     The clamp below is this driver's, not the vendor's, and it is what
  *     keeps every access inside the 8 KiB that was read.
  *
- *  3. 🔴 THE CHECKSUM FORMULA IS AT `apmib.h:1833`, NOT `apmib.c:547`.
+ *  3. NOTE: THE CHECKSUM FORMULA IS AT `apmib.h:1833`, NOT `apmib.c:547`.
  *     §4 cites the call site.  The arithmetic §4 states is right:
  *     CHECKSUM sums bytes into an `unsigned char` and returns `~sum + 1`,
  *     so CHECKSUM_OK's invariant is that the sum over all `len` body bytes,
@@ -2185,7 +1921,7 @@ out:
  *     and `:547` checksums that same buffer, and `/bin/flash`'s own
  *     `flash.c:2946-2951` does the identical thing independently.
  *
- *  4. ⚠️ "H6" IS NOT THE ONLY TAG THE VENDOR ACCEPTS.  `apmib.c:338` also
+ *  4. CAUTION: "H6" IS NOT THE ONLY TAG THE VENDOR ACCEPTS.  `apmib.c:338` also
  *     takes "Hf" and "Hu", and anything else means a COMPRESSED block with
  *     a different layout, not a corrupt one.  So `hw_sig_ok 0` here means
  *     *not the uncompressed H6 form*.  It is a stricter test than the
@@ -2214,7 +1950,7 @@ static int rtl819x_spi_verb_h601(void)
 	u8 sum = 0;
 	const u8 *body, *mac;
 
-	/* 🔴 EVERY VERDICT IS CLEARED FIRST, and that is not tidiness.  These
+	/* NOTE: EVERY VERDICT IS CLEARED FIRST, and that is not tidiness.  These
 	 * are file statics, and the two MAC booleans are OR-accumulated in a
 	 * loop that only ever writes 1.  Without this, a second run against a
 	 * blanked block would inherit the first run's `mac_not_zero 1` and
@@ -2290,7 +2026,7 @@ static int rtl819x_spi_verb_h601(void)
 	 * bit here says the block does not hold a usable station MAC. */
 	rtl819x_spi_h601_mac_group_bit = mac[0] & 1u;
 out:
-	/* 🔴 The buffer held this unit's MAC.  Zero it before freeing: the
+	/* NOTE: The buffer held this unit's MAC.  Zero it before freeing: the
 	 * page goes back to the allocator, and MEM-17 measured this DRAM
 	 * keeping a previous power cycle's contents. */
 	memset(buf, 0, RTL819X_SPI_H601_SIZE);
@@ -2345,12 +2081,12 @@ static int rtl819x_spi_verb_wedge(void)
 /* `trywrite` reaches layer L2 ON THE SILICON, which is the closest this image
  * can get to observing a write refusal by this driver.
  *
- * 🔴 WHY NOT L3, WHICH IS THE ONE THAT HAS NEVER FIRED ANYWHERE.  mtdchar's
+ * NOTE: WHY NOT L3, WHICH IS THE ONE THAT HAS NEVER FIRED ANYWHERE.  mtdchar's
  * :94 refusal -- `!(mtd->flags & MTD_WRITEABLE)` -- needs an EVEN char minor,
  * and tools/mkinitramfs.py refuses to declare one: it can check the odd-minor
  * rule from the declaration and cannot check mtd->flags, which is a run-time
  * property of this driver.  That refusal was accepted rather than argued with.
- * So :94 stays 讀, and this verb observes the layer immediately behind it.
+ * So :94 stays READ, and this verb observes the layer immediately behind it.
  *
  * It calls through the mtd_info's own function pointers rather than the
  * functions directly, so what is exercised is the path the MTD core takes.
@@ -2365,7 +2101,7 @@ static int rtl819x_spi_verb_trywrite(void)
 	u8 b = 0;
 	int rcw, rce, ok;
 
-	/* 🔴 NO mutex AROUND THIS SINCE R8b ITEM 4, and that is why the
+	/* NOTE: NO mutex AROUND THIS SINCE R8b ITEM 4, and that is why the
 	 * restructuring was not cosmetic.  mtd->write and mtd->erase now take
 	 * rtl819x_spi_lock themselves -- they must, because in a write image
 	 * they issue a transaction -- and this mutex is not recursive, so the
@@ -2387,7 +2123,7 @@ static int rtl819x_spi_verb_trywrite(void)
 	ei.len = RTL819X_SPI_ERASESIZE;
 	rce = rtl819x_spi_mtd.erase(&rtl819x_spi_mtd, &ei);
 
-	/* 🔴 THE EXPECTED ERRNO IS NOT unarmed_rc IN A WRITE IMAGE, and getting
+	/* NOTE: THE EXPECTED ERRNO IS NOT unarmed_rc IN A WRITE IMAGE, and getting
 	 * that wrong would have made this verb FAIL ON A CORRECT REFUSAL.  Both
 	 * calls are at offset 0, which is inside the forbidden window, so the
 	 * write TU refuses them FORBIDDEN (-EPERM) and never reaches the arming
@@ -2417,11 +2153,11 @@ static int rtl819x_spi_verb_trywrite(void)
  * with an end pointer like every other verb in this file -- simple_strtoul
  * with a NULL end returns 0 for a malformed field, and 0 is a legal address.
  *
- * 🔴 NO DEFAULTS.  An omitted field is -EINVAL and not a zero: `arm 20000`
+ * NOTE: NO DEFAULTS.  An omitted field is -EINVAL and not a zero: `arm 20000`
  * must not arm [0x20000, 0) with budget 0, and it must not arm the whole chip
  * either.  The owner types all three or nothing is armed.
  *
- * 🔴 AND THE VERB IS NOT THE AUTHORISATION.  CLAUDE.md's dated `owner-yes` per
+ * NOTE: AND THE VERB IS NOT THE AUTHORISATION.  CLAUDE.md's dated `owner-yes` per
  * exact payload is; this is the mechanism that makes an UNDECLARED write
  * impossible rather than merely discouraged.  rlxfw_spi_wr_chk_arm() refuses a
  * window overlapping the loader or H601 here, and every use refuses it again,
@@ -2485,7 +2221,7 @@ static int rtl819x_spi_verb_arm(const char *arg)
  *  - The payload's own declaration must name this region: a container's
  *    signed flash_at and flash_form (WHOL); a cr6c's burnAddr, plus
  *    check_image()'s zero 16-bit sum.
- *  - 🔴 EVERY install/erase verb, whatever its outcome, a refusal included,
+ *  - NOTE: EVERY install/erase verb, whatever its outcome, a refusal included,
  *    ends DISARMED.  One arm, one attempt: a retry re-types both statements.
  *
  * WHY THE WRITES DO NOT GO THROUGH rtl819x_spi_write_page/_erase_sector.
@@ -2518,7 +2254,7 @@ static int rtl819x_spi_verb_arm(const char *arg)
  * re-erases the block with the step its own verdict proves, and verifies.
  *
  * WHAT THIS DOES NOT ESTABLISH.  That any of it works on this die: no line
- * below has run anywhere.  That RTL819X_SPI_WIP_SPINS (推) outlasts an erase
+ * below has run anywhere.  That RTL819X_SPI_WIP_SPINS (INFERRED) outlasts an erase
  * of this part: if it does not, the install stops with ENGINE, n_wip_timeout
  * moves, and the region is left erased and invalid -- the safe failure, but
  * a failure.  That a container's signature is valid: D7's optional in-kernel
@@ -3304,7 +3040,7 @@ static int rtl819x_spi_write_proc(struct file *file, const char __user *buffer,
  * late_initcall, and the level is a decision rather than a habit:
  *
  *  - the vendor's map driver is module_init, i.e. device_initcall, and it
- *    registers TWO partitions (量 from the baseline: CONFIG_ROOTFS_SQUASH
+ *    registers TWO partitions (MEASURED from the baseline: CONFIG_ROOTFS_SQUASH
  *    with no dual image selects the two-entry rtl8196_parts1[] --
  *    "boot+cfg+linux" 0x130000 and "root fs" 0x2D0000, which re-derives
  *    FW-34's 1,245,184 and 2,949,120 exactly).  Registering BEFORE it would
@@ -3330,10 +3066,10 @@ static int __init rtl819x_spi_init(void)
 	rtl819x_spi_boot_sfcr2 = rtl819x_spi_rd(RTL819X_SFCR2);
 	rtl819x_spi_boot_sfcsr = rtl819x_spi_rd(RTL819X_SFCSR);
 
-	/* S1 IS THE PREDICTION.  讀 from the r54 artefact says FFC00000
+	/* S1 IS THE PREDICTION.  READ from the r54 artefact says FFC00000
 	 * (ComSrlCmd_RDID, SPI_CLK_DIV 7, divisor 16); REG-13 measured
 	 * 3FC00000 at the loader prompt (divisor 4).  This mark is what makes
-	 * the first of those 量 -- or refutes it. */
+	 * the first of those MEASURED -- or refutes it. */
 	rlxfw_markx("S1", rtl819x_spi_boot_sfcr);
 	rlxfw_markx("S2", rtl819x_spi_boot_sfcr2);
 	rlxfw_markx("S3", rtl819x_spi_boot_sfcsr);
@@ -3342,7 +3078,7 @@ static int __init rtl819x_spi_init(void)
 	rlxfw_markx("S4", (unsigned)rtl819x_spi_kat_rc);
 
 	rtl819x_spi_add_rc = add_mtd_device(&rtl819x_spi_mtd);
-	/* add_mtd_device returns 1 on failure in 2.6.30 -- 讀
+	/* add_mtd_device returns 1 on failure in 2.6.30 -- READ
 	 * drivers/mtd/mtdcore.c, it returns 0 on success and 1 when no slot
 	 * is free -- so this is not the usual errno convention and is not
 	 * written as one. */

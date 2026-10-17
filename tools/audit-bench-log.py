@@ -237,7 +237,7 @@ ALLOW = [
     ("line", "S-H601=",
      "rtl819x-spi 1.2's `h601` VERB mark, a fourth string carrying the "
      "region's name and a sibling of RLXFW-S-MH601 above -- which does not "
-     "cover it, the two tags differing by one letter. 讀 rtl819x-spi.c:1919, "
+     "cover it, the two tags differing by one letter. 讀 rtl819x-spi.c:2034, "
      "`rlxfw_markx(\"S-H601\", (unsigned)rtl819x_spi_h601_rc)`: the value is "
      "the verb's RETURN CODE and never a byte of the window; the driver emits "
      "booleans, a version and a structure size for that region and nothing "

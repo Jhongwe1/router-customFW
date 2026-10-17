@@ -6,7 +6,8 @@ with [`rtl819x-spi-write.c`](../../kernel/linux-2.6.30/drivers/mtd/devices/rtl81
 [`rtl819x-spi-install.h`](../../kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h) ·
 reasoning and every reading: [`notes/spi-mtd-driver.md`](../../notes/spi-mtd-driver.md) ·
 the flash rule: [ADR-006](../decisions/ADR-006-flash-write-rule.md) ·
-the file heads until 2026-10-18, verbatim: [`rtl819x-spi-write.c`](spi-write-history.md)
+the file heads until 2026-10-18, verbatim: [`rtl819x-spi.c`](spi-history.md),
+[`rtl819x-spi-write.c`](spi-write-history.md)
 
 ## What it does
 
