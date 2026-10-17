@@ -263,7 +263,7 @@ produced by the system package.
 loader path via `/etc/ld.so.conf.d/zz_i386-biarch-compat.conf`. This is the same
 mechanism that put the 32-bit libc there: `/lib32/libc.so.6` comes from
 `libc6-i386`, also an amd64 package. **`dpkg --add-architecture i386` is not
-required**, and `plan/`'s Dockerfile sketch (`zlib1g:i386`) asks for more than
+required**, and the plan's Dockerfile sketch (unpublished; `zlib1g:i386`) asks for more than
 the job needs.
 
 量, in this order:
