@@ -1,7 +1,7 @@
 # Known issues
 
 **What this repository does not establish.**
-`plan/CHARTER.md` §110 rule 2 asks for a known-issues list beside every release.
+[`charter.md`](charter.md) § *Releases*, rule 2, asks for a known-issues list beside every release.
 This is that list, and it is written to the same standard as everything else
 here: each entry names what is *not* true, what was measured instead, and which
 gate changes it. Nothing below is a plan; the plan is `PROGRESS.md`'s gate board.
