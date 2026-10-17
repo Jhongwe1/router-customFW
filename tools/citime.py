@@ -50,8 +50,10 @@ THE SERIES IS DERIVED, NOT MAINTAINED
 `LOG.md` and never into the owner.  A hand-maintained list has exactly that
 failure mode.  `citime record` writes rows into `tools/ci-suite-cost.tsv` from
 `gh`, `citime stats` recomputes n and the band from the file, and
-`citime check` asks GitHub which runs have no row here -- so a missed segment
-is a red line rather than a number that quietly stops moving.
+`citime check` asks GitHub which runs of ci.yml have no row here -- so a missed
+segment is a red line rather than a number that quietly stops moving.  Both
+`check` and `record --last` list ci.yml's runs alone (CI_WORKFLOW): build.yml's
+carry none of this table's jobs.
 
 CONTROLS
 --------
@@ -402,6 +404,13 @@ def write_tsv(path, rows):
     os.replace(tmp, path)
 
 
+# The workflow this table times.  .github/workflows/build.yml runs on the same
+# pushes and carries none of these jobs: listed unfiltered, `record --last`
+# would write it rows of NaN and `check` would call every build run missing.
+# P23 is the control.
+CI_WORKFLOW = "ci.yml"
+
+
 def _gh(args):
     r = subprocess.run(["gh"] + args, capture_output=True, text=True)
     if r.returncode != 0:
@@ -415,7 +424,8 @@ def cmd_record(a, gh=None):
     ids = list(a.runs)
     named = set(ids)
     if a.last:
-        listing = gh(["run", "list", "--limit", str(a.last),
+        listing = gh(["run", "list", "--workflow", CI_WORKFLOW,
+                      "--limit", str(a.last),
                       "--json", "databaseId,conclusion"])
         ids += [str(r["databaseId"]) for r in listing
                 if r["conclusion"] == "success"]
@@ -778,10 +788,12 @@ def cmd_segments(a):
     return 1 if bad else 0
 
 
-def cmd_check(a):
+def cmd_check(a, gh=None):
+    gh = gh or _gh      # injected by P23
     rows = {r["run_id"] for r in read_tsv(a.tsv)}
-    listing = _gh(["run", "list", "--limit", str(a.last),
-                   "--json", "databaseId,conclusion,createdAt,headSha"])
+    listing = gh(["run", "list", "--workflow", CI_WORKFLOW,
+                  "--limit", str(a.last),
+                  "--json", "databaseId,conclusion,createdAt,headSha"])
     missing = [r for r in listing
                if r["conclusion"] == "success" and str(r["databaseId"]) not in rows]
     print("%d successful runs in the last %d; %d have a row here; %d missing"
@@ -1289,6 +1301,38 @@ def selftest():
             rc, kept, _ = _record(d, "ok.tsv", _new_run(999003, 1131), ["999003"])
             assert rc == 0 and kept, ("the permitting half", rc, kept)
     case("P22", "a named run refused makes record exit 2; under --last it does not", p22)
+
+    # P23 -- the listing is ci.yml's alone (CI_WORKFLOW).  The spy reads the
+    # arguments `record --last` and `check` each hand `gh run list`; without
+    # the filter, build.yml's runs reach both.
+    def p23():
+        import contextlib
+        import io
+        seen = []
+
+        def gh(args):
+            assert args[:2] == ["run", "list"], ("only the listing", args)
+            seen.append(list(args))
+            return []
+
+        class _A:
+            pass
+        a = _A()
+        a.runs, a.last, a.force = [], 5, False
+        with tempfile.TemporaryDirectory() as d:
+            a.tsv = os.path.join(d, "l.tsv")
+            write_tsv(a.tsv, _ledger())
+            with contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                try:
+                    cmd_record(a, gh=gh)
+                except SystemExit:
+                    pass                # an empty listing: nothing to record
+                cmd_check(a, gh=gh)
+        assert len(seen) == 2, ("one listing each", seen)
+        for s in seen:
+            assert "--workflow" in s and s[s.index("--workflow") + 1] == CI_WORKFLOW, s
+    case("P23", "record --last and check list ci.yml's runs alone", p23)
 
     for cid, what in ok:
         print("  ok   %-4s %s" % (cid, what))
