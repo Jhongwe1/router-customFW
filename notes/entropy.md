@@ -490,8 +490,8 @@ attributable to this change and not to the burst.
 * **Not that the pool stays ≥ 128.** Readers consume it. R7's rule is *seen
   once*, which this satisfies.
 * **Not anything about `loud` or `quiet-swcore`.** Only `quiet` was built.
-* **Not that the image boots.** § 8 is a compile-and-link result; no line of
-  this has run on silicon.
+* **Not that the image boots.** § 8 is a compile-and-link result, and when it was written no line of
+  this had run on silicon; it has since, on 2026-09-30 (`SPEC.md` `FW-179`, and its residual `FW-180`).
 
 ## 7. Open — 未定
 

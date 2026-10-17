@@ -947,7 +947,7 @@ would need a negative deficit and `2^20` would need 553,632.
 *inside* the range and inert for the timeout. The same scan confirms
 bit 22 = `2^17` and bit 18 = `2^23`, each uniquely.
 
-### 11.2 🟢🟢 The mechanism: `bite` clears the counter and `biteraw` does not
+### 11.2 🟢🟢 The mechanism: `bite` clears the counter and `biteraw` does not — 🔄 its 1.456 ms repeatability is `n = 2`; at `n = 3` the spread is 34.622 ms and the control 3.8x (seating 19, § 3.4)
 
 🔴 **Found because the card got a column wrong.** § 3.3 of the card tabled the
 arming words as `00000000` / `00600000` / `00040000` / `00240000`. The board
@@ -976,7 +976,7 @@ reading cannot tell `OVSEL` 0 from `OVSEL` 1. Bits 16, 20, 21 and 23 stay
 ambiguous. `kickms 5000` before the `biteraw` fixes it for one extra command
 per cell.
 
-### 11.3 🔴 Four rungs refute the linear model, and `OVSEL` 3 is the outlier twice
+### 11.3 🔴 Four rungs refute the linear model, and `OVSEL` 3 is the outlier twice — 🔄 seating 19: three of the four residuals sit inside the jitter, so the model is undetermined, not refuted (§ 3.4)
 
     OVSEL 0      163.911 ms        OVSEL 8   41,910.358 ms
     OVSEL 3    1,340.982 ms        OVSEL 9   84,001.412 ms

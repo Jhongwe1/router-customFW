@@ -19,12 +19,12 @@ its four TX descriptor rings, its six RX pkthdr rings and one RX mbuf ring, its
 interrupt on LOPI line 12, a NAPI poll, and a `net_device` called `rlx0`. It
 ships **inert** — every hardware write is behind a `/proc` verb *and* behind a
 runtime unlock, so `n_writes` reading 0 on a boot capture is a measurement and
-not a promise. The vendor's Ethernet driver stays in the image and is never
-opened; that is a deliberate arrangement and § 1 says why.
+not a promise. Since `R6b-8` 8g the mainline image does not build the vendor's Ethernet driver
+(`CONFIG_RTL_819X_SWCORE=n`, [known issue 19](../docs/known-issues/19-no-vendor-ethernet-driver.md)), and `rlxfw-seam.c` makes its probe's two disarm writes; § 1 is why it stayed until then.
 
 ---
 
-## 1. Why the vendor's driver stays in the image
+## 1. Why the vendor's driver stayed in the image until `R6b-8`
 
 It would be natural to remove it — `R6-4`'s DoD even asks for *"my driver bound
 and the vendor's **not** loaded"*. **Removing it is the dangerous choice**, and
