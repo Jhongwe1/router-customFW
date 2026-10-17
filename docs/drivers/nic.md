@@ -3,7 +3,8 @@
 Source: [`rtl819x-nic.c`](../../kernel/linux-2.6.30/drivers/net/rtl819x-nic.c), version 1.6, with
 [`rtl819x-nic-tx.h`](../../kernel/linux-2.6.30/drivers/net/rtl819x-nic-tx.h) ·
 reasoning and every reading: [`notes/nic-driver.md`](../../notes/nic-driver.md) ·
-against the vendor's driver, field by field: [`docs/nic-vendor-diff.md`](../nic-vendor-diff.md)
+against the vendor's driver, field by field: [`docs/nic-vendor-diff.md`](../nic-vendor-diff.md) ·
+the file heads until 2026-10-18, verbatim: [`rlxfw-seam.c`](seam-history.md)
 
 ## What it does
 
