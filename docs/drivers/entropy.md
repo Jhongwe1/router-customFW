@@ -3,7 +3,8 @@
 Source: [`rlxfw-entropy.c`](../../kernel/linux-2.6.30/drivers/char/rlxfw-entropy.c), version 1.0, with
 [`rlxfw-entropy.h`](../../kernel/linux-2.6.30/include/linux/rlxfw-entropy.h) and
 [`0009-random-rlxfw-input.patch`](../../config/host-compat/0009-random-rlxfw-input.patch) ·
-reasoning and every reading: [`notes/entropy.md`](../../notes/entropy.md)
+reasoning and every reading: [`notes/entropy.md`](../../notes/entropy.md) ·
+the file head until 2026-10-18, verbatim: [`rlxfw-entropy.c`](entropy-history.md)
 
 ## What it does
 
