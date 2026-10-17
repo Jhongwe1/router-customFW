@@ -14,7 +14,7 @@ and the table disagree, the table is right and this document is stale.
 ## 0. What it does not claim
 
 **Does not claim that a row which does not trap is an instruction this core
-has.** `plan/router-rebuild-plan.md:716-719` (D14-5) says it in the strongest
+has.** The plan's `D14`, rule 5 ([`method.md`](method.md) § *Codegen and the ISA: bare metal only*), says it in the strongest
 terms the plan uses: *「沒有 trap」不構成「支援」的證據*. A row whose expected
 constant is `-` can only ever report that it did not trap, and it gets its own
 verdict word — `RAN` — rather than being folded into `RIGHT`.
@@ -300,11 +300,11 @@ because the value that was thrown away is the one that turns out to be needed.
 
 | | control | where |
 |---|---|---|
-| positive | the `baseline` group must read `RIGHT` | `plan:1013`, `:1074` |
-| C1 | `break` must trap — the handler is reached and returns | `plan`; 量 `bench/2026-08-25b` |
+| positive | the `baseline` group must read `RIGHT` | the plan's `R1` acceptance (unpublished) |
+| C1 | `break` must trap — the handler is reached and returns | the plan (unpublished); 量 `bench/2026-08-25b` |
 | ~~C2~~ **C5** | `special0e` must trap, ExcCode 10 | 量 `bench/2026-08-30`; renumbered 2026-09-15, below |
 | C3 | the four `cache` op values must **not** trap, in the same capture | 量 same boot |
-| C4 | the qemu arm, run and recorded first | `plan/DAY-ZERO.md:603` |
+| C4 | the qemu arm, run and recorded first | the plan's day-zero list (unpublished), quoted in [`isa-hazard.md`](isa-hazard.md) § 5 |
 
 🔄 **2026-09-15: `C2` is renumbered `C5`, because one id meant two
 different controls inside one instrument's documentation.** The second arm
