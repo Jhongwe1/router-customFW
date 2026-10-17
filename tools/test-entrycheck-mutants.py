@@ -13,9 +13,11 @@ WHAT IT COVERS, AND WHAT IT DOES NOT
 ------------------------------------
 Thirteen rows of the DoD are mutated here: E1's boundary, E2's CJK rule, E5's
 escaped pipe, E6's badge rule, E8w's large flag, E10's per-section limit, E14's
-`if: false`, E14w's whole-line match, E15's hop limit, E16's path-start rule,
-E17's directory-free driver pattern, E19's qemu transcripts as records, and
-E21's term list -- plus the by-name exemption mechanism E16, E19 and E21
+`if: false` and the workflows it reads (every file directly under
+.github/workflows/, MN15 and MN16), E14w's whole-line match, E15's hop limit,
+E16's path-start rule, E17's directory-free driver pattern, E19's qemu
+transcripts as records, and E21's term list -- plus the by-name exemption
+mechanism E16, E19 and E21
 share (CLAUDE.md's exemption from E16 and E19 is the case it names).  The
 other rows' controls are self-test cases that no mutant here exercises: E3,
 E4, E7, E8, E9, E11, E12, E13, E18 and E20.
@@ -95,6 +97,12 @@ MUT = [
     ("MN14 a by-name exemption is never applied                (kills E16p)",
      "        if p in names:\n            continue",
      "        if False:\n            continue"),
+    ("MN15 E14 reads ci.yml alone                              (kills E14b)",
+     '                  and p.endswith((".yml", ".yaml")))',
+     '                  and p.endswith("/ci.yml"))'),
+    ("MN16 E14 reads a workflow in a subdirectory              (kills E14s)",
+     '                  if p.startswith(WORKFLOWS) and "/" not in p[len(WORKFLOWS):]',
+     '                  if p.startswith(WORKFLOWS)'),
 
     # ---- the verdict logic -----------------------------------------------
     ("MV1  an UNMEASURED online row passes check               (kills U1)",

@@ -926,7 +926,7 @@ def _recipe_script(line: str) -> str:
     return line.replace("$$", "$")
 
 
-def find_suites(tree: Tree, doc):
+def find_suites(tree: Tree, doc, wfname: str = "ci.yml"):
     """{'userspace': [...], 'rlxboot': [...]}: where the workflow runs each."""
     found = {"userspace": [], "rlxboot": []}
     src_rules, _ = makefile_rules(tree.text("src/Makefile") or "")
@@ -988,7 +988,7 @@ def find_suites(tree: Tree, doc):
             wd = step.get("working-directory")
             cwd = posixpath.normpath(wd) if isinstance(wd, str) and wd else ""
             cwd = "" if cwd == "." else cwd
-            where = f"job `{jname}` step {k}"
+            where = f"{wfname} job `{jname}` step {k}"
             for argv in shell_commands(str(step["run"])):
                 cwd = take(argv, cwd, where, 0)
     return found, None
@@ -1402,19 +1402,40 @@ def e13(tree, inp):
             [", ".join(map(str, names))] if names else [])
 
 
+WORKFLOWS = ".github/workflows/"
+
+
+def workflow_files(tree):
+    """The workflow files GitHub runs: tracked .yml and .yaml directly under
+    .github/workflows/, sorted.  GitHub reads no subdirectory of it."""
+    return sorted(p for p in tree.files
+                  if p.startswith(WORKFLOWS) and "/" not in p[len(WORKFLOWS):]
+                  and p.endswith((".yml", ".yaml")))
+
+
 def e14(tree, inp):
-    wf = ".github/workflows/ci.yml"
-    t = _need(tree, wf)
-    if t is None:
-        return UNMEASURED, f"{wf} is not tracked", []
-    try:
-        doc = yaml_blocks(t)
-    except ValueError as e:
-        return UNMEASURED, f"cannot read {wf}", [str(e)]
-    found, why = find_suites(tree, doc)
-    if why:
-        return UNMEASURED, why, []
-    ev = []
+    # Every workflow, not ci.yml alone: P5e-4 puts the code in a workflow of
+    # its own so that one badge reports code, and the row asks for a CI job
+    # that builds and tests it, wherever that job is declared.
+    wfs = workflow_files(tree)
+    if not wfs:
+        return UNMEASURED, f"no workflow under {WORKFLOWS}", []
+    found = {"userspace": [], "rlxboot": []}
+    for wf in wfs:
+        t = _need(tree, wf)
+        if t is None:
+            return UNMEASURED, f"{wf} cannot be read", []
+        try:
+            doc = yaml_blocks(t)
+        except ValueError as e:
+            return UNMEASURED, f"cannot read {wf}", [str(e)]
+        got, why = find_suites(tree, doc, posixpath.basename(wf))
+        if why:
+            return UNMEASURED, f"{wf}: {why}", []
+        for k in found:
+            found[k] += got[k]
+    ev = [f"read {len(wfs)} workflow(s): "
+          + ", ".join(posixpath.basename(w) for w in wfs)]
     for k, label in (("userspace", "userspace host suite"),
                      ("rlxboot", "rlxboot hosttest")):
         ev.append(f"{label}: " + ("; ".join(found[k][:2]) if found[k]
@@ -1720,8 +1741,10 @@ ROWS = [
         "--gh-json: the entries of repositoryTopics (null reads 0)",
         online=True),
     Row("E14", "CI builds code", "host suites wired", e14,
-        ".github/workflows/ci.yml read as block YAML: every run: of every step "
-        "whose job and step `if:` is not literally false; comment lines "
+        "every tracked .yml and .yaml directly under .github/workflows/ (GitHub "
+        "reads no subdirectory), each read as block YAML; its `on:` is not "
+        "read, so a workflow never triggered still counts. Every run: of every "
+        "step whose job and step `if:` is not literally false; comment lines "
         "dropped, continuations joined, split on && || ; | & ( ), `cd DIR` "
         "and working-directory followed. Userspace: make in src (-C, "
         "--directory or cd) with goal `test`. rlxboot: make in src/rlxboot "
@@ -2469,6 +2492,35 @@ def self_test() -> int:
                                      "-C src host test rlxboot O=/tmp/o\n"),
                           **{"src/Makefile": SRC_MAKEFILE.replace(
                               " hosttest O=$(O)/rlxboot", " payload")}))
+
+        # ---- E14 reads every workflow, not ci.yml alone (P5e-4) -------------
+        ci_none = CI_PASS.split("      - name: userspace")[0]
+        wf_rlx = ci_none + "      - name: rlxboot" + CI_PASS.split(
+            "      - name: rlxboot")[1]
+
+        def with_wf(path, data, ci=ci_none):
+            f = files_with(".github/workflows/ci.yml", ci)
+            f[path] = data
+            return f
+        verdict_case("E14b", "ci.yml runs neither suite and build.yml runs "
+                     "both", "E14", PASS,
+                     with_wf(".github/workflows/build.yml", CI_PASS))
+        verdict_case("E14e", "the same workflow named build.yaml", "E14", PASS,
+                     with_wf(".github/workflows/build.yaml", CI_PASS))
+        verdict_case("E14s", "both suites only in a workflow under a "
+                     "subdirectory, which GitHub does not run", "E14", RED,
+                     with_wf(".github/workflows/old/build.yml", CI_PASS))
+        verdict_case("E14v", "the userspace suite in ci.yml and rlxboot's in "
+                     "build.yml", "E14", PASS,
+                     with_wf(".github/workflows/build.yml", wf_rlx,
+                             ci=CI_PASS.split("      - name: rlxboot")[0]))
+        verdict_case("E14x", "a second workflow that does not parse", "E14",
+                     UNMEASURED,
+                     with_wf(".github/workflows/build.yml",
+                             "jobs:\n  b:\n    steps:\n   - run: x\n",
+                             ci=CI_PASS))
+        verdict_case("E14u", "no workflow at all", "E14", UNMEASURED,
+                     without(".github/workflows/ci.yml"))
 
         # ---- E14w: the CI log -----------------------------------------------
         on_base("E14wr", "a log without `host suite: PASS`", "E14w", RED,
