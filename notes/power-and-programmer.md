@@ -65,7 +65,7 @@ for system core power."*
 **There is one external rail.** Injecting through the flash's `VCC` pin
 therefore supplies the SoC core, the SDRAM, the five-port switch and the WLAN —
 all of it through one clip contact and one flash-pin trace. The hypothesis
-`plan/DAY-ZERO.md` recorded as *"most likely"* now has a datasheet behind it
+the plan's day-zero list (unpublished) recorded as *"most likely"* now has a datasheet behind it
 instead of intuition.
 
 ## 3. Two things about the pins that were never read out before
@@ -192,7 +192,7 @@ instead.
 
 ## 4. The decision, and why it is the right one
 
-**Not done. Category: blocked on instrumentation** (`plan/` §17, item 5), with a
+**Not done. Category: blocked on instrumentation** ([`method.md`](../docs/method.md) § *Deliberately not done*, item 5), with a
 voluntary-risk component that is stated rather than folded in.
 
 Two reasons, in the order that matters:
@@ -224,7 +224,7 @@ recorded as unmeasured rather than guessed.
 
 | | |
 |---|---|
-| **`plan/` §17 item 5** — an independent second instrument for the flash dump — **stays open**, and what it is missing is now named precisely: a clip harness whose `VCC` line can be opened, **and** a measurement that the SoC releases `SF_CS0#`/`SF_SCK` in reset | it was already open; nothing regressed |
+| **Item 5 of [`method.md`](../docs/method.md) § *Deliberately not done*** — an independent second instrument for the flash dump — **stays open**, and what it is missing is now named precisely: a clip harness whose `VCC` line can be opened, **and** a measurement that the SoC releases `SF_CS0#`/`SF_SCK` in reset | it was already open; nothing regressed |
 | **H1 against H2 is undetermined** | it was undetermined before, and this file no longer implies otherwise |
 | the recovery story is still one path — the loader's TFTP rescue | **unchanged, and it is the reason R8's rescue drill is a hard precondition rather than a nicety** |
 
