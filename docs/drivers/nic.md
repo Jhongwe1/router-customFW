@@ -50,7 +50,8 @@ prompt before any driver ran (`NET-49`).
   length from 60 to 1,514 moved `JabberErr` by 0 (entry 14); 31 minutes and 2,363,511
   frames fired no recovery while 1.4 fired 12 times in two minutes (`NET-141`).
 - 量 `R6c`: booted from a flash slot, `rlx0` pings both ways after a watchdog reset and
-  after a cold power-on (entry 22; what made it work is the switch driver's write).
+  after a cold power-on (entry 22; what made it work is the switch driver's `vlan`,
+  [the switch page](switch.md)).
 
 ## Known limits
 
