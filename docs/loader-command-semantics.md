@@ -291,7 +291,7 @@ what it appears to test.
 
 ### The literal question, answered, and the plan's row for it was stale
 
-`plan/DAY-ZERO.md` lists this as *"upstream `P9-1`, still open"*. It is not
+The plan's day-zero list (unpublished) lists this as *"upstream `P9-1`, still open"*. It is not
 open. **C closed it, refuted, with three independent static sources**, and the
 dynamic half agreed at the bench on 2026-08-17.
 
