@@ -592,7 +592,7 @@ residual, which is a free confirmation of this field map.
 
 ### 🟢🟢 `SWINTSET` puts a rung BELOW the plan's first, and it costs nothing
 
-讀 `plan/router-rebuild-plan.md:1416`, the plan's checkpoint ladder is
+讀 the plan's `R6` block (unpublished; the same ladder is `R6-3`'s DoD in [`docs/history/steps-R6.md`](../docs/history/steps-R6.md)), the plan's checkpoint ladder is
 *loopback → 單向 TX → RX → NAPI，不要跳*. Writing `SWINTSET` raises the NIC's
 interrupt **with no ring, no descriptor, no PHY and no cable**.
 
