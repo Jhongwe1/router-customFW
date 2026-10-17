@@ -1,7 +1,8 @@
 # `rtl819x-wdt` — a `/dev/watchdog` on `WDTCNR`
 
 Source: [`rtl819x-wdt.c`](../../kernel/linux-2.6.30/drivers/watchdog/rtl819x-wdt.c), version 1.1 ·
-reasoning and every reading: [`notes/watchdog-driver.md`](../../notes/watchdog-driver.md)
+reasoning and every reading: [`notes/watchdog-driver.md`](../../notes/watchdog-driver.md) ·
+the file head until 2026-10-18, verbatim: [`rtl819x-wdt.c`](wdt-history.md)
 
 ## What it does
 

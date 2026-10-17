@@ -138,7 +138,7 @@
 		 * problem.  CDBR — the divider every consumer of this block
 		 * counts on — lives at 0x18, inside THIS node.  The 2.6.30
 		 * watchdog driver derives its own rate by reading TC0DATA and
-		 * CDBR directly (rtl819x-wdt.c:536-539), which works only
+		 * CDBR directly (rtl819x-wdt.c:166-169), which works only
 		 * because that kernel has no ownership model at all.  Here the
 		 * timer is the clock provider and the watchdog asks it.  That
 		 * is not decoration: SPEC.md CLK-08b's 14.965 MHz was a
