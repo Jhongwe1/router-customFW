@@ -55,12 +55,15 @@ From notes § 11 and the source's own list unless marked.
   `CONFIG_GPIOLIB` guard and defines it nowhere, so turning `CONFIG_DEBUG_FS` on breaks
   the link.
 - Nothing arbitrates between this driver and the vendor's on bit 6; the detector
-  counts what it sees, and cannot time it (notes § 6, § 13.5).
+  counts what it sees, and cannot time it (notes § 6, § 13.5). In the image `R5` ran,
+  the vendor's `/proc/gpio` is also a path from userspace that writes `PABCD_CNR`,
+  `DIR` and `DAT` (讀, `FW-65`).
 - Seven functions in the image form `PABCD_DAT`'s address and have not been read
   (notes § 5). `0xB8003504` has a value and no name.
 
 ## Where else
 
+- [`docs/drivers/keys.md`](keys.md) — the button, read through this chip.
 - [`docs/driver-diff.md`](../driver-diff.md) — beside the two public ports.
 - [`docs/blind-write-ledger.md`](../blind-write-ledger.md) § 4.9 — the one artefact
   reading of the vendor's GPIO code, which took this driver out of the blind section.
