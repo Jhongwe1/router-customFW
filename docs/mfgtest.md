@@ -8,7 +8,7 @@ This file is the design the second half is scored against: one row per check,
 with **how it is made to fail** and **whether that injection is reversible on
 this unit**, stated before any of them runs.
 
-`plan/router-rebuild-plan.md` §P1 has a check list of eight items. This gate
+The plan's `P1` block (unpublished) has a check list of eight items; the step list, committed 2026-09-16, quotes the line that mattered ([`history/steps-P1.md`](history/steps-P1.md) ①). This gate
 does not adopt it unaltered, and §1 says which items moved and why.
 
 ---
@@ -128,8 +128,8 @@ had noticed.** Its DoD names three example injections — *拔網線、清 MAC�
 餵狗* (unplug the cable, clear the MAC, skip feeding the dog). 量 2026-09-16:
 `清 MAC` has **exactly one hit in the whole repository** — the plan's own DoD
 line — and no adjudication anywhere. Clearing the MAC means writing `H601`,
-which `CLAUDE.md`'s Never table forbids touching at all and `plan/CHARTER.md`
-marks 永久禁止, because it is the one region a factory reset does not restore.
+which `CLAUDE.md`'s Never table forbids touching at all and [`charter.md`](charter.md) § *Boundaries*
+marks forbidden permanently, because it is the one region a factory reset does not restore.
 **It is struck**, and `FAIL-MAC` in §3 is simulated at the boundary the check
 reads, which is what `PROGRESS.md`'s own rule ③ prescribes for an injection that
 cannot be shown reversible.
