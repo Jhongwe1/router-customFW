@@ -6,7 +6,7 @@ this unit's own flash dump — or **推**, and each is marked. Zero flash bytes,
 zero power cycles, zero device readings.
 
 **This note owns two things**: the *reading* of the matrix, and the *decision*
-that replaced `plan/router-rebuild-plan.md:1128`'s `FLOOR`. The instrument
+that replaced the `FLOOR` of the plan's `R2` block (unpublished). The instrument
 itself — what `binsim` is, how `k=7` was chosen, its thirty-five controls — is
 `notes/binsim.md`'s and is not restated here. The cell lives in one place,
 `tools/binsim-corpus.tsv`'s `@floor` row, and this note is why it is that cell.
