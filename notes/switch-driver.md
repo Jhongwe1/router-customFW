@@ -750,9 +750,9 @@ between them and no reset**, and it costs nothing.
 ## 8.13 `resetcmp` is not a verb, and this file's verb list is the one the parser has
 
 量: the token `resetcmp` occurs in this repository only as a comment at
-`rtl819x-switch.c:375` and as prose in `docs/KNOWN-ISSUES.md` — **it was never
+`rtl819x-switch.c:308` and as prose in `docs/KNOWN-ISSUES.md` — **it was never
 in the parser**, and a frozen card's cell 8 asked for it. Typing it returns
-`-EINVAL`. 讀 `rtl819x-switch.c:588-661`, the parser accepts exactly nine
+`-EINVAL`. 讀 `rtl819x-switch.c:521-594`, the parser accepts exactly nine
 forms and nothing else (1.0–1.3; since 1.4 the rest go to 1.4's forms, § 15.3, then 1.5's, § 17.2):
 
 ```
@@ -2404,7 +2404,7 @@ is why 1.3 masks them.
 * **Every paged read restored page 0 and read it back** (量): `rs 0`, `rt 0`
   and `p1 0` on 8 of 8 (`G-P9:20–27`), and `retry 0` and `dirty 0` on every
   page from `A-MD` to `J-PR`. The page-0 control reads `rs 1` (`G-P1:20`):
-  `rtl819x-switch.c:1002 (RTL819X_MDIO_NOXFER)`, "none issued" — a page-0
+  `rtl819x-switch.c:935 (RTL819X_MDIO_NOXFER)`, "none issued" — a page-0
   `pread` makes no restore (讀; § 14.8).
 * **`MDCIOSR` 30:16** (量): `hi_or 00000000` on every page from `A-MD` to
   `J-PR`, and `hi 0000` on every row of every page — the 5 addresses holding

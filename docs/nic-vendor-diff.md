@@ -426,7 +426,7 @@ after the failure:
 r VCR0      4A00 00000000 000001FF 01
 ```
 
-讀 `rtl819x-switch.c:560-564`, the row is
+讀 `rtl819x-switch.c:493-497`, the row is
 `r <name> <off> <live> <S0' latched at subsys_initcall> <both><dumb>`. So
 **live `0x00000000`** against **`0x000001FF` at `subsys_initcall`**, and
 `NET-78` measured all 37 registers byte-identical across the three dumps —

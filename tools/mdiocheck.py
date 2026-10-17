@@ -288,7 +288,7 @@ typedef unsigned int u32;
 #define UNUSED __attribute__((unused))
 /* 1.5: the direct KSEG1 load's spelling, and three of the driver's own
  * defines from above the cut, which only the mutants use (SSIR, FULL_RST
- * and the switch window's physical base, rtl819x-switch.c:123-134). */
+ * and the switch window's physical base, rtl819x-switch.c:56-67). */
 #define __iomem
 #define KSEG1ADDR(a) ((unsigned long)(a) | 0xA0000000UL)
 #define RTL819X_SW_PHYS 0x1B800000
@@ -809,7 +809,7 @@ static UNUSED u32 rtl819x_sw_rd(unsigned int off)
 	return psrp_val[(off - 0x4128) / 4];
 }
 
-/* The switch's one guarded write path, as rtl819x-switch.c:287 writes it:
+/* The switch's one guarded write path, as rtl819x-switch.c:220 writes it:
  * refused, counted, while the switch is locked.  1.6's registers go to its
  * model; a store anywhere else but PCRP0-PCRP4 is counted as illegal and
  * not applied. */
@@ -841,7 +841,7 @@ static UNUSED int rtl819x_sw_wr(unsigned int off, u32 v)
 	return 0;
 }
 
-/* 1.5: rtl819x_sw_do_reset is above the cut (rtl819x-switch.c:382).  The
+/* 1.5: rtl819x_sw_do_reset is above the cut (rtl819x-switch.c:315).  The
  * stub writes nothing: it logs the call and its recipe as `X` and returns a
  * scripted rc, so what the guard lets through is visible and nothing else
  * is. */
@@ -1258,7 +1258,7 @@ int main(void)
 			do_reset_rc = (int)a;
 		} else if (!strncmp(line, "x ", 2)) {
 			/* the switch handler's reset branch, as
-			 * rtl819x-switch.c:636-640 writes it: two forms,
+			 * rtl819x-switch.c:569-573 writes it: two forms,
 			 * the recipe from buf[6], and count on success */
 			const char *b = line + 2;
 

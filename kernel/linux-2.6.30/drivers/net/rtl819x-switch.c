@@ -4,86 +4,13 @@
  * R6-2: "the switch to a dumb state from my code -- all ports one VLAN, no
  * acceleration", whose DoD is *a register read-back whose value differs from
  * RESET*, and whose named failure mode is *that a dumb switch looks identical
- * to a switch nobody configured*.
+ * to a switch nobody configured*.  The reset it measures against is the
+ * part's own: `reset full` and `reset vendor` assert `SwitchFullRst`, bit 2
+ * of `SSIR` at `0xBB804204`, which the vendor header comments *"Reset all
+ * tables & queues"* (READ `rtl865xc_asicregs.h:1399-1446`).  Versions 1.2 to
+ * 1.6 each appended a block of their own, headed by the version number.
  *
- * ======================================================================
- * WHY THIS DRIVER EXISTS IN THIS SHAPE, WHICH IS A MEASUREMENT PROBLEM
- * BEFORE IT IS A CONFIGURATION PROBLEM
- * ======================================================================
- *
- * 🔴 `bench/2026-09-17b/PREDICTIONS-B25-block24.md:96` recorded, before this
- * driver existed, that the DoD is *"not satisfiable today: none of the eight
- * has a known reset value"*.  That sentence was true of the method available
- * on 2026-09-17 morning and it is not true of this part.
- *
- * 讀 `rtl865xc_asicregs.h:1399-1446`: `SSIR` (alias `SIRR`) at
- * `SWMISC_BASE + 0x04` = `0xBB804204` carries `SwitchFullRst = (1<<2)`,
- * commented *"Reset all tables & queues"*, and `TRXRDY = (1<<0)`,
- * *"Start normal TX and RX"*.  讀 `rtl865x_asicCom.c:2002-2040`: the vendor's
- * own bring-up asserts it.  So the reset state is not a documentary gap --
- * it is a state this driver can ENTER and then read, on this die.
- *
- * That turns `D2` from a substitution into a measurement, and it makes the
- * proof four-cornered rather than two:
- *
- *   S0   the loader's state          -- 量 already, bench/2026-09-17b block 24
- *   S0'  after early kernel init,    -- latched by this driver at
- *        before the vendor NIC          subsys_initcall.  NOBODY HAS EVER
- *        driver runs                    MEASURED THIS STATE.
- *   S1   after FULL_RST              -- `reset` verb.  The reset baseline.
- *   S3   this driver's dumb config   -- `dumb` verb.
- *
- * `D2` is then **S3 != S1**, register by register, with:
- *
- *   - a POSITIVE control on the reset: at least one register must satisfy
- *     S1 != S0'.  If `FULL_RST` moves nothing, the write did nothing and the
- *     whole block is void.  That is the refutation condition, written here
- *     before the verb was run once.
- *   - a NEGATIVE control on the writes: a register this driver never writes
- *     must satisfy S3 == S1.  If everything moves, something other than this
- *     driver is moving it.
- *   - a ROUND TRIP: restore S0' and read again.  If a register does not come
- *     back, it is not a plain read/write cell and a read-back is not the
- *     proof `D2` assumes it is.  This part has one such register already --
- *     `WDTCLR` does not read back (`SPEC.md` `FW-52`) -- so this is a
- *     measured hazard and not a hypothetical one.
- *
- * ⚠️ THE LIMIT, STATED HERE RATHER THAN LEFT TO BE FOUND.  `FULL_RST` is a
- * SOFT reset of "tables & queues".  It is NOT proven identical to a power-on
- * reset.  What this driver can support is *differs from the state this part's
- * own documented full reset leaves it in* -- strictly stronger than "differs
- * from loader-state", strictly weaker than "differs from the power-on
- * default".  The gap is named, not hidden.
- *
- * 🟢 And there is an independent check available on exactly one register.
- * The draft datasheet's Table 64 gives per-bit defaults for `PCRP0`-`PCRP4`
- * which assemble to `0x007F....`, and this unit reads `PCRP0 = 0x007F0039`.
- * So after `FULL_RST`, `PCRP0`'s top half is PREDICTED to be `0x007F`.  If it
- * is, the "full reset as a reset baseline" method is validated against a
- * documentary source on the one register that has one.  If it is not, the
- * method is refuted -- which is also a result, and is why the prediction is
- * written down here.
- *
- * ======================================================================
- * WHY `MSCR` AND `VCR0` ARE IN THE TABLE THOUGH NOTHING HAS EVER READ THEM
- * ======================================================================
- *
- * 🔴🔴 `SPEC.md` `NET-21` derives this project's switch-register population
- * from 48 `lui ...,0xbb80` sites in the LOADER, converging on 13 addresses.
- * That is *what one agent touched*.  It is not *what configures the switch*.
- * 量 2026-09-17 (`tools/hdrcensus.py`): of the 21 addresses the vendor header
- * declares in the ALE block, NINETEEN have never been printed by this
- * repository -- and `MSCR`, the switch's operation-layer mode register, is
- * one of them.  `VCR0`, which holds the 802.1Q-unaware bit, is another.
- *
- * A census whose population is one agent's behaviour is blind to everything
- * that agent ignores.  Both registers are the direct object of R6-2's own
- * one-line definition, and neither was in the census that was supposed to
- * load it.
- *
- * ======================================================================
  * WHAT THIS DRIVER DOES NOT DO
- * ======================================================================
  *
  * 1. It does not touch the CPU-port DMA rings, the interrupt, or any
  *    `net_device`.  That is R6-3 and it is a different driver.
@@ -93,12 +20,18 @@
  * 3. It writes a table in one verb only: 1.6's `vlan` (R6c, at the end of
  *    this file) writes the VLAN and netif tables through the TACI block
  *    (`SWTACR`/`SWTAA`/`TCR0`-`TCR7`), a protocol and not a register write.
- *    `dumb` leaves every table alone: 推 that `En1QtagVIDignore` makes the
- *    table irrelevant for a dumb switch, and that 推 is still untested.
+ *    `dumb` leaves every table alone: INFERRED that `En1QtagVIDignore` makes the
+ *    table irrelevant for a dumb switch, and that INFERRED is still untested.
  * 4. It says nothing about whether the silicon agrees with the header.  This
  *    project has one measured counter-example already: the header names
  *    `PCRP5` at `0xBB804118` and the die reads `00000000` where every
  *    neighbour reads `xx7F00xx`.
+ *
+ * The driver page: docs/drivers/switch.md.  Why the driver has this shape --
+ * the four states S0, S0', S1 and S3, the controls on each, and the limit of
+ * `FULL_RST` as a reset baseline -- and why `MSCR` and `VCR0` are in the
+ * table: the head this file carried until 2026-10-18, verbatim in
+ * docs/drivers/switch-history.md.
  */
 
 #include <linux/init.h>
@@ -117,7 +50,7 @@
 
 #define RTL819X_SW_VERSION	"rtl819x-switch 1.6"
 
-/* 0xBB800000 through KSEG1.  讀 `rtl865xc_asicregs.h:147,171`:
+/* 0xBB800000 through KSEG1.  READ `rtl865xc_asicregs.h:147,171`:
  * `REAL_SWCORE_BASE 0xBB800000`, and `SWCORE_BASE` takes it in every build
  * that is not one of the three RTL865X_MODEL_* host simulators. */
 #define RTL819X_SW_PHYS		0x1B800000
@@ -135,7 +68,7 @@
 #define RTL819X_SW_SEMI_RST	(1u << 1)
 #define RTL819X_SW_TRXRDY	(1u << 0)
 
-/* The registers this driver's dumb configuration writes.  Offsets 讀 from
+/* The registers this driver's dumb configuration writes.  Offsets READ from
  * `rtl865xc_asicregs.h`; every one of them was re-derived by
  * `tools/hdrcensus.py` from the same header under `-D CONFIG_RTL_8196E`
  * rather than copied out of a note. */
@@ -146,7 +79,7 @@
 #define RTL819X_SW_PVCR0	0x4A08		/* :2301 */
 #define RTL819X_SW_PVCR4	0x4A18		/* :2305 */
 
-/* Port status, one register per port.  量 two sources, which is the rule
+/* Port status, one register per port.  MEASURED two sources, which is the rule
  * for a register entering code: derived from `rtl865xc_asicregs.h`
  * (`PCRAM_BASE = SWCORE_BASE + 0x4100` at :1132, `PSRP0 = 0x028 +
  * PCRAM_BASE` at :1143, `PortStatusLinkUp = (1<<4)` at :1332), and
@@ -172,7 +105,7 @@
 
 /* PVCR packs TWO ports per word: PVID[11:0] + priority[14:12] for the even
  * port, PVID[27:16] + priority[30:28] for the odd one (`:2393`-`:2430`).
- * 🟢 量 2026-09-17: decoding block 26's readings that way gives ports 0-3 on
+ * OK: MEASURED 2026-09-17: decoding block 26's readings that way gives ports 0-3 on
  * VID 9, port 4 on VID 8, port 8 on VID 9 -- and this image's OWN boot line
  * `eth1 added. vid=8 Member port 0x10` says bit 4, i.e. port 4, by a path
  * that shares no code with the register read. */
@@ -308,13 +241,13 @@ static int rtl819x_sw_wr(unsigned int off, u32 v)
  * jack live?  It has two states, and the operator changes it with a
  * cable, which makes it an observable rather than a field.
  *
- * ⚠️ It is deliberately NOT a snapshot read.  It goes to the silicon on
+ * CAUTION: It is deliberately NOT a snapshot read.  It goes to the silicon on
  * every call, because a cached answer would make the cable stop being
  * the control.  `n_linkq` is its own denominator so the ethtool path is
  * separable from every other read this driver does -- without it,
  * `n_reads` moving would not say who moved it.
  *
- * 🔴 Returns 0 rather than an error when nothing is linked, and -ENODEV
+ * NOTE: Returns 0 rather than an error when nothing is linked, and -ENODEV
  * only before this driver has latched.  A caller that cannot tell those
  * apart must treat both as down, which is what the NIC driver does. */
 static unsigned long rtl819x_sw_n_linkq;
@@ -370,7 +303,7 @@ static void rtl819x_sw_snapshot(int slot)
  *                   follows FULL_RST with a 650 ms clock-gate cycle of the
  *                   switch core.
  *
- * 🔴 讀 `rtl865x_asicCom.c:2002-2016`: on the 8196E the vendor does NOT trust
+ * NOTE: READ `rtl865x_asicCom.c:2002-2016`: on the 8196E the vendor does NOT trust
  * `FULL_RST` alone.  Whether the extra 650 ms changes any register is
  * unmeasured by anybody, and `resetcmp` in the card is what asks.
  *
@@ -524,7 +457,7 @@ static int rtl819x_sw_do_restore(int slot)
  * /proc
  * ------------------------------------------------------------------------ */
 static int rtl819x_sw_v14_lines(char *page);	/* 1.4, below */
-/* 🔴 `read_proc_t` sprintfs into ONE 4,096-byte page with no bounds check --
+/* NOTE: `read_proc_t` sprintfs into ONE 4,096-byte page with no bounds check --
  * the same hard limit `rtl819x-spi` 1.1's two-level map was shaped by.  The
  * table is 37 registers at ~22 bytes plus ~20 fields, which is ~1.2 KiB; the
  * budget below is what keeps that a fact rather than a hope. */
@@ -691,7 +624,7 @@ static int __init rtl819x_sw_init(void)
 	 * so they are in the boot capture of EVERY boot rather than only in a
 	 * /proc read somebody remembered to take.
 	 *
-	 * 🔴 Looked up BY NAME and not by array index.  An index here would be
+	 * NOTE: Looked up BY NAME and not by array index.  An index here would be
 	 * silently wrong the first time a register is inserted above it, and
 	 * the mark would then carry the wrong register's value under the right
 	 * register's name -- which is the one failure mode a boot capture
@@ -722,7 +655,7 @@ subsys_initcall(rtl819x_sw_init);
  * Appended rather than threaded through the file, and every line above that
  * changed is one that was blank or is changed in place (the version string,
  * three prototypes, and the three call sites -- `rtl819x_sw_rd`, the /proc
- * page, the init), so no line number above this block moved: 量 at
+ * page, the init), so no line number above this block moved: MEASURED at
  * `f758d62`, seventeen committed files cite this driver by line, 23
  * citations, and none of the cited ranges holds a changed line (FW-110).
  *
@@ -730,7 +663,7 @@ subsys_initcall(rtl819x_sw_init);
  * Two sources: the vendor header, `rtl865xc_asicregs.h:1328`
  * (`LinkDownEventFlag (1<<8)`, "Port Link Down Event detecting monitor
  * flag"), and the datasheet's Table 65 (docs/loader-phy-and-switch.md, the
- * PSRP paragraph); and 量 `SPEC.md` `NET-11`, where one read of a port whose
+ * PSRP paragraph); and MEASURED `SPEC.md` `NET-11`, where one read of a port whose
  * jack was already empty cleared it.  So every reader of `PSRP` destroys the
  * evidence the next reader would need.  1.1 had three such readers -- the
  * slot-0 snapshot, the `/proc` table and `rtl819x_sw_any_link()`, which
@@ -795,7 +728,7 @@ subsys_initcall(rtl819x_sw_init);
 
 /* PSRP0..PSRP7 at 0xBB804128 + 4p.  Two sources: `rtl865xc_asicregs.h:1143`-
  * `:1150` (`PSRPn (0x028 + 4n + PCRAM_BASE)`), and the reads this project has
- * decoded against the vendor's `port_status` (量 `NET-10`); the LinkUp and
+ * decoded against the vendor's `port_status` (MEASURED `NET-10`); the LinkUp and
  * bit-8 fields are `NET-11`'s.  PSRP8 is excluded (see above). */
 #define RTL819X_SW_NPSRP	8
 #define RTL819X_PSRP_LDE	(1u << 8)	/* LinkDownEventFlag, :1328 */
@@ -879,7 +812,7 @@ static int rtl819x_sw_lde_lines(char *page)
  *
  * THE REGISTER CONTRACT.  MDCIOCR 0xBB804004: bit 31 COMMAND (1 = write),
  * 28:24 PHYADD, 20:16 REGADD, 15:0 WRDATA.  MDCIOSR 0xBB804008: bit 31 STATUS
- * (1 = in progress), 15:0 RDATA.  讀 x3: the datasheet's Tables 58-59,
+ * (1 = in progress), 15:0 RDATA.  READ x3: the datasheet's Tables 58-59,
  * `rtl865xc_asicregs.h:1046-1062`, and the loader's primitives at 0x80402F80
  * and 0x80402FF8 (SPEC.md NET-15).  One store of the whole word issues the
  * command; STATUS clear is completion.  MDCIOSR 30:16: the datasheet says
@@ -890,7 +823,7 @@ static int rtl819x_sw_lde_lines(char *page)
  * NO 10 ms DELAY.  The tree that builds delays only on 8198 and 8196C
  * revision A (`rtl865x_asicL2.c:5558-5564`, whose erratum is "mdio data read
  * will delay 1 mdc clock"); the loader delays 10 ms before every poll,
- * unconditionally (0x80402FC0).  量: on PHY 0 the vendor's UNDELAYED /proc
+ * unconditionally (0x80402FC0).  MEASURED: on PHY 0 the vendor's UNDELAYED /proc
  * path read registers 2, 3, 0 and 1 as 001C, C880, 1100 and 78C9
  * (bench/2026-09-19 C19-PHYID, C20-PHYST) -- the values the loader's DELAYED
  * read returned for the same registers (F2, E6, X8, E12d).  A shifted or
@@ -898,7 +831,7 @@ static int rtl819x_sw_lde_lines(char *page)
  * values on PHY 0 only; `scan` against the loader's MDIOR rows re-tests it
  * on 0-4.
  *
- * WHO ELSE ISSUES MDIO COMMANDS IN THIS IMAGE, AND WHY IRQs GO OFF.  讀, a
+ * WHO ELSE ISSUES MDIO COMMANDS IN THIS IMAGE, AND WHY IRQs GO OFF.  READ, a
  * call census of r6b6q's vmlinux: 25 read and 43 write call sites in 20
  * vendor functions, all through the vendor's two accessors.  All run in
  * process context -- the probe, the /proc writers, re865x_close -- except
@@ -918,7 +851,7 @@ static int rtl819x_sw_lde_lines(char *page)
  * udelay(1) between polls: <= 2 x 10 ms of delay, nominal.  `pread` holds
  * IRQs off across at most seven transactions (six, and one retried restore
  * whose first attempt never stored, so has no poll after it): <= 13 x 10 ms
- * = 130 ms, nominal, plus the reads.  推 a transaction that completes takes
+ * = 130 ms, nominal, plus the reads.  INFERRED a transaction that completes takes
  * tens of us (`spin` measures it); the worst case is the failure the bound
  * exists for.  At HZ 100 it would cost ~13 ticks, and at 38400 baud the
  * UART's FIFO overruns after ~4 ms of host input, so a card does not type
@@ -935,7 +868,7 @@ static int rtl819x_sw_lde_lines(char *page)
  * would spend its one shot on phylib's -EIO and a pread's restore could be
  * refused, leaving the PHY on page 1.
  *
- * THE ONLY PHY WRITES: REGISTER 31, THE PAGE SELECT, VALUES 1 AND 0.  讀 x2,
+ * THE ONLY PHY WRITES: REGISTER 31, THE PAGE SELECT, VALUES 1 AND 0.  READ x2,
  * code only -- the loader's PORT1 (0x8040A0A0, docs/loader-phy-and-switch.md
  * section 4) and the tree that builds (`Set_GPHYWB`, rtl865x_asicL2.c:1230-
  * 1266) both select a page by writing it to register 31 and restore by
@@ -954,7 +887,7 @@ static int rtl819x_sw_lde_lines(char *page)
  *
  * WHY phy_mask IS ~0 AT REGISTRATION.  phylib calls an address empty only
  * when `(id & 0x1fffffff) == 0x1fffffff` (phy_device.c:231).  Register 2
- * reads 0x0000 at 5-31 (量 SPEC.md NET-24), so their IDs cannot be all-ones
+ * reads 0x0000 at 5-31 (MEASURED SPEC.md NET-24), so their IDs cannot be all-ones
  * in bits 28:0 whatever register 3 holds, and an unmasked scan would
  * register 27 phantom phy_devices.  The bus registers with every address
  * masked -- registration issues no MDIO command -- and `probe` scans 0-4 one
@@ -1176,7 +1109,7 @@ static int rtl819x_mdio_probe(void)
 /* `scan lo hi`: registers 0-5 of every address in [lo, hi] through
  * mdiobus_read, and PSRPa after each row for a < 5 through the one switch
  * read path, so a PSRP bit 8 consumed here is counted (1.2).  Reading
- * register 1 clears the PHY's latched-low link bit (推, IEEE 802.3
+ * register 1 clears the PHY's latched-low link bit (INFERRED, IEEE 802.3
  * 22.2.4.2.13): a card that wants a link-down latch reads it before a scan.
  * The bound's positive control: at `bound 0` a read whose STATUS is still
  * set when first polled prints E145, and the next one may print E016. */
@@ -1204,7 +1137,7 @@ static int rtl819x_mdio_scan(unsigned int lo, unsigned int hi)
 
 /* `pread a page reg`: one register of PHY a on page 1, for C-18's page-1
  * reads; page 0 reads the same register number unpaged, the control that the
- * select changed what is read (讀: the vendor's 8196E init leaves page-1
+ * select changed what is read (READ: the vendor's 8196E init leaves page-1
  * register 16 bits 15:13 at 110 on PHYs 0-4, Setting_RTL8196E_PHY,
  * rtl865x_asicL2.c:4177).  At page 1, in ONE IRQs-off section: read register
  * 31 (must be 0, or nothing is written), select the page, read register 31
@@ -1215,7 +1148,7 @@ static int rtl819x_mdio_scan(unsigned int lo, unsigned int hi)
  * through the one switch read path.  The vendor's Setting_RTL8196E_PHY and
  * enable_EEE set EnForceMode on PCRP0-4 around their paged writes and its
  * /proc `extRead` does not; this does not, so the switch's own PHY polling
- * may meet a selected page (推), and PSRP bit 8 either side is the only
+ * may meet a selected page (INFERRED), and PSRP bit 8 either side is the only
  * detector here -- valid only while no vendor eth is open, whose link DSR
  * reads PSRP too. */
 static int rtl819x_mdio_pread(unsigned int a, unsigned int page,
@@ -1472,8 +1405,8 @@ device_initcall(rtl819x_mdio_init);
  * above moves (FW-110).
  *
  * WHY.  The loader's `J` handler clears bit 0 of PCRP0-PCRP4 as its last act
- * before it enters the payload (讀 its code, 0x804092F4-0x80409354;
- * notes/switch-driver.md section 8.3), and 量 the prompt reads `nn7F0039`
+ * before it enters the payload (READ its code, 0x804092F4-0x80409354;
+ * notes/switch-driver.md section 8.3), and MEASURED the prompt reads `nn7F0039`
  * (bench/2026-09-19 C1-L4104, C2-L4114) where the S0' latch reads `nn7F0038`
  * (C9-SW0).  At SWCORE=y the vendor's probe sets the bit again (C9-SW0's live
  * column, SPEC.md NET-52); at SWCORE=n nothing does, and arm II's step (5)
@@ -1484,14 +1417,14 @@ device_initcall(rtl819x_mdio_init);
  * Interface", RW, default 0 -- "When disabled, the PHY interface will be
  * isolated from the MAC."  B, `rtl865xc_asicregs.h:1258`, `(1<<0)`, in the
  * CONFIG_RTL_8196E arm that opens at :1168 (the #else arm's :1322 gives the
- * same bit).  量, the 0x39/0x38 transition above, on all five ports.  The
+ * same bit).  MEASURED, the 0x39/0x38 transition above, on all five ports.  The
  * addresses, 0xBB804104 + 4n, were already this driver's table (B
- * :1132-:1138, D Table 62, 量 the same captures).
+ * :1132-:1138, D Table 62, MEASURED the same captures).
  *
  * THE IDENTITY CHECK.  No store is made unless the pre-read carries the
  * port's own number in `ExtPHYID`, bits 30:26: D Table 64 (default port 0-4
  * = 0x0-0x4), B :1174-:1175 in the same arm (the #else arm puts the field
- * at 28:24, which is why the arm is named), and 量 SPEC.md NET-09 (0, 1, 2,
+ * at 28:24, which is why the arm is named), and MEASURED SPEC.md NET-09 (0, 1, 2,
  * 3, 4, bench/2026-08-24b E9).  A word that fails it is not port n's PCRP by
  * its own field: -EPROTO, nothing written.
  *
@@ -1673,7 +1606,7 @@ static int rtl819x_sw_v14_lines(char *page)
  * above moves (FW-110).
  *
  * WHY `init`.  Arm II pinged neither way on the loader's switch state and
- * both ways once `phyif all` had set EnablePHYIf in PCRP0-PCRP4 (量
+ * both ways once `phyif all` had set EnablePHYIf in PCRP0-PCRP4 (MEASURED
  * notes/switch-driver.md section 16.7, SPEC.md NET-164): the bit the
  * loader's `J` clears (1.4's WHY), which no vendor probe sets again on a
  * SWCORE=n image.  The product cannot rely on a typed verb, so the standard
@@ -1689,17 +1622,17 @@ static int rtl819x_sw_v14_lines(char *page)
  * found the same way, through the same rtl819x_phyif_port() -- two sources
  * and a measurement for EnablePHYIf and three for the ExtPHYID identity
  * check (1.4's THE BIT and THE IDENTITY CHECK).  What it will read: on
- * SWCORE=n the post-`J` word, nn7F0038 on ports 0-4 (量
+ * SWCORE=n the post-`J` word, nn7F0038 on ports 0-4 (MEASURED
  * bench/2026-09-28/M2-SW.log:39-43, live equal to slot 0), so five stores;
  * on SWCORE=y the word the vendor's probe left before /init runs, nn7F0039
- * (量 AV-P03.log:9-13 in the same directory), so five `already` and no
+ * (MEASURED AV-P03.log:9-13 in the same directory), so five `already` and no
  * store.
  *
  * WHY THE `reset` GUARD.  `reset full` and `reset vendor` assert FULL_RST,
  * "Reset all tables & queues" (this file's header), and the CPU port's DMA
  * engine -- another block, CPU_IFACE at 0xB8010000 -- moves frames between
  * those queues and descriptor rings in DRAM.  What a reset does to an
- * engine that is running is unmeasured (推: frames lost at best, at worst an
+ * engine that is running is unmeasured (INFERRED: frames lost at best, at worst an
  * engine left on a descriptor the reset orphaned), and the `reset vendor` of
  * notes/switch-driver.md section 16.3 was typed only after `disarm`, by
  * hand.  So both verbs refuse -EBUSY, counted in `reset_busy`, before any
@@ -1712,7 +1645,7 @@ static int rtl819x_sw_v14_lines(char *page)
  * B `:527`-`:528`, `TXCMD (1 << 31)` "Enable Tx" and `RXCMD (1 << 30)`
  * "Enable Rx" -- the lines rtl819x-nic.c cites for NIC_TXCMD and NIC_RXCMD,
  * in drivers/net/rtl819x/AsicDriver/ of the drop rlxfw-kbuild.sh stages.
- * 量, the word on this die: C4000000 with rlxfw's NIC armed and its engine
+ * MEASURED, the word on this die: C4000000 with rlxfw's NIC armed and its engine
  * on (a `peek`, bench/2026-09-28/M6-VP5.log:8; the NIC's own mark
  * RLXFW-N-ENGON=C4000000, AN-N2.log:6), and 04000000 after `disarm` (the
  * NIC page's `now_icr`, AR-NIC.log:49; a `peek`, AR-C0.log:8).  So the test
@@ -1724,12 +1657,12 @@ static int rtl819x_sw_v14_lines(char *page)
  *
  * A CHECK, NOT A LOCK.  The load is one instant, and a reset lasts at least
  * 300 ms of mdelay() with IRQs on.  What sets TXCMD and RXCMD is
- * rtl819x-nic (讀): its /proc verbs and `ifconfig rlx0 up` run in process
+ * rtl819x-nic (READ): its /proc verbs and `ifconfig rlx0 up` run in process
  * context and cannot run inside this verb (UP, PREEMPT_NONE: 1.2's #error);
  * its s99a recovery timer runs in softirq and can, but only while the NIC
  * is armed -- after `disarm`, nic_do_engine() refuses -ENXIO.  So the state
  * this protects is the one `disarm` leaves.  `engine off` also clears the
- * two bits (讀: it clears them alone) but leaves the NIC armed, so a reset
+ * two bits (READ: it clears them alone) but leaves the NIC armed, so a reset
  * after it is permitted and not protected from that timer.  On SWCORE=y the
  * vendor's driver owns the engine, and what its timers do is not read here.
  *
@@ -1766,8 +1699,8 @@ static int rtl819x_sw_v14_lines(char *page)
  *
  * WHAT `init` ADDS TO A STANDARD BOOT.  On SWCORE=n /init's `init` reads
  * PCRP0-PCRP4, stores five words and reads them back, so `n_writes` after
- * the boot went from 1 (`start`'s store; 量 bench/2026-09-26b/X-SW1.log)
- * to 6 (量 bench/2026-10-04/PER-SW.log, a RAM boot) and `n_reads` gained
+ * the boot went from 1 (`start`'s store; MEASURED bench/2026-09-26b/X-SW1.log)
+ * to 6 (MEASURED bench/2026-10-04/PER-SW.log, a RAM boot) and `n_reads` gained
  * 10.  Since R6c /init types 1.6's `vlan` after `init`, which adds its own
  * stores and reads (its block counts them).  The boot gains one mark line,
  * RLXFW-SW-INIT=00001F1F, 24 bytes in tools/bootbytes.py's model (17 + 7),
@@ -1876,7 +1809,7 @@ static int rtl819x_sw_v15_lines(char *page)
  *
  * WHY.  Booted from flash, rlxfw receives no Ethernet frame (SPEC.md
  * NET-171): the stock loader configures the switch only on its prompt path,
- * and a SWCORE=n image left the VLAN group to it.  量 bench/2026-10-08b, a
+ * and a SWCORE=n image left the VLAN group to it.  MEASURED bench/2026-10-08b, a
  * flash boot read and not written: the VLAN, netif and L2 tables empty
  * (A05-A07); PVCR0-3 00010001, PVID 1 on every port, under VCR0's ingress
  * filtering (000001FF) with no VLAN 1 entry (A02); port 3's
@@ -1888,12 +1821,12 @@ static int rtl819x_sw_v15_lines(char *page)
  *
  * THE VALUES are the owner's ruling O1 of 2026-10-08, which supersedes 8d's
  * ruling 3 (the group inherited as a unit, no take-over).  Three sources for
- * what is stored: 讀 the loader's own stores (stage2.bin: PVCR0-3 <- 00080008
+ * what is stored: READ the loader's own stores (stage2.bin: PVCR0-3 <- 00080008
  * at 0x80403920-0x80403944; VLAN 8 with member = untag = 63 at
- * 0x804029E4-0x804029F4; FFCR <- 3 at 0x804039F0-0x804039FC); 讀 Bb, the
+ * 0x804029E4-0x804029F4; FFCR <- 3 at 0x804039F0-0x804039FC); READ Bb, the
  * vendor bootcode (swCore.c "Set PVID of all ports to 8"; ethInt_865x.c VLAN
  * 8 with ALL_PORT_MASK as member and untag; FFCR = EN_UNUNICAST_TOCPU |
- * EN_UNMCAST_TOCPU); 量 every RAM boot above.  The draft datasheet has no
+ * EN_UNMCAST_TOCPU); MEASURED every RAM boot above.  The draft datasheet has no
  * VLAN, ALE or table section.
  *   VLAN slot 8           00807E3F and seven zero words: VID 8, fid 0, member
  *                         = untag = ports 0-5 (B rtl865x_asicCom.h:230-242,
@@ -1907,7 +1840,7 @@ static int rtl819x_sw_v15_lines(char *page)
  * VERIFIED, NEVER STORED: PVCR4 00000001, VCR0 000001FF, PBVCR0 00000000 and
  * PLITIMR 07FAC688 -- equal on both measured paths (A02 and A08 above;
  * PER-SW, and bench/2026-09-28/M2-VP3.log for PLITIMR) and stored by neither
- * the loader nor the bootcode, so their one source is 量.  A mismatch refuses
+ * the loader nor the bootcode, so their one source is MEASURED.  A mismatch refuses
  * the verb before any table is read: the group is determined as a unit or
  * not touched.  Never touched: MACCR, MEMCR, the PHY patch, QNUMCR, LEDCREG,
  * the L2 table.
@@ -1923,7 +1856,7 @@ static int rtl819x_sw_v15_lines(char *page)
  * second `vlan` stores nothing.
  *
  * ONE TABLE WRITE, for a slot whose eight words differ, IRQs off from (1) to
- * (10) (UP, PREEMPT_NONE: 1.2's #error).  讀 x2: B, the staged tree's
+ * (10) (UP, PREEMPT_NONE: 1.2's #error).  READ x2: B, the staged tree's
  * 96E/rtl865x_asicBasic.S (_rtl8651_forceAddAsicEntry :961-1024, its forward
  * routine :654-697), and Bb's rtl8196x/swTable.c (swTable_forceAddEntry
  * :76-98, tableAccessForeword :137-156).  Neither bounds a wait; every bound
@@ -1964,7 +1897,7 @@ static int rtl819x_sw_v15_lines(char *page)
  * IRQs stay off for at most four bounds of polls, (1), (3), (4) and (8):
  * about 40 ms nominal, reached only by an engine that does not answer
  * (tools/mdiocheck.py K51 measures one bound in a section).  On the flash
- * path the writes come before `start` sets TRXRDY (S0' SSIR 00000000, 量
+ * path the writes come before `start` sets TRXRDY (S0' SSIR 00000000, MEASURED
  * bench/2026-10-08/X-V08r-sw.log); on the RAM path the loader left it set
  * (PER-SW), so frames may arrive while STOP_TLU holds the lookups, and what
  * the switch does with them then has not been measured.
@@ -2019,7 +1952,7 @@ static int rtl819x_sw_v15_lines(char *page)
  * digits and 1.2's `lde0` at their 0/1 and two-digit widths; at their types'
  * widest they add 172, and the page is 3,042.  The SWCORE=y line is shorter.
  *
- * WHAT A STANDARD BOOT DOES (推, from the code; the bench reads it).  /init
+ * WHAT A STANDARD BOOT DOES (INFERRED, from the code; the bench reads it).  /init
  * types `vlan` between `init` and `start`.  On the flash path: one table
  * write (12 stores) and five register stores, so `n_writes` after the boot
  * goes from 6 to 23; on the RAM path one table write, 6 to 18.  `n_reads`
