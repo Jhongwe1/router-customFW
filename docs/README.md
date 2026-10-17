@@ -10,6 +10,7 @@ true now is in the pages it links.
 - [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md) — what does not work, and what each release does not establish
 - [`reports/README.md`](reports/README.md) — one row per gate result: its claim, and what it does not establish
 - [`bringup.md`](bringup.md) — the bring-up report
+- [`build.md`](build.md) — building rlxfw, and what has been run the way that page says
 
 ## Reports
 
