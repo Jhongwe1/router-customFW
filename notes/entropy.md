@@ -87,7 +87,7 @@ live sites, 0 `struct irqaction`:
 
 | driver | site | flags |
 |---|---|---|
-| `rtl819x-nic` | `drivers/net/rtl819x-nic.c:1677`, `:2687` (IRQ 12) | `IRQF_DISABLED` |
+| `rtl819x-nic` | `drivers/net/rtl819x-nic.c:1524`, `:2534` (IRQ 12) | `IRQF_DISABLED` |
 | `rtl819x-timer` | `drivers/clocksource/rtl819x-timer.c:1824` (IRQ 25) | `IRQF_DISABLED` |
 
 🔴 Those two numbers are unchanged by § 3's hook, and that is deliberate: the

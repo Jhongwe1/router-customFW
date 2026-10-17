@@ -5,193 +5,40 @@
  * is *the checkpoint ladder is walked and NOT skipped: loopback -> one-way TX
  * -> RX -> NAPI, each rung with an observable before the next is attempted*,
  * and whose named failure mode is *`OWN`-bit write ordering and big-endian
- * descriptor fields* -- the plan's own refutation condition being *frames go
- * out and none come back*, which is what a wrong field layout looks like from
- * the outside.
+ * descriptor fields*.  It owns the CPU port's DMA engine and the `net_device`
+ * `rlx0`, and every hardware write is behind a verb and a runtime unlock.
  *
- * ======================================================================
- * WHY THIS DRIVER CAN START FROM A KNOWN STATE, WHICH IS A MEASUREMENT
- * AND NOT AN ASSUMPTION
- * ======================================================================
+ * The loader leaves the engine RUNNING (MEASURED: `CPUICR = 0xC4000000` at
+ * its prompt), with rings in memory Linux will reuse.  Since R6b-8 the
+ * mainline image does not build the vendor's Ethernet tree
+ * (`CONFIG_RTL_819X_SWCORE=n`), and drivers/net/rlxfw-seam.c makes the vendor
+ * probe's two disarm writes from `bsp_setup()`, before any allocator exists;
+ * on a SWCORE=y image the vendor's probe still makes them.  IRQ 12 is taken
+ * by the `irqon` verb, which reports `request_irq`'s return value rather than
+ * assuming it.  IRQ 12 IS NOT LINE 25: it is `BSP_SWCORE_IRQ`, LOPI base 8 +
+ * 4, gated by `GIMR` bit 15, and does not go through the ICTL cascade the
+ * timer uses.
  *
- * The vendor's Ethernet driver is in this image and owns this hardware.  It
- * is not removed, and that is deliberate: 讀 `rtl_nic.c:6214-6215`, its
- * `re865x_probe()` writes `CPUIIMR = 0` and `CPUICR &= ~(TXCMD|RXCMD)` --
- * i.e. the vendor's probe DISARMS the DMA engine the loader left running.
+ * THREE RULES THE CODE BELOW FOLLOWS:
+ *  - No C bitfields.  Every descriptor field is an explicit shift and mask
+ *    over `u32` words, with the byte and bit range it came from.  The layout
+ *    was MEASURED twice, from the loader's live rings and by compiling the
+ *    vendor struct under two compilers, and the two agree field for field.
+ *  - Everything uncached.  Rings, descriptors and packet buffers are reached
+ *    through KSEG1, because this D-cache is NOT coherent with a bus master
+ *    (`CPU-45`); `alloc` writes back and invalidates the region once before
+ *    the KSEG1 alias is used.
+ *  - The RX buffers keep the loader's two-byte reserve (`NIC_RX_OFFSET`), so
+ *    an IP header lands 4-byte aligned behind a 14-byte Ethernet header.
  *
- * 量 confirms both halves on this die:
+ * It does not configure the switch core, it attaches no PHY (the CPU port has
+ * none), and it does not copy `swNic_receive`'s checksum drop.
  *
- *   loader state   `CPUICR = 0xC4000000`  bench/2026-09-19b/X7-cpufull-a
- *   Linux state    `CPUICR = 0x00000000`  bench/2026-09-17b block 26 §2.4
- *
- * 🔴 SO REMOVING THE VENDOR DRIVER WOULD BE THE DANGEROUS CHOICE, NOT THE
- * SAFE ONE.  The loader leaves RXCMD set with ring bases at `0xA040FC70`,
- * which is physical `0x0040FC70` -- memory Linux will hand out.  Something
- * must turn that engine off before the kernel reuses those pages, and in this
- * image the only thing that does is the vendor's probe.
- *
- * The other half of the arrangement is the interrupt.  讀 `rtl_nic.c:4227`:
- *
- *	rc = request_irq(dev->irq, interrupt_isr, IRQF_DISABLED, dev->name, dev);
- *
- * -- `IRQF_DISABLED`, NOT `IRQF_SHARED`, and it is called from
- * `re865x_open()` (`:4174`), i.e. on the first `ifconfig up`, not from probe.
- * So on an image where no vendor interface is ever brought up, IRQ 12 is
- * unclaimed and this driver can take it exclusively.  That is a condition,
- * not a wish: `irqon` reports the `request_irq` return value rather than
- * assuming it, and a `-EBUSY` there means somebody opened an interface.
- *
- * ⚠️ IRQ 12 IS NOT LINE 25.  `notes/switch-driver.md:438-442`: the switch
- * core is `BSP_SWCORE_IRQ` = 12 = LOPI base 8 + 4, gated by `GIMR` bit 15
- * (`BSP_SW_IE`), and it does NOT go through the ICTL cascade that `R5-3`'s
- * timer used at line 25.  None of that driver's interrupt experience carries
- * across and this comment exists so nobody assumes it does.
- *
- * ======================================================================
- * WHY THERE ARE NO C BITFIELDS IN THIS FILE
- * ======================================================================
- *
- * The vendor describes the packet header as `struct rtl_pktHdr` in
- * `common/mbuf.h`, and it is C bitfields with NO endian conditional -- 量,
- * `grep -c ENDIAN common/mbuf.h` = 0.  The layout is therefore an UNSTATED
- * ABI CONSEQUENCE: it is whatever this compiler happens to do with bitfields
- * on a big-endian target, and it is exactly the thing this gate's 否證 ① is
- * about.  Copying the struct would make the driver's correctness depend on a
- * property no source file states.
- *
- * So every field here is an explicit shift and mask over `u32` words, and
- * each one carries the byte and bit range it came from.  The point is
- * auditability: a descriptor built by this file can be checked against a
- * `DW` hexdump by eye, which a bitfield struct cannot.
- *
- * The layout below is 量 TWICE, by routes that share no code:
- *
- *   (a) ON THIS DIE, from the loader's own live and working rings --
- *       `bench/2026-09-19b/X9-rings` and `X10-descs`, read at the loader
- *       prompt before anything booted.  Pkthdr descriptors at `A040FDD8`,
- *       `FDF0`, `FE08`, `FE20` -- three intervals of 0x18, so the stride is
- *       24 and not the 32 the header's own comment claims.  mbuf descriptors
- *       at `A040FF30`, `FF48`, `FF60`, `FF78`, same stride.  The data
- *       buffers are `A040FF9A`, `A041079A`, `A0410F9A`, `A041179A` --
- *       EXACTLY 0x800 apart, which is the third independent confirmation of
- *       the 2048-byte mbuf (the others being `CPUICR[26:24] = 4` and the
- *       `0x0800` in the descriptor's own `m_extsize`).
- *
- *   (b) FROM THE SOURCE, by compiling the vendor struct under two different
- *       compilers and dumping the assignments.  See `notes/nic-driver.md`.
- *
- * 🟢 The two agree field for field.  That is 否證 ① answered at the desk,
- * before a single frame is transmitted, and it is the reason this driver is
- * being written with a layout rather than with a hypothesis.
- *
- * ⚠️ 量 also says the buffers sit at `...9A`, i.e. 2 MOD 4.  That is the
- * two-byte reserve that makes an IP header land 4-byte aligned behind a
- * 14-byte Ethernet header.  It is preserved here -- `NIC_RX_OFFSET` -- and it
- * is NOT a detail this driver would have arrived at by reasoning.
- *
- * ======================================================================
- * WHY EVERYTHING IS UNCACHED, WHICH THIS GATE PRE-REGISTERED
- * ======================================================================
- *
- * `CPU-45` is answered and the answer is that this D-cache is NOT coherent
- * with a real bus master: seating 26 had the switch's RX DMA overwrite DRAM
- * under a resident line and the cached read returned the OLD value, twice,
- * with the "it was just evicted" escape closed by the data itself.
- *
- * `R6`'s own 否證 `D1` says, written before any of this existed, that the
- * consequence is *the driver uses uncached mappings throughout -- with the
- * throughput cost measured rather than assumed, because an uncached ring is
- * a different D5*.  This file does exactly that: rings, descriptors AND
- * packet buffers are all reached through KSEG1.  The cost is R6-5's to
- * measure; it is not paid here on a guess that it is small.
- *
- * ⚠️ `kmalloc` returns a KSEG0 address and the allocator may leave dirty
- * lines over it.  `alloc` therefore writes back and invalidates the whole
- * region ONCE before the KSEG1 alias is ever used.  Without that, a dirty
- * cache line could be written back over data the engine had already DMA'd --
- * which is the same non-coherence, in the direction that is easy to forget.
- *
- * ======================================================================
- * WHAT THIS DRIVER DOES NOT DO
- * ======================================================================
- *
- * 1. ~~It registers no `net_device` and no `ethtool` ops~~, and it touches
- *    no PHY.  🔄 2026-09-22: TWO THIRDS OF THIS ITEM EXPIRED AND NOBODY
- *    DELETED IT.  `R6-4` landed on 2026-09-19: `register_netdev()` runs
- *    behind the `netdev on` verb and `nic_netdev_ops` is installed at
- *    init.  1.3 adds `nic_ethtool_ops` (get_drvinfo, get_link,
- *    get_ringparam): it expired too.  🟢 THE PHY THIRD IS STILL TRUE, and it
- *    is true for a reason rather than by omission: 讀 + 量, the CPU port
- *    has no PHY behind it at all -- MDIO address 6 is silent while 0-4
- *    answer, `PCRP6`'s `EnablePHYIf` is clear, `PSRP6`'s EEE field is 0,
- *    and the CPU interface is in the SYSTEM window (0xB8010000) rather
- *    than the switch core's.  A `phy_device` attached to `rlx0` would
- *    have to name an MII address belonging to a different port.  The
- *    `mii_bus` that IS correct here belongs to `rtl819x-switch.c` and
- *    serves ports 0-4; it is named as not done rather than skipped.
- * 2. It writes NOTHING at boot.  Every hardware write is behind a verb AND
- *    behind a runtime unlock, so `n_writes` reading 0 on a boot capture is a
- *    measurement and not a promise.
- * 3. It does not configure the switch core; others set its traps.  讀
- *    `rtl865x_asicL2.c:4694,4703`, the vendor's PROBE already sets
- *    `SWTCR0 |= NAPTF2CPU` and `FFCR |= EN_UNMCAST_TOCPU` on SWCORE=y, and
- *    leaves unknown UNICAST untrapped (`FFCR &= ~EN_UNUNICAST_TOCPU`).  On
- *    SWCORE=n no probe runs: rtl819x-switch 1.6's `vlan`, which /init
- *    types, sets FFCR to 3 (EnUnkUC2CPU | EnUnkMC2CPU), so unknown unicast
- *    is trapped there too.  A driver that expects arbitrary unicast before
- *    R6-4 binds a MAC address depends on which image it runs in.
- * 4. It does not copy `swNic_receive`'s checksum test.  讀
- *    `rtl865xc_swNic.c:604`: the vendor DROPS any frame whose `ph_flags`
- *    lacks BOTH `CSUM_IP_OK` and `CSUM_TCPUDP_OK`.
- *    🔴 THE REASON THIS COMMENT FIRST GAVE WAS WRONG AND THE SILICON SAID SO.
- *    It read *"An ARP frame carries neither"*.  量 2026-09-19,
- *    `bench/2026-09-19b/C32-nic10`: a broadcast ARP request delivered to the
- *    CPU port arrives with `ph_flags = 0x8063`, which INCLUDES both bits.  So
- *    the vendor's test would have passed that frame and the worked example
- *    was invented rather than measured.  The rule survives and is narrower:
- *    the test is a filter on a field this driver has not characterised, its
- *    two bits are set by hardware for reasons nothing here has established,
- *    and adopting it would make RX depend on that.  What is measured is the
- *    VALUE, twice: 0x80E3 for a frame the loader received and 0x8063 for one
- *    Linux received, each decomposing into named bits with no residue.
- * 5. It implements NAPI's MECHANISM -- mask at interrupt, bounded poll,
- *    unmask at exhaustion -- ~~but does not bind a `struct napi_struct`,
- *    because in 2.6.30 that needs a `net_device` and the `net_device` is
- *    R6-4~~.  🔄 2026-09-22: EXPIRED, same day and same step as item 1,
- *    and it survived three seatings of being false.  `netif_napi_add()`
- *    binds `nic_napi` at init and `nic_poll` is the real NAPI poll.  Both
- *    items were found by an audit and not by a test, which is the point
- *    worth keeping: nothing in this repository checks a comment.
- *
- * ======================================================================
- * THE LADDER, AND THE OBSERVABLE EACH RUNG MUST PRODUCE
- * ======================================================================
- *
- *   rung 0  swint     `CPUICR |= SWINTSET` with the engine ON and the mask
- *                     OPEN.  Observable: `n_irq` moves and `/proc/interrupts`
- *                     grows a line 12 that was not there before.
- *                     🔴 The ONLY reason this rung is written this way is
- *                     that seating 27 REFUTED it written the other way:
- *                     `SPEC.md` `NET-47`, `SWINTSET` with the engine off and
- *                     the mask closed leaves no trace and raises no
- *                     `CPUIISR` bit, with an off-card control (an
- *                     `0x04000000` written down the same path STUCK) proving
- *                     that is the die and not the instrument.
- *                     ⚠️ And there is no named pending bit to look for: 量,
- *                     `rtl865xc_asicregs.h` defines no `SW_INT_IP`.  `n_irq`
- *                     is the observable; a `CPUIISR` bit is a bonus.
- *   rung 1  lb on; tx one frame.  Observable: the frame appears in the RX
- *                     ring with the payload this driver wrote.  No PHY, no
- *                     cable, no switch forwarding involved.
- *   rung 2  lb off; tx.  Observable: the workstation's capture.
- *   rung 3  rx        Observable: a frame the workstation sent, decoded.
- *                     ⚠️ RX IS ATTEMPTED BEFORE TX ON PURPOSE.  `ph_flags`
- *                     on transmit is the one field that cannot be derived
- *                     from the layout, and a received frame carries the
- *                     ASIC's own value for it.  Measuring beats guessing and
- *                     the ordering is free.
- *   rung 4  poll      Observable: interrupts masked during the poll, frames
- *                     drained, mask restored, `n_irq` still moving after.
+ * The driver page: docs/drivers/nic.md; the reasoning and every reading:
+ * notes/nic-driver.md.  The head this file carried until 2026-10-18 -- why
+ * it could start from a known state, the bitfield and cache arguments in
+ * full, what it does not do item by item, and the R6-3 ladder -- is verbatim
+ * in docs/drivers/nic-history.md.
  */
 
 #include <linux/init.h>
@@ -226,14 +73,14 @@
 extern int rtl819x_sw_any_link(void);
 #define RTL819X_NIC_PROC_NAME	"rtl819x-nic"
 
-/* 🔴 `read_proc` is handed ONE 4,096-byte page and `nic_read_proc` does not
+/* NOTE: `read_proc` is handed ONE 4,096-byte page and `nic_read_proc` does not
  * bounds-check, so an overflow is not a truncated dump -- it is a store past
  * the page.  `rtl819x-spi` 1.1 met this same limit and answered it by putting
  * its 1,024-line map on a SECOND /proc file.  That answer is wrong for what
  * is HERE: this dump's readers are cells in frozen cards, and moving a line
  * moves them.  1.5's new content is not here; it is /proc/rtl819x-nic-tx.
  *
- * 量 2026-09-22, `scratchpad/pagebudget.py` charging every `sprintf` in this
+ * MEASURED 2026-09-22, `scratchpad/pagebudget.py` charging every `sprintf` in this
  * handler its widest expansion (`%u` 10, `%d` 11, `%X` 8, `%s` 15, the loops at
  * full trip counts): **3,829 of 4,096**.  Re-run 2026-09-26 it gives 3,864 on
  * `fae5f9a`, the commit that wrote 3,829, and 4,091 on 1.4; charging `rx_bytes`
@@ -245,9 +92,9 @@ extern int rtl819x_sw_any_link(void);
  * this driver are all `sprintf` lines.  A capped dump SAYS `truncated 1`
  * instead of corrupting memory.
  *
- * 🔴 THE CHECK IS PER ITERATION AND NOT PER BLOCK: a loop cannot start an
+ * NOTE: THE CHECK IS PER ITERATION AND NOT PER BLOCK: a loop cannot start an
  * iteration above 3,900 and its longest line is 61, so the loops end at or
- * below 3,961, plus 12 if one trips.  🔄 1.5 (R6b-2), per conversion: `tx15`
+ * below 3,961, plus 12 if one trips.  UPDATE: 1.5 (R6b-2), per conversion: `tx15`
  * is guarded the same way and bounded to 63 bytes, so it ends at or below
  * 3,963; the unguarded tail -- rx_len, rx_ph1, rx_ph3, rx_ph4, 66 bytes --
  * follows, and the hexdump's guard is exact (a frame dump cut in half is worse
@@ -259,10 +106,10 @@ extern int rtl819x_sw_any_link(void);
 /* ------------------------------------------------------------------------
  * The register block.
  *
- * `CPU_IFACE_BASE = SYSTEM_BASE + 0x10000` = 0xB8010000, 讀
+ * `CPU_IFACE_BASE = SYSTEM_BASE + 0x10000` = 0xB8010000, READ
  * `rtl865xc_asicregs.h:491` with `REAL_SYSTEM_BASE 0xB8000000` at `:148`.
  *
- * 🔴 This is the SYSTEM block, next door to the timer at 0xB8003100.  It is
+ * NOTE: This is the SYSTEM block, next door to the timer at 0xB8003100.  It is
  * NOT `0xBB800000` (the switch core, where rtl819x-switch.c lives) and it is
  * NOT `0xBB000000` (the switch TABLE window).  Writing CPUICR at either of
  * those would write into a different peripheral.
@@ -281,17 +128,17 @@ extern int rtl819x_sw_any_link(void);
 #define NIC_CPUIIMR		0x028	/* :512  */
 #define NIC_CPUIISR		0x02C	/* :513  W1C */
 
-/* 🔴 NOT an indexed macro.  讀 `rtl865xc_asicregs.h:505`, the vendor's own
+/* NOTE: NOT an indexed macro.  READ `rtl865xc_asicregs.h:505`, the vendor's own
  * `CPUTPDCR(idx)` is WRONG for idx 2 and 3 -- TX bases are non-contiguous
  * (0x020/0x024 then 0x060/0x064), so the macro resolves idx 2 to 0xB8010028
- * = CPUIIMR and idx 3 to 0xB801002C = CPUIISR.  量: both indexed macros have
+ * = CPUIIMR and idx 3 to 0xB801002C = CPUIISR.  MEASURED: both indexed macros have
  * zero call sites in the whole vendor tree, so the vendor never steps on it
  * and the landmine is live for anyone who writes the helper the macro looks
  * like an invitation to write.  These two are spelled out instead. */
 #define NIC_CPUTPDCR2		0x060	/* :508  8196E only */
 #define NIC_CPUTPDCR3		0x064	/* :509  */
 
-/* CPUICR fields, 讀 `:527-548`, and re-derived against this die's own
+/* CPUICR fields, READ `:527-548`, and re-derived against this die's own
  * `C4000000`: TXCMD | RXCMD | BUSBURST_32WORDS(00) | MBUF_2048BYTES(4<<24). */
 #define NIC_TXCMD		(1u << 31)
 #define NIC_RXCMD		(1u << 30)
@@ -305,7 +152,7 @@ extern int rtl819x_sw_any_link(void);
 #define NIC_STOPTX		(1u << 21)
 #define NIC_SWINTSET		(1u << 20)
 #define NIC_LBMODE		(1u << 19)
-#define NIC_LBSPEED		(1u << 18)	/* 🔴 the header defines BOTH
+#define NIC_LBSPEED		(1u << 18)	/* NOTE: the header defines BOTH
 						 * `LB10MHZ` and `LB100MHZ` as
 						 * (1<<18), `:543-544`, with
 						 * contradictory comments.  One
@@ -313,7 +160,7 @@ extern int rtl819x_sw_any_link(void);
 						 * in the material says which.
 						 * `NET-38 殘留 ③`. */
 
-/* Descriptor ownership, 讀 `:549-554`, and 量 on this die: the loader's idle
+/* Descriptor ownership, READ `:549-554`, and MEASURED on this die: the loader's idle
  * RX rings hold entries with bit 0 SET and its idle TX rings hold entries
  * with bit 0 CLEAR.  An idle receive ring is owned by the hardware (it is
  * waiting to fill it) and an idle transmit ring is owned by the CPU (there is
@@ -323,9 +170,9 @@ extern int rtl819x_sw_any_link(void);
 #define NIC_DESC_WRAP		(1u << 1)	/* last entry of the ring */
 #define NIC_DESC_ADDR		0xFFFFFFFCu
 
-/* CPUIIMR / CPUIISR, 讀 `:561-640`.  Only the ones this driver uses.
+/* CPUIIMR / CPUIISR, READ `:561-640`.  Only the ones this driver uses.
  *
- * 🟢 The decode is checked against this die: the loader leaves
+ * OK: The decode is checked against this die: the loader leaves
  * `CPUIIMR = 0x000007F8`, which is EXACTLY `RX_DONE_IE_ALL (0x3f<<3)` |
  * `TX_DONE_IE_ALL (0x3<<9)` with no residue, and `CPUIISR = 0x80000000`,
  * which is exactly `LINK_CHANGE_IP` -- one latched link-change that nothing
@@ -336,7 +183,7 @@ extern int rtl819x_sw_any_link(void);
 #define NIC_IE_TX_DONE_ALL	(0x3u << 9)
 #define NIC_IE_TX_ALL_DONE_ALL	(0x3u << 1)
 #define NIC_IE_PKTHDR_RUNOUT	(0x3fu << 17)
-#define NIC_IE_MBUF_RUNOUT	(1u << 11)	/* 🔴 mask bit 11, but the
+#define NIC_IE_MBUF_RUNOUT	(1u << 11)	/* NOTE: mask bit 11, but the
 						 * matching STATUS bit is 16
 						 * (`:630`).  Every other
 						 * pair in this block shares a
@@ -348,11 +195,11 @@ extern int rtl819x_sw_any_link(void);
 
 /* What this driver unmasks.
  *
- * 🔴🔴 THE FIRST VERSION OF THIS CONSTANT WEDGED THE INTERFACE UNDER LOAD AND
+ * NOTE: THE FIRST VERSION OF THIS CONSTANT WEDGED THE INTERFACE UNDER LOAD AND
  * THE MEASUREMENT IS `bench/2026-09-19b/C58-afterflood2`.  It read
  * `(RX_DONE_ALL | TX_DONE_ALL | TX_ALL_DONE_ALL)` = 0x7FE, dropping the
  * run-out enables on the stated ground that only the sources this ladder
- * observes should be on.  量, under four concurrent 1400-byte floods: the RX
+ * observes should be on.  MEASURED, under four concurrent 1400-byte floods: the RX
  * pkthdr ring ran out, `CPUIISR` latched bit 17 `PKTHDR_DESC_RUNOUT_IP0`, and
  * because bits 17-22 were masked NO INTERRUPT FIRED -- so NAPI was never
  * scheduled, two filled descriptors were never harvested or handed back, and
@@ -361,14 +208,14 @@ extern int rtl819x_sw_any_link(void);
  * 0x00020000 at rest, which proves the ISR had not run since -- the ISR W1Cs
  * everything it reads.
  *
- * 🟢 THE LESSON IS ABOUT THE VENDOR'S CONSTANT, NOT ABOUT THIS BIT.  The
+ * OK: THE LESSON IS ABOUT THE VENDOR'S CONSTANT, NOT ABOUT THIS BIT.  The
  * vendor writes `CPUIIMR = 0x807E01FE` and `0x007E0000` is exactly the field
  * dropped here.  A constant read out of a working driver carries knowledge
  * that its own source does not explain, and the part of it that could not be
  * justified from first principles was the part that mattered.  Dropping a bit
  * because its purpose is not understood is not conservatism.
  *
- * ⚠️ `MBUF_DESC_RUNOUT`'s enable is bit 11 and its STATUS is bit 16, 讀
+ * CAUTION: `MBUF_DESC_RUNOUT`'s enable is bit 11 and its STATUS is bit 16, READ
  * `rtl865xc_asicregs.h:585-586` and `:630-631` -- the only pair in this block
  * that does not share a position.  That asymmetry is load-bearing here and is
  * why the enable and the status are two separate constants below.
@@ -385,7 +232,7 @@ extern int rtl819x_sw_any_link(void);
 #define NIC_IP_RX_WORK		(NIC_IE_RX_DONE_ALL | NIC_IE_PKTHDR_RUNOUT | \
 				 NIC_IP_MBUF_RUNOUT)
 
-#define NIC_IRQ			12	/* BSP_SWCORE_IRQ, 讀
+#define NIC_IRQ			12	/* BSP_SWCORE_IRQ, READ
 					 * `boards/rtl8196e/bsp/bspchip.h:108`,
 					 * corroborated by the chip table at
 					 * `:81` and by LOPI base 8 + 4. */
@@ -399,7 +246,7 @@ extern int rtl819x_sw_any_link(void);
  * busybox has no `dd` and no `md5sum`, so nothing on the device can digest a
  * buffer -- printing it is the only way to see it.
  *
- * ⚠️ The three vendor trees DISAGREE on the vendor's own sizes for exactly
+ * CAUTION: The three vendor trees DISAGREE on the vendor's own sizes for exactly
  * this config symbol (base tree 256/128, wecb and saturn49 512/1024).  That
  * is another reason not to inherit a number from them.
  * ------------------------------------------------------------------------ */
@@ -409,7 +256,7 @@ extern int rtl819x_sw_any_link(void);
 /* s32a.  How many times tx_mode 1 re-reads the OWN bit of the slot it wants
  * before it gives up and drops the frame.
  *
- * 讀 `rtl_nic.c:5122`, the vendor's own constant for the same decision:
+ * READ `rtl_nic.c:5122`, the vendor's own constant for the same decision:
  *
  *     #define	RTL_NIC_TX_RETRY_MAX		(128)
  *
@@ -423,7 +270,7 @@ extern int rtl819x_sw_any_link(void);
 #define NIC_TX_RETRY_MAX	128
 
 #define NIC_TXMODE_STOPQ	0	/* today's path: netif_stop_queue + BUSY  */
-#define NIC_TXMODE_VENDOR	1	/* 讀 rtl_nic.c:5161-5171: poll, then drop */
+#define NIC_TXMODE_VENDOR	1	/* READ rtl_nic.c:5161-5171: poll, then drop */
 
 /* s99a (c).  How a pkthdr's `ph_mbuf` word relates to its own slot index.
  * Three states and not two on purpose: AGREE alone says the detector does not
@@ -434,14 +281,14 @@ extern int rtl819x_sw_any_link(void);
 #define NIC_PHC_SKEW		1
 #define NIC_PHC_BAD		2
 #define NIC_BUF_SZ		2048	/* must agree with NIC_MBUF_2048 */
-#define NIC_RX_OFFSET		2	/* 量: the loader's buffers are at
+#define NIC_RX_OFFSET		2	/* MEASURED: the loader's buffers are at
 					 * `...9A`, 2 mod 4 */
-#define NIC_DESC_BYTES		24	/* 量: stride on this die, and the
+#define NIC_DESC_BYTES		24	/* MEASURED: stride on this die, and the
 					 * header's "exactly 32 bytes" comment
 					 * is wrong -- sizeof is 24 under
 					 * CONFIG_RTL_8196E */
-/* 🔴 2026-09-22: THAT IS TRUE OF `rtl_pktHdr` AND FALSE OF `rtl_mBuf`, and
- * this one constant is the stride for BOTH rings.  讀 `common/mbuf.h:33-49`,
+/* NOTE: 2026-09-22: THAT IS TRUE OF `rtl_pktHdr` AND FALSE OF `rtl_mBuf`, and
+ * this one constant is the stride for BOTH rings.  READ `common/mbuf.h:33-49`,
  * counted by declaration order: `m_next` 0, `m_pkthdr` 4, `m_len` 8,
  * `m_flags` 10, one pad byte at 11 so `m_data` can be 4-aligned, `m_data` 12,
  * `m_extbuf` 16, `m_extsize` 20, `m_reserved[2]` 22, **`skb` 24** --
@@ -455,7 +302,7 @@ extern int rtl819x_sw_any_link(void);
  * `sizeof(struct rtl_mBuf)` = 28, so porting that line literally would be
  * wrong by 4 in 28 per slot.
  *
- * ⚠️ One consequence is load-bearing for `NET-82` below: rlxfw's mbuf
+ * CAUTION: One consequence is load-bearing for `NET-82` below: rlxfw's mbuf
  * descriptors are 24 bytes and therefore have NO `skb` word.  The vendor's
  * receive path takes `pPkthdr->ph_mbuf->skb` (`:629`) -- byte 24, which does
  * not exist here.  rlxfw's analogue is `m_data` at word 3, which is what it
@@ -467,7 +314,7 @@ extern int rtl819x_sw_any_link(void);
  * i is the most significant bit of byte 4i -- which is how a `DW` hexdump
  * reads, and that is the point.
  *
- * pkthdr, 量 on this die and confirmed by compiling the vendor struct:
+ * pkthdr, MEASURED on this die and confirmed by compiling the vendor struct:
  *   w0  bytes  0..3   ph_mbuf              (pointer to the mbuf descriptor)
  *   w1  bytes  4..5   ph_len               (INCLUDES the 4-byte FCS)
  *       byte   6 hi   ph_queueId
@@ -506,19 +353,19 @@ extern int rtl819x_sw_any_link(void);
 	((((u32)(len) & 0xFFFFu) << 16) | ((u32)(flags) & 0xFFFFu))
 #define NIC_MB_MK5(extsize)	(((u32)(extsize) & 0xFFFFu) << 16)
 
-/* 量, from the loader's working rings on this die: every mbuf descriptor in
+/* MEASURED, from the loader's working rings on this die: every mbuf descriptor in
  * every ring carries `m_flags = 0x009C`, which decomposes with no residue
  * into MBUF_USED | MBUF_EXT | MBUF_PKTHDR | MBUF_EOR.  Used as a measured
  * constant rather than reassembled from four names whose values would be a
  * second thing to get right. */
 #define NIC_MB_FLAGS_INIT	0x009Cu
 
-/* 量, the loader's idle TX pkthdr template on this die (`A040FCE8`, word 3 =
+/* MEASURED, the loader's idle TX pkthdr template on this die (`A040FCE8`, word 3 =
  * `0x88000000`) and its idle RX pkthdr template (`A040FDD8`, word 3 =
  * `0x90000000`).  Both carry 0x8000; the differing bit is 0x0800 on TX and
  * 0x1000 on RX.
  *
- * 🔴 THIS IS THE ONE FIELD THIS DRIVER CANNOT DERIVE.  It is a default, it
+ * NOTE: THIS IS THE ONE FIELD THIS DRIVER CANNOT DERIVE.  It is a default, it
  * is overridable from the `tx` verb, and the ladder measures the ASIC's own
  * value on a RECEIVED frame before it relies on this one.  That ordering is
  * the mitigation and it is why rung 3 is attempted before rung 2. */
@@ -588,11 +435,11 @@ static u32 nic_last_rx_ph1, nic_last_rx_ph3, nic_last_rx_ph4;
  * is fixed at 02:52:4C:58:46:57 -- 0x02 marks it locally administered, and
  * the remaining five bytes are ASCII "RLXFW".
  *
- * 🟢 That turns a limitation into R6-4's own DoD requirement.  The gate asks
+ * OK: That turns a limitation into R6-4's own DoD requirement.  The gate asks
  * for a POSITIVE discriminator -- "a string only my driver produces" rather
  * than the vendor's absence -- and an address no Realtek OUI can contain,
  * on an interface named `rlx0` where the vendor's are `eth0`..`eth5`, is
- * exactly that.  ⚠️ The limitation is still real and is named here: this
+ * exactly that.  CAUTION: The limitation is still real and is named here: this
  * driver cannot yet be the interface a shipped firmware uses, because a
  * shipped firmware must present the address on the label.  Reading `H601`
  * safely is a separate problem and it is not solved by this file.
@@ -608,7 +455,7 @@ static u32 nic_last_rx_ph1, nic_last_rx_ph3, nic_last_rx_ph4;
  * frame's length.
  *
  * NOTHING IN THIS DRIVER COULD SEE THAT.  `n_rx` counted every one of 5,281
- * frames while 218 datagrams died above it -- 量 seating 30, and it is why
+ * frames while 218 datagrams died above it -- MEASURED seating 30, and it is why
  * `PROGRESS.md`'s D6 row says *zero drops by the driver's own counters* would
  * be "true and meaningless".  This is the counter that makes that row mean
  * something.
@@ -642,7 +489,7 @@ static unsigned long nic_n_arm_flush;	/* CPU-owned slots `arm` discarded */
 /* R6-4a.  The TX queue's stop/wake ledger.  Four counters and one state,
  * because `n_xmit_busy` alone cannot tell "the stop path was never
  * reached" from "it was reached and the wake worked" -- both read 0.
- * 量 `bench/2026-09-19b`, four concurrent 1400-byte floods on two images:
+ * MEASURED `bench/2026-09-19b`, four concurrent 1400-byte floods on two images:
  * `n_xmit_busy 0` every time, which is the first reading and was mistaken
  * for nothing at all.
  *
@@ -666,7 +513,7 @@ static unsigned long nic_n_tx_timeout;
  * s99a (b) -- THE INTERRUPT MASK AS A VARIABLE, so `NET-67 殘留`'s strongest
  * remaining candidate can be run as a single-variable A/B on one boot.
  *
- * 量 `docs/nic-vendor-diff.md` 12.4: at the loader prompt this die's
+ * MEASURED `docs/nic-vendor-diff.md` 12.4: at the loader prompt this die's
  * `CPUIIMR` is `0x000007F8` -- RX_DONE 0..5 and TX_DONE 0/1, nothing else --
  * while this driver arms `NIC_IIMR_LADDER` = `0x007E0FFE`, which additionally
  * unmasks TX_ALL_DONE (bits 1-2), MBUF_DESC_RUNOUT's enable (bit 11) and all
@@ -676,8 +523,8 @@ static unsigned long nic_n_tx_timeout;
  * (`12.2`: a service loop with two reclaim call sites) and therefore does not
  * depend on any of those interrupts for liveness.
  *
- * 🔴 WHY THIS CANNOT BE DONE FROM /proc WITH THE OLD CODE, which is the
- * reason it needs an image at all: 讀 the unmask in `nic_poll` below -- it
+ * NOTE: WHY THIS CANNOT BE DONE FROM /proc WITH THE OLD CODE, which is the
+ * reason it needs an image at all: READ the unmask in `nic_poll` below -- it
  * OR-ed the three RX-work enables back in on EVERY napi_complete.  A mask
  * written through the vendor's `/proc/rtl865x/memory` would be restored by
  * the first arriving packet, and the read-back cell would have shown a FALSE
@@ -685,7 +532,7 @@ static unsigned long nic_n_tx_timeout;
  * do it was discarded at the desk for that reason (`14.4`).  So the restore
  * is bounded by this variable, and the variable is what the verb sets.
  *
- * 🔴 THE A/B HAS A CONFOUND AND IT IS NAMED HERE RATHER THAN LEFT TO BE
+ * NOTE: THE A/B HAS A CONFOUND AND IT IS NAMED HERE RATHER THAN LEFT TO BE
  * FOUND.  `NIC_IIMR_LADDER`'s own comment records that dropping the run-out
  * enables -- mask `0x7FE`, which is the loader's `0x7F8` plus TX_ALL_DONE --
  * made this interface PERMANENTLY DEAF under load
@@ -698,7 +545,7 @@ static unsigned long nic_n_tx_timeout;
  * and `now_iisr` clear.  A card that reads only "did it stop answering"
  * cannot tell them apart; one that reads `n_rx` and `now_iisr` can.
  *
- * 🟢 TWO SOURCES: `iimr_base` is what this driver believes it armed and
+ * OK: TWO SOURCES: `iimr_base` is what this driver believes it armed and
  * `now_iimr` is the register read back.  If they disagree, something else is
  * writing `CPUIIMR` -- which is the very defect 14.4 warned about, arriving
  * as a reading instead of as a worry. */
@@ -734,14 +581,14 @@ static u32 nic_iimr_base = NIC_IIMR_LADDER;
  *                            in place as the second layer.
  *
  * WHY A TIMER AND NOT THE ISR.  The obvious cheap form is to recover from
- * `nic_tx_try_wake()`, which already runs on every interrupt.  量 `NET-99`:
+ * `nic_tx_try_wake()`, which already runs on every interrupt.  MEASURED `NET-99`:
  * during the wedge `n_irq` advanced ONLY because the host kept pinging -- six
  * interrupts per probe and nothing in between.  A recovery hung off the
  * interrupt therefore does not run on a board that has gone quiet, which is
  * the case where it is most needed.  The kernel's own answer to this is
  * `dev_watchdog`, and the only reason it is unavailable is `NET-57`.
  *
- * 🔄 1.4, 2026-09-23: DEFAULT ON.  `NET-107`: seating 37's 17 Mbit/s had
+ * UPDATE: 1.4, 2026-09-23: DEFAULT ON.  `NET-107`: seating 37's 17 Mbit/s had
  * `recover 1` typed, and a boot that typed nothing read 0.06.  `recover 0`
  * still reaches the old arm, so one boot can still carry both arms.
  *
@@ -757,7 +604,7 @@ static u32 nic_iimr_base = NIC_IIMR_LADDER;
  *
  * and `recov_rc` carries WHICH call failed rather than collapsing to a count.
  *
- * 🔴 REFUTATION CONDITIONS, written before the board is powered:
+ * NOTE: REFUTATION CONDITIONS, written before the board is powered:
  *   - `n_recov_ok >= 1` with the ping after it still 0/4 REFUTES "these three
  *     calls are a recovery" -- they returned 0 and the interface did not come
  *     back.  `NET-101` measured the opposite twice, by hand.
@@ -790,13 +637,13 @@ static int		 nic_recov_rc[3];
 /* ------------------------------------------------------------------------
  * s99a (c) -- `NET-82`, AS AN INSTRUMENT FIRST AND A CHANGE SECOND.
  *
- * 讀 `rtl865xc_swNic.c:597-628`: the vendor consumes a received frame with
+ * READ `rtl865xc_swNic.c:597-628`: the vendor consumes a received frame with
  * ONE index.  It tests OWN on `rxPkthdrRing[currRxPkthdrDescIndex]`, masks
  * `OWN|WRAP` off to get the pkthdr's address, and then FOLLOWS that pkthdr's
  * `ph_mbuf` pointer to the mbuf and the buffer.  It never indexes the mbuf
  * ring to find a buffer; `currRxMbufDescIndex` exists and belongs to refill.
  *
- * 讀 this file at `nic_do_alloc`: rlxfw writes `rx_ph[i].w0 = &rx_mb[i]` when
+ * READ this file at `nic_do_alloc`: rlxfw writes `rx_ph[i].w0 = &rx_mb[i]` when
  * it builds the ring, and `nic_refill()` does NOT rewrite w0.  So after a
  * frame has been delivered, `rx_ph[i].w0` holds whatever the ENGINE left
  * there.  That makes one word a direct test of `NET-61`'s mechanism:
@@ -806,7 +653,7 @@ static int		 nic_recov_rc[3];
  *   if it does not, the engine used a different mbuf slot for this pkthdr
  *   and `nic_dw(nic_rx_mb, i, 3)` is reading SOMEBODY ELSE'S BUFFER.
  *
- * 🔴 WHY THIS IS NOT SIMPLY "SWITCH TO THE VENDOR'S WAY".  `NET-70`'s
+ * NOTE: WHY THIS IS NOT SIMPLY "SWITCH TO THE VENDOR'S WAY".  `NET-70`'s
  * `n_dsync` detector -- which has a three-state positive control and has read
  * 0 through every wedge -- measures the two hardware POSITION registers.  It
  * cannot see what the engine wrote into a descriptor.  Swapping the harvest
@@ -817,14 +664,14 @@ static int		 nic_recov_rc[3];
  * behind `nic_ph_follow`, and the counters below are collected in BOTH
  * modes.  `n_ph_diff` is the finding; `n_ph_chk` is its denominator.
  *
- * 🔄 1.3, 2026-09-22: THE DEFAULT IS NOW 1, AND THE COST IS PAID RATHER
+ * UPDATE: 1.3, 2026-09-22: THE DEFAULT IS NOW 1, AND THE COST IS PAID RATHER
  * THAN WAIVED.  `NET-82`'s condition was that the cost be written down
  * first; `NET-102` and `NET-103` (seating 37) are that writing-down.  What
  * is given up is real and is stated here: following the pointer REMOVES
  * this fault class rather than observing it, so `n_dsync` is no longer a
  * quantity whose zero means anything about this path.
  *
- * 🟢 What replaces it is NOT an argument, it is two properties of the
+ * OK: What replaces it is NOT an argument, it is two properties of the
  * code.  (a) The comparison at `nic_ph_class()` is UNCONDITIONAL -- the
  * switch picks which answer to return, not whether to look -- so
  * `n_ph_chk` and `n_ph_diff` count the same thing in both modes and the
@@ -832,14 +679,14 @@ static int		 nic_recov_rc[3];
  * reaches the old path, and it has a MEASURED signature to be recognised
  * by: 0.04-0.07 Mbit/s against 17 Mbit/s, `NET-102`.
  *
- * 🔴 What is lost is a property of the TEXT, and it is named rather than
+ * NOTE: What is lost is a property of the TEXT, and it is named rather than
  * quietly dropped: while the default was 0, every return in that mode was
  * literally `nic_dw(nic_rx_mb, i, 3)`, so *the default is today's
  * behaviour* could be read off the source.  It cannot any more.  The
  * replacement is weaker in kind and stronger in evidence: from 1.4 a boot
  * capture carries `RLXFW-N7` (1.3 said so, emitted none); modes differ 250x.
  *
- * 🔴 THE BOUNDS TEST IS NOT DEFENSIVE PROGRAMMING, IT IS THE SAFETY
+ * NOTE: THE BOUNDS TEST IS NOT DEFENSIVE PROGRAMMING, IT IS THE SAFETY
  * ARGUMENT.  `ph0` is a word a DMA engine wrote into memory this driver does
  * not otherwise validate.  Dereferencing it unchecked is the same shape as
  * the mechanism `NET-64`'s retracted draft feared -- and here it is cheap to
@@ -866,10 +713,10 @@ static unsigned long	 nic_ph_first_nrx;
 static u32		 nic_ph_last;		/* the raw w0, last harvest  */
 static u32		 nic_ph_last_bf;	/* the m_data it resolved to */
 static unsigned int	 nic_ph_last_j;		/* the slot it named	     */
-/* 🔴 `nic_ph_last_bf` is assigned ONLY on the SKEW branch and
+/* NOTE: `nic_ph_last_bf` is assigned ONLY on the SKEW branch and
  * `nic_ph_last_j` on EVERY call, so the two adjacent dump lines describe
  * different events whenever the last frame was an AGREE -- and no field
- * said which case a dump was in.  量 `CORRECTIONS-block40.md` § 5.3: the
+ * said which case a dump was in.  MEASURED `CORRECTIONS-block40.md` § 5.3: the
  * dereference identity this driver's own comment states held in 10 of 25
  * dumps and failed in 15, tracking the windows where `n_ph_diff` did not
  * move.  This field is written unconditionally beside `nic_ph_last_j`, so
@@ -894,7 +741,7 @@ static int		 nic_ph_test_seen;
  *   tx_retry_max_seen  the most re-reads any single call needed.  This is what
  *                      says whether NIC_TX_RETRY_MAX was ever approached.
  *   n_tx_recovered     calls where the engine returned the slot before the
- *                      bound.  🔴 THIS IS THE ONE THAT ANSWERS AN OPEN
+ *                      bound.  NOTE: THIS IS THE ONE THAT ANSWERS AN OPEN
  *                      QUESTION: > 0 means the engine resumes by itself, which
  *                      no reading in this project has ever been able to see,
  *                      because the queue-stop killed the interface at the first
@@ -992,12 +839,12 @@ static inline void nic_re_set(u32 ring, unsigned int idx, u32 v)
 /* ------------------------------------------------------------------------
  * The interrupt handler.
  *
- * Shape 讀 from `rtl_nic.c:3729-3731`: read CPUIISR, write it straight back
+ * Shape READ from `rtl_nic.c:3729-3731`: read CPUIISR, write it straight back
  * (W1C), THEN mask it with CPUIIMR.  Reading before clearing and clearing the
  * whole word is what makes a shared-status register safe; masking afterwards
  * is only for deciding what to do.
  *
- * 🔴 It must stay short.  `FW-45`/`CLK-28`: this board runs a watchdog that
+ * NOTE: It must stay short.  `FW-45`/`CLK-28`: this board runs a watchdog that
  * bites at ~1.33 s under Linux, kicked every 10 ms by the vendor's tick, so a
  * long interrupt-blocked window resets the board.  There is no work here
  * beyond counters for exactly that reason -- the frames are harvested by a
@@ -1016,7 +863,7 @@ static void nic_refill(unsigned int i);
 /* R6-4a.  Restart the transmit queue if -- and only if -- the slot that
  * `nic_xmit` will look at next is CPU-owned again.
  *
- * 🔴 THE TEST IS A LEVEL, NOT AN EDGE, AND THAT IS THE WHOLE DESIGN.  The
+ * NOTE: THE TEST IS A LEVEL, NOT AN EDGE, AND THAT IS THE WHOLE DESIGN.  The
  * obvious form is "the ISR saw TX_DONE, therefore wake", and an edge can
  * be consumed by an ISR invocation that runs while the queue is not yet
  * stopped -- after which no further edge is owed and the queue stays
@@ -1025,7 +872,7 @@ static void nic_refill(unsigned int i);
  * it, so a lost TX_DONE costs every frame offered until the next
  * interrupt of any kind (noqueue drops them), not the interface.
  *
- * 🟢 That the source exists at all is 量 on this die and not assumed.
+ * OK: That the source exists at all is MEASURED on this die and not assumed.
  * `bench/2026-09-19b/C19-nic6.log` is a single `tx` verb with `n_rx 0`,
  * and it reads `n_irq 1` with `last_iisr 0000320E` -- bits 1 and 2
  * (TX_ALL_DONE) and bit 9 (TX_DONE).  One transmit, one interrupt, TX
@@ -1035,7 +882,7 @@ static void nic_refill(unsigned int i);
  * Cost in interrupt context: one KSEG1 read, one bit test, and on the
  * rare taken branch a `test_and_clear_bit` plus a softirq raise.
  * Bounded, no loop -- `FW-45`'s ~1.33 s hardware watchdog is nowhere
- * near.  量 the config this builds under: `CONFIG_CPU_HAS_LLSC` is
+ * near.  MEASURED the config this builds under: `CONFIG_CPU_HAS_LLSC` is
  * ABSENT, so `test_and_clear_bit` takes arch/rlx's `raw_local_irq_save`
  * fallback (`arch/rlx/include/asm/bitops.h`, the `#else` of the
  * `#ifdef CONFIG_CPU_HAS_LLSC` pairs) -- not an `ll`/`sc` pair, and so
@@ -1043,7 +890,7 @@ static void nic_refill(unsigned int i);
  * handler below already does the same class of operation, 12,623 times
  * in `bench/2026-09-19b/C58-afterflood2.log`.
  *
- * ⚠️ `nic_tx_idx` is read here with no lock.  量: this image is built
+ * CAUTION: `nic_tx_idx` is read here with no lock.  MEASURED: this image is built
  * `# CONFIG_SMP is not set` and `CONFIG_PREEMPT_NONE=y`, and the only
  * writer is inside `nic_xmit`'s `spin_lock_irqsave`, which on that
  * configuration is a `local_irq_save` -- so this handler cannot observe
@@ -1083,7 +930,7 @@ static int nic_tx_try_wake(void)
  * re-test has already failed -- so a stop that the engine undid within the
  * same critical section never arms anything.
  *
- * ⚠️ `mod_timer` is called with `nic_lock` held and interrupts off.  That is
+ * CAUTION: `mod_timer` is called with `nic_lock` held and interrupts off.  That is
  * safe -- it takes the timer base's own lock, which nothing here holds -- and
  * it is the reason the arm is not done after the unlock: between the unlock
  * and the arm, the ISR can run, wake the queue and `del_timer` a timer that
@@ -1157,7 +1004,7 @@ static void nic_recov_fn(unsigned long data)
 	/* `arm` zeroed both indices and handed every TX slot back, so the
 	 * level is true and the queue can run.
 	 *
-	 * 🔴 THIS IS A DEPARTURE FROM WHAT `NET-101` MEASURED AND IT IS
+	 * NOTE: THIS IS A DEPARTURE FROM WHAT `NET-101` MEASURED AND IT IS
 	 * DELIBERATE.  By hand, the queue stayed stopped after the three writes
 	 * and was woken only when the host's next ARP arrived and `:754` saw
 	 * the freed ring -- `tx_stopped 1 / n_tx_wake 0` before the ping,
@@ -1199,13 +1046,13 @@ static irqreturn_t nic_isr(int irq, void *dev_id)
 	 * which the poll completes and unmasks, and then this line masks
 	 * again with no poll left to undo it.
 	 *
-	 * 🔴 Written with `__raw_writel` and not `nic_wr` deliberately: this
+	 * NOTE: Written with `__raw_writel` and not `nic_wr` deliberately: this
 	 * is interrupt context, and `nic_wr` takes the unlock decision and
 	 * bumps a non-atomic counter.  The write guard's job is to stop a
 	 * BOOT from writing, and by the time an interrupt can arrive the
 	 * unlock has already been given; making n_writes racy would cost a
 	 * measurement to protect nothing. */
-	/* 🔴 The condition is NIC_IP_RX_WORK and not RX_DONE alone, for the
+	/* NOTE: The condition is NIC_IP_RX_WORK and not RX_DONE alone, for the
 	 * reason NIC_IIMR_LADDER's comment records: a descriptor run-out means
 	 * there are filled descriptors waiting AND no free ones, which is
 	 * exactly when a poll is most needed and is precisely the case the
@@ -1237,7 +1084,7 @@ static irqreturn_t nic_isr(int irq, void *dev_id)
 
 /* Harvest at most `budget` frames into sk_buffs.  Returns how many.
  *
- * ⚠️ The copy is byte-wise and that is a MEASUREMENT PROBLEM DEFERRED, not an
+ * CAUTION: The copy is byte-wise and that is a MEASUREMENT PROBLEM DEFERRED, not an
  * oversight.  The DMA buffers are 2 mod 4 (`NIC_RX_OFFSET`, which is what
  * makes the IP header land aligned behind a 14-byte Ethernet header), so a
  * word-at-a-time copy out of them would be an unaligned load, which on this
@@ -1258,7 +1105,7 @@ static irqreturn_t nic_isr(int irq, void *dev_id)
  * ever reported 0 is a claim with no control.
  *
  * The subtraction is unsigned and wraps mod 2^32; NIC_RX_DESC is 8, which
- * divides 2^32, so the `%` recovers the right slot difference.  ⚠️ On an
+ * divides 2^32, so the `%` recovers the right slot difference.  CAUTION: On an
  * 8-slot ring 4 is its own negative, so this reports HOW FAR apart and not
  * WHICH ring leads -- `NET-61`'s residual, which this function does not
  * close. */
@@ -1326,12 +1173,12 @@ static int nic_ph_class(u32 w0, unsigned int i, unsigned int *j_out)
 /* THE HARDWARE HALF.  Resolve the data buffer for the frame in RX pkthdr slot
  * `i`, and measure whether the two routes to it disagree.
  *
- * 🔴 THE COMPARISON IS UNCONDITIONAL AND THE SWITCH ONLY PICKS THE ANSWER.
+ * NOTE: THE COMPARISON IS UNCONDITIONAL AND THE SWITCH ONLY PICKS THE ANSWER.
  * Putting the comparison inside the switch would confound "the pointer was
  * different" with everything else `phfollow 1` does; this way a single boot in
  * the DEFAULT mode already says whether the switch can matter at all.
  *
- * 🔴 And in mode 0 every return below is literally `nic_dw(nic_rx_mb, i, 3)`
+ * NOTE: And in mode 0 every return below is literally `nic_dw(nic_rx_mb, i, 3)`
  * -- the expression this replaced -- so "the default is today's behaviour" is
  * a property of the text rather than of a test.
  *
@@ -1509,20 +1356,20 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (e & NIC_DESC_OWN)
 		nic_n_tx_full++;
 
-	/* s32a MODE 1 -- the vendor's ring-full contract, 讀 rtl_nic.c:5161-5171.
+	/* s32a MODE 1 -- the vendor's ring-full contract, READ rtl_nic.c:5161-5171.
 	 *
 	 * Poll the OWN bit of the slot we want, bounded; if it frees, fall
 	 * through and transmit; if it does not, DROP the frame and report
 	 * NETDEV_TX_OK.  The queue is never stopped, so there is nothing that
 	 * has to be woken, so there is no liveness dependency on an interrupt.
 	 *
-	 * 🔴 Spinning with interrupts off is correct HERE and would not be in
+	 * NOTE: Spinning with interrupts off is correct HERE and would not be in
 	 * general: the OWN bit is cleared by the engine's own DMA write, not by
 	 * anything this CPU runs, so the condition can change while interrupts
 	 * are masked.  That is the same reason the vendor's swNic_txDone polls
 	 * inside local_irq_save (rtl865xc_swNic.c:795-833).
 	 *
-	 * ⚠️ WHAT THIS DOES NOT DO: it does not make the engine resume, and it
+	 * CAUTION: WHAT THIS DOES NOT DO: it does not make the engine resume, and it
 	 * does not reclaim anything -- this driver frees the skb synchronously
 	 * at the end of nic_xmit, so there is no completion queue to drain.
 	 * The only thing the vendor's swNic_txDone does for us is the OWN-bit
@@ -1561,8 +1408,8 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 		/* RE-TEST AFTER THE STOP.  The engine can retire this slot
 		 * between the read above and the stop.
 		 *
-		 * 🔴 ON THIS BUILD THAT WINDOW CANNOT LOSE THE WAKE, AND WHAT
-		 * CLOSES IT IS NOT IN THIS FILE.  量 `# CONFIG_SMP is not set`
+		 * NOTE: ON THIS BUILD THAT WINDOW CANNOT LOSE THE WAKE, AND WHAT
+		 * CLOSES IT IS NOT IN THIS FILE.  MEASURED `# CONFIG_SMP is not set`
 		 * and `CONFIG_PREEMPT_NONE=y`, so the `spin_lock_irqsave`
 		 * above is a `local_irq_save` and nic_isr cannot run inside
 		 * it; the completion latches in CPUIISR, which is sticky W1C,
@@ -1610,7 +1457,7 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 	bf = nic_bufs + (NIC_RX_DESC + i) * NIC_BUF_SZ + nic15_pol.txoff;
 	for (k = 0; k < len; k++)
 		__raw_writeb(skb->data[k], (void __iomem *)(bf + k));
-	/* 讀 `rtl865xc_swNic.c:718-721`: a runt is padded to 64 and the FCS is
+	/* READ `rtl865xc_swNic.c:718-721`: a runt is padded to 64 and the FCS is
 	 * counted in ph_len.  Both are the ASIC's arithmetic. */
 	while (len < 60) {
 		__raw_writeb(0, (void __iomem *)(bf + len));
@@ -1624,7 +1471,7 @@ static int nic_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	nic_dw_set(nic_tx_ph, i, 1, NIC_PH_MK1(len + 4, 0, 0));
 	/* ph_flags 0x8800 and portlist 0x3F are not chosen: they are what this
-	 * die's own loader puts in a TX descriptor, 量
+	 * die's own loader puts in a TX descriptor, MEASURED
 	 * `bench/2026-09-19b/X14-rings-post` word 3 of `A040FCE8` reading
 	 * `8800003F` after a real transfer. */
 	nic_dw_set(nic_tx_ph, i, 3, NIC_PH_MK3(NIC_PH_FLAGS_TX_DEFAULT, 0x3F));
@@ -1720,16 +1567,16 @@ static struct net_device_stats *nic_ndo_stats(struct net_device *dev)
 
 /* R6-4a.  The recovery of last resort, and an instrument.
  *
- * 讀 `rtl819x-nic.c:1654`: this driver has ALWAYS set
- * `dev->watchdog_timeo = 5 * HZ`.  讀 `net/sched/sch_generic.c:240-249`:
+ * READ `rtl819x-nic.c:2947`: this driver has ALWAYS set
+ * `dev->watchdog_timeo = 5 * HZ`.  READ `net/sched/sch_generic.c:240-249`:
  * `__netdev_watchdog_up()` arms the timer only
  * `if (dev->netdev_ops->ndo_tx_timeout)` -- so until this line existed
- * that assignment was DEAD CODE and the watchdog was never started.  讀
+ * that assignment was DEAD CODE and the watchdog was never started.  READ
  * `:227` of the same file: when it does fire it calls `ndo_tx_timeout`
  * with NO NULL check, so the pairing is not optional in either
  * direction.
  *
- * 量 that the handler can really be entered: `netif_carrier_ok()` is
+ * MEASURED that the handler can really be entered: `netif_carrier_ok()` is
  * `!test_bit(__LINK_STATE_NOCARRIER)` (`netdevice.h:1532-1535`), this
  * driver never calls `netif_carrier_off()`, and that bit has zero
  * occurrences in `net/core/dev.c` -- so the carrier precondition is
@@ -1747,7 +1594,7 @@ static struct net_device_stats *nic_ndo_stats(struct net_device *dev)
  * than as a single event; and `n_tx_timeout 0` after a load is then the
  * evidence that the interrupt-driven wake never needed help.
  *
- * 量 the console cost, which is the thing that could have made this
+ * MEASURED the console cost, which is the thing that could have made this
  * unsafe under `FW-45`'s ~1.33 s hardware watchdog: `dev_watchdog`
  * guards the call with `WARN_ONCE`, and this image is built
  * `# CONFIG_BUG is not set`, under which `WARN(cond, fmt)` reduces to
@@ -1766,16 +1613,16 @@ static void nic_ndo_tx_timeout(struct net_device *dev)
  * and this driver carried one occurrence of the word: a comment saying
  * there were none.
  *
- * 🔴 `get_link` is deliberately NOT `ethtool_op_get_link`.  That helper
+ * NOTE: `get_link` is deliberately NOT `ethtool_op_get_link`.  That helper
  * is `netif_carrier_ok()` = `!test_bit(__LINK_STATE_NOCARRIER)`; this
  * driver never calls `netif_carrier_off()`, so the bit is never set and
  * the helper could only ever return 1.  `docs/history/runsheet-2026-09-27.md:317` is the house
  * rule -- *a tool that always says 1 cannot fail* -- and a field that
  * cannot fail is not an observable.
  *
- * 🟢 What it reads instead is the switch's per-port LinkUp bits, which
+ * OK: What it reads instead is the switch's per-port LinkUp bits, which
  * the operator can flip with a cable.  That is the right SEMANTIC as well
- * as the testable one: 讀 + 量, the CPU port this driver serves has no
+ * as the testable one: READ + MEASURED, the CPU port this driver serves has no
  * PHY behind it -- MDIO address 6 is silent while 0-4 answer, `PCRP6`'s
  * `EnablePHYIf` is clear, `PSRP6`'s EEE field is 0, and the CPU interface
  * lives in the SYSTEM window rather than the switch core's.  So `rlx0`'s
@@ -1783,7 +1630,7 @@ static void nic_ndo_tx_timeout(struct net_device *dev)
  * constant.  What a user of `rlx0` wants to know is whether a jack is
  * live.
  *
- * ⚠️ It does NOT call `netif_carrier_on/off`.  Carrier gates the
+ * CAUTION: It does NOT call `netif_carrier_on/off`.  Carrier gates the
  * datapath, and this image already carries the changes it exists to
  * test.  The coupling is named rather than taken: `ethtool rlx0` can
  * report no link while the interface still transmits, and that is a true
@@ -1861,7 +1708,7 @@ static int nic_do_alloc(void)
 	nic_alloc_bytes = need;
 	memset(nic_alloc_raw, 0, need);
 
-	/* 🔴 The one cache operation in this driver, and it is here rather
+	/* NOTE: The one cache operation in this driver, and it is here rather
 	 * than anywhere else on purpose.  `kmalloc` handed back a KSEG0
 	 * address; every access after this line is through KSEG1.  A dirty
 	 * line left over the region would, at an unpredictable later moment,
@@ -1960,7 +1807,7 @@ static int nic_do_alloc(void)
 	return 0;
 }
 
-/* arm -- point the hardware at the rings.  讀 `rtl865xc_swNic.c:1306-1384`:
+/* arm -- point the hardware at the rings.  READ `rtl865xc_swNic.c:1306-1384`:
  * the vendor writes all four TX bases, then all six RX pkthdr bases, then the
  * mbuf base, with interrupts off and no fence or read-back between them and
  * the later enable.
@@ -1998,7 +1845,7 @@ static int nic_do_arm(void)
 	/* RE-ESTABLISH BOTH RINGS AND ZERO BOTH INDICES, TOGETHER, BEFORE THE
 	 * BASE REGISTERS ARE WRITTEN.
 	 *
-	 * 量 `bench/2026-09-20b/R9-NB0` and `N1`, the two dumps either side of
+	 * MEASURED `bench/2026-09-20b/R9-NB0` and `N1`, the two dumps either side of
 	 * `A1`'s re-arm.  BEFORE: `rx_idx 1`, `rpdcr0_pos A15B8004`,
 	 * `rmdcr0_pos A15B8024` -- slot 1 on both -- and all eight ring words
 	 * SWCORE-owned, so THE RING WAS CLEAN.  AFTER the arm and one ping:
@@ -2008,39 +1855,39 @@ static int nic_do_arm(void)
 	 * slot 0; nothing restarted the software.  So `arm` creates an INDEX
 	 * SKEW, and the skew then manufactures the hole one frame at a time.
 	 *
-	 * ⚠️ On that run the index reset alone would have sufficed, and this
+	 * CAUTION: On that run the index reset alone would have sufficed, and this
 	 * function cannot tell which case it is in.  `engine off` writes
 	 * CPUIIMR 0 and does NOT call `napi_disable()`, and `arm` is a separate
 	 * /proc write, so a frame already delivered and not yet harvested is
 	 * still CPU-owned here -- a hole the engine stalls on.  Handing every
 	 * slot back makes the post-arm state the post-alloc state, and the
 	 * post-alloc state is the only one measured to work end to end
-	 * (`R6-BASE` -> `R8-B0`, 20 of 20).  ⚠️ True of the ring words and of
+	 * (`R6-BASE` -> `R8-B0`, 20 of 20).  CAUTION: True of the ring words and of
 	 * what `nic_refill` writes; it does NOT restore `rx_ph[i].dw0`,
 	 * `rx_mb[i].dw1`, `rx_mb[i].dw5` or `rx_ph[i].dw3`, exactly as on every
 	 * ordinary harvest.
 	 *
-	 * 🔴 IT DISCARDS THOSE FRAMES.  `n_rx` does not move and `rx_dropped`
+	 * NOTE: IT DISCARDS THOSE FRAMES.  `n_rx` does not move and `rx_dropped`
 	 * does not move, so `n_arm_flush` is what stops "arm destroyed nothing"
 	 * being unfalsifiable -- the same reason `n_dsync_chk` exists beside
 	 * `n_dsync`.
 	 *
-	 * 讀 `rtl865xc_swNic.c:1134-1384`: the vendor's only arm is inside
+	 * READ `rtl865xc_swNic.c:1134-1384`: the vendor's only arm is inside
 	 * `swNic_init`, which builds every descriptor, zeroes
 	 * `currRxPkthdrDescIndex[]` and `currRxMbufDescIndex`, and writes
 	 * `CPURPDCR0`/`CPURMDCR0` LAST, all under `local_irq_save`.  The vendor
-	 * never re-arms a live ring.  ⚠️ `swNic_resetDescriptors` (`:1406`)
+	 * never re-arms a live ring.  CAUTION: `swNic_resetDescriptors` (`:1406`)
 	 * looks like a lighter precedent and is NOT one: its body clears
 	 * TXCMD|RXCMD and returns, inside `#ifdef FAT_CODE`, which the tree
-	 * defines nowhere (量, two hits -- the `#ifdef` and its `#endif`).
+	 * defines nowhere (MEASURED, two hits -- the `#ifdef` and its `#endif`).
 	 *
 	 * TX is the SAME bit with the opposite RESTING value, not an inverted
 	 * polarity: OWN set is the engine's on both rings (`NIC_DESC_OWN`, and
-	 * 讀 `rtl865xc_asicregs.h:553-554`), but an idle TX slot is the CPU's.
+	 * READ `rtl865xc_asicregs.h:553-554`), but an idle TX slot is the CPU's.
 	 * A slot left SWCORE-owned here is a stale buffer the engine transmits
 	 * the moment it is enabled.
 	 *
-	 * 🔴 THE LOCK IS NOT DECORATION AND `nic_engine_on` IS NOT A SUBSTITUTE
+	 * NOTE: THE LOCK IS NOT DECORATION AND `nic_engine_on` IS NOT A SUBSTITUTE
 	 * FOR IT.  `nic_do_engine(0)` does not `napi_disable()`, so a poll
 	 * scheduled before the mask was cleared can still run `nic_poll` in
 	 * softirq and write `nic_rx_idx` and call `nic_refill()` in the middle
@@ -2075,7 +1922,7 @@ static int nic_do_arm(void)
 	/* NET-67 H1.  `nic_tx_rings == 1` is what every seating so far ran:
 	 * three TX bases holding ZERO while `TXFD` is a single doorbell bit
 	 * with no ring number (`rtl865xc_asicregs.h:538`).  This die's own
-	 * loader runs TX0 AND TX1 armed (量 `NET-48`: A040FC88 / FCA0) and
+	 * loader runs TX0 AND TX1 armed (MEASURED `NET-48`: A040FC88 / FCA0) and
 	 * the vendor's `swNic_init` arms four -- so three zeroed bases is a
 	 * difference between this driver and BOTH implementations that do not
 	 * wedge, and no seating has read it.  At 4 they hold a well-formed
@@ -2097,9 +1944,9 @@ static int nic_do_arm(void)
 	nic_armed = 1;
 	rlxfw_markx("N-ARM", nic_rx_ring);
 	/* A mark only the re-establishing arm emits, so a capture can say WHICH
-	 * arm ran without resting on `RLXFW-ID0` alone.  🔴 It does NOT claim
-	 * the ring is repaired: 量 `Z10-nic`, `arm` already zeroed both
-	 * hardware positions BEFORE this change, and 量 `Z11-f6` read 11/181
+	 * arm ran without resting on `RLXFW-ID0` alone.  NOTE: It does NOT claim
+	 * the ring is repaired: MEASURED `Z10-nic`, `arm` already zeroed both
+	 * hardware positions BEFORE this change, and MEASURED `Z11-f6` read 11/181
 	 * (93.9 % loss) after exactly that repair where a fresh boot reads
 	 * 20/20.  This makes `arm` non-fatal; it does not make it a repair. */
 	rlxfw_markx("N-ARMR", (u32)nic_n_arm_flush);
@@ -2108,7 +1955,7 @@ static int nic_do_arm(void)
 
 /* refill one RX descriptor.
  *
- * 🔴 THE ORDER IS THE POINT OF THIS FUNCTION and it is the vendor's, 讀
+ * NOTE: THE ORDER IS THE POINT OF THIS FUNCTION and it is the vendor's, READ
  * `rtl865xc_swNic.c:342-383`: the MBUF ownership goes back first (`:376`),
  * the PKTHDR ownership second (`:359`/`:379`).  The engine needs somewhere to
  * put bytes before it needs a header slot to describe them; handing back the
@@ -2116,7 +1963,7 @@ static int nic_do_arm(void)
  *
  * No barrier is needed and none is used.  Both rings are KSEG1, so the store
  * is on the bus by the time the next instruction issues -- which is also why
- * `rtl865xc_swNic.c` contains no `wmb()`, `mb()` or `sync` anywhere (量, zero
+ * `rtl865xc_swNic.c` contains no `wmb()`, `mb()` or `sync` anywhere (MEASURED, zero
  * hits).  On a cached ring this function would be wrong without one. */
 static void nic_refill(unsigned int i)
 {
@@ -2160,7 +2007,7 @@ static unsigned int nic_harvest(unsigned int budget)
 		nic_last_rx_ph3 = nic_dw(nic_rx_ph, i, 3);
 		nic_last_rx_ph4 = nic_dw(nic_rx_ph, i, 4);
 
-		/* 讀 `rtl865xc_swNic.c:650`: the ASIC counts the 4-byte FCS in
+		/* READ `rtl865xc_swNic.c:650`: the ASIC counts the 4-byte FCS in
 		 * ph_len, symmetric with the +4 the vendor's TX adds. */
 		nic_last_rx_len = (len >= 4) ? (len - 4) : len;
 		if (nic_last_rx_len > NIC_KEEP)
@@ -2194,7 +2041,7 @@ static unsigned int nic_harvest(unsigned int budget)
  * number.  A capture on the workstation cannot mistake it for anything, and
  * neither can rung 1, which has to recognise it coming back.
  *
- * ORDER, 讀 `rtl865xc_swNic.c:692-774`: fill every field, THEN set OWN
+ * ORDER, READ `rtl865xc_swNic.c:692-774`: fill every field, THEN set OWN
  * (`:760`), THEN ring the doorbell `CPUICR |= TXFD` (`:771`).  If OWN were
  * set first the engine could fetch a descriptor whose length and buffer had
  * not been written; that is this gate's own named failure mode and this
@@ -2244,7 +2091,7 @@ static int nic_do_tx(u32 portlist, u32 flags, u32 vid, u32 payload_len)
 	}
 
 	frame = 14 + payload_len;
-	/* 讀 `rtl865xc_swNic.c:718-721`: ph_len carries the FCS, and a runt is
+	/* READ `rtl865xc_swNic.c:718-721`: ph_len carries the FCS, and a runt is
 	 * padded to 64 before the +4.  Both are the ASIC's arithmetic, not a
 	 * convention this driver gets to choose. */
 	if (frame < 60)
@@ -2268,7 +2115,7 @@ static int nic_do_tx(u32 portlist, u32 flags, u32 vid, u32 payload_len)
 	}
 	if (nic15_pol.txrb) nic15_rb_pre_bell(i);	/* 1.5: before TXFD */
 	/* The doorbell is a read-modify-write on the register that also holds
-	 * TXCMD, RXCMD, the burst size and the mbuf size.  讀
+	 * TXCMD, RXCMD, the burst size and the mbuf size.  READ
 	 * `rtl865xc_swNic.c:771`.  There is no separate doorbell register --
 	 * which means a driver that writes CPUICR with `=` at the wrong moment
 	 * disables the engine while trying to kick it. */
@@ -2280,11 +2127,11 @@ static int nic_do_tx(u32 portlist, u32 flags, u32 vid, u32 payload_len)
 	return 0;
 }
 
-/* engine on/off.  讀 `rtl865x_asicCom.c:1352-1355`: the vendor writes CPUICR
+/* engine on/off.  READ `rtl865x_asicCom.c:1352-1355`: the vendor writes CPUICR
  * with `=`, not `|=` -- burst size and mbuf size go in the same store as the
  * enables -- then W1Cs stale pending, then opens the mask.  That order is
  * kept.  The W1C matters here more than it does for the vendor: this die has
- * a LINK_CHANGE_IP latched since before the kernel started (量, `CPUIISR`
+ * a LINK_CHANGE_IP latched since before the kernel started (MEASURED, `CPUIISR`
  * reads 0x80000000 at the loader prompt), so an unmasked handler would take
  * an interrupt for an event that happened before it existed. */
 static int nic_do_engine(int on)
@@ -2378,7 +2225,7 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 	 * the queue is stopped RIGHT NOW, and that is the reading by which a
 	 * wedged interface is told from a busy one.  -1 when there is no
 	 * net_device, so the field never has to be read as 0-meaning-two-
-	 * things.  量 the page budget this sits in: the largest committed
+	 * things.  MEASURED the page budget this sits in: the largest committed
 	 * dump of this file is `bench/2026-09-19b/C58-afterflood2.log` at
 	 * 1,244 bytes including the echoed command; these five lines add
 	 * about 110, against the 4,096 `read_proc` gives and does not
@@ -2408,8 +2255,8 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 	len += sprintf(page + len, "now_icr %08X\n", nic_rd(NIC_CPUICR));
 	len += sprintf(page + len, "now_iimr %08X\n", nic_rd(NIC_CPUIIMR));
 	len += sprintf(page + len, "now_iisr %08X\n", nic_rd(NIC_CPUIISR));
-	/* 🔴 These two read back the engine's CURRENT POSITION, not the base
-	 * this driver wrote -- `SPEC.md` `NET-32`, and 量 again on this die at
+	/* NOTE: These two read back the engine's CURRENT POSITION, not the base
+	 * this driver wrote -- `SPEC.md` `NET-32`, and MEASURED again on this die at
 	 * the loader prompt, where a cold `CPURMDCR0` reads exactly the base
 	 * and a used one reads 12 bytes further on.  Printed under names that
 	 * say so. */
@@ -2419,9 +2266,9 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 		       nic_rd(NIC_CPURMDCR0));
 	len += sprintf(page + len, "tpdcr0_pos %08X\n",
 		       nic_rd(NIC_CPUTPDCR0));
-	/* 🔴 The other three TX ring bases, which `nic_do_arm` writes ZERO to
+	/* NOTE: The other three TX ring bases, which `nic_do_arm` writes ZERO to
 	 * and which no seating has ever read back.  This die's own loader runs
-	 * TX0 and TX1 armed (量 `NET-48`: A040FC88 / FCA0) and the vendor's
+	 * TX0 and TX1 armed (MEASURED `NET-48`: A040FC88 / FCA0) and the vendor's
 	 * `swNic_init` arms four; `TXFD` is one doorbell bit with NO ring
 	 * number (`rtl865xc_asicregs.h:538`).  So "three of the four bases are
 	 * zero" is a difference between this driver and BOTH implementations
@@ -2491,14 +2338,14 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 	len += sprintf(page + len, "ph_test_j %u\n", nic_ph_test_j);
 	len += sprintf(page + len, "ph_test_seen %d\n", nic_ph_test_seen);
 	len += sprintf(page + len, "j_now %lu\n", jiffies);
-	/* ⚠️ `n_dsync_chk` EQUALS `n_napi_poll` -- one check per poll.  The
+	/* CAUTION: `n_dsync_chk` EQUALS `n_napi_poll` -- one check per poll.  The
 	 * counter that is ~2x is `n_reads`, because the check is two
 	 * `nic_rd()` per poll, so `n_reads` is no longer the small auditable
 	 * number it was before this driver version.
 	 *
-	 * 🔴 `FW-107`: until 2026-09-22 this comment hung the factor on
+	 * NOTE: `FW-107`: until 2026-09-22 this comment hung the factor on
 	 * `n_dsync_chk`, and it is the comment that exists to prevent a
-	 * misreading.  量 2026-09-21, three dumps: `n_dsync_chk` 5 / 350 /
+	 * misreading.  MEASURED 2026-09-21, three dumps: `n_dsync_chk` 5 / 350 /
 	 * 73,810 against `n_napi_poll` 5 / 350 / 73,810, while `n_reads` reads
 	 * 18 / 720 / 147,628 = 2x + 8 / 2x + 20 / 2x + 8. */
 	len += sprintf(page + len, "n_dsync_chk %lu\n", nic_n_dsync_chk);
@@ -2520,7 +2367,7 @@ static int nic_read_proc(char *page, char **start, off_t off, int count,
 		len += sprintf(page + len, "mb_ring %08X\n", nic_mb_ring);
 		len += sprintf(page + len, "tx_ring %08X\n", nic_tx_ring);
 		len += sprintf(page + len, "bufs %08X\n", nic_bufs);
-		/* 🔴 rx_ph and rx_mb were NOT printed, and the `phtest` comment
+		/* NOTE: rx_ph and rx_mb were NOT printed, and the `phtest` comment
 		 * claims its arguments are computed from bases "this same file
 		 * prints".  That was true of `dsynctest` and false of `phtest`:
 		 * block 40 derived A15B8110 at the desk from alloc arithmetic
@@ -2712,7 +2559,7 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 			nic_recov_disarm();
 		} else if (!strcmp(buf + 8, "1")) {
 			nic_recov_mode = 1;
-			/* 🔴 ARM IMMEDIATELY IF THE QUEUE IS ALREADY STOPPED.
+			/* NOTE: ARM IMMEDIATELY IF THE QUEUE IS ALREADY STOPPED.
 			 * `nic_recov_arm()` is otherwise called only at the
 			 * stop TRANSITION, so a detector switched on over an
 			 * existing stall would wait for a second stall that
@@ -2723,7 +2570,7 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 			 * side: `n_tx` frozen at 17 for 600 s is exactly a
 			 * transition that never repeats.
 			 *
-			 * 🟢 What it buys is the single-variable experiment:
+			 * OK: What it buys is the single-variable experiment:
 			 * wedge with the detector OFF, read the wedge whole,
 			 * then switch the detector on IN FRONT OF the fault.
 			 * The fault is already present when the variable
@@ -2771,7 +2618,7 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 	 * driver that has no ring.  That is the same hole `dsynctest`'s own
 	 * `-ENXIO` closes.
 	 *
-	 * ⚠️ WHAT IT DOES NOT COVER, said rather than left to be found: the
+	 * CAUTION: WHAT IT DOES NOT COVER, said rather than left to be found: the
 	 * DEREFERENCE.  It exercises classification and the index arithmetic
 	 * only.  The load has its own check -- `ph_last_bf` must equal
 	 * `bufs + ph_last_j * NIC_BUF_SZ + NIC_RX_OFFSET`, and `bufs` is
@@ -2866,7 +2713,7 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 		 *
 		 * `n_xmit_busy 0` after a flood is ambiguous: it is what a
 		 * working wake looks like AND what a stop path that was never
-		 * reached looks like.  量 `bench/2026-09-19b/L2-after` and
+		 * reached looks like.  MEASURED `bench/2026-09-19b/L2-after` and
 		 * `M7-after`: four concurrent 1400-byte floods never exhausted
 		 * four TX descriptors on either image, so the ambiguity is
 		 * measured rather than feared.  This verb takes the load out
@@ -2876,7 +2723,7 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 		 * TXCMD and not STOPTX (bit 21).  Either would do it; TXCMD is
 		 * a bit this driver already writes on every `engine on` and
 		 * whose value is anchored by this die's own `CPUICR C4000000`
-		 * at the loader prompt, while `NIC_STOPTX` is 讀 out of
+		 * at the loader prompt, while `NIC_STOPTX` is READ out of
 		 * `rtl865xc_asicregs.h` and has never been exercised here.
 		 *
 		 * `nic_engine_on` is deliberately LEFT SET: clearing it would
@@ -2886,7 +2733,7 @@ static int nic_write_proc(struct file *file, const char __user *buffer,
 		 * while transmit is stalled, which is the negative half of the
 		 * reading.
 		 *
-		 * ⚠️ REFUTATION CONDITION FOR THE CONTROL ITSELF: if
+		 * CAUTION: REFUTATION CONDITION FOR THE CONTROL ITSELF: if
 		 * `txstall off` does not restore transmit -- a ping after it
 		 * fails, or the `txd*` OWN bits stay set -- then clearing
 		 * TXCMD mid-flight wedges this engine, the control is VOID,
@@ -3058,7 +2905,7 @@ static int __init rtl819x_nic_init(void)
 	 * `N1` carries the prediction: bits 31:30 (TXCMD/RXCMD) clear, or no
 	 * one disarmed the loader's engine.  SWCORE=y reads 00000000 (63 boots:
 	 * the vendor's probe also resets the core); SWCORE=n's seam clears 31:30
-	 * only, so 04000000, MBUF_2048BYTES (推).  Printed; nothing gates on it. */
+	 * only, so 04000000, MBUF_2048BYTES (INFERRED).  Printed; nothing gates on it. */
 	rlxfw_markx("N1", nic_boot_icr);
 	rlxfw_markx("N2", nic_boot_iimr);
 	rlxfw_markx("N3", nic_boot_iisr);
@@ -3125,7 +2972,7 @@ late_initcall(rtl819x_nic_init);
  * THE BOOT POLICY, AND WHAT IT DOES AND DOES NOT MEAN.  1.5 started a boot at
  * 1.4's settings, and at them every store of nic_xmit, nic_do_tx,
  * nic_do_engine, nic_do_arm and nic_ndo_open has 1.4's value and 1.4's order
- * (tools/storeseq.py reads that off the built objects).  🔄 1.6 (R6b-10)
+ * (tools/storeseq.py reads that off the built objects).  UPDATE: 1.6 (R6b-10)
  * starts a boot at `txlen vendor` (NIC15_LEN_BOOT, rtl819x-nic-tx.h, whose
  * comment says why), so a boot that types no verb stores m_len and m_extsize
  * as F + 4 -- the only values that differ; txoff and txrb stay 1.4's, and
@@ -3380,7 +3227,7 @@ static int nic15_line(char *page, int *len)
  * The sweep.  R6b-3 needs every length from 60 to 1,514 and a card cannot
  * loop (`for` is refused; config/image-commands.tsv has no `seq`), so the
  * loop is here.  THE UNIT IS FIXED, one per length, because block 46 and
- * block 38 show a carry-over (推): the faulty-length frame goes out intact and
+ * block 38 show a carry-over (INFERRED): the faulty-length frame goes out intact and
  * the NEXT frame is the one that goes wrong, so without a re-arm per unit each
  * length would measure its predecessor's history.
  *
@@ -3430,7 +3277,7 @@ static int nic15_line(char *page, int *len)
  * Each cycle also prints 1.4's four marks, 85 B or about 22 ms at 38400, so a
  * full sweep is about 32 s and 124 KB of console (a guess; sw j0/j1 price it).
  *
- * 🔴 NOTHING ELSE MAY WRITE /proc/rtl819x-nic WHILE A SWEEP RUNS.  The sweep
+ * NOTE: NOTHING ELSE MAY WRITE /proc/rtl819x-nic WHILE A SWEEP RUNS.  The sweep
  * holds its write for the whole run and yields only in cond_resched() between
  * units.  A second sweep, `swclear`, every behaviour verb, and any `engine
  * on` or ndo_open that is not the sweep's own are refused (-EBUSY)

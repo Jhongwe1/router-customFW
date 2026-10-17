@@ -1015,7 +1015,7 @@ confirm it refuted it instead.
    `:701` of this file as a *ping-bound floor*, and quoting it as the copy rate
    was an error in this section's first draft.
 2. `MBUF_RUNOUT` fires: `seen_iisr` goes `0000320E` → `0001320E`, and bit 16 is
-   `NIC_IP_MBUF_RUNOUT` (`rtl819x-nic.c:347`). First seen at `C16-f14`.
+   `NIC_IP_MBUF_RUNOUT` (`rtl819x-nic.c:194`). First seen at `C16-f14`.
 3. The engine's two RX position registers desynchronise by **exactly 4** and
    stay there. Indices are `(pos − base) / 4` with `rx_ring A15B8000` and
    `mb_ring A15B8020` (🔄 2026-09-26, `R6b-5`: *exactly 4* is this seating's reads only — seating 31 saw 1, 2 and 3, transient (`bench/2026-09-21/CORRECTIONS-block33.md` § 1), and over the committed dumps, block 46 excluded, `dsync_last_d` takes every value from 1 to 7, 4 most often (70 dumps), and `dsync_first_d` 1 to 5; a single-sample Δ is a lower bound, `SPEC.md` § 17 `NET-61` 殘留, whose burst half block 46's arm C reopened, § 22.2):
@@ -1245,7 +1245,7 @@ at every read across six arms. The reason the loop stays is the TX side.
 * **Why the engine stops retiring TX descriptors.** Nothing was read on the
   engine's side of the ring: `tpdcr0_pos` was not sampled across a wedge, and
   🔄 **2026-09-21 (seating 32): THAT CLAUSE IS FALSE and was false when it
-  was written.** `rtl819x-nic.c:2420-2421` prints `tpdcr0_pos` on every
+  was written.** `rtl819x-nic.c:2267-2268` prints `tpdcr0_pos` on every
   `cat /proc/rtl819x-nic`, so this seating sampled it **six times** across
   the wedge without meaning to. What hid it is `wedgeprobe.sh:32`, whose
   operator filter names `rpdcr0_pos` and `rmdcr0_pos` and not
@@ -1279,7 +1279,7 @@ are told apart by the assembled image's sha256 and never by `RECIPE_ID`
 
 § 11.6 and `SPEC.md`'s `NET-67` 殘留 say the engine-side TX register *"was not
 read"*. It was read **six times**, by seating 31's own captures, because
-`rtl819x-nic.c:2420-2421` prints `tpdcr0_pos` on every `cat`. The reason nobody
+`rtl819x-nic.c:2267-2268` prints `tpdcr0_pos` on every `cat`. The reason nobody
 saw it: `bench/2026-09-21/wedgeprobe.sh` writes the full `/proc` to the `.log`
 and shows the operator a filtered view whose filter (`:32`) names `rpdcr0_pos`
 and `rmdcr0_pos` and **not** `tpdcr0_pos`. 量:
@@ -1684,7 +1684,7 @@ why it is not the obvious thing:
 
 The board's `ping` still reported 100 % loss. 🔴 **So frames arrive, are
 counted, and are delivered in a form the stack cannot use** — and 讀
-`rtl819x-nic.c:1388-1433`, `nic_napi_harvest()` takes the OWN bit and the length
+`rtl819x-nic.c:1235-1280`, `nic_napi_harvest()` takes the OWN bit and the length
 from `nic_rx_ring`/`nic_rx_ph` at index `i` and the buffer address from
 `nic_rx_mb` at **the same `i`**, which is exactly the coupling `NET-82` says
 the vendor does not have. The final dump reads `n_dsync 70,717` of
@@ -1707,7 +1707,7 @@ Virtual device rlx0 asks to queue packet!
 `dev_queue_xmit`, taken when the queue is stopped or `dev_hard_start_xmit`
 returns non-zero, and it **drops** the skb. 讀 `net/ethernet/eth.c:349-353`:
 under `CONFIG_RTL_819X` the vendor's `ether_setup` sets `tx_queue_len = 0`,
-and rlxfw's `alloc_netdev(0, "rlx%d", ether_setup)` (`rtl819x-nic.c:3092`)
+and rlxfw's `alloc_netdev(0, "rlx%d", ether_setup)` (`rtl819x-nic.c:2939`)
 uses that same function — so `rlx0` has no qdisc and nothing holds the frames.
 
 🔴 **And the driver's own correctness argument for the stop/wake design,
@@ -1781,7 +1781,7 @@ per packet.
 * 🔴 **One instrument defect was mine**: `env PATH=.:$PATH qemu-mips-static
   iperf3 …` exits **127** under WSL because this host's `PATH` carries Windows
   paths with spaces. The fix is the binary's full path.
-* 🔴 **`FW-107`**: this file's own driver comment at `rtl819x-nic.c:2494-2503`
+* 🔴 **`FW-107`**: this file's own driver comment at `rtl819x-nic.c:2341-2350`
   says `n_dsync_chk` is about 2× `n_napi_poll`. 量: they are **equal** (5/5,
   350/350, 73,810/73,810) and it is `n_reads` that is about 2× (18, 720,
   **147,628**). The substance is right and the counter named is wrong.
@@ -1797,7 +1797,7 @@ committed. 讀 `AsicDriver/rtl865xc_asicregs.h:561-640`:
 * **bit 17** is `PKTHDR_DESC_RUNOUT_IP0` — the RX **pkthdr** descriptor ring
   ran out.
 * **bit 16** is the **mbuf** descriptor ring run-out. Its *enable* is bit 11
-  and its *status* is bit 16; the asymmetry is real and `rtl819x-nic.c:338-347`
+  and its *status* is bit 16; the asymmetry is real and `rtl819x-nic.c:185-194`
   and `:316` already carry it.
 
 量, the seven states this seating produced:
@@ -1869,7 +1869,7 @@ descriptors. `SPEC.md` `NET-100`.
 
 ### 15.3 🟢🟢 `engine off` → `arm` → `engine on`, twice from a pristine wedge
 
-讀 `rtl819x-nic.c:2052-2058`: `arm`'s TX loop writes each slot as
+讀 `rtl819x-nic.c:1899-1905`: `arm`'s TX loop writes each slot as
 `address | WRAP` with **no OWN bit** — which is `NET-72`'s one remaining
 candidate, sitting in this driver the whole time. 量, on a fresh boot whose
 wedge nothing else had touched:
@@ -1886,7 +1886,7 @@ the same boot: `n_tx_stop 2`, `n_tx_wake 2`, `tx_stopped 0`, ping 4/4.
 🟢 **The queue half is already written, and which code does it is a reading.**
 The dump taken after the recovery but *before* the ping reads `tx_stopped 1` /
 `n_tx_wake 0`; the one after reads `0` / `1`. The host's ARP arrives and the
-level test at `:754` — which runs on **any** interrupt, not only `TX_DONE` —
+level test at `:924` — which runs on **any** interrupt, not only `TX_DONE` —
 sees the freed ring and calls `netif_wake_queue()` itself. **`P2` has only the
 detector left to write.** `SPEC.md` `NET-101`.
 
@@ -1925,7 +1925,7 @@ engine-owned; after that `dev_queue_xmit` stops offering, because `NET-57`'s
 which is `NET-99`'s table read from the driver's side, where `n_tx` sits at
 **17** across +16/+46/+120/+600 s. A counter-based detector would read the same
 value forever. The trigger is therefore **time since the stop**, on a private
-`timer_list`, armed at `netif_stop_queue()` and deleted by `:754`'s level test
+`timer_list`, armed at `netif_stop_queue()` and deleted by `:924`'s level test
 when the cheap path wins first.
 
 Not `watchdog_timeo`: `NET-55`/`NET-57` measured `dev_watchdog_up()` never
@@ -1959,7 +1959,7 @@ independent identities with no residual:
 
 The first says every arm was accounted for; the second says every stop was,
 and that the one queue restart the recovery did **not** perform was done by
-`:754`'s cheap path after `E0-RESC`'s hand rescue.
+`:924`'s cheap path after `E0-RESC`'s hand rescue.
 
 🟢 **The single spurious firing is worth more than a zero would have been.**
 It happened at `recovms 20` (`recov_jiffies` 2), which is the branch that
@@ -2364,10 +2364,10 @@ old numbers:
 
 | what § 10.2 says | today |
 |---|---|
-| the OWN test | `rtl819x-nic.c:1398` |
-| the pkthdr ring read | `:1401` |
-| `ph_len` minus FCS | `:1402-1403` |
-| the buffer address | `:1411`, which since `dfe40d9` goes through `nic_ph_buf()` (`:1344-1386`) rather than reading `nic_dw(nic_rx_mb, i, 3)` inline |
+| the OWN test | `rtl819x-nic.c:1245` |
+| the pkthdr ring read | `:1248` |
+| `ph_len` minus FCS | `:1249-1250` |
+| the buffer address | `:1258`, which since `dfe40d9` goes through `nic_ph_buf()` (`:1191-1233`) rather than reading `nic_dw(nic_rx_mb, i, 3)` inline |
 
 ⚠️ **The last row is the one to read twice.** `NET-61`'s finding is *the
 driver indexes both rings with the same `i`*; the fix in `dfe40d9` moved that
@@ -2449,7 +2449,7 @@ Second-sourced (106th segment): every number in the table reproduces from the ra
 by a separate parser; the driver pads a frame to 60 B before counting it (讀).
 
 量: each `-S1` dump shows the TX ring's last four descriptors, and a descriptor's `len`
-is the frame + 4 (讀 `rtl819x-nic.c:1625` writes `ph_len` as `len + 4` and `:2551-2553`
+is the frame + 4 (讀 `rtl819x-nic.c:1472` writes `ph_len` as `len + 4` and `:2398-2400`
 prints it; 量 in seating B, `P1-TR2` sent five frames, 503 B by `nd_stats` = 263 + 4 ×
 60, and its ring read `len` 267 and three 64s, § 20.1). In four of the six failed trials
 a frame the size of the `iperf3` server's results repeats — `P1-TR3-S1` 263 B ×3,
@@ -2968,14 +2968,14 @@ The TX length fields, side by side (讀):
 
 | field | `rlxfw` 1.4, `nic_xmit` | vendor `_swNic_send` (`rtl865xc_swNic.c:713-721`) |
 |---|---|---|
-| `ph_len` | L + 4, with L padded to 60 (`rtl819x-nic.c:1625`) | L + 4, or 64 when L < 60 |
+| `ph_len` | L + 4, with L padded to 60 (`rtl819x-nic.c:1472`) | L + 4, or 64 when L < 60 |
 | `m_len` | L (`:1622` at `873a471`; 1.5's default arm) | = `ph_len` |
 | `m_extsize` | 2,046, constant (`:1623` at `873a471`; 1.5's default arm) | = `ph_len` |
 | buffer | its own copy, at 2 mod 4 (`NIC_RX_OFFSET` reused, `:1610` at `873a471`; 1.5's `txoff 2`) | `skb->data`, zero-copy, written back from the cache first (`rtl_nic.c:5159`) |
 | padding | zero-fill to 60 | none |
 | `ph_portlist` | `0x3F` | masked with `0x1f` |
 
-The comment at `rtl819x-nic.c:1613` cites the vendor's lines 718–721 for the padding and
+The comment at `rtl819x-nic.c:1460` cites the vendor's lines 718–721 for the padding and
 the FCS in `ph_len`; the same four lines set `m_len` and `m_extsize` equal to `ph_len`,
 which `rlxfw` did not copy. Each candidate, with what refutes it:
 
@@ -3006,8 +3006,8 @@ which `rlxfw` did not copy. Each candidate, with what refutes it:
   Refuted by a recovery at a length whose `JabberErr` Δ is 0.
 
 Not a candidate (讀): cache coherency. Rings, descriptors and buffers are one region,
-written back once at allocation (`rtl819x-nic.c:1872`) and used through `CKSEG1ADDR`
-(`:1875`), uncached; the vendor's per-frame writeback has no counterpart because none is
+written back once at allocation (`rtl819x-nic.c:1719`) and used through `CKSEG1ADDR`
+(`:1722`), uncached; the vendor's per-frame writeback has no counterpart because none is
 needed.
 
 ### 21.7 What block 45 does not establish
@@ -3383,7 +3383,7 @@ sweep's bookkeeping, the dispatcher, both page formatters — is `rtl819x-nic-tx
 Every accepted behaviour verb — the same value re-typed included — marks the policy
 **dirty**. While it is dirty `engine on` refuses -ESTALE (151 on this arch, 讀
 `arch/rlx/include/asm/errno.h`), and so does `ifconfig rlx0 up`: `ndo_open` asks the same
-gate at `:1665`, before `napi_enable` and `nic_ndev_up`, so a refused `up` changes nothing
+gate at `:1512`, before `napi_enable` and `nic_ndev_up`, so a refused `up` changes nothing
 ("Stale NFS file handle", 推 the libc's text). `arm` clears it and, only then, writes all
 four TX slots back to alloc's words, so both arms of an A/B start from the same descriptor
 memory. A policy switch is `ifconfig rlx0 down`; the verb; `arm`; `ifconfig rlx0 up`.
@@ -3409,7 +3409,7 @@ In loopback each frame is classified in the kernel; no looped byte leaves it. A 
 **ours** when bytes 6..13 (source `02:52:4C:58:46:57`, `0x88B5`) match; the digit at byte 24
 then says which of our frames it is — the previous frame's digit is **repeat**, any other
 wrong digit **digit**, both bad and neither foreign. [0, F) is compared, with
-`__raw_readb`, only for our own digit. `nic_ph_class` and `:1376`'s bounds test resolve the
+`__raw_readb`, only for our own digit. `nic_ph_class` and `:1223`'s bounds test resolve the
 mbuf, so `NET-82`'s counters do not move, and `nic_last_rx*` is never written. The first
 unit's frame a registers delta0 = `ph_len` − (F + 4); it must be right and delta0 must be 0
 or 4, and if it is not — or frame a is foreign on the retry as well — the sweep refuses
@@ -3506,7 +3506,7 @@ recovery — tested inside `spin_lock_irqsave`, and refused while `rlx0` is up. 
 control controlled neither position nor bus load — matched uncached loads instead. F8: the
 positive control's protocol and the DMA base — probe 0, and `bufs` as a covariate. F9: a
 verb that returns 0 is re-run by stdio — every verb returns `count`. F11: `arm` left stale
-TX words — the dirty arm rewrites them. F14: a skewed mbuf and `:1376`'s bounds test — the
+TX words — the dirty arm rewrites them. F14: a skewed mbuf and `:1223`'s bounds test — the
 frame is SKEW and never dereferenced, and the next unit's arm hands every mbuf back. The
 review of the written driver (2026-09-26) found three sweep defects and six risks, all
 fixed before the builds above: the mode read from `CPUICR`, which `engine on` clears (now
@@ -5099,7 +5099,7 @@ the only common divisor above 1,504. 讀 the build cell `$FWRE_WORK/rebuild/r3-4
 (`.config:6` `CONFIG_RTL_819X=y`): `include/linux/skbuff.h:35–37` defines `RTL_PRIV_DATA_SIZE`
 128 under `CONFIG_RTL_819X`, and `__alloc_skb` aligns `size + RTL_PRIV_DATA_SIZE`
 (`net/core/skbuff.c:195`) before `truesize = size + sizeof(struct sk_buff)` (:211); with the
-driver's `dev_alloc_skb(len + 2)` for a 1,442-B frame (`rtl819x-nic.c:1412`), `NET_SKB_PAD` 32
+driver's `dev_alloc_skb(len + 2)` for a 1,442-B frame (`rtl819x-nic.c:1259`), `NET_SKB_PAD` 32
 (`skbuff.h:1421`) and `SMP_CACHE_BYTES` 32 (`arch/rlx/include/asm/cache.h:14`, `:18`: `L1_CACHE_SHIFT` 5 and
 `SMP_CACHE_BYTES` = `L1_CACHE_BYTES`, the build's constants, not a measured line size), SKB_DATA_ALIGN(1,442 + 2 + 32 + 128) = 1,632 and the
 **truesize is 1,632 + 200 = 1,832 B** (`NET-142`). S = 200 has two routes: `rmem_default` =
@@ -5158,8 +5158,8 @@ ACK with timestamps and one SACK block is 14 + 20 + 44 = 78 B, and so is a 12-B 
 retransmission (推 both). **It was the second of five frames after the re-arm** (量 + 讀).
 `D3-Y-SW` typed `txlen rlxfw` before `arm`, and every accepted behaviour verb marks the TX policy
 dirty, the same value re-typed included (讀 `rtl819x-nic-tx.h`); `nic_do_arm` (build cell
-`rtl819x-nic.c:1973–2107`) sets `nic_tx_idx = 0` (:2062) and calls `nic15_armed()` (:2096),
-which with the policy dirty zeroes every TX slot's `ph_len` word (:3344). The six `K` runs,
+`rtl819x-nic.c:1820–1954`) sets `nic_tx_idx = 0` (:1909) and calls `nic15_armed()` (:1943),
+which with the policy dirty zeroes every TX slot's `ph_len` word (:3191). The six `K` runs,
 each re-armed with the same text, read `tx_idx 0` and `len 0` in all four slots right after it
 (`bench/2026-09-27b/K1-0061-R0.log:199`, `:208–211`, and the other five alike): every length at
 `X-BR1` was written after the re-arm. With `tx_idx` 1 that is 1, 5 or 9 frames; four written
