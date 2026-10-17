@@ -326,7 +326,7 @@ precomputed values in the same output as the control**:
 | `+24` | `0x00001000` | `li v0,4096` |
 
 If those four match, the fifth is trustworthy. If they do not, the address or
-the layout is misread and the ID must not be believed. `plan/` §17 listed the
+the layout is misread and the ID must not be believed. The plan's item 4 ([`method.md`](method.md) § *Deliberately not done*) listed the
 JEDEC ID as removed because R5b's MTD probe would read it; it turns out the
 console reads it first, with no driver and no risk.
 
@@ -359,7 +359,7 @@ From B, `spi_common.c`, with the vendor's own comments:
 | `0x02` | `PP` | page program; `SPI_PAGE_SIZE` = `0x100` |
 | `0xB9` / `0xAB` | `DP` / `RDP` | deep power down, and release from it |
 
-**This closes the JEDEC ID question at the desk.** `plan/` §17 listed it as
+**This closes the JEDEC ID question at the desk.** The plan's item 4 ([`method.md`](method.md) § *Deliberately not done*) listed it as
 stuck on instrumentation. It is not: the same controller `FLW` already drives on
 this device can issue `0x9F`, and B has a function that does exactly that,
 `ComSrlCmd_RDID()`. Reading the ID still needs code running on the device
