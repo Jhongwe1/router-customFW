@@ -11,7 +11,7 @@ what `SPEC.md` §0 means by it** — nothing below was measured on the device.
 **Not one line of this file is a statement about silicon.**
 
 The comparand is always `$FWRE_WORK/extracted/unit-2018/squashfs-root/bin/<prog>`,
-the program cut out of **this machine's flash dump**. `plan/` puts that in a box
+the program cut out of **this machine's flash dump**. The plan (unpublished) puts that in a box
 and `notes/which-drop.md` §6 calls it the easiest thing in this gate to get
 wrong; `tools/rebuild-census.py` refuses rather than substituting another
 comparand, and `A6` is the case that pins it.
