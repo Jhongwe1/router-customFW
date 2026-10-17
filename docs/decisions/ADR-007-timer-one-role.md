@@ -13,6 +13,6 @@ TC1 is either a clocksource or a clockevent device, chosen with `mode cs` or `mo
 - The handover is one-way inside a boot: the 2.6.30 tick core has no unregister, so `disarm` returns `-EBUSY` once a device is registered, and a wedge needs a power cycle (`notes/timer-driver.md` § 12.8).
 - After the handover the vendor's TC0 still interrupts at 100 Hz, still pets the watchdog, and no longer advances `jiffies` (讀, § 12.3). 量 seating 13: the tick is the driver's, shown causally, with zero lost ticks (§ 13).
 ## Evidence
-[`notes/timer-driver.md`](../../notes/timer-driver.md) § 1, § 12, § 13 and § 14; [`docs/driver-diff.md`](../driver-diff.md) § 3.4; [`docs/GATE-RESULTS.md`](../GATE-RESULTS.md) entry 8 (`R5`); [`SPEC.md`](../../SPEC.md) `CPU-42`, `IRQ-09`, `REG-05`. Decided 2026-09-06, in `R5-3b-1` (version 3.0); armed at boot 2026-09-06, version 4.1.
+[`notes/timer-driver.md`](../../notes/timer-driver.md) § 1, § 12, § 13 and § 14; [`docs/driver-diff.md`](../driver-diff.md) § 3.4; [`docs/GATE-RESULTS.md`](../GATE-RESULTS.md) entry 8 (`R5`); [`SPEC.md`](../../SPEC.md) `CLK-25` (the decision itself, as a finding), `CPU-42`, `IRQ-09`, `REG-05`. Decided 2026-09-06, in `R5-3b-1` (version 3.0); armed at boot 2026-09-06, version 4.1.
 ## Status
 In force: the driver in the tree is version 4.1.
