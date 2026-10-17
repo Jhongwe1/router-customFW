@@ -531,11 +531,11 @@ so.
 | the **vendor** | `REG32(BSP_TCIR) \|= BSP_TC0IP` — read, OR, write back |
 | `shibajee` | `status = readl(TCIR); writel(status, TCIR);` — *"Clear all interrupts"* |
 | `ggbruno` | `tc0_irs = tc_r32(IR); tc0_irs \|= TC0_PENDING; tc_w32(tc0_irs, IR);` |
-| **mine** | `ackip` writes **one bit**, `1u << 28`, and reads it back |
+| **mine** | `ackip` writes the enable bits back as it read them and `TC1IP` alone among the `IP` bits — `(before & RTL819X_TCIR_IE_BITS) \| RTL819X_TCIR_TC1IP`, `rtl819x-timer.c:987-988` — so `TC0IP` is written 0, which clears nothing, and reads `TCIR` back |
 
 **Three of the four commit the same read-modify-write on a write-1-to-clear
 register**, and each of the three therefore clears *every* pending bit that
-happened to be set — including one belonging to a driver it has never heard of.
+happened to be set — including one belonging to a driver it has never heard of. That bites only where two users share `TCIR`, as the vendor's tick and this driver do on this board (below); in `shibajee`'s and `ggbruno`'s trees one timer interrupt is ever enabled, so there the write-back is inert (推), a hazard waiting for a second user. `shibajee`'s `writel(0xf0, base + TCIR)` (`:157`) clears neither pending bit by that driver's own defines (讀).
 
 🟢 **This project measured the consequence rather than arguing it.**
 `SPEC.md` `IRQ-09`, seating 12: the vendor's tick handler clears my `TC1IP`
@@ -550,7 +550,7 @@ out `0|0` and the reading was right while the assignment was wrong.
 > row is not *my code is better* — it is that a measurement bought a decision
 > that reading the datasheet did not.
 
-⚠️ And the honest half: my single-bit write is only safe because `TCIR`'s `IP`
+⚠️ And the honest half: my write clears only `TC1IP`, and that is safe only because `TCIR`'s `IP`
 bits are documented write-1-to-clear *and* because `ackip` proves it at run time
 before `reqirq` is allowed to proceed. The driver's own comment says a proof at
 one instant is not a proof at every instant, and the handler carries the guard
@@ -629,7 +629,7 @@ because the first version of one of them was wrong.
 **① `shibajee`'s four `TCCNR` bit-setters cannot set any of the four bits they
 exist to set.** Each is `u16 tccnr; tccnr = readl(base + TCCNR); … tccnr |=
 TCCNR_TC0_EN_BIT; writel(tccnr, base + TCCNR);` with the four control bits at
-31:28. The read truncates to sixteen bits; the `|=` promotes to `int`, ORs, and
+31:28. The read truncates to sixteen bits; the `|=` ORs in `unsigned long` (`BIT()` is `UL(1) << nr`), and
 converts back to `u16`, discarding bit 31 again.
 
 量, the same function body compiled twice with one type changed, which is the
@@ -666,7 +666,7 @@ and on the big-endian MIPS cross compiler alike, and warns
 
 What survives is narrower and still real: **the code is wrong and works, and
 what makes it work is the compiler's choice rather than anything in the
-language.** A fold to `0` is equally permitted, and then `pending` is always
+language.** The language permits anything, and another compiler does something else. 量 2026-10-18, an uncommitted probe computing the expression from runtime inputs (`gimr` `0xffffffff`, `gisr` `0x300`): GCC 13.3 gives `0x300` at `-O0` and `-O2`; clang 18.1.3 on x86-64 gives `0x100` at `-O0` and `0xc8768808` at `-O2` — not even a subset of the two inputs. MIPS clang was not tried. If a compiler folds the mask to `0`, `pending` is always
 zero and every interrupt is spurious. In a kernel built `-Werror` the warning
 is a build failure. `RTL8196E_NR_IRQS 128` against a 32-bit `GIMR`/`GISR` is a
 separate, plain inconsistency.
