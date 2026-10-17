@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 13 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 13 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 A one-word correction that cannot be made without invalidating evidence
 

@@ -1,6 +1,6 @@
 # `docs/KNOWN-ISSUES.md` — what single segments and seatings did not establish
 
-Moved here verbatim from `docs/KNOWN-ISSUES.md` by `P5e-2` on 2026-10-10: the eighteen sections
+Moved here verbatim from `docs/KNOWN-ISSUES.md` by `P5e-2` on 2026-10-17: the eighteen sections
 between its lines 632 and 1264 at `530dce4c` whose heading reads *What … did NOT establish*
 (one reads *did NOT pay*) with a date, 2026-09-16 to 2026-09-25. Each lists what one segment
 or one seating left open as it stood then; the release sections that followed carry what

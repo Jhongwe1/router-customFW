@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 1 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 1 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔄 ~~The firmware does not exist~~ — struck at `v1.0` (2026-10-09); each row below says what is still true
 

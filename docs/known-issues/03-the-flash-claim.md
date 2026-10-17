@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 3 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 3 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## The flash claim, and why it is not "zero bytes written"
 

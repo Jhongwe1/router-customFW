@@ -71,6 +71,6 @@ entry's heading, or else the day its heading entered this file.
 ## Records
 
 - [What single segments and seatings did not establish](history/known-issues-segment-limits.md):
-  the eighteen dated lists of 2026-09-16 to 2026-09-25, moved there verbatim on 2026-10-10.
+  the eighteen dated lists of 2026-09-16 to 2026-09-25, moved there verbatim on 2026-10-17.
 - [Closed entries, and the `v0.5` and `v0.6` lists](history/known-issues-closed.md), moved
   verbatim on 2026-10-09.

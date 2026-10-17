@@ -1,6 +1,6 @@
 # `PROGRESS.md`'s explanatory notes, archived verbatim
 
-Moved here verbatim from `PROGRESS.md` at `530dce4c` by `P5e-2` on 2026-10-09, when the file was cut
+Moved here verbatim from `PROGRESS.md` at `530dce4c` by `P5e-2` on 2026-10-17, when the file was cut
 to its state: the paragraphs under § Now's table and the table *The four things this file
 tracks* (lines 28–62), § Records moved out of this file (lines 66–97), whose rows
 `docs/history/README.md` now indexes, and the debt census's notes (lines 372–392 and 411–416)

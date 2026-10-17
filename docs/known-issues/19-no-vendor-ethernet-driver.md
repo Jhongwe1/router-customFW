@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 19 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 19 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 The mainline image has no vendor Ethernet driver, so `R9`'s controlled variable holds only in `quiet-swcore` — 2026-09-28 (`R6b-8` 8g)
 

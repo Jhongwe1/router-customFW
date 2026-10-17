@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 10 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 10 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 The device cannot check the driver's own arithmetic, and a mark it prints can be invisible to a `grep`
 

@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 8 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 8 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 The image contains a flash-write path, and it is not mine
 

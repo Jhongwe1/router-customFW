@@ -14,9 +14,9 @@ the work (house rule 6).
 | | |
 |---|---|
 | **Active gate** | **`P5e`**, opened 2026-10-09 (132nd segment) by the owner: the repository made readable and checkable by a reader with no context — the README, entry pages, CI that builds code, a video, one external report. Its step list is at the end of this file. The three decisions taken at opening: ① only rlxfw's own kernel sources move, out of `config/` into `kernel/`; `src/` stays, since `src/rlxboot` compiles `src/lib`'s crypto; ② no `README.zh-TW.md`; ③ `bench/` is marked `linguist-generated`, and archiving it as a release asset is not scheduled. `v1.0` was released 2026-10-09 from `2eb1a3d6` (§ Release clock). Each flash write is a separate dated yes for that exact payload (`FW-113`), and power actions wait for the owner's word. |
-| **Active step** | **`P5e-2`** ⑧ — `docs/FINDINGS.md` cut to one page — with `P5e-3` and `P5e-4` free to run beside it. Closed: `P5e-0`, and `P5e-1` on 2026-10-17 — rlxfw's own kernel sources in `kernel/`, `RECIPE_ID` over both roots, the full desk-sweep and CI green on `e949311f`; two DoD clauses are met in intent and not to the letter, each named in `LOG.md`. Landed of `P5e-2`: ①–⑦ — `LOG.md` by month in `docs/log/`; `RUNSHEET.md` and the old `CHANGELOG.md` in `docs/history/`; this file cut to its state; `docs/KNOWN-ISSUES.md` an index of pages under `docs/known-issues/`; `docs/spec/README.md`, an English entry to `SPEC.md`; `docs/reports/README.md`, an index of the gate results. |
+| **Active step** | **`P5e-3`** and **`P5e-4`**, side by side. Closed: `P5e-0`, and `P5e-1` on 2026-10-17 — rlxfw's own kernel sources in `kernel/`, `RECIPE_ID` over both roots, the full desk-sweep and CI green on `e949311f`; two DoD clauses are met in intent and not to the letter, each named in `LOG.md`. `P5e-2` has landed all eight parts — `LOG.md` by month in `docs/log/`; `RUNSHEET.md` and the old `CHANGELOG.md` in `docs/history/`; this file cut to its state; `docs/KNOWN-ISSUES.md` an index of pages under `docs/known-issues/`; `docs/spec/README.md`, an English entry to `SPEC.md`; `docs/reports/README.md`, an index of the gate results; `docs/FINDINGS.md` one page — and closes with the gate, when this step list leaves and E11 can read green. |
 | **Session history** | `LOG.md`, one dated entry per segment. What this table said until 2026-09-23 is archived verbatim in `docs/history/progress-now.md`. |
-| **Next after this** | 🔄 **2026-10-17 (133rd)**: `P5e-2` ⑧, then `P5e-3` and `P5e-4`, then `P5e-5`. |
+| **Next after this** | 🔄 **2026-10-17 (133rd)**: `P5e-3` and `P5e-4`, then `P5e-5`. |
 | **Blocked on** | Nothing in `P5e`'s path. Its outward acts wait for the owner's yes, each: every push, the GitHub topics and About URL, the video upload, the report to `shibajee/linux-rtl8196e`. Waiting, blocking no step: 量 the shared vendor toolchain tree has three deleted tracked files (`FW-235`), so builds run against a pin-identical copy and the desk-sweep's `T13` reads red; restoring the tree is the owner's. Also `FW-142`; `FW-143`; `CLK-42` 殘留; `FW-172` stays 推; `SPEC-R8a.md`'s demotion is rehearsed, unapplied; `LA-1`'s two rungs, which need a seating. |
 
 **Step list for the active gate**: `P5e`'s, at the end of this file, where it moves
@@ -65,13 +65,13 @@ Status: `·` not started · `~` in progress · `✓` closed (needs an evidence l
 | **R6c** | an image booted from a flash slot pings both ways after a watchdog reset and after a cold power-on | 4 | ✓ | `docs/GATE-RESULTS.md` entry 22 |
 | **P5e** | the repository readable and checkable by a reader with no context; closes on `entrycheck` green and one outside reader | 1 | ~ | the step list at the end of this file |
 
-The `Est.` column is deleted (2026-10-09, `P5e-2`), as its own analysis recommended: an estimate is planning material, not state. What it measured stays: on 2026-09-11 (`R5-11`), actual segments against the plan's 小計 over nine gates, **n = 9 · min 0.33× · max 1.38× · spread 4.15× · mean 0.844× · median 0.833×** — a band, not a ratio. The analysis: `docs/history/progress-est-analysis-2026-10-09.md`; the column: `docs/history/progress-gate-board-2026-10-09.md`.
+The `Est.` column is deleted (2026-10-17, `P5e-2`), as its own analysis recommended: an estimate is planning material, not state. What it measured stays: on 2026-09-11 (`R5-11`), actual segments against the plan's 小計 over nine gates, **n = 9 · min 0.33× · max 1.38× · spread 4.15× · mean 0.844× · median 0.833×** — a band, not a ratio. The analysis: `docs/history/progress-est-analysis-2026-10-09.md`; the column: `docs/history/progress-gate-board-2026-10-09.md`.
 
 ---
 
 ## Release clock
 
-This table owns which versions have shipped; what each one contains is `CHANGELOG.md`'s and `README.md`'s. Its notes until 2026-10-09: `docs/history/progress-release-clock-2026-10-09.md`.
+This table owns which versions have shipped; what each one contains is `CHANGELOG.md`'s and `README.md`'s. Its notes until 2026-10-17: `docs/history/progress-release-clock-2026-10-09.md`.
 
 | version | Shipped |
 |---|---|
@@ -104,7 +104,7 @@ Open questions that outlive a single session. Each one names the gate that will 
 | `REGIMM-1` 🆕 | 🔴 **`teqi` 家族在每一支儀器之外，而發現它的是一次不相干的安全問題。** 上一段把「21 個未向量 cause」的危害量成空清單，而那個結論的位址是母體 —— 75 條裡沒有任何一條 REGIMM trap。量：零命中。收它需要一列 payload 加一行 `hazlint` 的 `ISA_TRAPS`，而 `SPEC.md` `CPU-60` 是它的家。🔄 **2026-09-15(第七十一段):成本的更正終於傳回擁有者檔了。** 這一列在第六十九段就判定它**不是**「搭現有卡片零增量上機成本」——需要帶例外處理器的 payload,而每一顆這樣的 payload 都把列表編譯進去、被卡片 sha256 釘死 —— 但 `SPEC.md` `CPU-60` 與 `docs/isa-payload.md` §7 兩處**同日寫著相反的話而沒有被改**,直到今晚才就地更正。⚠️ 這是一次「同一天內部翻案沒有傳回擁有者檔」的案例,而抓到它的不是任何閘門,是一次列舉式的稽核 | ~~`R1-pub-4`~~，或任何一段動 `isa-payload.tsv` 的桌面段 🔄 **2026-09-16（第八十段）：那個具名 gate 劃掉，常設指示留下。** 它在 2026-09-16 走完它自己的步驟。⚠️ 而這一列自己第六十九段就判定它**不是**零增量上機成本，所以常設指示是它真正的擁有者而不是一個方便的說法 |
 | `VDR-1` 🆕 | 🔴 **進入廠商 userspace 的每一條路都以一次 flash 寫入開場，而這件事之前沒有任何一個檔案說過。** 主控台沒 shell／沒 getty／沒 login（`/etc/inittab` 全注解）、loader 沒有 `init=`／`bootargs` 機制（13 針 0 命中）、`TELNET_ENABLED` = 0；唯一實證的入口 `formSysCmd` 觸發後會把 `SYSCMD_SELECT` 寫進 `0x00C000` 的 `COMPCS`（量 `P10-10`，在兩個禁區之外且 blast radius 有界，但它是寫入）。⚠️ 而還有兩個未量的環節：沒有 `chmod` applet （下載下來是 0644，`execve` 給 `EACCES`），以及 payload 的 stdout 到底落在 UART 還是要轉到 `/var/web` 再用 HTTP 拿。**最便宜的決定性實驗不花 flash 也不花電源**：在 `qemu-mips-static -L squashfs-root` 下演練整條鏈 | ~~`R9`~~ 🔄 **2026-09-16（第八十段）**，接手自 ~~`R1-pub-4`~~（`docs/isa-prior-art.md` § 9.5）；而寫 flash 這一步永遠是擁有者的明確 yes：its subject is the vendor firmware's own behaviour, which was that gate's third column 🔄 **2026-10-04（第一百二十二段）：那道閘劃掉了，而這一列刻意不是整列 ⊘。** ⊘ 2026-10-04（第一百二十二段；裁決記在 `docs/GATE-RESULTS.md` entry 19；計畫 § 17「出於自願的範圍外」）：**只有矽片半邊** —— 進廠商 userspace 的唯一實證入口寫 flash（左格的量測），那道閘的標題是零 flash 寫入，擁有者 2026-10-04 的決定又把順序定成嚴格串行（它全關之後才寫 flash）。⚠️ **這一格刻意不拼出那道閘的代號，也不拼出左格那個量測的 id**：這一列還是 OPEN，所以 `cfcensus` 真的讀這一格 —— `L12` 就是為了「一個常設指示旁邊坐著一道收完尾的閘」而存在，`L2` 會把一個步驟 id 讀成不存在的閘，而 `L8` 的 `CLOSURE` 集合會把「已＋關」這兩個字讀成這一列自己收了（我第一次寫就踩到這一條）。閘名在紀錄裡，擁有者在這一格。🔴 攤出來的是一個**選擇**而不是一具缺的儀器：`CLAUDE.md` 把一次 flash 寫入定義成擁有者的明確 yes，而那個 yes 隨時給得出來，所以它填「出於自願的範圍外」而不是「卡在儀器上」。**重新打開**：一張凍結卡片帶著擁有者對一個寫 `0x00C000` 的 payload 的 `owner-yes` 列（`FW-113`），而且在第一次寫 slot **之前** —— 那一次寫之後這台就沒有廠商欄了。🔄 2026-10-08：那一次寫發生在 2026-10-07（`bench/2026-10-07` 的 `W3`），所以這個條件在這一台上不會再成立，矽片半邊的 ⊘ 在這台上是永久的；換一台才重新打開（計畫 § 17 第 8 項）。🟢 **沒有 ⊘ 的那一半是這一列自己寫的那一半**：qemu-user 演練不花 flash 也不花電源，而它沒有排進任何一段；它受兩條界限 —— 廠商二進位只在 `tools/vendor-tripwire.sh` 底下、從一個 scratch 目錄跑（讀 `CLAUDE.md`），而 `docs/emulation-surface.md` § 8.1 量到 75 列裡 34 列在矽片與 `qemu-mips-static` 之間不一致，所以它定得了鏈的管路、定不了指令的行為；**任何一段在 `tools/vendor-tripwire.sh` 底下跑廠商二進位的桌面段** |
 
-Closed (✅) and declined (⊘) rows are records: the thirteen moved on 2026-10-09 are in `docs/history/progress-carried-forward-2026-10-09.md`, earlier ones in `docs/history/progress-carried-forward.md`.
+Closed (✅) and declined (⊘) rows are records: the thirteen moved on 2026-10-17 are in `docs/history/progress-carried-forward-2026-10-09.md`, earlier ones in `docs/history/progress-carried-forward.md`.
 
 ---
 
@@ -114,7 +114,7 @@ Closed (✅) and declined (⊘) rows are records: the thirteen moved on 2026-10-
 hand** — `cfcensus write` regenerates them and a hand edit here is overwritten
 without warning. Nothing checks that they are current (`FW-111`).
 
-What the census reads, and the debt it cannot see, are described in `tools/cfcensus.py`'s docstring; this section's notes until 2026-10-09 are in `docs/history/progress-notes-2026-10-09.md`.
+What the census reads, and the debt it cannot see, are described in `tools/cfcensus.py`'s docstring; this section's notes until 2026-10-17 are in `docs/history/progress-notes-2026-10-09.md`.
 
 <!-- cfcensus:counts begin -->
 | what | n | meaning |

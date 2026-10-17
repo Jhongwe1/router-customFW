@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 15 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 15 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 The check that asks whether a committed file holds forbidden flash bytes cannot run in CI, and has been invoked wrong
 

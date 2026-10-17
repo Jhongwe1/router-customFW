@@ -1,6 +1,6 @@
 # `PROGRESS.md` § Carried forward — closed and declined rows, archived verbatim
 
-Moved here verbatim from `PROGRESS.md` at `530dce4c`, lines 338–362, by `P5e-2` on 2026-10-09, when
+Moved here verbatim from `PROGRESS.md` at `530dce4c`, lines 338–362, by `P5e-2` on 2026-10-17, when
 § Carried forward was cut to its open rows: the eight rows whose first cell says ✅ and the
 five whose first cell says ⊘, in the table's order. Rows moved earlier are in
 `docs/history/progress-carried-forward.md`. A record: never edited. Cite a row by its id;

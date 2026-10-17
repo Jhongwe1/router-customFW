@@ -1,6 +1,6 @@
 # `PROGRESS.md` § Gate board, archived verbatim with its `Est.` column
 
-Moved here verbatim from `PROGRESS.md` at `530dce4c`, lines 103–133, by `P5e-2` on 2026-10-09, when
+Moved here verbatim from `PROGRESS.md` at `530dce4c`, lines 103–133, by `P5e-2` on 2026-10-17, when
 each row was cut to one line — what closing the gate means in one clause, its actual
 segments, its status and its `docs/GATE-RESULTS.md` entry — and the `Est.` column was
 deleted. Rows of gates closed by 2026-09-30 had been cut once already; their earlier text is

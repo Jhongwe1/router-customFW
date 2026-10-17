@@ -46,11 +46,11 @@ fourteen by `R1y-4` on 2026-09-30 from `e274ccb`, each later one in its gate's c
 | [progress-ladder.md](progress-ladder.md) | § Session ladder | by `R1y-4`, 2026-09-30, from `e274ccb` |
 | [progress-corrections.md](progress-corrections.md) | § Corrections | by `R1y-4`, 2026-09-30, from `e274ccb` |
 | [progress-gate-board.md](progress-gate-board.md) | the closed gates' board rows before `R1y-5` cut them to what closing each means | by `R1y-5`, 2026-09-30, from `e274ccb` |
-| [progress-gate-board-2026-10-09.md](progress-gate-board-2026-10-09.md) | § Gate board, every row whole, with the deleted `Est.` column | by `P5e-2`, 2026-10-09, from `530dce4c` |
-| [progress-est-analysis-2026-10-09.md](progress-est-analysis-2026-10-09.md) | the analysis of the `Est.` column that recommended deleting it, with its measured ratio | by `P5e-2`, 2026-10-09, from `530dce4c` |
-| [progress-release-clock-2026-10-09.md](progress-release-clock-2026-10-09.md) | § Release clock's notes: the first releases, and why the table keeps only the shipped dates | by `P5e-2`, 2026-10-09, from `530dce4c` |
-| [progress-carried-forward-2026-10-09.md](progress-carried-forward-2026-10-09.md) | the thirteen closed and declined rows of § Carried forward | by `P5e-2`, 2026-10-09, from `530dce4c` |
-| [progress-notes-2026-10-09.md](progress-notes-2026-10-09.md) | the notes under § Now, *The four things this file tracks*, § Records moved out of this file, and the debt census's notes and counts | by `P5e-2`, 2026-10-09, from `530dce4c` |
+| [progress-gate-board-2026-10-09.md](progress-gate-board-2026-10-09.md) | § Gate board, every row whole, with the deleted `Est.` column | by `P5e-2`, 2026-10-17, from `530dce4c` |
+| [progress-est-analysis-2026-10-09.md](progress-est-analysis-2026-10-09.md) | the analysis of the `Est.` column that recommended deleting it, with its measured ratio | by `P5e-2`, 2026-10-17, from `530dce4c` |
+| [progress-release-clock-2026-10-09.md](progress-release-clock-2026-10-09.md) | § Release clock's notes: the first releases, and why the table keeps only the shipped dates | by `P5e-2`, 2026-10-17, from `530dce4c` |
+| [progress-carried-forward-2026-10-09.md](progress-carried-forward-2026-10-09.md) | the thirteen closed and declined rows of § Carried forward | by `P5e-2`, 2026-10-17, from `530dce4c` |
+| [progress-notes-2026-10-09.md](progress-notes-2026-10-09.md) | the notes under § Now, *The four things this file tracks*, § Records moved out of this file, and the debt census's notes and counts | by `P5e-2`, 2026-10-17, from `530dce4c` |
 
 ## `README.md`, `CHANGELOG.md` and the runsheet
 
@@ -68,5 +68,6 @@ fourteen by `R1y-4` on 2026-09-30 from `e274ccb`, each later one in its gate's c
 | File | What it holds | Moved |
 |---|---|---|
 | [claude-md-2026-09-23.md](claude-md-2026-09-23.md) | `CLAUDE.md` as it stood before it was rewritten to rules only | 2026-09-23 |
-| [known-issues-closed.md](known-issues-closed.md) | `docs/KNOWN-ISSUES.md`'s closed entries and its `v0.5` and `v0.6` sections | by `P5e-2`, 2026-10-09, from `530dce4c` |
-| [known-issues-segment-limits.md](known-issues-segment-limits.md) | `docs/KNOWN-ISSUES.md`'s eighteen dated *What … did NOT establish* sections, each one segment's or seating's limits | by `P5e-2`, 2026-10-10, from `530dce4c` |
+| [known-issues-closed.md](known-issues-closed.md) | `docs/KNOWN-ISSUES.md`'s closed entries and its `v0.5` and `v0.6` sections | by `P5e-2`, 2026-10-17, from `530dce4c` |
+| [known-issues-segment-limits.md](known-issues-segment-limits.md) | `docs/KNOWN-ISSUES.md`'s eighteen dated *What … did NOT establish* sections, each one segment's or seating's limits | by `P5e-2`, 2026-10-17, from `530dce4c` |
+| [findings-2026-10-17.md](findings-2026-10-17.md) | `docs/FINDINGS.md` whole: 257 rows of findings, each under the decision it changed | by `P5e-2`, 2026-10-17, with `git mv` |

@@ -128,6 +128,15 @@ BUDGET = {
     #   now); x 1.03 = 9,862.25, three significant figures up = 9,870.
     "PROGRESS.md#Now:bytes": 6000,
     "PROGRESS.md#Now:maxline": 1000,
+    "docs/FINDINGS.md:lines": 38,  # 2026-10-17, P5e-2 (8): the page cut to
+    #   fourteen findings, the old one moved whole to
+    #   docs/history/findings-2026-10-17.md.  量 36 lines after this commit;
+    #   x 1.03 = 37.08, three significant figures up = 37.1, and a line count
+    #   is whole, so 38; the floor, 19, is below the page.  P5e's DoD caps the
+    #   page at 60.
+    "docs/FINDINGS.md:bytes": 5400,  # the same commit: 量 5,238 B; x 1.03 =
+    #   5,395.14, three significant figures up = 5,400; the floor, 2,700, is
+    #   below the page.
 }
 
 # Keys with a CEILING ONLY.  § Now is rewritten every session and its size

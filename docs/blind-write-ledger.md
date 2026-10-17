@@ -319,7 +319,7 @@ addresses to `System.map` names, and those nine names are already declared in
 section covered four drivers, and it was still reading it after `48a7a2a` moved
 `R5-4` out of the section on 2026-09-06: the header was rewritten and the count
 beside it was not. It is replaced by the names rather than simply deleted the
-way `docs/FINDINGS.md:375`'s "These four" was, because unlike that one this
+way `docs/history/findings-2026-10-17.md:508`'s "These four" was, because unlike that one this
 count is load-bearing -- read as four it awards the STRONGEST independence
 claim to the one driver in the group that has a vendor `artefact` reading
 carrying register addresses and bit numbers, and § 8's table in this same file

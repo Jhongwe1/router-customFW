@@ -1,6 +1,6 @@
 # `docs/KNOWN-ISSUES.md` — closed entries and earlier releases' sections
 
-Moved here verbatim from `docs/KNOWN-ISSUES.md` at `530dce4c` by `P5e-2` on 2026-10-09: every entry
+Moved here verbatim from `docs/KNOWN-ISSUES.md` at `530dce4c` by `P5e-2` on 2026-10-17: every entry
 whose own text records it closed or fixed, and the `v0.5` and `v0.6` sections, each whole and
 in the file's order. The current file keeps the entries still open and the `v1.0` section.
 First are the two paragraphs of the current file rewritten to point here, as they stood: its

@@ -1,6 +1,6 @@
 # `PROGRESS.md` § Release clock's notes, archived verbatim
 
-Moved here verbatim from `PROGRESS.md` at `530dce4c` by `P5e-2` on 2026-10-09, when the section was
+Moved here verbatim from `PROGRESS.md` at `530dce4c` by `P5e-2` on 2026-10-17, when the section was
 cut to its version table and one line: its opening paragraph (lines 213–216) and everything
 under the table (lines 229–329). A record: never edited. `tools/docmove.py` proves the move.
 

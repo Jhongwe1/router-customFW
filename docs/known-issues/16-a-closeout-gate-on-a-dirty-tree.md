@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 16 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 16 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 A closeout gate run on a dirty tree has its own findings switched off — 2026-09-16
 

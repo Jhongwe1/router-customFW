@@ -1,6 +1,6 @@
 # `PROGRESS.md`'s analysis of the gate board's `Est.` column, archived verbatim
 
-Moved here verbatim from `PROGRESS.md` at `530dce4c`, lines 135–207, by `P5e-2` on 2026-10-09, in the
+Moved here verbatim from `PROGRESS.md` at `530dce4c`, lines 135–207, by `P5e-2` on 2026-10-17, in the
 commit that deleted the column, which is the repair its last paragraph recommends. The
 column's values are in `docs/history/progress-gate-board-2026-10-09.md`. A record: never edited. `tools/docmove.py`
 proves the move.

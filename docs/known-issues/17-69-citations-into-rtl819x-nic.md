@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 17 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 17 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 69 citations into `rtl819x-nic.c` rotted in one segment, and they are DECLARED rather than repaired — 2026-09-22
 

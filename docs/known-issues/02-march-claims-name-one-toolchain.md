@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 2 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 2 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 Every per-`-march` claim here is about ONE toolchain, and until 2026-09-13 none of them said which
 

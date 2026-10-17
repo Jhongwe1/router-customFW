@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 12 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 12 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 `\r\r\n` has two sources and only one of them is a wrap
 

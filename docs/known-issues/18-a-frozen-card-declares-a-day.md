@@ -1,4 +1,4 @@
-Part of [the known-issues index](../KNOWN-ISSUES.md): entry 18 of 19, moved here verbatim from that file on 2026-10-10.
+Part of [the known-issues index](../KNOWN-ISSUES.md): entry 18 of 19, moved here verbatim from that file on 2026-10-17.
 
 ## 🔴 A frozen card declares a day none of its captures happened on — 2026-09-23 (desk)
 
