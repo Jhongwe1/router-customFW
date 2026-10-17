@@ -8,7 +8,7 @@ is active; this file owns the work.
 
 ## 1. What `D2` actually asks for, and what arrived on 2026-09-09
 
-`plan/router-rebuild-plan.md` § 6-R5 (v5, review item 12) gives every driver
+The plan's `R5` block (§ 6, v5, review item 12; unpublished: [`method.md`](../docs/method.md) § *Quoting the plan*) gives every driver
 **two** binding models. The first — `platform_device` on 2.6.30 — has run on
 the silicon. The second is this, and its row has **four** acceptance criteria,
 not two:
@@ -120,7 +120,7 @@ checked" while reading as "every node was checked".
 
 ## 4. 量: how big is criterion ②
 
-`plan` estimates the whole of `D2` at **~0.3 segments per driver**. That is
+The plan estimates the whole of `D2` at **~0.3 segments per driver**. That is
 compatible with a `.dts` node and a binding; whether it is compatible with
 *"the driver compiles in a modern kernel tree"* was an open question, and the
 segment's own opening brief predicted it was not.
