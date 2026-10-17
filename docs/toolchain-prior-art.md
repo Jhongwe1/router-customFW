@@ -367,10 +367,10 @@ stated rather than left to be inferred:
 with one measurement in it, not two segments of measurement.~~
 🔴 **2026-09-13, the next segment: that sentence is true of the
 *assembly* and false of the *step*, and the difference is the one row the
-plan says can kill the project quietly.** `plan/router-rebuild-plan.md:1141`
+plan says can kill the project quietly.** The plan's `R2c` paragraph (unpublished)
 requires the **load-delay row of `R2c`'s table to run on the silicon in all
-three columns** — `R1f`'s fragment compiled once per toolchain — and the same
-file's § 389 table marks that row as the only cell that can kill the project
+three columns** — `R1f`'s fragment compiled once per toolchain — and the
+plan's `D1` table marks that row as the only cell that can kill the project
 silently. **Nothing in this census reaches it**: § 5 records `TC-43` as the
 only row here whose number contains a device reading, so ~~two of the three
 columns have never had anything run on this die~~ 🔄 **2026-09-14 (seating 22): the
