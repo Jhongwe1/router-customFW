@@ -28,16 +28,16 @@ per-defect detail. Those findings belong to the pinned reverse-engineering
 project, and 讀 2026-10-04 from `upstream/docs/disclosure.md`'s status column
 at the pin `4d3ff26`, **thirteen** of its ids are marked held — `D-3`,
 `D-4`, `D-9`, `D-10`, `D-11`, `D-12`, `D-13`, `D-14`, `D-15`, `D-16`, `D-17`,
-`D-18`, `D-19` — with `D-19` additionally marked NOT SEARCHED. ⚠️ `plan/` § 15
+`D-18`, `D-19` — with `D-19` additionally marked NOT SEARCHED. ⚠️ The plan's disclosure rule ([`charter.md`](charter.md) § *Disclosure* translates it, without the count)
 says four; the file at the pin says thirteen, and the file wins.
 
-So the rule here, from `plan/` § 15: a **class-level** statement about rlxfw's
+So the rule here, from [`charter.md`](charter.md) § *Disclosure*: a **class-level** statement about rlxfw's
 own design is publishable; a **named** statement pointing at a specific vendor
 line, address or handler follows the disclosure state and is not written while
 that state is held; and a **reproduction** — a request anyone could paste —
 never appears in this repository while any of those rows is held, and none has
-been sent. Where the vendor appears below it appears as one of `plan/` § 8's
-published category names, or as prior art with a CVE id, and never with an
+been sent. Where the vendor appears below it appears as one of the class names of the plan's § 8 table
+(command injection, authentication and the like), or as prior art with a CVE id, and never with an
 endpoint, a parameter name, a payload or an ordering.
 
 **What `docs/KNOWN-ISSUES.md` owns and this file does not restate**: the
@@ -103,7 +103,7 @@ power-on and after a warm reboot with no command typed.
 
 **What rlxfw does not do.**
 
-* **No transport security.** Management is plaintext HTTP. 讀 `plan/` `D8`: TLS
+* **No transport security.** Management is plaintext HTTP. 讀 the plan's size budget ([`flash.md`](flash.md) § *The size budget the plan set*): TLS
   is conditional on the size budget and the decision was left to the numbers;
   no TLS library is in the image and none has been measured into it.
 * **No reading of this surface under attack.** The fuzzing and the sweeps are
@@ -268,7 +268,7 @@ it bricks the device.**
   prompt without waiting for ESC and without printing anything** — so corrupting
   the image is itself a path to the prompt.
 
-**What rlxfw does.** Nothing, and it must not. `plan/` § 8.2 records this row as
+**What rlxfw does.** Nothing, and it must not. The plan's § 8.2 records this row as
 *a feature, not a bug — take it away and you brick it*, and this project's
 position is that **physical or LAN access to the loader equals complete control,
 accepted by design**.
@@ -290,10 +290,10 @@ and not protection for a deployed device.
 
 ## 8. `T7` — the vendor WLAN driver, as code inside rlxfw's kernel
 
-🔴 **Near-zero containment, stated in the threat model because `plan/` `D16`
+🔴 **Near-zero containment, stated in the threat model because the plan's `D16`
 requires it to be.** This is a driver this project did not write and cannot
 audit, linked into a monolithic kernel. The size figure used here is this
-repository's own and not `plan/`'s line count: 量 `SPEC.md` `FW-51`,
+repository's own and not the plan's line count: 量 `SPEC.md` `FW-51`,
 `built-in.o` **820,910 bytes**.
 
 **What it reaches, each with a reading.**
@@ -310,7 +310,7 @@ repository's own and not `plan/`'s line count: 量 `SPEC.md` `FW-51`,
   first version of that reading came from the wrong directory and was corrected
   by measuring the artefact.
 
-**What this project got right about it, and it is a correction to `plan/`.** The
+**What this project got right about it, and it is a correction to the plan.** The
 driver that **builds** is `rtl8192cd/`, **not** `rtl8192e/`: 量 `FW-51`,
 `built-in.o` **820,910 bytes**; 讀 `FW-103`, `rtl8192e/` carries the same two
 print lines and that directory never enters the image. And at `SWCORE=n` — the
@@ -372,18 +372,18 @@ that excludes: no seccomp (推), no `no_new_privs` (推), no LSM, and NX **未�
 
 ## 11. The seven that cannot be fixed, and where each now stands
 
-`plan/` § 8.2 names seven. 🔴 Four of them are **not** in the state `plan/`
+The plan's § 8.2 (unpublished: [`method.md`](method.md) § *Quoting the plan*) names seven. 🔴 Four of them are **not** in the state the plan
 records, because the evidence it cites does not exist in this repository.
 
-| `plan/` § 8.2 row | `plan/`'s evidence | what this repository actually holds |
+| the plan's § 8.2 row | the plan's evidence | what this repository actually holds |
 |---|---|---|
 | **NX** | *`R1a`'s NX test* | 🔴 **未定.** No such test ran and no reading of page-level execute permission exists on this die. `SPEC.md` `CPU-49` 殘留 records NX as one of seven items deliberately excluded from `R1a`'s population, ⊘ 2026-09-30 as voluntarily out of scope. `docs/hardening-matrix.md` `SPEC.md` `CPU-49` 殘留 |
 | **ASLR** | *`R3` reads the source* | 🔴 **未定.** 量 2026-10-04: zero hits for `aslr`, `randomize_va` or `arch_pick_mmap` across `notes/`, `docs/` and `SPEC.md`. One desk grep settles it. `TC-26` 殘留 ① |
 | **seccomp / `no_new_privs`** | *read the 2.6.30 source* | 🔴 **推, not 讀.** The kernel is 2.6.30.9 (讀) and the features are 3.x and 3.5+, but no grep of this tree's `Kconfig` was taken. `TC-26` 殘留 ② |
 | **True secure boot** | *the manual's contents has no OTP chapter* | ⚠️ **partly.** The loader half **is** read: 讀 `LDR-18`, an unkeyed 16-bit sum, and the loader region is permanently unwritable by rule. The fuse half is **⊘ out of scope**, owned by `PROGRESS.md`'s `R8a` row — *no evidence of a key-hash fuse* — and not reopened here |
 | **Physical attacker** | *threat model's out-of-scope* | ✅ **in scope here, § 6, and stated unmitigated** with four readings of what it reaches |
-| **Vendor WiFi driver** | *written plainly in the threat model* | ✅ **§ 8, and with three readings `plan/` did not have** — the directory that builds, the `.bss` that covers the loader's DMA, and the watchdog sites the config flag does not remove |
-| **Loader's unauthenticated TFTP rescue** | *physical/LAN access = complete control, accepted* | ✅ **§ 7, accepted and unmitigated** — and with a 未定 `plan/` did not name: whether it is reachable with no console at all (`LDR-25` 殘留) |
+| **Vendor WiFi driver** | *written plainly in the threat model* | ✅ **§ 8, and with three readings the plan did not have** — the directory that builds, the `.bss` that covers the loader's DMA, and the watchdog sites the config flag does not remove |
+| **Loader's unauthenticated TFTP rescue** | *physical/LAN access = complete control, accepted* | ✅ **§ 7, accepted and unmitigated** — and with a 未定 the plan did not name: whether it is reachable with no console at all (`LDR-25` 殘留) |
 
 ## 12. What this threat model does not establish
 
@@ -398,16 +398,16 @@ records, because the evidence it cites does not exist in this repository.
   set is the privilege drop being verified by reversing it, and one step is not
   an adversary.
 * **Not that the position list is complete.** It was derived from what this
-  project has measured and from `plan/` § 8.2, not from a systematic
+  project has measured and from the plan's § 8.2, not from a systematic
   enumeration. A position nobody named has no row, and the absence of a row is
   not evidence.
 * **Not anything about the vendor's reachable attack surface.** The vendor's
   firmware **has no shell** (`docs/GATE-RESULTS.md`, `P2`'s ⊘ *Structural, not
   deferred*), and every evidenced path into its userspace opens with a flash
   write — so for most of the vendor's side this gate can read static shape and
-  nothing else. `plan/` § 8.1's `CVE-2014-8361` entry is the standing precedent:
+  nothing else. Upstream's `P6-1` on `CVE-2014-8361` (`upstream/PROGRESS.md`) is the standing precedent:
   the code shape was present and the effect was not.
-* **Not that `plan/` § 8.3's entropy comparison can ever be run.** It needs 100
+* **Not that the plan's § 8.3 entropy comparison can ever be run.** It needs 100
   reads of `/dev/urandom` across 20 boots of the **vendor** firmware, which
   needs a shell. ⊘ Structural, not deferred.
 * **Not a severity ranking.** No position above carries a likelihood, an

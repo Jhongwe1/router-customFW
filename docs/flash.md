@@ -96,7 +96,10 @@ with 68 KiB to spare. It called the slot boundaries provisional until the erase
 size and the locator's `bank_offset` were read. For RAM, of the 26,052 kB Linux
 reported (`MEM-06`): kernel ≤ 8 MiB, userspace ≤ 6 MiB, an update buffer of
 1.92 MiB, DMA rings and the receive pool about 600 KiB, at least 8 MiB to spare.
-`SPEC.md` holds these as `TGT-07` to `TGT-09`.
+TLS was left to the numbers: if the root filesystem without it came to at most
+650 KiB, TLS would fit; if not, a smaller library (BearSSL, about 150 KiB against
+mbedTLS's 280), MIPS16, or one slot instead of two — which the plan called a real
+option, not a failure. `SPEC.md` holds the budget as `TGT-07` to `TGT-09`.
 
 Built instead (`FW-167`, [`update-chain.md`](../notes/update-chain.md) § 6): slot A
 at `0x070000` and slot B at `0x190000`, 1,179,648 bytes each, and the
