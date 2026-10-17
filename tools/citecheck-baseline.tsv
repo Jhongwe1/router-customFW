@@ -23,7 +23,6 @@
 # reviewer can see what the citation was for without running git.
 #
 # kind	citing-file	cited-path	cited-line	sha256-16	the row, then
-M3	SPEC.md	kernel/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	471	eccd40f0ec1a3d81	kernel/linux-2.6.30/drivers/clocksource/rtl819x-timer.c:471 
 M3	SPEC.md	kernel/linux-2.6.30/drivers/net/rtl819x-switch.c	93	5636dac03795413a	kernel/linux-2.6.30/drivers/net/rtl819x-switch.c:93 is a blank line
 M3	docs/GATE-RESULTS.md	kernel/linux-2.6.30/drivers/input/keyboard/rtl819x-keys.c	91	dbd3ca7a99fd5ba1	kernel/linux-2.6.30/drivers/input/keyboard/rtl819x-keys.c:91 is a blan
 M3	docs/GATE-RESULTS.md	kernel/linux-2.6.30/drivers/net/rtl819x-switch.c	93	5636dac03795413a	kernel/linux-2.6.30/drivers/net/rtl819x-switch.c:93 is a blank line

@@ -274,7 +274,7 @@ majority of the work.
 tree.  It is elided here on purpose: `ledgerscan check` reads a path shaped
 like a driver tree as a CITATION that the blind-write ledger has to cover, and
 it is right to — it cannot tell a scratch copy from a path this project has
-read.  The line is `rtl819x-timer.c:409`,
+read.  The line is `rtl819x-timer.c:71`,
 `kernel/linux-2.6.30/drivers/clocksource/`.)*
 
 量: that header exists only at

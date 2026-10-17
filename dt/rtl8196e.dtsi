@@ -131,7 +131,7 @@
 		 * the second request_mem_region() would take -EBUSY.  The two
 		 * devices are given adjacent, disjoint windows at word
 		 * granularity: this node owns 0x00–0x1b, the watchdog owns
-		 * 0x1c–0x1f.  rtl819x-timer.c:478 names 0x1c for exactly this
+		 * 0x1c–0x1f.  rtl819x-timer.c:140 names 0x1c for exactly this
 		 * reason and touches nothing in it.
 		 *
 		 * 🔴 And `#clock-cells`, which is the other half of the same

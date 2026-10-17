@@ -441,11 +441,11 @@ mt_tick() {
 	# written that was a NO-TAKE: the counters agree with each other whatever
 	# the period is.
 	#
-	# 讀 rtl819x-timer.c:860-861, which is where these two fields come from:
+	# 讀 rtl819x-timer.c:522-523, which is where these two fields come from:
 	#     rtl819x_ce_reload      counts per tick, LIVE   (what `cereload` writes)
 	#     rtl819x_ce_reload_hz   counts per tick that HZ implies (derived at
 	#                            init from hz_used / HZ)
-	# and :1544, where the DRIVER ITSELF refuses to hand the tick over with
+	# and :1206, where the DRIVER ITSELF refuses to hand the tick over with
 	# -ERANGE when they differ, its own comment reading "`cereload` has already
 	# made the period deliberately wrong".  So this is the driver's criterion
 	# read back, not a second one invented here.

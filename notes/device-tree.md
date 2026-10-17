@@ -82,7 +82,7 @@ where that stops being free.** `WDTCNR` is at `0x1800311c`; the Timer/Counter
 block starts at `0x18003100`. Two sibling nodes each claiming the documented
 block would overlap, and the second `request_mem_region()` would take `-EBUSY`.
 The tree gives the timer `0x00`–`0x1b` and the watchdog `0x1c`–`0x1f`:
-adjacent, disjoint, at word granularity. `rtl819x-timer.c:478` already named
+adjacent, disjoint, at word granularity. `rtl819x-timer.c:140` already named
 `0x1c` for this reason and touches nothing in it.
 
 🔴 **② `CDBR` lives inside the timer too, and that is why the timer is a clock

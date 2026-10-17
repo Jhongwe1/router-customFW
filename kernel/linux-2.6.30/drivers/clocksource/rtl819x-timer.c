@@ -5,382 +5,44 @@
  * drivers/clocksource/ by tools/rlxfw-marks.py from kernel/;
  * config/rlxfw-marks.tsv carries the one Kbuild line that links it.
  *
- * WRITTEN BLIND, AND THAT WORD HAS A LEDGER -- AND A DATE.
- * docs/blind-write-ledger.md 4.3 is the frozen record of what this
- * repository had read of anyone else's timer ON 2026-09-03, WHEN THE FIRST
- * VERSION OF THIS FILE WAS WRITTEN: one string literal of the vendor's
- * (`"rlx timer"`, arch/rlx/kernel/rlx-cevt.c:139,226, taken for an
- * arch/rlx-vs-arch/mips proof), the weak generic kernel/sched_clock.c:39, and
- * arch/rlx/kernel/rlx-time.c with zero citations.  Neither vendor file was
- * opened to write it.  Every number below comes from SPEC.md -- this die's
- * own readings -- or from the RTL8196E datasheet, which is the specification
- * and not an implementation.
+ * NOT A BLIND WRITE.  docs/blind-write-ledger.md 4.3 records what had been
+ * read of anyone else's timer when version 1.0 was written, on 2026-09-03;
+ * the vendor's timer files were opened in full on 2026-09-04 and 2026-09-06
+ * (ledger 4.2 and 4.3), and everything from version 2.0 on was written after.
  *
- * 🔴 THE BLIND CLAIM IS BOUNDED BY A DATE AND NOT BY THIS FILE'S CONTENTS.
- * On 2026-09-04, R5-10 opened arch/rlx/bsp/timer.c and arch/rlx/kernel/
- * rlx-time.c IN FULL (ledger 4.2), so the sentence above is history and not
- * a present-tense claim.  What survives unqualified is the ORIGINAL version:
- * its source predates that reading by a day, which git log can check and
- * this comment cannot.  Everything added in version 2.0 -- the derived rate,
- * the interrupt path -- was written AFTER, and docs/driver-diff.md's timer
- * section must say so rather than inherit the word.
+ * It drives TC1.  TC0, the vendor's tick, keeps running, and arm() checks
+ * that TC0's bits in the shared TCCNR did not move.  The count rate and the
+ * shift are derived at init and never compiled in: under Linux the divider is
+ * 1000 and not 14 (MEASURED seating 11, SPEC.md REG-11, CLK-22).  Since 4.0
+ * the tick is handed over at boot by a sequencer of the same steps the verbs
+ * take, and RLXFW-TA<n> marks each stage on the wire.
  *
- * 🔴 2026-09-06, R5-3b: arch/rlx/kernel/rlx-cevt.c WAS OPENED IN FULL, and
- * everything in version 3.0 was written after it.  Ledger 4.3 carries the
- * row; the depth moves line -> full for that path.  What was taken is
- * stated there and it is not a register sequence -- the vendor's TC0
- * clockevent programs no timer register at all (its set_mode and
- * set_next_event are stubs).  What was taken is the RATING, 100, which is
- * the number this driver has to beat, and the fact that its features word
- * carries CLOCK_EVT_FEAT_PERIODIC alone.  Both are facts about what this
- * driver must coexist with, not about how to drive TC1.
+ * WHY RATING 0.  The CLOCKSOURCE's rating is 0, strictly below
+ * clocksource_jiffies' 1, so it cannot become the system time base by
+ * accident.  The clockevent's rating is a different field on a different
+ * structure: see THE CLOCKEVENT.
  *
- * WHAT VERSION 2.0 CHANGED, AND WHY EACH WAS FORCED BY A READING
- * (R5-3a, 2026-09-04; the /proc format moved, so RTL819X_TC_VERSION moved):
+ * THE CLOCKEVENT.  TC1 HAS ONE RELOAD REGISTER AND THE TWO JOBS WANT
+ * DIFFERENT VALUES: the clocksource wants a power-of-two period, and a
+ * 100 Hz clockevent wants 2,000 counts.  So `mode cs` and `mode ce` choose
+ * one, and arm() writes a different TC1DATA under each.  A software-extended
+ * clocksource is refuted on this die rather than skipped: the vendor's tick
+ * ack is a read-modify-write on write-1-to-clear bits, so a pending TC1IP
+ * lives at most one tick (SPEC.md IRQ-09).
  *
- *   1. The count rate is DERIVED at init, two independent ways, instead of
- *      being the compiled-in 14,286,057.  量 seating 11: under Linux the
- *      divider is 1000 and not 14, so the compiled figure was 71.43x high
- *      (SPEC.md REG-11, CLK-22).
- *   2. The shift is derived WITH it, because it cannot be a constant once the
- *      rate is not.  量 at the desk: clocksource_hz2mult() returns u32 and
- *      2.6.30 has no clocks_calc_mult_shift(); at 200,000 Hz the old shift of
- *      24 gives an exact mult of 83,886,080,000, which TRUNCATES to
- *      2,281,701,376 -- 136 ns per count against a true 5,000.  Fixing the
- *      reported rate without the shift would have shipped a worse number
- *      than the bug.
- *   3. tc1_ext is advanced by a kernel timer, not by whoever reads /proc.
- *      量 TM-5c: 462 s with no reader left tc1_ext 92,362,366 counts behind
- *      the counter and tc1_ext_trusted still reading 1.
- *   4. tc1_ext_trusted is decided in JIFFIES.  Its old test was on a gap
- *      already reduced mod 2^27, so a gap of one full period plus delta read
- *      as delta -- 量 TM-5b2: a real 140,693,532-count gap reported as
- *      6,475,672 and trusted.
- *   5. The interrupt path exists, in four separately-typed steps.  See
- *      "THE INTERRUPT PATH" below.
+ * THE INTERRUPT PATH.  `reqirq` refuses unless this driver has ITSELF watched
+ * `ackip` take TC1IP from 1 to 0 (I3): the ICTL chip masks without acking and
+ * handle_level_irq() unmasks after the handler, so a handler that cannot
+ * clear TC1IP re-triggers at once.  The handler clears TC1IP, reads it back,
+ * and on a bit still set calls disable_irq_nosync(), so a storm becomes one
+ * line in /proc.
  *
- * WHAT VERSION 4.0 CHANGED
- * (R5-3b-2, 2026-09-06; the /proc format moved again, so the version did):
- *
- *   1. The handover happens at boot instead of from a /proc write.  It is
- *      a SEQUENCER and not a reimplementation: every hardware step is the
- *      same function the verb calls, in the order the card typed on
- *      2026-09-06.  See "ARMING AT BOOT" at rtl819x_boot_arm_early().
- *   2. Seven boot_* lines in /proc, and ten RLXFW-TA<n> lines on the wire.
- *      The duplication is the point: /proc needs a shell and the wire does
- *      not, and the failure this step can produce is one that never
- *      reaches a shell.
- *   3. Nothing in the arm/ackip/register path changed.  A diff that
- *      touched those would have broken the one property that makes this
- *      step cheap -- that R5-3b-1's three cold boots are evidence about
- *      the code this version runs.
- *
- * WHAT VERSION 4.1 CHANGED, AND THE BOARD IS WHY
- * (2026-09-06, seating 14, between K2 and M1):
- *
- *   1. The late half re-bases the pre-check window instead of inheriting
- *      the one that starts at reqirq.  4.0's window spans the vendor's
- *      NIC initialisation, which 量 costs 11 of 585 interrupts -- 1.88 %
- *      against a 1 % tolerance -- so 4.0 refused its own handover on
- *      both boots it was given, with ce_check_dc/dj identical to the
- *      interrupt on a cold boot and a warm one.
- *   2. TA6 now prints that shortfall instead of the wait. The wait is
- *      ~300 on every boot and says nothing; the shortfall is a
- *      measurement of the vendor's driver that nothing else produces.
- *   3. Three attempts, and boot_ce_tries says how many were used.
- *   4. 🔴 THE TOLERANCE DID NOT MOVE. 1 % refused a state in which the
- *      system clock would have run 1.88 % slow through boot, with
- *      nothing in the kernel able to notice -- which is exactly what
- *      R5-3b-1's `cereload` rows demonstrated. Widening it would have
- *      been fixing the instrument to agree with the experiment.
- *
- * WHY TIMER/COUNTER 1 AND NOT 0.
- * TC0 is the vendor's system tick and this driver never writes it.  TC0 is
- * also unusable as a clocksource on its own: SPEC.md CLK-17 records that it
- * wraps every 142,858 counts -- 9.9998 ms, and NOT a power of two -- so the
- * `(now - last) & mask` arithmetic every clocksource core uses is wrong for
- * it, and the software alternative (`if (d < 0) d += 142858`) needs a read
- * more often than once per 10 ms.  At CONFIG_HZ=100 nothing in this kernel
- * can guarantee that.
- *
- * TC1 is idle on this unit: 量 SPEC.md REG-06/REG-08/REG-09 -- TC1DATA = 0,
- * TC1CNT = 0, and TCCNR = 0xC0000000, whose TC1En (bit 29) and TC1Mode
- * (bit 28) are both clear.  Programming it with a power-of-two period makes
- * the mask arithmetic exact.  docs/probe3-cells.md 8 already weighed this
- * write once and declined it, recording it as "the upgrade path for R5-0";
- * this is that path taken, with the guards that payload could not afford.
- *
- * WHY ARMING WAS A WRITE TO /proc AND NOT SOMETHING init DOES
- * (true of versions 1.0 to 3.0; 🔄 2026-09-06 version 4.0 arms at boot,
- *  and the block at the end of this section is why that became sayable).
- * Enabling TC1 sets bits in TCCNR, which is the same register that holds
- * TC0En.  Two hazards follow and neither is settled by any source this
- * project has:
- *
- *   (1) a read-modify-write of TCCNR could disturb TC0 and stop the system
- *       tick;
- *   (2) TCIR's TC1IP (bit 28) latches on a TC1 timeout, and something has to
- *       stop that reaching the vendor's timer handler.  D Table 14/15 say it
- *       does not have to: the global controller gives the two timers SEPARATE
- *       bits -- GIMR bit 8 TC0_IE / bit 9 TC1_IE, GISR bit 8 TC0_IP / bit 9
- *       TC1_IP -- so a TC1 timeout raises bit 9, which is a different line
- *       from the one the vendor's tick uses.  量 SPEC.md REG-01: GIMR reads
- *       0x00008100 at the loader prompt, i.e. TC0_IE set and TC1_IE CLEAR.
- *
- *       🔴 2026-09-04: hazard (2)'s PRECONDITION was never met, and that is
- *       not the same as the hazard being wrong.  量 seating 11 (TM-5b2): over
- *       703.46 s and a full 2^27 period, TC1IP stayed 0 -- because
- *       rtl819x_tc1_arm() writes TCCNR and TC1DATA and NEVER writes TCIR bit
- *       30, the timer block's own interrupt enable.  Version 1.0 armed a
- *       counter and did not arm an interrupt.  The sentence above is a
- *       prediction this file made and could not test; version 2.0's `armirq`
- *       is what tests it (docs/interrupt-map.md 3.2, notes/timer-driver.md 9).
- *
- *       🟢 2026-09-04, seating 12 (CFG-2): what Linux leaves in GIMR IS now
- *       established, and this paragraph used to say it was not.  量:
- *       gimr_at_init = 0x00209100 -- bits 8, 12, 15 and 21 -- so TC0's ICTL
- *       position (bit 8) and UART0's (bit 12) are unmasked and TC1's (bit 9)
- *       is CLEAR, at arch_initcall, before this driver writes anything.
- *       After request_irq(25) it reads 0x00209300: bit 9 and nothing else,
- *       set by bsp_ictl_irq_unmask on this driver's behalf.  The driver
- *       still never writes GIMR; it READS it, refuses to arm while bit 9 is
- *       set by anyone but itself, and prints both words.
- *
- *       ⚠️ Bit 12 being set is not idle trivia.  讀 arch/rlx/bsp/irq.c:
- *       bsp_ictl_irq_dispatch() is an `else if` chain that dispatches ONE
- *       source per exception and tests BSP_UART0_IP (bit 12) and
- *       BSP_UART1_IP (bit 13) BEFORE BSP_TC1_IP (bit 9).  量 seating 12,
- *       EX-19: the console's 41,824 interrupts arrived as `8: RLX LOPI
- *       serial`, i.e. down the LOPI vector and not through this chain, and
- *       gisr read 0x88000004 with bit 12 clear.  So the starvation the
- *       chain would permit does not happen in this configuration -- which
- *       is a measurement about this board, not a property of the code.
- *
- * A driver that armed at boot would put both hazards in front of the boot,
- * where a hang costs the whole power cycle -- this project's most expensive
- * unit.  Arming from userspace puts them after a shell, where the failure is
- * observed, bounded and reversible, and where GIMR can be READ first.  R5-2's
- * reading is what makes the boot-time path (R5-3) safe to write; ~~until then
- * this file boots inert and writes nothing~~.
- *
- * 🔄 2026-09-06 (R5-3b-2): THAT LAST CLAUSE EXPIRED, AND THE TWO HAZARDS
- * ARE ANSWERED RATHER THAN ACCEPTED.  The paragraph above is kept because
- * it was the correct decision on the evidence of the day it was written,
- * and because what changed is the evidence and not the reasoning.
- *
- *   (1) is answered by a guard that has run on the silicon.  arm() does
- *       not blind-write TCCNR: it reads the word back and compares
- *       RTL819X_TCCNR_TC0_BITS against what it read before, restores the
- *       old value and returns -EIO if they moved.  量 seating 13, three
- *       cold boots: tccnr 0xF0000000 after arm against 0xC0000000 before,
- *       i.e. exactly the TC1 bits and nothing of TC0's, and the vendor's
- *       own tick kept advancing across the whole seating.
- *
- *   (2) is answered by a reading of the mask rather than by an argument
- *       about it.  量 seating 12 (CFG-2): GIMR is 0x00209100 at
- *       arch_initcall -- TC1's bit 9 CLEAR -- and reaches 0x00209300 only
- *       after request_irq(25), set by bsp_ictl_irq_unmask on this
- *       driver's behalf.  So between S1 and S4 of the sequencer a TC1
- *       timeout raises a bit nothing is listening to, and the vendor's
- *       tick is on bit 8 and on the LOPI serial vector, neither of which
- *       this driver touches.
- *
- * 🔴 AND THE HAZARD THE PARAGRAPH ABOVE NAMED LAST -- "a hang costs the
- * whole power cycle" -- IS NOT ANSWERED.  It is REDUCED, and the
- * difference is worth a line.  It cannot be removed: past
- * clockevents_register_device() this boot has no way back.  What the ten
- * RLXFW-TA<n> marks buy is that the power cycle is not spent on silence.
- * They go out through prom_putchar, which needs no console and no log
- * buffer, so the last line on the wire names the stage that did not
- * return.  A power cycle that produces a bisected failure point is a
- * different transaction from one that produces nothing.
- *
- * WHY RATING 0.
- * 讀 kernel/time/clocksource.c: clocksource_enqueue() inserts sorted by
- * rating and select_clocksource() takes the list head, so the highest rating
- * wins.  clocksource_jiffies has rating 1 and is always registered.  A
- * rating of 1 here would tie with it and rely on enqueue's `>=` to break the
- * tie in jiffies' favour -- true today, and an implementation detail.  0 is
- * strictly lower, so this clocksource cannot become the system time base by
- * accident whether or not arch/rlx registers one of its own.  The rating
- * band documented in include/linux/clocksource.h starts at 1; 0 is outside
- * it deliberately, and this comment is the reason.  R5-3 raises it.
- *
- * 🔄 R5-3b: R5-3 does NOT raise it, and that is a correction rather than a
- * deferral.  The number above is the CLOCKSOURCE's rating and it stays 0.
- * What R5-3b raises is a different field on a different structure -- the
- * CLOCKEVENT's -- because on this part the two cannot be the same timer
- * channel at the same time.  See THE CLOCKEVENT below.
- *
- * WHAT THIS FILE DOES NOT KNOW, ON PURPOSE.
- * Whether arch/rlx registers a clocksource of its own is not looked up here.
- * The experiment does not need it: /sys/devices/system/clocksource/
- * clocksource0/available_clocksource answers it on the silicon, and not
- * knowing is what keeps docs/driver-diff.md's timer rows worth writing.
- *
- * THE CLOCKEVENT, AND WHY IT IS A MODE AND NOT AN ADDITION  (R5-3b)
- * -----------------------------------------------------------------
- * 🔴 TC1 HAS ONE RELOAD REGISTER AND THE TWO JOBS WANT DIFFERENT VALUES.
- *
- *   the clocksource wants a POWER-OF-TWO period, because every clocksource
- *   core computes (now - last) & mask and that is exact only when the
- *   hardware period is mask + 1;
- *
- *   a 100 Hz clockevent wants hz_used / HZ = 200,000 / 100 = 2,000 counts,
- *   which is 2^4 x 125 and not a power of two -- and no power of two at or
- *   above this driver's floor of 2^8 divides it.
- *
- * So one TC1 cannot be both.  `mode cs` and `mode ce` are that fact made
- * typeable; arm() writes a different TC1DATA under each and registers the
- * clocksource under only the first.
- *
- * 🔴 AND THE OBVIOUS ESCAPE IS CLOSED BY A MEASUREMENT THIS PROJECT ALREADY
- * OWNS.  The standard way to keep both is a software-extended clocksource:
- * the tick ISR adds one period to a 64-bit accumulator, and read() returns
- * accumulator + counter.  It has one race -- between the counter wrapping and
- * the ISR running, read() goes BACKWARDS by up to one period -- and the
- * standard fix is to ask the hardware whether a wrap is pending and add a
- * period if it is.  On this part that question cannot be asked: SPEC.md
- * IRQ-09, 量 seating 12 -- the vendor's bsp_timer_ack() is `REG32(BSP_TCIR)
- * |= BSP_TC0IP`, a read-modify-write on a register whose IP bits are
- * write-1-to-clear, called a hundred times a second, so any pending bit in
- * TCIR has a lifetime of at most one 10 ms tick.  A wrap-pending test built
- * on TC1IP would be right most of the time, and a clocksource that is right
- * most of the time hands the timekeeping core a backwards step that its
- * unsigned (now - last) & mask turns into a jump of nearly the whole mask.
- * The escape is therefore REFUTED rather than skipped, and the refutation is
- * a reading of this die and not a preference.
- *
- * WHY PERIODIC AND NOT ONESHOT.
- * 量, on the .config this image is built from: CONFIG_NO_HZ and
- * CONFIG_HIGH_RES_TIMERS are not set and CONFIG_TICK_ONESHOT is absent, so
- * kernel/time/tick-common.c cannot put the tick device into oneshot mode at
- * all.  A oneshot implementation would be a path this configuration can never
- * execute, and an untested path in the one driver that can stop the board
- * booting is worth less than the sentence saying it is absent.
- *
- * THE HANDOVER, AND THE FOUR THINGS READ OUT OF THE CORE THAT DECIDE IT
- * (讀 kernel/time/tick-common.c and kernel/time/clockevents.c, 2.6.30):
- *
- *   1. tick_check_new_device() takes the new device only if
- *      `curdev->rating >= newdev->rating` is FALSE.  The vendor's rlx
- *      clockevent is rating 100 (讀 arch/rlx/kernel/rlx-cevt.c:234), so a
- *      rating of exactly 100 does NOT take over.  It has to be strictly
- *      greater.  That inequality is what makes the negative control below
- *      free.
- *   2. The "prefer one shot capable devices" test only BLOCKS a non-oneshot
- *      newdev when curdev already has oneshot.  It never promotes.  So
- *      advertising ONESHOT would buy nothing even if it were safe.
- *   3. tick_setup_device() sets the OLD device's event_handler to
- *      clockevents_handle_noop.  So after the handover the vendor's TC0
- *      interrupt still fires at 100 Hz, still runs its own ISR -- which still
- *      pets the hardware watchdog (CONFIG_RTL_WTDOG=y) and still runs
- *      bsp_timer_ack() -- and no longer advances jiffies.  Nothing
- *      double-counts, and nothing stops.
- *   4. The order of set_mode calls is SHUTDOWN then PERIODIC, both inside
- *      tick_device_lock with interrupts off: clockevents_exchange_device()
- *      shuts the new device down before tick_setup_periodic() starts it.
- *      This driver's set_mode therefore must not treat SHUTDOWN as "stop the
- *      hardware", because the hardware is what the next call depends on.
- *
- * WHY set_mode TOUCHES NO REGISTER ON THE NORMAL PATH.
- * arm() has already programmed TC1DATA and TCCNR, and `cevt` refuses unless a
- * read-back says so.  set_mode(PERIODIC) therefore VERIFIES and records; it
- * writes only if the verification fails, and counts that as ce_hw_bad.  The
- * asymmetry is deliberate: the failure mode of "an interrupt arrives and does
- * nothing" is a slow clock, and the failure mode of "no interrupt arrives" is
- * a board that has to be power-cycled.
- *
- * 🔴 THE HANDOVER IS ONE-WAY WITHIN A BOOT, AND NOTHING HERE HIDES THAT.
- * The tick core exposes no way to give a device back: tick_cpu_device is a
- * static per-cpu variable and tick_device_lock is a static spinlock, neither
- * exported.  So once either clock_event_device of this driver is registered,
- * `disarm` REFUSES -- stopping TC1 under a registered device would stop the
- * system tick with no way to restart it.  Recovery is a power cycle.
- *
- * WHY THERE ARE TWO clock_event_devices.
- * ce_mode reading CLOCK_EVT_MODE_PERIODIC after `cevt` is the evidence that
- * the handover happened.  On its own that is an argument from source: the
- * field is written only by clockevents_set_mode(), which is called only from
- * the two places above.  The probe device turns it into a measurement.  It is
- * identical in every respect except a rating of 99 -- strictly below the
- * vendor's 100 -- so the core is REQUIRED to decline it, and the same fields
- * read on the same silicon in the same seating come back
- * ce_probe_mode = UNUSED and ce_probe_mode_calls = 0.  Without that arm, a
- * reading of PERIODIC has no negative control.  It costs one /proc write and
- * carries no risk, and its set_mode is the SAME function as the real one, so
- * a surprise selection would leave a running tick rather than a dead board.
- *
- * THE PRE-CHECK, AND WHY IT IS NOT A BENCH-CARD RULE.
- * `cevt` refuses unless this driver has itself watched its interrupt arrive
- * at the rate the kernel's tick needs -- irq_count advancing 1:1 with jiffies,
- * over at least RTL819X_CE_MIN_J jiffies since reqirq, within
- * RTL819X_CE_TOL_PERMILLE.  The window costs nothing: it is whatever time
- * passes between `reqirq` and `cevt`, which a card spends reading /proc
- * anyway.  A stop-if written on a card would be a rule whose correctness
- * depends on the operator reading two numbers correctly at 38400 baud; this
- * repository has ruled that shape out once already (CLAUDE.md, the H601
- * pre-read containment), so the check belongs to the thing that would be
- * destroyed.
- *
- * WHAT THE PRE-CHECK CANNOT DO, written here because a guard whose limits are
- * not written down gets trusted past them:
- *   * it measures TC1 delivery while the VENDOR still drives jiffies.  It
- *     cannot see a failure that only appears once jiffies depends on TC1 --
- *     for instance a handler that deadlocks against a lock tick_periodic
- *     takes.  Nothing at the desk can see that either; it is what the first
- *     cell is for.
- *   * it is a ratio over one window.  A delivery that stops later passes it.
- *
- * THE INTERRUPT PATH, AND WHY IT IS FOUR VERBS AND NOT ONE  (R5-3a)
- * -----------------------------------------------------------------
- * docs/interrupt-map.md 3.1: a TC1 interrupt crosses SEVEN gates in three
- * register files.  This driver owns two of them (TCCNR's TC1En, TCIR's
- * TC1IE); the kernel already owns GIMR bit 9 and Status.
- *
- *   armirq   sets TCIR bit 30 alone.  GIMR bit 9 stays clear, so nothing can
- *            be DELIVERED -- 量 RUNSHEET C5, 2026-08-24: on this die a GIMR
- *            mask stops delivery and NOT latching.  Zero risk by measurement
- *            rather than by argument.
- *   ackip    writes 1 to TCIR bit 28 and reads it back.  This is the only
- *            test this project has of D Table 25's write-1-to-clear claim,
- *            which is single-source.
- *   reqirq   request_irq(25, ...).  The first real delivery.
- *   freeirq  gives it back.
- *
- * and R5-3b adds four more, in the order a card must use them:
- *
- *   mode ce   selects the clockevent period.  Disarmed only.
- *   rating N  the clockevent's rating.  Before registration only.
- *   cevtprobe registers the rating-99 device.  The negative control.
- *   cevt      registers the real one.  THE HANDOVER, and one-way.
- *   cereload  makes the period deliberately wrong, AFTER the handover, so
- *             that the board's own clock can be seen to follow it against
- *             the host's.  Refused before `cevt` by `cevt`'s own -ERANGE.
- *
- * 🔴 reqirq REFUSES unless this driver has ITSELF watched ackip take TC1IP
- * from 1 to 0.  The reason is mechanical, not cautious.  讀 arch/rlx/bsp/irq.c:
- * the ICTL irq_chip's .mask_ack is bsp_ictl_irq_mask -- it MASKS and does not
- * ack the device -- and 讀 kernel/irq/chip.c handle_level_irq(): after the
- * handler returns it unmasks unless IRQ_DISABLED.  So a handler that cannot
- * clear TC1IP re-triggers immediately and the board is gone.  A stop-if on a
- * bench card would be a rule whose correctness depends on the experiment
- * coming out the expected way; this repository has already ruled that shape
- * out once (CLAUDE.md, the H601 pre-read containment).  The precondition is
- * therefore checked by the thing that would be destroyed.
- *
- * 🔴 AND THE HANDLER CARRIES THE SAME GUARD AT RUN TIME.  It clears TC1IP,
- * READS IT BACK, and if the bit is still set calls disable_irq_nosync() --
- * which sets IRQ_DISABLED, which is the flag handle_level_irq() consults
- * before unmasking.  An interrupt storm becomes one line in /proc.
- *
- * WHAT NEITHER GUARD CAN DO, stated here because a guard whose limits are not
- * written down gets trusted past them:
- *   * it cannot save a handler that HANGS -- nothing here has a watchdog;
- *   * it cannot act before the first delivery, so if merely unmasking wedges
- *     the part, the guard never runs;
- *   * ackip proving write-1-to-clear at one instant does not prove it at
- *     every instant. It is n=1 by construction and the /proc file says so.
+ * The driver page: docs/drivers/timer.md; the reasoning and every reading:
+ * notes/timer-driver.md.  Each version's changes and the reading that forced
+ * them, why TC1 and not TC0, the hazards of arming and how they were
+ * answered, the handover, the pre-check and what neither guard can do: the
+ * head this file carried until 2026-10-18, verbatim in
+ * docs/drivers/timer-history.md.
  */
 
 #include <linux/init.h>
@@ -425,17 +87,17 @@
 #define RTL819X_GISR		0x04		/* REG-02, D Table 15 */
 
 /*
- * 🆕 R5-3a: the four routing registers, READ ONLY, in the same block.
+ * NEW: R5-3a: the four routing registers, READ ONLY, in the same block.
  *
  * `IRR0`-`IRR3` are eight 4-bit destination-select fields each, written
- * unconditionally by `bsp_irq_init()` on every boot (讀 arch/rlx/bsp/irq.c:
+ * unconditionally by `bsp_irq_init()` on every boot (READ arch/rlx/bsp/irq.c:
  * 222-225).  SPEC.md: `REG-32`, `REG-03`, `REG-04`, `REG-33`.  THREE OF THE
  * FOUR HAVE NEVER BEEN READ AT ALL, and `IRR1`'s one reading is at the loader
  * prompt (`0x30050004`), which `bsp_irq_init` overwrites -- so under Linux
  * every nibble should differ.
  *
- * 🔴 They are here because there is no other way to read them on this board.
- * 量 2026-09-04, config/rlxfw-initramfs.tsv: this image carries ELEVEN
+ * NOTE: They are here because there is no other way to read them on this board.
+ * MEASURED 2026-09-04, config/rlxfw-initramfs.tsv: this image carries ELEVEN
  * busybox symlinks and `devmem` is not one of them.  A read that needs an
  * applet the image does not have is a read that does not happen.
  */
@@ -447,23 +109,23 @@
 /* D Table 14/15: the two timers have SEPARATE bits at the global controller,
  * which is what bounds this driver's second hazard.  A TC1 timeout raises
  * GISR bit 9, not the bit 8 the vendor's tick uses, and GIMR bit 9 is the
- * mask for it -- 量 REG-01, clear at the loader prompt. */
+ * mask for it -- MEASURED REG-01, clear at the loader prompt. */
 #define RTL819X_INTC_TC0	(1u << 8)
 #define RTL819X_INTC_TC1	(1u << 9)
 
 /*
- * TC1's Linux IRQ number.  讀 arch/rlx/bsp/bspchip.h:102,
+ * TC1's Linux IRQ number.  READ arch/rlx/bsp/bspchip.h:102,
  * `BSP_TC1_IRQ (BSP_IRQ_ICTL_BASE + 9)` with `BSP_IRQ_ICTL_BASE` = 16, so 25.
  * docs/interrupt-map.md 1 and 3.1.
  *
- * 🔴 Written as a literal rather than by including bspchip.h, for the same
+ * NOTE: Written as a literal rather than by including bspchip.h, for the same
  * reason every register address in this file is a literal: that header is the
  * BSP's private one, it is not on a driver's include path, and depending on it
  * would put a vendor header in the include graph of a file whose whole claim
  * is that it did not read one.  The derivation is in the comment; the check
  * that it is still true is BUILD_BUG_ON below and the /proc `irq_num` line.
  *
- * ⚠️ TC0 is IRQ 13 and is NOT on this domain -- it is a LOPI line, masked in
+ * CAUTION: TC0 is IRQ 13 and is NOT on this domain -- it is a LOPI line, masked in
  * ESTATUS through mflxc0.  The two timers in one register block do not share
  * a route, and nothing in this file goes anywhere near TC0's.
  */
@@ -510,12 +172,12 @@
  * ------------------------------------------------------------------------ */
 
 /*
- * The rate TC0CNT and TC1CNT increment at.  SPEC.md CLK-17, 量: derived from
+ * The rate TC0CNT and TC1CNT increment at.  SPEC.md CLK-17, MEASURED: derived from
  * two measured quantities and nothing else -- CLK-04's 100.0018 Hz tick and
  * REG-05's TC0DATA = 142,858.  It needs no divisor semantics and no 200 MHz
  * figure.
  *
- * THAT IT IS ALSO TC1's RATE IS 讀, NOT 量.  D 8.2 says one Clock Division
+ * THAT IT IS ALSO TC1's RATE IS READ, NOT MEASURED.  D 8.2 says one Clock Division
  * Base Register "defines the base clock for counting" for the block, so both
  * timers and the watchdog divide the same clock.  REFUTED BY: a measured TC1
  * rate outside CLK-17 +- 50 ppm on the silicon, which would be a finding
@@ -524,11 +186,11 @@
 #define RTL819X_TC_HZ		14286057
 
 /*
- * 🔴 AND IT IS THE LOADER'S RATE, NOT LINUX'S.  量 seating 11 (TM-1), the
+ * NOTE: AND IT IS THE LOADER'S RATE, NOT LINUX'S.  MEASURED seating 11 (TM-1), the
  * first reading of this block under a kernel: CDBR is 0x03E80000 -- divisor
  * 1000 -- where the loader left 0x000E0000, divisor 14; and TC0DATA is
  * 0x00007D00 (reload 2,000) where the loader left 0x0022E0A0 (142,858).
- * arch/rlx/bsp/timer.c is what rewrites both (讀 2026-09-04, R5-10).  So the
+ * arch/rlx/bsp/timer.c is what rewrites both (READ 2026-09-04, R5-10).  So the
  * constant above is 71.43x the rate this driver actually counts at under
  * Linux, and version 1.0 printed it as `hz_assumed` for a whole seating.
  *
@@ -545,12 +207,12 @@
  *       one the clocksource uses.
  *
  *   hz_cdbr = BSP_SYS_CLK_RATE / (CDBR >> 16)
- *       Needs the 200 MHz figure, which is 讀 (arch/rlx/bsp/bspchip.h
- *       BSP_SYS_CLK_RATE) and 量 to 200.0049 MHz +- 7 ppm (SPEC.md CLK-02).
+ *       Needs the 200 MHz figure, which is READ (arch/rlx/bsp/bspchip.h
+ *       BSP_SYS_CLK_RATE) and MEASURED to 200.0049 MHz +- 7 ppm (SPEC.md CLK-02).
  *
  * They are different quantities that must agree: the first descends from the
  * kernel's own tick, the second from the crystal.  On this part both give
- * 200,000 (量 TM-1: 2000 * 100, and 200000000 / 1000), and hz_agree in /proc
+ * 200,000 (MEASURED TM-1: 2000 * 100, and 200000000 / 1000), and hz_agree in /proc
  * is that comparison made by the driver rather than by a reader.  A
  * disagreement is a finding about the SoC's dividers, not about this file.
  */
@@ -583,7 +245,7 @@
 #define RTL819X_TC1_MASK	(RTL819X_TC1_PERIOD - 1u)
 
 /*
- * 🆕 R5-3a: the period is settable, while disarmed, by `period <bits>`.
+ * NEW: R5-3a: the period is settable, while disarmed, by `period <bits>`.
  *
  * It is not a convenience.  docs/interrupt-map.md 3.3 cell I2 has to wait at
  * least one TC1 period to see whether TC1IP latches, and at the Linux rate
@@ -600,13 +262,13 @@
 #define RTL819X_TC1_BITS_MAX	27
 
 /*
- * The shift search.  2.6.30 has NO clocks_calc_mult_shift() -- 讀
+ * The shift search.  2.6.30 has NO clocks_calc_mult_shift() -- READ
  * include/linux/clocksource.h, which carries clocksource_hz2mult() and
  * nothing else -- so this driver does the search itself.
  *
- * 🔴 It cannot be a constant once the rate is derived, and the failure is
+ * NOTE: It cannot be a constant once the rate is derived, and the failure is
  * SILENT.  clocksource_hz2mult returns u32 by a cast, so an oversized value
- * is truncated with no diagnostic.  量 at the desk, 2026-09-04:
+ * is truncated with no diagnostic.  MEASURED at the desk, 2026-09-04:
  *
  *   hz = 14,286,057, shift 24 -> mult 1,174,376,947            fits
  *   hz =    200,000, shift 24 -> mult 83,886,080,000 -> u32 2,281,701,376
@@ -619,7 +281,7 @@
  *
  * TWO bounds, and the second is the one that is easy to forget:
  *   * mult must fit u32, or clocksource_hz2mult truncates it;
- *   * mask * mult must fit s63, because 讀 cyc2ns() is
+ *   * mask * mult must fit s63, because READ cyc2ns() is
  *     `((u64)cycles * cs->mult) >> cs->shift` returned as s64.
  * With mask = 2^27-1 and mult <= 2^32-1 the product is at most 2^59, so the
  * second bound cannot bite at this mask -- it is computed anyway, because the
@@ -650,9 +312,9 @@
 #define RTL819X_TC1_RATING	0
 
 /*
- * 🆕 R5-3b.  The clockevent's ratings.
+ * NEW: R5-3b.  The clockevent's ratings.
  *
- * 讀 arch/rlx/kernel/rlx-cevt.c:234, `cd->rating = 100`, and 讀
+ * READ arch/rlx/kernel/rlx-cevt.c:234, `cd->rating = 100`, and READ
  * kernel/time/tick-common.c tick_check_new_device(): the incumbent keeps the
  * tick unless `curdev->rating >= newdev->rating` is false.  So 100 is the
  * number to beat and it must be beaten strictly.
@@ -685,7 +347,7 @@
  * ratio is not dominated by the +-1 jiffy quantisation of its own endpoints:
  * one jiffy in 300 is 3,333 ppm and the tolerance below is 10,000.
  *
- * TOL_PERMILLE is 10, i.e. 1 %.  量 seating 12 (SPEC.md IRQ-08): the measured
+ * TOL_PERMILLE is 10, i.e. 1 %.  MEASURED seating 12 (SPEC.md IRQ-08): the measured
  * delivery rate was within 0.0199 % and 0.0994 % of the programmed rate at
  * two periods 16x apart, and 0.0206 % with the NIC up and four pings in
  * flight.  1 % is a hundred times the worst of those, so this refuses on a
@@ -699,16 +361,16 @@
  * R5-3b-2, arming at boot.
  *
  * RTL819X_BOOT_ACK_TRIES / _US: the ackip retry, and the two numbers come
- * from a measurement rather than from taste.  IRQ-09 (量 seating 12): the
+ * from a measurement rather than from taste.  IRQ-09 (MEASURED seating 12): the
  * vendor's tick handler does REG32(BSP_TCIR) |= BSP_TC0IP a hundred times
  * a second, and every IP bit in that register is write-1-to-clear, so a
  * TC1IP belonging to this driver survives at most one 10 ms tick.  At an
  * 8-bit period TC1 wraps every 256/200,000 s = 1.28 ms, so the bit is back
- * within 1.28 ms of any clear -- 量 seating 12 put the duty cycle at
+ * within 1.28 ms of any clear -- MEASURED seating 12 put the duty cycle at
  * 87.20 %.  Sampling every 500 us for 64 tries covers 32 ms, which is more
  * than three of the vendor's own tick periods.
  *
- * 🔴 The loop exists because ONE ackip is a coin toss and a coin toss in a
+ * NOTE: The loop exists because ONE ackip is a coin toss and a coin toss in a
  * boot path is a driver that arms on some boots and not others -- which is
  * indistinguishable, from a capture, from hardware that is intermittent.
  *
@@ -724,14 +386,14 @@
 
 /*
  * 4.1, and this constant exists because of a measurement rather than a
- * worry.  量 seating 14, K1 (cold boot) and K2 (warm boot, byte-identical
+ * worry.  MEASURED seating 14, K1 (cold boot) and K2 (warm boot, byte-identical
  * fields): ce_check_dj = 585, ce_check_dc = 574.  Over the span from
  * reqirq at arch_initcall to the pre-check at late_initcall -- which is
  * exactly the vendor's NIC driver initialisation -- TC1 delivered 574 of
  * the 585 interrupts a 100 Hz source owes.  ELEVEN SHORT, 1.88 %, against
  * a 1 % tolerance, and the handover was refused with -ETIME on both boots.
  *
- * 🟢 The same boot at the shell, K1-P -> K1-Q over 14,385 jiffies:
+ * OK: The same boot at the shell, K1-P -> K1-Q over 14,385 jiffies:
  * Djiffies 14,385 against Dirq_count 14,384 -- ONE short, 0.0070 % -- and
  * the tick was still the vendor's there, so those two numbers are
  * independent sources and not one identity written twice.
@@ -758,7 +420,7 @@
 #define RTL819X_BOOT_S_DONE	9
 
 /*
- * 🆕 `cereload <counts>` -- the bounds on a DELIBERATELY WRONG tick period.
+ * NEW: `cereload <counts>` -- the bounds on a DELIBERATELY WRONG tick period.
  *
  * WHY THE VERB EXISTS.  My clockevent runs at HZ and so does the vendor's, so
  * "line 25 advanced 1:1 with jiffies" and "line 13 advanced 1:1 with jiffies"
@@ -774,7 +436,7 @@
  * kernel is expressed in jiffies and simply runs slow.  Zero is excluded
  * because a reload of 0 is not a slow clock, it is an undefined one.
  *
- * 🔴 It may only be used while ARMED and in clockevent mode, and `cevt`
+ * NOTE: It may only be used while ARMED and in clockevent mode, and `cevt`
  * REFUSES while the live reload differs from the one HZ implies.  So the
  * sequence is fixed by the code: hand the tick over at the right rate, then
  * make it wrong on purpose, then put it back.  A card cannot reorder that.
@@ -808,10 +470,10 @@ static int rtl819x_last_verdict;	/* 0, or the -errno of the last refusal */
 static u32 rtl819x_tccnr_after_arm;
 static u32 rtl819x_tc1_delta_at_arm;	/* the counter's own movement proof */
 
-/* The software extension of the counter.  🔄 R5-3a: advanced by a KERNEL
+/* The software extension of the counter.  UPDATE: R5-3a: advanced by a KERNEL
  * TIMER, not by whoever happens to read /proc.
  *
- * 量 TM-5c, seating 11: 462 s with nobody reading, and tc1_ext sat 92,362,366
+ * MEASURED TM-5c, seating 11: 462 s with nobody reading, and tc1_ext sat 92,362,366
  * counts behind tc1_cycles while tc1_ext_trusted still read 1 -- because
  * rtl819x_ext_advance()'s only caller was inside the /proc read.  "The sum of
  * the intervals somebody looked at" is not an extension of a counter. */
@@ -855,7 +517,7 @@ static u32 rtl819x_irq_last_tcir;
 static int rtl819x_irq_cookie;
 static u32 rtl819x_irq_preacked;	/* TC1IP already 0 on ISR entry (IRQ-09) */
 
-/* 🆕 R5-3b.  The clockevent. */
+/* NEW: R5-3b.  The clockevent. */
 static int rtl819x_mode = RTL819X_MODE_CS;
 static u32 rtl819x_ce_reload;		/* counts per tick, LIVE */
 static u32 rtl819x_ce_reload_hz;	/* counts per tick that HZ implies */
@@ -944,7 +606,7 @@ static inline u32 rtl819x_tc1_raw(void)
 }
 
 /*
- * 🔄 R5-3b: the mask is applied in clocksource mode ONLY.
+ * UPDATE: R5-3b: the mask is applied in clocksource mode ONLY.
  *
  * In clockevent mode the hardware period is hz_used / HZ = 2,000 counts and
  * rtl819x_tc1_mask() describes a power of two that the counter is no longer
@@ -969,9 +631,9 @@ static inline u32 rtl819x_tc1_reload(void)
 /*
  * One period in jiffies, and the quarter of it the extension timer runs at.
  *
- * 🆕 R5-3b.  ONE owner, because two had already disagreed: version 2.0
+ * NEW: R5-3b.  ONE owner, because two had already disagreed: version 2.0
  * computed this inside arm() alone, so `period 8` on a disarmed driver moved
- * mask_bits and left period_jiffies describing the previous period -- 量
+ * mask_bits and left period_jiffies describing the previous period -- MEASURED
  * seating 12 EX-1, mask_bits = 8 beside period_jiffies = 524
  * (notes/timer-driver.md 11.6 6).  It changed no behaviour, because arm()
  * recomputes; what it changed was what /proc SAYS, and a dump that describes a
@@ -1011,9 +673,9 @@ static struct clocksource rtl819x_tc1_clocksource = {
 
 /* Advance the software extension.  Caller holds rtl819x_tc_lock.
  *
- * 🔴 TWO gap figures, and keeping both is the point.  `d` is already reduced
+ * NOTE: TWO gap figures, and keeping both is the point.  `d` is already reduced
  * mod the period, so an interval of one full period plus delta is
- * indistinguishable from delta -- 量 TM-5b2: a real gap of 140,693,532 counts
+ * indistinguishable from delta -- MEASURED TM-5b2: a real gap of 140,693,532 counts
  * reported as 6,475,672, which is exactly that value mod 2^27, with
  * tc1_ext_trusted still reading 1.  `dj` is in jiffies, which this driver
  * never reduces, so it cannot alias.
@@ -1044,7 +706,7 @@ static void rtl819x_ext_advance(u32 now)
  * consecutive misses are needed before the extension can alias -- and the
  * jiffies gap above would report even that.
  *
- * ⚠️ This timer is driven by the vendor's TC0 tick, so it shares TC0's fate:
+ * CAUTION: This timer is driven by the vendor's TC0 tick, so it shares TC0's fate:
  * if the system tick dies, so does the extension AND so does `jiffies`, and
  * a stopped `jiffies` makes dj read 0, which looks trustworthy.  That is a
  * real blind spot and it is bounded: a board whose tick has stopped is not
@@ -1108,16 +770,16 @@ static int rtl819x_tc1_arm(void)
 		ret = -ENODEV;
 		goto out;
 	}
-	/* 🆕 R5-3b.  -ERANGE: clockevent mode was asked for on a kernel whose
+	/* NEW: R5-3b.  -ERANGE: clockevent mode was asked for on a kernel whose
 	 * tick rate does not divide the counter's rate, so no integer reload
-	 * gives HZ exactly.  量 on this build it does -- 200,000 / 100 = 2,000
+	 * gives HZ exactly.  MEASURED on this build it does -- 200,000 / 100 = 2,000
 	 * -- and the refusal exists so that a config change makes the driver
 	 * say so instead of running the system clock at the wrong rate. */
 	if (rtl819x_mode == RTL819X_MODE_CE && !rtl819x_ce_reload_exact) {
 		ret = -ERANGE;
 		goto out;
 	}
-	/* 🔄 R5-3a: the refusal now asks WHOSE bit it is.  Version 1.0 read a
+	/* UPDATE: R5-3a: the refusal now asks WHOSE bit it is.  Version 1.0 read a
 	 * set GIMR bit 9 as "something under Linux unmasked it", which was the
 	 * only possibility then.  After `reqirq` it is normally OURS -- and a
 	 * driver that refused to re-arm because of a mask its own request_irq()
@@ -1150,7 +812,7 @@ static int rtl819x_tc1_arm(void)
 	before = rtl819x_tc1_cycles();
 	udelay(100);
 	after = rtl819x_tc1_cycles();
-	/* 🔄 R5-3b: `& mask` is wrong in clockevent mode for the reason given at
+	/* UPDATE: R5-3b: `& mask` is wrong in clockevent mode for the reason given at
 	 * rtl819x_tc1_cycles().  100 us is about 20 counts at 200 kHz against a
 	 * 2,000-count period, so a wrap inside the window would need the counter
 	 * to run 100x fast; the branch is written for correctness, not because
@@ -1181,13 +843,13 @@ static int rtl819x_tc1_arm(void)
 	 * by clocksource_register() below. */
 	rtl819x_tc1_clocksource.mask = CLOCKSOURCE_MASK(rtl819x_period_bits);
 
-	/* 🆕 R5-3b.  In clockevent mode there is no software extension and no
+	/* NEW: R5-3b.  In clockevent mode there is no software extension and no
 	 * kernel timer driving one: rtl819x_ext_advance()'s arithmetic is the
 	 * masked kind, the period is not a power of two, and the ISR runs once
 	 * per period anyway -- so ce_cycles is exact where an extension would be
 	 * approximate.  Every tc1_ext_* line in /proc therefore reads 0 in this
 	 * mode, and `mode=ce` on the line above it is why. */
-	/* 🔄 R5-3b: both derived quantities come from one function, and it is
+	/* UPDATE: R5-3b: both derived quantities come from one function, and it is
 	 * called here for BOTH modes -- a mode that jumped over it would print
 	 * period_jiffies=0, a zero that reads as a measurement of a 0-jiffy
 	 * period rather than as an unset variable.  In clockevent mode the value
@@ -1217,7 +879,7 @@ out:
 	if (ret == 0) {
 		ret = clocksource_register(&rtl819x_tc1_clocksource);
 		if (ret) {
-			/* 🔴 R5-3a, found at the desk and not on the device:
+			/* NOTE: R5-3a, found at the desk and not on the device:
 			 * version 1.0 cleared `armed` here and left TC1
 			 * COUNTING.  The hardware stayed enabled, `disarm`
 			 * then returned -EINVAL because `armed` was 0, and
@@ -1225,7 +887,7 @@ out:
 			 * unreachable state created by the one path that is
 			 * supposed to be the safe failure.  It has never been
 			 * reached (clocksource_register returned 0 on the
-			 * silicon, 量 seating 11), which is why a reading
+			 * silicon, MEASURED seating 11), which is why a reading
 			 * would not have found it. */
 			spin_lock_irqsave(&rtl819x_tc_lock, flags);
 			rtl819x_tc1_armed = 0;
@@ -1248,7 +910,7 @@ out:
  * Set or clear TCIR bit 30, preserving TC0's enable and writing ZERO into
  * both IP positions.
  *
- * 🔴 The zeros are the load-bearing part.  Both IP bits are write-1-to-clear
+ * NOTE: The zeros are the load-bearing part.  Both IP bits are write-1-to-clear
  * (D Table 25), so a read-modify-write that carried a set IP back would clear
  * it -- and if that IP were TC0's, this driver would have eaten the vendor
  * tick's pending flag on its way to setting an unrelated enable.  Masking
@@ -1386,12 +1048,12 @@ static struct clock_event_device rtl819x_tc1_cevt_probe = {
 };
 
 /*
- * 🔴 NO LOCK HERE, and that is a reading rather than an oversight.
+ * NOTE: NO LOCK HERE, and that is a reading rather than an oversight.
  *
- * 讀 kernel/time/clockevents.c and tick-common.c: every call reaches this
+ * READ kernel/time/clockevents.c and tick-common.c: every call reaches this
  * function from clockevents_exchange_device() (inside local_irq_save) or from
  * tick_setup_periodic() (inside tick_check_new_device's
- * spin_lock_irqsave(&tick_device_lock))  -- interrupts are off at both.  量
+ * spin_lock_irqsave(&tick_device_lock))  -- interrupts are off at both.  MEASURED
  * on this build: CONFIG_SMP is not set and CONFIG_PREEMPT is not set, so with
  * interrupts off nothing else on this machine can be executing.  Taking
  * rtl819x_tc_lock would additionally nest this driver's lock inside two of
@@ -1443,7 +1105,7 @@ static void rtl819x_ce_set_mode(enum clock_event_mode mode,
 	case CLOCK_EVT_MODE_UNUSED:
 	case CLOCK_EVT_MODE_RESUME:
 	default:
-		/* 🔴 SHUTDOWN deliberately does NOT stop TC1.
+		/* NOTE: SHUTDOWN deliberately does NOT stop TC1.
 		 * clockevents_exchange_device() calls it on the way IN, one
 		 * statement before tick_setup_periodic() turns the same device
 		 * on, so a driver that honoured it would switch its own tick
@@ -1458,7 +1120,7 @@ static void rtl819x_ce_set_mode(enum clock_event_mode mode,
  * Unreachable in this configuration, and the return value is chosen for what
  * happens if that is ever wrong.
  *
- * 讀 kernel/time/tick-common.c tick_setup_periodic(): a device WITHOUT
+ * READ kernel/time/tick-common.c tick_setup_periodic(): a device WITHOUT
  * CLOCK_EVT_FEAT_PERIODIC is driven by `for (;;) { if
  * (!clockevents_program_event(...)) return; next += tick_period; }` -- with
  * interrupts disabled.  A set_next_event that always fails makes that loop
@@ -1467,7 +1129,7 @@ static void rtl819x_ce_set_mode(enum clock_event_mode mode,
  * afterwards, because ce_next_calls is in /proc and must be 0.
  *
  * The other two callers -- tick_program_event() and the broadcast path -- are
- * behind CONFIG_TICK_ONESHOT and CONFIG_GENERIC_CLOCKEVENTS_BROADCAST, 量
+ * behind CONFIG_TICK_ONESHOT and CONFIG_GENERIC_CLOCKEVENTS_BROADCAST, MEASURED
  * both absent from this build's .config.
  */
 static int rtl819x_ce_set_next(unsigned long delta,
@@ -1513,8 +1175,8 @@ static int rtl819x_ce_precheck(void)
  *            clear its own pending bit is what keeps handle_level_irq's
  *            unmask from re-triggering forever, and after the handover that
  *            loop would take the system clock with it.
- *   -EBUSY   already registered.  🔴 This is the only thing standing between
- *            a second `cevt` and a corrupted list: 量 on this build,
+ *   -EBUSY   already registered.  NOTE: This is the only thing standing between
+ *            a second `cevt` and a corrupted list: MEASURED on this build,
  *            CONFIG_BUG is not set, so clockevents_register_device()'s own
  *            BUG_ON(dev->mode != CLOCK_EVT_MODE_UNUSED) compiles to nothing.
  *   -ENODEV  the hardware does not read back what arm() wrote.  Checked here
@@ -1542,7 +1204,7 @@ static int rtl819x_tc1_cevt_register(int probe)
 	else if (probe ? rtl819x_ce_probe_registered : rtl819x_ce_registered)
 		ret = -EBUSY;
 	else if (rtl819x_ce_reload != rtl819x_ce_reload_hz)
-		/* 🔴 -ERANGE: `cereload` has already made the period deliberately
+		/* NOTE: -ERANGE: `cereload` has already made the period deliberately
 		 * wrong.  Handing the tick over at a rate the kernel does not
 		 * expect would make every later reading ambiguous between "the
 		 * takeover worked and the clock is wrong" and "the takeover did
@@ -1558,7 +1220,7 @@ static int rtl819x_tc1_cevt_register(int probe)
 			ret = rtl819x_ce_precheck();
 	}
 
-	/* 🔴 Marked registered BEFORE the call and inside the same critical
+	/* NOTE: Marked registered BEFORE the call and inside the same critical
 	 * section as the -EBUSY test.  clockevents_register_device() can call
 	 * set_mode(PERIODIC) synchronously, which sets ce_live, after which the
 	 * next TC1 interrupt is a system tick -- so `disarm`'s refusal has to
@@ -1590,7 +1252,7 @@ static int rtl819x_tc1_cevt_register(int probe)
  * does not say whether a reload written mid-period takes effect at the next
  * wrap or immediately, and this verb does not need to know: either way the
  * period that follows is the new one, and the cell that uses it measures over
- * seconds.  ⚠️ That ignorance is stated rather than assumed away -- a cell
+ * seconds.  CAUTION: That ignorance is stated rather than assumed away -- a cell
  * that tried to measure the FIRST period after the write would be measuring
  * something this project has not established.
  */
@@ -1688,7 +1350,7 @@ static int rtl819x_tc1_set_rating(const char *s)
  * The handler.  IRQF_DISABLED, so interrupts are already off and a plain
  * spin_lock is enough.
  *
- * 讀 kernel/irq/chip.c handle_level_irq(): mask_ack_irq() runs first (the
+ * READ kernel/irq/chip.c handle_level_irq(): mask_ack_irq() runs first (the
  * ICTL chip's .mask_ack is bsp_ictl_irq_mask, which masks and does not ack),
  * then this runs, then the source is unmasked UNLESS desc->status carries
  * IRQ_DISABLED.  So clearing TC1IP here is what makes the unmask safe, and
@@ -1703,18 +1365,18 @@ static irqreturn_t rtl819x_tc1_isr(int irq, void *dev_id)
 	spin_lock(&rtl819x_tc_lock);
 	ir = rtl819x_tc_rd(RTL819X_TCIR);
 	if (!(ir & RTL819X_TCIR_TC1IP)) {
-		/* 🆕 R5-3b.  TC1IP clear on entry is counted SEPARATELY from
+		/* NEW: R5-3b.  TC1IP clear on entry is counted SEPARATELY from
 		 * "not ours", because SPEC.md IRQ-09 gives it a second cause
 		 * that has nothing to do with ownership: the vendor's
 		 * bsp_timer_ack() erases every pending bit in TCIR a hundred
 		 * times a second, and it can erase ours between the latch and
-		 * this read.  irq_preacked is that rate, and 量 seating 12 it
+		 * this read.  irq_preacked is that rate, and MEASURED seating 12 it
 		 * was 0 in 119,818 deliveries. */
 		rtl819x_irq_preacked++;
 
-		/* 🔴 In clockevent mode this is NOT a reason to return early,
+		/* NOTE: In clockevent mode this is NOT a reason to return early,
 		 * and that is the design constraint IRQ-09 imposes on this
-		 * step.  讀 arch/rlx/bsp/irq.c bsp_ictl_irq_dispatch(): line 25
+		 * step.  READ arch/rlx/bsp/irq.c bsp_ictl_irq_dispatch(): line 25
 		 * is reached only when GIMR & GISR has BSP_TC1_IP set, so the
 		 * dispatcher has ALREADY proved the interrupt is TC1's -- the
 		 * TCIR read is a second and weaker witness.  Skipping
@@ -1725,7 +1387,7 @@ static irqreturn_t rtl819x_tc1_isr(int irq, void *dev_id)
 		 * cell I1's refutation condition is "anything different from
 		 * seating 11" and a control that has moved is not a control. */
 		if (rtl819x_mode != RTL819X_MODE_CE) {
-			/* Not ours.  讀 kernel/irq/spurious.c
+			/* Not ours.  READ kernel/irq/spurious.c
 			 * note_interrupt(): after 100,000 interrupts on a line,
 			 * more than 99,900 of them unhandled disables it.  A
 			 * second net under the one below, and a slow one -- it
@@ -1758,7 +1420,7 @@ static irqreturn_t rtl819x_tc1_isr(int irq, void *dev_id)
 	live = rtl819x_ce_live;
 	spin_unlock(&rtl819x_tc_lock);
 
-	/* 🆕 R5-3b.  The tick, outside this driver's lock on purpose.
+	/* NEW: R5-3b.  The tick, outside this driver's lock on purpose.
 	 *
 	 * event_handler is tick_handle_periodic once the core has taken this
 	 * device, and that path takes xtime_lock (write side) and rq->lock.
@@ -1779,11 +1441,11 @@ static irqreturn_t rtl819x_tc1_isr(int irq, void *dev_id)
 	 * here needs.  Between the unlock and this call the source is still
 	 * masked by mask_ack_irq, so nothing can arrive.
 	 *
-	 * 🔴 R5-3b: once the tick is ours this call STOPS THE SYSTEM CLOCK, and
+	 * NOTE: R5-3b: once the tick is ours this call STOPS THE SYSTEM CLOCK, and
 	 * it is kept anyway.  A storm on line 25 with the tick on it is a
 	 * livelocked board that also stops the clock, and it stops the vendor's
 	 * TC0 handler too -- which is what pets the hardware watchdog
-	 * (CONFIG_RTL_WTDOG=y, 讀 arch/rlx/kernel/rlx-cevt.c:159).  A stopped
+	 * (CONFIG_RTL_WTDOG=y, READ arch/rlx/kernel/rlx-cevt.c:159).  A stopped
 	 * clock leaves a board that can be read; a livelock leaves one that
 	 * resets itself.  Neither is good and the first is better. */
 	if (stuck)
@@ -1795,7 +1457,7 @@ static irqreturn_t rtl819x_tc1_isr(int irq, void *dev_id)
  * I4.  The first real delivery in this project.
  *
  * request_irq() ends in desc->chip->startup(), which for the ICTL chip is the
- * unmask that sets GIMR bit 9 -- so the mask is moved BY ITS OWNER (讀
+ * unmask that sets GIMR bit 9 -- so the mask is moved BY ITS OWNER (READ
  * arch/rlx/bsp/irq.c bsp_ictl_irq_unmask, an unlocked read-modify-write that
  * a second writer would race).  This driver never writes GIMR.
  */
@@ -1826,7 +1488,7 @@ static int rtl819x_tc1_reqirq(void)
 	spin_lock_irqsave(&rtl819x_tc_lock, flags);
 	if (!ret) {
 		rtl819x_irq_requested = 1;
-		/* 🆕 R5-3b.  The pre-check's window opens here and nowhere else.
+		/* NEW: R5-3b.  The pre-check's window opens here and nowhere else.
 		 * `cevt` compares (irq_count, jiffies) against this pair, so the
 		 * window is exactly "since delivery began" -- no verb to
 		 * remember, no clock for the operator to read, and a window
@@ -1853,7 +1515,7 @@ static int rtl819x_tc1_freeirq(void)
 	spin_unlock_irqrestore(&rtl819x_tc_lock, flags);
 
 	/* free_irq can sleep, and it must not be called from interrupt context
-	 * (讀 kernel/irq/manage.c: __free_irq opens with WARN(in_interrupt())).
+	 * (READ kernel/irq/manage.c: __free_irq opens with WARN(in_interrupt())).
 	 * This runs from a /proc write, which is process context.
 	 *
 	 * A depth left behind by the storm guard does NOT survive: __free_irq
@@ -1866,9 +1528,9 @@ static int rtl819x_tc1_freeirq(void)
 }
 
 /*
- * 🔄 R5-3a: disarm unwinds EVERYTHING this driver created, in reverse order.
+ * UPDATE: R5-3a: disarm unwinds EVERYTHING this driver created, in reverse order.
  *
- * Version 1.0 had two writes to undo and undid both -- 量 seating 11, twice,
+ * Version 1.0 had two writes to undo and undid both -- MEASURED seating 11, twice,
  * the second after a 703 s arm.  Version 2.0 can also have requested an IRQ
  * and set TCIR bit 30, and leaving either behind would break the property
  * that reading made a result: `tccnr_at_init`/`tcir_at_init` are in /proc so
@@ -1886,10 +1548,10 @@ static int rtl819x_tc1_disarm(void)
 		spin_unlock_irqrestore(&rtl819x_tc_lock, flags);
 		return -EINVAL;
 	}
-	/* 🔴 R5-3b.  -EBUSY once EITHER clock_event_device is registered, and
+	/* NOTE: R5-3b.  -EBUSY once EITHER clock_event_device is registered, and
 	 * this refusal is the honest form of "the handover is one-way".
 	 *
-	 * 讀 kernel/time/clockevents.c: there is no unregister.  A registered
+	 * READ kernel/time/clockevents.c: there is no unregister.  A registered
 	 * device sits on clockevent_devices for the life of the boot, and if it
 	 * is also the tick device its interrupt is the only thing advancing
 	 * jiffies.  Stopping TC1 here would stop the system clock with nothing
@@ -1972,7 +1634,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	u32 irr0, irr1, irr2, irr3, status;
 	u32 gap, reads, ticks;
 	int armed, verdict, len = 0;
-	/* 🆕 R5-3b.  Snapshotted with everything else, for the same reason:
+	/* NEW: R5-3b.  Snapshotted with everything else, for the same reason:
 	 * a takeover reading and the counter reading that explains it have to
 	 * describe one instant. */
 	int ce_mode_, ce_reg, ce_preg, ce_live_, ce_lm, ce_plm;
@@ -1980,13 +1642,13 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	u64 ce_cyc;
 	unsigned long ce_h;
 
-	/* 🔴 `Status` is read BEFORE the lock, and that is not tidiness.
+	/* NOTE: `Status` is read BEFORE the lock, and that is not tidiness.
 	 * spin_lock_irqsave() disables interrupts, so a Status read inside it
 	 * would report IEc = 0 ALWAYS -- a constant dressed as a measurement.
 	 * IM2 and BEV are unaffected by the lock, so only one of the three
 	 * bits needed care and all three are taken where all three are true.
 	 *
-	 * ⚠️ `ST0_IEC` and not `ST0_IE`: 讀 arch/rlx/include/asm/rlxregs.h,
+	 * CAUTION: `ST0_IEC` and not `ST0_IE`: READ arch/rlx/include/asm/rlxregs.h,
 	 * this core has the MIPS-I three-deep interrupt-enable stack
 	 * (IEc/IEp/IEo at bits 0/2/4) and no single `ST0_IE`. That agrees with
 	 * SOURCES.json's binutils note that every Lexra core is ISA_MIPS1. */
@@ -2000,7 +1662,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	tc0cnt	= rtl819x_tc_rd(RTL819X_TC0CNT);
 	j	= get_jiffies_64();
 	getnstimeofday(&ts);
-	/* 🔄 R5-3b: not in clockevent mode.  rtl819x_ext_advance() reduces its
+	/* UPDATE: R5-3b: not in clockevent mode.  rtl819x_ext_advance() reduces its
 	 * gap mod a power-of-two mask that the hardware is not using there. */
 	if (rtl819x_tc1_armed && rtl819x_mode != RTL819X_MODE_CE)
 		rtl819x_ext_advance(cyc);
@@ -2049,7 +1711,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	/* Declared parameters -- so the card does not re-derive them and get
 	 * a different answer from the driver's.
 	 *
-	 * 🔄 R5-3a: `hz_assumed` is kept AND is no longer what the clocksource
+	 * UPDATE: R5-3a: `hz_assumed` is kept AND is no longer what the clocksource
 	 * runs on.  It is the compiled-in constant, which seating 11 showed is
 	 * the loader's rate and 71.43x the kernel's; `hz_used` is what was
 	 * derived at init and built into `mult`.  Both are printed because a
@@ -2060,7 +1722,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	len += scnprintf(page + len, PAGE_SIZE - len, "hz_cdbr=%u\n", rtl819x_hz_cdbr);
 	len += scnprintf(page + len, PAGE_SIZE - len, "hz_agree=%d\n", rtl819x_hz_agree);
 	len += scnprintf(page + len, PAGE_SIZE - len, "hz_used=%u\n", rtl819x_hz_used);
-	/* 🔄 R5-3b: the HARDWARE period, which in clockevent mode is
+	/* UPDATE: R5-3b: the HARDWARE period, which in clockevent mode is
 	 * hz_used / HZ and not mask + 1. */
 	len += scnprintf(page + len, PAGE_SIZE - len, "period_cycles=%u\n",
 			 rtl819x_tc1_reload());
@@ -2082,9 +1744,9 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	len += scnprintf(page + len, PAGE_SIZE - len, "tc1_ext_gap_max_j=%llu\n",
 			 (unsigned long long)gap_j);
 	len += scnprintf(page + len, PAGE_SIZE - len, "tc1_ext_ticks=%u\n", ticks);
-	/* 🔄 R5-3a: decided in JIFFIES, which this driver never reduces, so it
+	/* UPDATE: R5-3a: decided in JIFFIES, which this driver never reduces, so it
 	 * cannot alias.  The old test was `gap < mask/2` on a gap already
-	 * reduced mod the period -- 量 TM-5b2, a real 140,693,532-count gap
+	 * reduced mod the period -- MEASURED TM-5b2, a real 140,693,532-count gap
 	 * read as 6,475,672 and passed.  This is the owner's rule
 	 * (Δjiffies × TICK_NSEC against one period in ns) with both sides
 	 * divided by TICK_NSEC: the same inequality, no 64-bit multiply, and
@@ -2126,7 +1788,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	len += scnprintf(page + len, PAGE_SIZE - len, "tcir_tc1ip=%d\n",
 			 (ir & RTL819X_TCIR_TC1IP) ? 1 : 0);
 
-	/* 🆕 R5-3a.  TC1IE is the gate seating 11 left clear without knowing
+	/* NEW: R5-3a.  TC1IE is the gate seating 11 left clear without knowing
 	 * it -- SPEC.md REG-10, docs/interrupt-map.md 3.2 -- so it goes on its
 	 * own line beside TC1IP, which is the bit it is supposed to produce.
 	 * The two together are the whole of cell I2. */
@@ -2153,7 +1815,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	len += scnprintf(page + len, PAGE_SIZE - len, "irq_last_tcir=%08X\n",
 			 rtl819x_irq_last_tcir);
 
-	/* 🆕 R5-3a.  The routing, and the CPU-side gate.  Read only, and free:
+	/* NEW: R5-3a.  The routing, and the CPU-side gate.  Read only, and free:
 	 * the four IRR words are in the block this driver already maps, and
 	 * `Status` costs one mfc0.  Three of the four IRRs have never been read
 	 * on this die and the fourth only at the loader prompt. */
@@ -2193,7 +1855,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 	len += scnprintf(page + len, PAGE_SIZE - len, "arm_delta_100us=%u\n",
 			 rtl819x_tc1_delta_at_arm);
 
-	/* 🆕 R5-3b.  Appended at the end and not interleaved, so a capture from
+	/* NEW: R5-3b.  Appended at the end and not interleaved, so a capture from
 	 * version 2.0 and one from 3.0 differ by a suffix -- which is what makes
 	 * `diff` between two seatings readable. */
 	len += scnprintf(page + len, PAGE_SIZE - len, "mode=%s\n",
@@ -2216,7 +1878,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 			 ce_preg);
 	len += scnprintf(page + len, PAGE_SIZE - len, "ce_live=%d\n", ce_live_);
 	/* The mode enum, as the number the core wrote: 0 UNUSED, 1 SHUTDOWN,
-	 * 2 PERIODIC, 3 ONESHOT, 4 RESUME (讀 include/linux/clockchips.h).
+	 * 2 PERIODIC, 3 ONESHOT, 4 RESUME (READ include/linux/clockchips.h).
 	 * -1 means this driver's own initial value and no call yet. */
 	len += scnprintf(page + len, PAGE_SIZE - len, "ce_mode=%d\n", ce_lm);
 	len += scnprintf(page + len, PAGE_SIZE - len, "ce_mode_calls=%u\n", ce_mc);
@@ -2230,7 +1892,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
 			 (unsigned long long)ce_cyc);
 	len += scnprintf(page + len, PAGE_SIZE - len, "ce_check_dc=%u\n", ce_dc);
 	len += scnprintf(page + len, PAGE_SIZE - len, "ce_check_dj=%u\n", ce_dj);
-	/* 🟢 The takeover's second and independent witness.  Before it,
+	/* OK: The takeover's second and independent witness.  Before it,
 	 * event_handler is clockevents_handle_noop; after
 	 * tick_set_periodic_handler() it is tick_handle_periodic.  The address
 	 * is printed as well as the flag so it can be resolved against this
@@ -2283,7 +1945,7 @@ static int rtl819x_tc_read_proc(char *page, char **start, off_t off,
  * card, the input is one small integer, and pulling in the scanf machinery
  * for it would be the larger change.
  *
- * ⚠️ It refuses while armed.  The alternative -- re-loading TC1DATA under a
+ * CAUTION: It refuses while armed.  The alternative -- re-loading TC1DATA under a
  * running counter -- would leave the clocksource's mask and the hardware's
  * period disagreeing for the length of one wrap, and `(now - last) & mask` is
  * exact only while they agree.  That is the one property a power-of-two
@@ -2307,7 +1969,7 @@ static int rtl819x_tc1_set_period(const char *s)
 		return -EBUSY;
 	}
 	rtl819x_period_bits = (unsigned int)bits;
-	/* 🆕 R5-3b: and the derived pair follows it immediately, so that a
+	/* NEW: R5-3b: and the derived pair follows it immediately, so that a
 	 * disarmed dump never shows mask_bits and period_jiffies describing two
 	 * different periods. */
 	rtl819x_derive_period();
@@ -2335,7 +1997,7 @@ static int rtl819x_tc_write_proc(struct file *file, const char __user *buffer,
 		ret = rtl819x_tc1_arm();
 	else if (!strcmp(buf, "disarm"))
 		ret = rtl819x_tc1_disarm();
-	/* 🆕 R5-3a.  ONE VERB PER GATE, and that is the design rather than an
+	/* NEW: R5-3a.  ONE VERB PER GATE, and that is the design rather than an
 	 * interface preference: docs/interrupt-map.md 3.3 makes I1..I4 four
 	 * separate writes and four separate reads so that a wedge costs the
 	 * rest of a seating and not the step before it.  Folding `armirq` into
@@ -2354,7 +2016,7 @@ static int rtl819x_tc_write_proc(struct file *file, const char __user *buffer,
 		ret = rtl819x_tc1_freeirq();
 	else if (!strncmp(buf, "period ", 7))
 		ret = rtl819x_tc1_set_period(buf + 7);
-	/* 🆕 R5-3b.  `cevtprobe` before `cevt` is not an ordering this code
+	/* NEW: R5-3b.  `cevtprobe` before `cevt` is not an ordering this code
 	 * enforces -- the two are independent registrations -- but it is the
 	 * order the card runs them in, because the probe is the negative
 	 * control for the reading `cevt` produces. */
@@ -2404,22 +2066,22 @@ static int rtl819x_tc_write_proc(struct file *file, const char __user *buffer,
  * between the two levels becomes a reading rather than an assumption.
  *
  * WHY late_initcall AND NOT A WORKQUEUE.
- * 讀 init/main.c: do_initcalls() runs every level to completion inside
+ * READ init/main.c: do_initcalls() runs every level to completion inside
  * kernel_init, and only then does init_post() exec /sbin/init.  So a
  * late_initcall is the last place that is still guaranteed to be BEFORE
  * userspace -- which is what this step's DoD says.  A workqueue would race
  * the first process.
  *
- * 🔴 WHY THERE IS NO RUNTIME SWITCH, WHICH WAS CONSIDERED AND REJECTED.
+ * NOTE: WHY THERE IS NO RUNTIME SWITCH, WHICH WAS CONSIDERED AND REJECTED.
  * A magic word left in DRAM by the loader would have let one image both arm
- * and not arm.  MEM-17 refutes it: 量 2026-08-31, this board's DRAM retains a
+ * and not arm.  MEM-17 refutes it: MEASURED 2026-08-31, this board's DRAM retains a
  * previous power cycle's contents, so a stale word would arm a boot that
  * asked not to be armed -- and a switch that can be set by the previous
  * experiment is not a switch.  The recovery path is cheaper anyway: nothing
  * of this is in flash, the image is TFTP'd to RAM on every cycle, so a wedged
  * boot costs exactly one power cycle and the previous image is the fallback.
  *
- * 🔴 WHAT A FAILURE COSTS, BY STAGE.
+ * NOTE: WHAT A FAILURE COSTS, BY STAGE.
  * S1..S7 are soft: the sequencer unwinds with disarm(), the vendor keeps the
  * tick, the board boots, and /proc plus the marks say which stage and which
  * errno.  S8 is the only hard one -- past clockevents_register_device() the
@@ -2524,7 +2186,7 @@ static int __init rtl819x_boot_arm_late(void)
 	}
 
 	/*
-	 * S6.  🔄 4.1: the window is taken HERE, and the old one is kept as a
+	 * S6.  UPDATE: 4.1: the window is taken HERE, and the old one is kept as a
 	 * reading.  See RTL819X_BOOT_CE_TRIES for the two measurements that
 	 * forced this; in one line, the span this function used to judge on is
 	 * the vendor's NIC initialisation and it costs 11 of 585 interrupts,
@@ -2566,7 +2228,7 @@ static int __init rtl819x_boot_arm_late(void)
 			msleep(20);
 		}
 
-		/* 🔴 The verdict is NOT marked here, and that is deliberate.
+		/* NOTE: The verdict is NOT marked here, and that is deliberate.
 		 * rtl819x_tc1_cevt_register() runs this same pre-check under its
 		 * own lock, so a failure surfaces as TA7's errno -- one mark,
 		 * one meaning.  A mark here would print -ETIME twice for one
@@ -2578,7 +2240,7 @@ static int __init rtl819x_boot_arm_late(void)
 
 	/* S7 -- the negative control, and it is not optional.  A rating of 300
 	 * winning means nothing unless a rating of 99 on the same hardware,
-	 * through the same registration call, on the same boot, loses.  量
+	 * through the same registration call, on the same boot, loses.  MEASURED
 	 * seating 13: ce_probe_registered=1 with ce_probe_mode_calls=0, three
 	 * times.  If that stops being true this line is where it shows. */
 	rtl819x_boot_stage = RTL819X_BOOT_S_PROBE;
@@ -2687,7 +2349,7 @@ static int __init rtl819x_timer_init(void)
 	u32 div, mult = 0, lo, hi, ce_mult = 0;
 
 	/* 25 must be a real IRQ number in this configuration.  NR_IRQS is 48 =
-	 * 8 CPU + 8 LOPI + 32 ICTL (讀 arch/rlx/include/asm/mach-generic/irq.h),
+	 * 8 CPU + 8 LOPI + 32 ICTL (READ arch/rlx/include/asm/mach-generic/irq.h),
 	 * and if a config change ever shrinks it this stops the build rather
 	 * than calling request_irq() on a number the kernel has no desc for. */
 	BUILD_BUG_ON(RTL819X_TC1_IRQ >= NR_IRQS);
@@ -2716,10 +2378,10 @@ static int __init rtl819x_timer_init(void)
 	 * measurement rather than a preference: R5-2 verified
 	 * ΔTC1 = Δjiffies × (TC0DATA >> 4) + Δ(TC0CNT >> 4) with residual
 	 * EXACTLY ZERO over three intervals -- so "one jiffy is TC0DATA>>4
-	 * counts" is 量 on this die, while hz_cdbr additionally needs the
+	 * counts" is MEASURED on this die, while hz_cdbr additionally needs the
 	 * 200 MHz figure to be right.  hz_cdbr is the cross-check.
 	 *
-	 * 🔴 If TC0DATA reads 0 -- a block this driver's model does not
+	 * NOTE: If TC0DATA reads 0 -- a block this driver's model does not
 	 * describe -- the fallback is the compiled constant, and hz_used says
 	 * which was taken.  Falling back SILENTLY to a rate 71.43x wrong is
 	 * exactly what version 1.0 did without knowing it.
@@ -2730,7 +2392,7 @@ static int __init rtl819x_timer_init(void)
 	 * whose mult reads 0 until somebody arms would invite the reader to
 	 * think the number is broken rather than unset.  NTP adjusts mult on
 	 * the selected clocksource only, and at rating 0 this is never it. */
-	/* 🔴 The search runs against the LARGEST mask this driver can be set
+	/* NOTE: The search runs against the LARGEST mask this driver can be set
 	 * to, not the current one.  `period` can shrink the mask later, and a
 	 * smaller mask only relaxes the mask*mult bound -- so a shift chosen
 	 * at the maximum stays valid for every period, and one chosen at the
@@ -2741,7 +2403,7 @@ static int __init rtl819x_timer_init(void)
 	rtl819x_tc1_clocksource.mult = mult;
 	rtl819x_tc1_clocksource.mask = CLOCKSOURCE_MASK(rtl819x_period_bits);
 
-	/* 🆕 R5-3b.  The clockevent's period is the vendor's own reload: 量
+	/* NEW: R5-3b.  The clockevent's period is the vendor's own reload: MEASURED
 	 * REG-05, TC0DATA >> 4 = 2,000, and hz_used is (TC0DATA >> 4) * HZ, so
 	 * hz_used / HZ is that same 2,000 by construction.  The division is
 	 * checked rather than assumed because a kernel with a different HZ would
@@ -2796,7 +2458,7 @@ static int __init rtl819x_timer_init(void)
 	pde->read_proc  = rtl819x_tc_read_proc;
 	pde->write_proc = rtl819x_tc_write_proc;
 
-	/* 🔴 AFTER the /proc entry and not before it.  If arming fails, the
+	/* NOTE: AFTER the /proc entry and not before it.  If arming fails, the
 	 * only thing that can say why is this file, and a sequencer that ran
 	 * before its own reporting channel existed would have to be debugged
 	 * from the marks alone.  A create_proc_entry() that failed returns

@@ -88,7 +88,7 @@
  * `SPEC.md` `FW-64`, 量 2026-09-10: one `cat` is TWO `read_proc` invocations
  * on this kernel, and two of this project's counting identities were written
  * as though it were one.  A single `read(fd, buf, 4096)` of a handler whose
- * output fits in one page is ONE invocation: 讀 `rtl819x-timer.c:2271-2276`,
+ * output fits in one page is ONE invocation: 讀 `rtl819x-timer.c:1933-1938`,
  * the handler sets `*eof = 1` and returns `min(len, count)`, so the second
  * invocation only happens if something asks for the bytes past `len`.  This
  * program never does.
@@ -208,10 +208,10 @@ static void uc_field(const char *k, u32 v)
 
 #define UC_PROC		"/proc/rtl819x-timer"
 #define UC_BUF		4096u		/* one page: the handler's own bound */
-#define UC_SHIFT	4u		/* RTL819X_TC_VALUE_SHIFT, 讀 :485.
+#define UC_SHIFT	4u		/* RTL819X_TC_VALUE_SHIFT, 讀 :147.
 					 * `tc0cnt` and `tc0data` are printed
-					 * RAW (:2100-2101) where the TC1 path
-					 * shifts (:943).  A reader that forgets
+					 * RAW (:1762-1763) where the TC1 path
+					 * shifts (:605).  A reader that forgets
 					 * this is wrong by 16x. */
 
 static char uc_buf[UC_BUF];

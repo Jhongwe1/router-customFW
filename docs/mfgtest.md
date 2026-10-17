@@ -568,7 +568,7 @@ its rate keeps `skew` at 0 and `dj > 0`. 量 `C10-M28`: with `cereload 20000`
 the line reads **`dj=503 di=503 skew=0`** — the old criterion satisfied — while
 the cell took **66.78 s** against 21.9 s for a healthy one. The check now also
 reads `ce_reload` against `ce_reload_hz`, which is the driver's own `-ERANGE`
-criterion at `rtl819x-timer.c:1544`.
+criterion at `rtl819x-timer.c:1206`.
 
 ⚠️ Both are software values, so this catches a period programmed wrong and says
 nothing about a hardware clock that has drifted. **`/proc/interrupts` line 13 —

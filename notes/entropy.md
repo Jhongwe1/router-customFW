@@ -88,7 +88,7 @@ live sites, 0 `struct irqaction`:
 | driver | site | flags |
 |---|---|---|
 | `rtl819x-nic` | `drivers/net/rtl819x-nic.c:1524`, `:2534` (IRQ 12) | `IRQF_DISABLED` |
-| `rtl819x-timer` | `drivers/clocksource/rtl819x-timer.c:1824` (IRQ 25) | `IRQF_DISABLED` |
+| `rtl819x-timer` | `drivers/clocksource/rtl819x-timer.c:1486` (IRQ 25) | `IRQF_DISABLED` |
 
 🔴 Those two numbers are unchanged by § 3's hook, and that is deliberate: the
 hook is a **net-zero** edit (`FW-110`). It replaces the blank line after
@@ -225,7 +225,7 @@ on IRQ 25. 🔴 This file **never writes the block**: it reads four words —
 writes none, so it cannot disturb either tick.
 
 🔴 **No new register value enters code.** Base `0x18003100`, offset `0x08` and
-the bits-31:4 shift are the three that `rtl819x-timer.c:418`, `:474` already
+the bits-31:4 shift are the three that `rtl819x-timer.c:80`, `:136` already
 carries on two sources (D 8.2.1 Table 19 and Table 22, plus read on this die),
 and `REG-07` is 量: two reads of `0xB8003108` seconds apart gave 114,003 and
 16,989 ticks. They are restated in the entropy file rather than shared so the

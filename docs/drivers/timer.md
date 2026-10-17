@@ -2,7 +2,8 @@
 
 Source: [`rtl819x-timer.c`](../../kernel/linux-2.6.30/drivers/clocksource/rtl819x-timer.c), version 4.1 ·
 reasoning and every reading: [`notes/timer-driver.md`](../../notes/timer-driver.md) ·
-the decision: [ADR-007](../decisions/ADR-007-timer-one-role.md)
+the decision: [ADR-007](../decisions/ADR-007-timer-one-role.md) ·
+the file head until 2026-10-18, verbatim: [`rtl819x-timer.c`](timer-history.md)
 
 ## What it does
 
