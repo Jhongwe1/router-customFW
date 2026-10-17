@@ -8,4 +8,5 @@ The decisions that shaped rlxfw, one page each: Context, Decision, Alternatives 
 - [ADR-004](ADR-004-init-never-execs-shell.md) — PID 1 never execs a shell.
 - [ADR-005](ADR-005-codegen-constraints.md) — `-fno-if-conversion` and the other code-generation constraints for this core.
 - [ADR-006](ADR-006-flash-write-rule.md) — Flash writes only under the owner's dated yes for that exact payload; the loader and `H601` never written.
+- [ADR-007](ADR-007-timer-one-role.md) — The timer driver is either a clocksource or a clockevent device, not both.
 - [ADR-010](ADR-010-bench-card-predictions.md) — Bench cards carry predictions frozen before power, and the relaxation of 2026-09-27.
