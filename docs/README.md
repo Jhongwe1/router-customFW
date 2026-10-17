@@ -1,0 +1,35 @@
+# docs/
+
+Where to read about rlxfw, in three layers. This page holds links only; what is
+true now is in the pages it links.
+
+## Start here
+
+- [`../README.md`](../README.md) — what rlxfw is
+- [`FINDINGS.md`](FINDINGS.md) — what was found, on one page
+- [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md) — what does not work, and what each release does not establish
+- [`reports/README.md`](reports/README.md) — one row per gate result: its claim, and what it does not establish
+- [`bringup.md`](bringup.md) — the bring-up report
+
+## Reports
+
+- [`GATE-RESULTS.md`](GATE-RESULTS.md) — every gate's result, as written when it closed
+- [`boot-time-table.md`](boot-time-table.md) — boot time, network up and throughput, the vendor firmware beside rlxfw
+- [`differential.md`](differential.md) — the vendor firmware against rlxfw, by mechanism class
+- [`rlx-isa.md`](rlx-isa.md) — the Lexra RLX4181 instruction set, measured on one die
+- [`rlx-cache-and-cp0.md`](rlx-cache-and-cp0.md) — the cache model and the CP0 census
+- [`toolchain-comparison.md`](toolchain-comparison.md) — three toolchains, the same measurements
+- [`emulation-surface.md`](emulation-surface.md) — where the emulator and the silicon disagree
+- [`mfgtest.md`](mfgtest.md) — the manufacturing test
+- [`threat-model.md`](threat-model.md) and [`hardening-matrix.md`](hardening-matrix.md) — the positions this device is attacked from, and the mitigations on this part
+
+## Reference and record
+
+- [`spec/README.md`](spec/README.md) — how to read [`SPEC.md`](../SPEC.md), every number held about the device
+- [`../notes/README.md`](../notes/README.md) — the engineering notes, one per subsystem
+- The loader: [`loader-command-semantics.md`](loader-command-semantics.md), [`loader-flash-write.md`](loader-flash-write.md), [`loader-phy-and-switch.md`](loader-phy-and-switch.md)
+- rlxfw's drivers against the vendor's: [`driver-diff.md`](driver-diff.md), [`nic-vendor-diff.md`](nic-vendor-diff.md), [`blind-write-ledger.md`](blind-write-ledger.md), [`vendor-modifications.md`](vendor-modifications.md)
+- [`interrupt-map.md`](interrupt-map.md) — the interrupt map, and the layers a timer interrupt crosses
+- The ISA probes: [`isa-prior-art.md`](isa-prior-art.md), [`isa-payload.md`](isa-payload.md), [`isa-hazard.md`](isa-hazard.md), [`probe3-cells.md`](probe3-cells.md), [`rlxprobe-audit-2026-08-25.md`](rlxprobe-audit-2026-08-25.md), [`toolchain-prior-art.md`](toolchain-prior-art.md)
+- Releasing: [`release-process.md`](release-process.md), [`offer.md`](offer.md), [`sbom.md`](sbom.md)
+- The record: [`history/README.md`](history/README.md) (text moved out of the state documents), [`log/README.md`](log/README.md) (the log, month by month), [`../LOG.md`](../LOG.md) (this month)
