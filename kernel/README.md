@@ -17,22 +17,22 @@ build identity the image prints at boot.
 
 ## The drivers
 
-| file | what it is | notes |
-|---|---|---|
-| [`drivers/clocksource/rtl819x-timer.c`](linux-2.6.30/drivers/clocksource/rtl819x-timer.c) | a clocksource on Timer/Counter 1 | [timer-driver](../notes/timer-driver.md) |
-| [`drivers/gpio/rtl819x-gpio.c`](linux-2.6.30/drivers/gpio/rtl819x-gpio.c) | a gpiolib `gpio_chip` on the PABCD port | [gpio-driver](../notes/gpio-driver.md) |
-| [`drivers/input/keyboard/rtl819x-keys.c`](linux-2.6.30/drivers/input/keyboard/rtl819x-keys.c) | the board's buttons, polled, as an input device | |
-| [`drivers/watchdog/rtl819x-wdt.c`](linux-2.6.30/drivers/watchdog/rtl819x-wdt.c) | a `/dev/watchdog` on `WDTCNR` | [watchdog-driver](../notes/watchdog-driver.md) |
-| [`drivers/mtd/devices/rtl819x-spi.c`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c) | a read-only MTD device on the SPI flash controller, by programmed I/O | [spi-mtd-driver](../notes/spi-mtd-driver.md) |
-| [`drivers/mtd/devices/rtl819x-spi-write.c`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-write.c) | the flash write path: its policy, its counters, two MTD entry points; off in every committed image | [spi-mtd-driver](../notes/spi-mtd-driver.md) |
-| [`drivers/mtd/devices/rtl819x-spi-wrpolicy.h`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h) | every refusal the write path makes, as pure arithmetic | |
-| [`drivers/mtd/devices/rtl819x-spi-install.h`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h) | every decision the slot install path makes, as pure functions | |
-| [`drivers/net/rtl819x-nic.c`](linux-2.6.30/drivers/net/rtl819x-nic.c) | the CPU-port DMA driver | [nic-driver](../notes/nic-driver.md) |
-| [`drivers/net/rtl819x-nic-tx.h`](linux-2.6.30/drivers/net/rtl819x-nic-tx.h) | the TX policy's declarations, and the part of it that touches no hardware | [nic-driver](../notes/nic-driver.md) |
-| [`drivers/net/rtl819x-switch.c`](linux-2.6.30/drivers/net/rtl819x-switch.c) | the switch-core driver | [switch-driver](../notes/switch-driver.md) |
-| [`drivers/net/rtl819x-view.c`](linux-2.6.30/drivers/net/rtl819x-view.c) | a read-only view of the switch registers, MIB counters and tables, at `/proc/rtl819x-view` | |
-| [`drivers/net/rlxfw-seam.c`](linux-2.6.30/drivers/net/rlxfw-seam.c) | what code outside the vendor Ethernet tree still needs from it when that tree is not built | |
-| [`drivers/char/rlxfw-entropy.c`](linux-2.6.30/drivers/char/rlxfw-entropy.c) | an entropy source, and its credit policy | [entropy](../notes/entropy.md) |
+| file | what it is | notes | page |
+|---|---|---|---|
+| [`drivers/clocksource/rtl819x-timer.c`](linux-2.6.30/drivers/clocksource/rtl819x-timer.c) | Timer/Counter 1 as the system tick, or as a clocksource | [timer-driver](../notes/timer-driver.md) | [timer](../docs/drivers/timer.md) |
+| [`drivers/gpio/rtl819x-gpio.c`](linux-2.6.30/drivers/gpio/rtl819x-gpio.c) | a gpiolib `gpio_chip` on the PABCD port | [gpio-driver](../notes/gpio-driver.md) | [gpio](../docs/drivers/gpio.md) |
+| [`drivers/input/keyboard/rtl819x-keys.c`](linux-2.6.30/drivers/input/keyboard/rtl819x-keys.c) | the board's buttons, polled, as an input device | [gpio-driver](../notes/gpio-driver.md) §§ 10–13 | [keys](../docs/drivers/keys.md) |
+| [`drivers/watchdog/rtl819x-wdt.c`](linux-2.6.30/drivers/watchdog/rtl819x-wdt.c) | a `/dev/watchdog` on `WDTCNR` | [watchdog-driver](../notes/watchdog-driver.md) | [wdt](../docs/drivers/wdt.md) |
+| [`drivers/mtd/devices/rtl819x-spi.c`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c) | a read-only MTD device on the SPI flash controller, by programmed I/O | [spi-mtd-driver](../notes/spi-mtd-driver.md) | [spi](../docs/drivers/spi.md) |
+| [`drivers/mtd/devices/rtl819x-spi-write.c`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-write.c) | the flash write path: its policy, its counters, two MTD entry points; off in every committed image | [spi-mtd-driver](../notes/spi-mtd-driver.md) | [spi](../docs/drivers/spi.md) |
+| [`drivers/mtd/devices/rtl819x-spi-wrpolicy.h`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h) | every refusal the write path makes, as pure arithmetic | | [spi](../docs/drivers/spi.md) |
+| [`drivers/mtd/devices/rtl819x-spi-install.h`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h) | every decision the slot install path makes, as pure functions | | [spi](../docs/drivers/spi.md) |
+| [`drivers/net/rtl819x-nic.c`](linux-2.6.30/drivers/net/rtl819x-nic.c) | the CPU-port DMA driver | [nic-driver](../notes/nic-driver.md) | [nic](../docs/drivers/nic.md) |
+| [`drivers/net/rtl819x-nic-tx.h`](linux-2.6.30/drivers/net/rtl819x-nic-tx.h) | the TX policy's declarations, and the part of it that touches no hardware | [nic-driver](../notes/nic-driver.md) | [nic](../docs/drivers/nic.md) |
+| [`drivers/net/rtl819x-switch.c`](linux-2.6.30/drivers/net/rtl819x-switch.c) | the switch-core driver | [switch-driver](../notes/switch-driver.md) | [switch](../docs/drivers/switch.md) |
+| [`drivers/net/rtl819x-view.c`](linux-2.6.30/drivers/net/rtl819x-view.c) | a read-only view of the switch registers, MIB counters and tables, at `/proc/rtl819x-view` | | [switch](../docs/drivers/switch.md) |
+| [`drivers/net/rlxfw-seam.c`](linux-2.6.30/drivers/net/rlxfw-seam.c) | what code outside the vendor Ethernet tree still needs from it when that tree is not built | | [nic](../docs/drivers/nic.md) |
+| [`drivers/char/rlxfw-entropy.c`](linux-2.6.30/drivers/char/rlxfw-entropy.c) | an entropy source, and its credit policy | [entropy](../notes/entropy.md) | [entropy](../docs/drivers/entropy.md) |
 
 ## The rest
 
