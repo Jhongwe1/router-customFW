@@ -48,7 +48,7 @@ in so many words that this does not make them derived works 讀. So the two
 halves are two different provenance arguments, and writing one licence over
 both would hide that.
 
-**Why not Apache-2.0, which the project plan named.** `plan/` item `D10` said
+**Why not Apache-2.0, which the project plan named.** the unpublished plan's item `D10` said
 *kernel GPLv2, userspace Apache-2.0*. It is **stale** on two counts and was not
 followed: it names uClibc-ng and monocypher, and 量 the image has uClibc 0.9.30
 (§ 5) and TweetNaCl (§ 6) instead. On the licence itself, 推: Apache-2.0's

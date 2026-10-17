@@ -41,7 +41,7 @@
       "tools/ (loader-tftp, mkramboot, console-lint, console-dump, loader-unpack, mkflash, rtcase, the CI checkers)",
       "ghidra/scripts/*.java (BoaFormTable, BoaMnemonics, BoaStringXrefs, ...)"
     ],
-    "detail": "plan/UPSTREAM-INVENTORY.md",
+    "detail": "an inventory kept with the project's unpublished plan; the list above is its summary",
     "fetch": "now"
   },
   "source_trees": [
@@ -186,7 +186,7 @@
       "title": "RTL8196E-VE1/2/3 Draft Datasheet — 5-Port 10/100M Ethernet Router Network Processor",
       "revision": "Rev. D1.1, 17 July 2013, TrackID JATR-3375-16",
       "marking": "CONFIDENTIAL: Development Partners Only",
-      "handling": "CITE, DO NOT COMMIT. See plan/router-rebuild-plan.md D12.",
+      "handling": "CITE, DO NOT COMMIT: it is someone else's property (CLAUDE.md, Never).",
       "supplies": {
         "interrupt_controller": "base 0xB800_3000 — GIMR 3000, GISR 3004, IRR1 300C, IRR2 3010 (sec 8.1)",
         "timer_watchdog": "base 0xB800_3100 — TC0DATA 3100, TC1DATA 3104, TC0CNT 3108, TC1CNT 310C, TCCNR 3110, TCIR 3114, CDBR 3118, WDT 311C (sec 8.2)",
@@ -204,8 +204,8 @@
       "caveats": [
         "It is a DRAFT. Draft and production silicon can differ.",
         "It is the -VE1/2/3 variant, which has embedded DRAM by MCM. THIS UNIT HAS EXTERNAL SDRAM (Winbond W9825G6KH) and is therefore NOT this part.",
-        "Its CPU claim (RLX4181, MIPS-1) contradicts the common 'RTL8196E = RLX5281' convention AND the 142 lwl/lwr/swl/swr instructions in this device's own /bin/boa. See plan F34 and gate R1.",
-        "Therefore: no register value goes into code on this document's authority alone. Two independent sources, always (D12)."
+        "Its CPU claim (RLX4181, MIPS-1) contradicts the common 'RTL8196E = RLX5281' convention AND the 142 lwl/lwr/swl/swr instructions in this device's own /bin/boa. See SPEC.md CPU-04 (PRId, measured) and gate R1's entry in docs/GATE-RESULTS.md.",
+        "Therefore: no register value goes into code on this document's authority alone. Two independent sources, always (docs/method.md, Two sources)."
       ],
       "fetch": "now"
     },
@@ -219,8 +219,8 @@
       "sha256": "b8c26d5af2a5b228f9794b28a1eb7d7b987853d278ffaa7e06143ae78067d828",
       "kind_of_document": "SCANNED IMAGES (11 CCITTFaxDecode streams, no text layer). Machine text extraction fails and correctly reports failure. A human reads it.",
       "handling": "CITE, DO NOT COMMIT.",
-      "why": "The sibling part. Its CPU/Features bullet on the first pages is a FOURTH independent source for F34: if it also says RLX4181, the 'C=4181 / E=5281' convention is wrong in both directions and the R1 measurement is the only thing left standing.",
-      "task": "plan/DAY-ZERO.md item 6 — read one bullet with your eyes, ten seconds.",
+      "why": "The sibling part. Its CPU/Features bullet on the first pages is a FOURTH independent source for the core's identity (SPEC.md CPU-04): if it also says RLX4181, the 'C=4181 / E=5281' convention is wrong in both directions and the R1 measurement is the only thing left standing.",
+      "task": "read that one bullet with your eyes, ten seconds (item 6 of the unpublished plan's day-zero list).",
       "fetch": "now"
     },
     {
