@@ -11,78 +11,17 @@
  *
  * A `cat` prints the cached result of the last verb that loaded anything, and
  * loads nothing itself -- which matters because one `cat` renders the page
- * twice (FW-64).
+ * twice (FW-64).  It STORES TO NO REGISTER, ever: there is no store accessor
+ * in this file, and so no unlock.  A word is loaded only if it lies inside
+ * one of four named blocks and two of three sources place it -- B, the header
+ * the build compiles (drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h); D,
+ * the draft datasheet; a value this die printed for the word in a capture
+ * committed under bench/, a loader DW dump or, for the MIB, the vendor's
+ * asicCounter dump -- and everything else is refused before any load.
  *
- * ======================================================================
- * WHY A FILE OF ITS OWN
- * ======================================================================
- *
- * Not a 1.4 of rtl819x-switch.c.  Seating 43's third press pins HEAD's
- * rtl819x-switch.c and tools/mdiocheck.py by sha, and mdiocheck cuts that
- * driver from its 1.3 banner to the END OF THE FILE, so a block appended
- * there would enter mdiocheck's harness and fail it.  This file shares no
- * code and no symbol with it: rtl819x-switch keeps its own read path, its
- * PSRP bookkeeping and its MDIO gate, and nothing here calls them.
- *
- * ======================================================================
- * WHAT MAY BE LOADED: THE ADMISSION TABLE
- * ======================================================================
- *
- * A word is loaded only if it lies inside one of four named blocks AND two of
- * three sources place it: B, the header the build compiles
- * (drivers/net/rtl819x/AsicDriver/rtl865xc_asicregs.h, sha256 e29c3051...);
- * D, the draft datasheet; and 量, a value this die printed for the word in a
- * capture committed under bench/: a loader DW dump, or, for the MIB, the
- * vendor's /proc/rtl865x/asicCounter dump.  That is CLAUDE.md's rule for a
- * register value entering code, applied to an address entering a read path.
- * 311 words pass under it -- the table below, 298, and 1.1's at the end of
- * this file, 13 -- word for word, and every run carries its sources.
- *
- * That 量 is narrower than "any reading": a read through the vendor's
- * /proc/rtl865x/memory does not count, and in 1.0 one word turned on it:
- * 0xBB804500, SBFCTR/SBFCR0 (B :1673-:1674), printed 000000F4 on all three
- * such reads (bench/2026-09-21b: B5-REGc, B5-REGc2, D2-REGa-a2), and 1.0
- * refused it (8c's census: 299 with it, 298 with 量 limited as above; 8c's
- * ruling D2: 298).  8c-cells then read it and twelve one-source words with
- * the loader's DW (bench/2026-09-27d/AL-D*), so 1.1 admits the thirteen
- * (notes/switch-driver.md section 16.4).  0x4D48 stays out: a reading and
- * no name in B's live branch.  Such words go through the vendor's memory
- * node, which bounds nothing itself; tools/cardcheck.py does (HW-1).
- *
- * Everything else is refused BEFORE ANY LOAD, the whole request with it:
- * `peek A n` checks all n words first, and loads none unless all n pass.
- * Flash (0xBD000000-0xBD3FFFFF, 0xBFC00000 up) is in no block, so H601
- * (flash 0x6000-0x7FFF) cannot reach a capture through this node.  The
- * admission is by exact KSEG1 address: the KSEG0 alias of an admitted
- * register (0x9B80xxxx) and its physical address are refused like any other.
- *
- * PSRP0-PSRP8 (0xBB804128-0xBB804148) are refused with a reason of their
- * own, `psrp`: bit 8, LinkDownEventFlag, clears when read (B :1328, D Table
- * 65, 量 NET-11), and /proc/rtl819x-switch 1.2 already reads them and keeps
- * what it consumes.  A read here would consume it where nothing keeps it.
- *
- * ======================================================================
- * WHAT THIS DRIVER DOES NOT DO
- * ======================================================================
- *
- * 1. It STORES TO NO REGISTER, ever: there is no store accessor in this file,
- *    and so no unlock.  NET-109's ByPassTCRC cell, which needs a write, goes
- *    through the vendor's /proc/rtl865x/memory (decision D4).
- * 2. It loads nothing at boot.  The initcall creates the node and prints
- *    nothing unless that fails (RLXFW-VW0-NOPROC).
- * 3. It issues no table command.  `tbl` never writes SWTACR, SWTAA, a TCR
- *    or EN_STOP_TLU, so the table engine runs nothing and no table can
- *    change because of it; see the table read below.
- * 4. It issues no MDIO command.  MDIO stays rtl819x-switch 1.3's.
- * 5. It says nothing about read side effects beyond the ones named here:
- *    none is known for the 311 (推), and which of them were read on this die
- *    before is in the sources column.  The MIB's read-to-clear is 未定.
- *
- * ======================================================================
  * THE TABLE READ
- * ======================================================================
  *
- * 讀 `_rtl8651_readAsicEntry`, drivers/net/rtl819x/AsicDriver/96E/
+ * READ `_rtl8651_readAsicEntry`, drivers/net/rtl819x/AsicDriver/96E/
  * rtl865x_asicBasic.S:1043-1215, the reader the vendor's VLAN, netif and L2
  * getters call.  Per slot: load SWTACR (0xBB804D00) until bit 0,
  * ACTION_START (B :209-:211), reads clear -- the vendor's wait is unbounded;
@@ -94,58 +33,22 @@
  * tries; after ten unequal ones the vendor copies the SECOND buffer out and
  * returns success.  This prints that second buffer, the number of tries, and
  * `eq` or `mis`.  The StopTLU variant (:1216 on) sets EN_STOP_TLU in SWTCR0
- * and has no C caller in the tree (讀, grep); it is not what this copies.
+ * and has no C caller in the tree (READ, grep); it is not what this copies.
  * Base 0xBB000000 is REAL_SWTBL_BASE (B :151), the type numbers are the
  * enum in rtl865x_asicBasic.h (VLAN 6, netif 4; L2 0), the slot counts are
  * rtl865x_asicCom.h's (16 VLAN slots under CONFIG_RTL_8196E, 8 netifs), and
- * the 32-byte stride is the `sll $2,$18,5` of the reader; 量 SWTAA reads
+ * the 32-byte stride is the `sll $2,$18,5` of the reader; MEASURED SWTAA reads
  * BB060100 at the loader and BB040020 under Linux (NET-28), both inside
  * these windows on slot boundaries.  D has no table section (L2: 1.1's).
  *
- * ⚠️ `rtl8651_getAsicVlan` reads index = vid (rtl865x_asicCom.c:146) while
+ * CAUTION: `rtl8651_getAsicVlan` reads index = vid (rtl865x_asicCom.c:146) while
  * the vendor's writer searches for a free slot, so a slot number here is NOT
  * a VID; the decoder never takes one for the other.
  *
- * ======================================================================
- * THE MIB
- * ======================================================================
- *
- * The 32 words per port that the vendor's `rtl865xC_dumpAsicDiagCounter`
- * (rtl865x_asicCom.c:1776 on) reads, for ports 0-6 (0-5 and the CPU port),
- * and CpuEvent: 7 x 32 + 1 = 225.  Loaded per port in ascending address
- * order, RX then TX, and CpuEvent last; the vendor's order is unsequenced C
- * (printf arguments), so no order is copied.  Out: MIB_CONTROL at 0x000 (a
- * write restarts the counters; it is never read either), etherStatsOctets
- * (0x10C/0x110), ifOutDiscards (0x814), 0x828 and 0x830, which the vendor's
- * dump does not read (B only), and ports 7-8 (B only).  The byte counters are
- * a word pair (lo, lo + 4); the pair can tear across a carry between its two
- * loads, and nothing here can tell (推).
- *
- * ======================================================================
- * THE PAGE
- * ======================================================================
- *
- *     version rtl819x-view 1.1
- *     admit %u                 words the tables admit, summed at render
- *     last %s j %lu rc %d      none|mib|vlan|netif|peek|l2, its jiffies, rc
- *     n_mib %lu n_tbl %lu n_peek %lu refused %lu busy %lu ld %lu
- *     ref %08X %s              the last refused word and none|out|psrp
- *     ...the last verb's result...
- *     jiffies %lu              the terminator
- *
- * `refused` counts -EACCES refusals, `busy` the tbl verbs refused -EBUSY,
- * `ld` every load this file has made.  A refused or malformed request
- * changes no cached result.  The result's own lines, and the page's size,
- * are over the /proc section below.
- *
- * ======================================================================
- * WHAT IT CANNOT SEE
- * ======================================================================
- *
- * The silicon.  tools/viewcheck.py drives this file on the host against a
- * model written from the same sources as the table, so a misreading shared
- * by both passes there.  How long SWTACR stays busy, whether a table slot
- * tears, whether a MIB read clears a counter: the bench says.
+ * The driver page: docs/drivers/switch.md.  Why a file of its own, the
+ * admission rule and its 311 words, what this driver does not do, the MIB,
+ * the page and what this file cannot see: the head it carried until
+ * 2026-10-18, verbatim in docs/drivers/view-history.md.
  */
 
 #include <linux/init.h>
@@ -201,7 +104,7 @@
  * The admission table.  One row is a run of `n` consecutive words starting
  * at KSEG1 address `a`, repeated `rep` times `stride` bytes apart (the MIB's
  * seven ports; 1 and 0 everywhere else).  Each row's comment is: the names,
- * B's lines, then the second source.  量 "DW X n" is a loader dump of n words
+ * B's lines, then the second source.  MEASURED "DW X n" is a loader dump of n words
  * from X committed under bench/; D is a table of the draft datasheet.
  * ------------------------------------------------------------------------ */
 
@@ -214,25 +117,25 @@ struct rtl819x_view_run {
 
 static const struct rtl819x_view_run rtl819x_view_runs[] = {
 	/* ---- the switch block, 0xBB804000-0xBB804FFF: 54 words ---- */
-	{ 0xBB804000,  4, 1, 0 },	/* MACCR MDCIOCR MDCIOSR PMCR, B :997-:1000; 量 DW BB804000 4, D Table 57 (04, 08) */
+	{ 0xBB804000,  4, 1, 0 },	/* MACCR MDCIOCR MDCIOSR PMCR, B :997-:1000; MEASURED DW BB804000 4, D Table 57 (04, 08) */
 	{ 0xBB804044,  1, 1, 0 },	/* BSCR, B :1014; D Tables 60-61 */
-	{ 0xBB804100, 10, 1, 0 },	/* PITCR PCRP0-PCRP8, B :1133-:1142; D Table 62 (all but 18), 量 DW BB804100 8, DW BB804114 4 */
-	{ 0xBB80414C,  2, 1, 0 },	/* P0GMIICR P5GMIICR, B :1152-:1153; 量 DW BB80414C 4 */
-	{ 0xBB804200,  4, 1, 0 },	/* CVIDR SSIR CRMR BISTCR, B :1401-:1406; 量 DW BB804200 4 */
-	{ 0xBB804234,  4, 1, 0 },	/* MEMCR, BISTTSDR0|1 (one address, two names), BISTTSDR2, BISTTSDR3, B :1438, :1407-:1410; 量 DW BB804234 4 */
+	{ 0xBB804100, 10, 1, 0 },	/* PITCR PCRP0-PCRP8, B :1133-:1142; D Table 62 (all but 18), MEASURED DW BB804100 8, DW BB804114 4 */
+	{ 0xBB80414C,  2, 1, 0 },	/* P0GMIICR P5GMIICR, B :1152-:1153; MEASURED DW BB80414C 4 */
+	{ 0xBB804200,  4, 1, 0 },	/* CVIDR SSIR CRMR BISTCR, B :1401-:1406; MEASURED DW BB804200 4 */
+	{ 0xBB804234,  4, 1, 0 },	/* MEMCR, BISTTSDR0|1 (one address, two names), BISTTSDR2, BISTTSDR3, B :1438, :1407-:1410; MEASURED DW BB804234 4 */
 	{ 0xBB804300,  2, 1, 0 },	/* LEDCREG (LEDCR) LEDCR1, B :2627-:2628, :2633; D Tables 67-70 */
 	{ 0xBB80430C,  1, 1, 0 },	/* LEDBCR, B :2629; D Tables 67-70 */
-	{ 0xBB804400, 14, 1, 0 },	/* TEACR TEATCR RMACR ALECR MSCR L4TOCR SWTCR0 SWTCR1 PLITIMR DACLRCR FFCR MGFCR_E0R0-R2, B :1479-:1493; 量 DW at 4400, 4410, 4418, 4428 x4, contiguous */
-	{ 0xBB804A00,  8, 1, 0 },	/* VCR0 VCR1 PVCR0-PVCR4 PBVCR0, B :2299-:2306; 量 DW at 4A00, 4A08, 4A10 x4, and rtl819x-switch 1.3's table */
-	{ 0xBB804D00,  3, 1, 0 },	/* SWTACR SWTASR SWTAA, B :196-:198; 量 DW BB804D00 4 */
-	{ 0xBB804D3C,  1, 1, 0 },	/* TCR7, B :206; 量 DW BB804D3C 4 */
+	{ 0xBB804400, 14, 1, 0 },	/* TEACR TEATCR RMACR ALECR MSCR L4TOCR SWTCR0 SWTCR1 PLITIMR DACLRCR FFCR MGFCR_E0R0-R2, B :1479-:1493; MEASURED DW at 4400, 4410, 4418, 4428 x4, contiguous */
+	{ 0xBB804A00,  8, 1, 0 },	/* VCR0 VCR1 PVCR0-PVCR4 PBVCR0, B :2299-:2306; MEASURED DW at 4A00, 4A08, 4A10 x4, and rtl819x-switch 1.3's table */
+	{ 0xBB804D00,  3, 1, 0 },	/* SWTACR SWTASR SWTAA, B :196-:198; MEASURED DW BB804D00 4 */
+	{ 0xBB804D3C,  1, 1, 0 },	/* TCR7, B :206; MEASURED DW BB804D3C 4 */
 
-	/* ---- the MIB, 0xBB801000: 225 words.  B :275-:315; 量 the vendor's
+	/* ---- the MIB, 0xBB801000: 225 words.  B :275-:315; MEASURED the vendor's
 	 * asicCounter dump of exactly these words in 266 committed bench/
 	 * .log captures, equal to the netdev's own counts byte for byte
 	 * (NET-46) and cumulative across 76 reads (notes/nic-driver.md
 	 * section 26).  For the 28 words of the 14 byte-counter pairs the dump
-	 * prints only lo + (hi << 22), so their 量 is of that sum, not of
+	 * prints only lo + (hi << 22), so their MEASURED is of that sum, not of
 	 * each word.  D has no MIB section.  Ports 0-6, 0x80 apart. ---- */
 	{ 0xBB801100,  2, 7, 0x80 },	/* ifInOctets, lo and hi, B :282 */
 	{ 0xBB801108,  1, 7, 0x80 },	/* ifInUcastPkts, B :283 */
@@ -245,8 +148,8 @@ static const struct rtl819x_view_run rtl819x_view_runs[] = {
 	{ 0xBB801084,  1, 1, 0 },	/* etherStatsCpuEventPkt (CpuEvent), B :281 */
 
 	/* ---- the CPU interface, 0xB8010000: 17 words.  D has none. ---- */
-	{ 0xB8010000, 15, 1, 0 },	/* CPUICR CPURPDCR0-5 CPURMDCR0 CPUTPDCR0-1 CPUIIMR CPUIISR, CPUQDM0|1 2|3 4|5 (half-words, read as the word pair), B :492-:519; 量 NET-48 (DW B8010000 16, twice, identical) */
-	{ 0xB8010060,  2, 1, 0 },	/* CPUTPDCR2 CPUTPDCR3, B :508-:509; 量 NET-48 (DW B8010060 4) */
+	{ 0xB8010000, 15, 1, 0 },	/* CPUICR CPURPDCR0-5 CPURMDCR0 CPUTPDCR0-1 CPUIIMR CPUIISR, CPUQDM0|1 2|3 4|5 (half-words, read as the word pair), B :492-:519; MEASURED NET-48 (DW B8010000 16, twice, identical) */
+	{ 0xB8010060,  2, 1, 0 },	/* CPUTPDCR2 CPUTPDCR3, B :508-:509; MEASURED NET-48 (DW B8010060 4) */
 
 	/* ---- PIN_MUX: 2 words.  No reading on this die yet. ---- */
 	{ 0xB8000040,  2, 1, 0 },	/* PIN_MUX_SEL PIN_MUX_SEL2, B :3115-:3116; D Tables 35-36 */
@@ -723,23 +626,23 @@ device_initcall(rtl819x_view_init);
  *
  * THE THIRTEEN WORDS
  *
- * Each has B and 量, a loader DW reading of this die: the L column of
+ * Each has B and MEASURED, a loader DW reading of this die: the L column of
  * 8c-cells group A, the cold prompt of 2026-09-27, committed under
  * bench/2026-09-27d/ (notes/switch-driver.md sections 16.2 and 16.4).
  * "AL-D04:2 w2" is the second word on line 2 of AL-D04.log, lines counted
  * on LF with CR stripped.  D places none of them.  All thirteen were read
  * again on the V and R boots of 2026-09-28 through the vendor's memory
- * node; nothing is known of a read side effect (推).  0x4D48 is not here:
+ * node; nothing is known of a read side effect (INFERRED).  0x4D48 is not here:
  * a reading (AL-D17:2) and no name in B's live branch.  Nor is WFQRCRP6
  * (0xBB8048F8, B :2220): AL-D14's sixteen words end at 0xBB8048EC.
  */
 static const struct rtl819x_view_run rtl819x_view_runs11[] = {
-	{ 0xBB804048,  1, 1, 0 },	/* CSCR, B :1015; 量 DW BB804044 4, AL-D04:2 w2 */
-	{ 0xBB804160,  1, 1, 0 },	/* EEECR, B :1365; 量 DW BB804154 4, AL-D07:2 w4 */
-	{ 0xBB804500,  1, 1, 0 },	/* SBFCTR|SBFCR0 (one address, two names), B :1673-:1674; 量 DW BB804500 4, AL-D11:2 w1 */
-	{ 0xBB804704,  3, 1, 0 },	/* IBCR0 IBCR1 IBCR2, B :1831-:1833; 量 DW BB804700 4, AL-D12:2 w2-w4 */
-	{ 0xBB804754,  1, 1, 0 },	/* QNUMCR, B :1850; 量 DW BB804750 4, AL-D13:2 w2 */
-	{ 0xBB8048B0,  1, 6, 0x0C },	/* WFQRCRP0-WFQRCRP5, PSCR (B :2159) + 0x0B0 + 12p, B :2202 :2205 :2208 :2211 :2214 :2217; 量 DW BB8048B0 16, AL-D14:2-5, the dump's words 1, 4, 7, 10, 13 and 16 */
+	{ 0xBB804048,  1, 1, 0 },	/* CSCR, B :1015; MEASURED DW BB804044 4, AL-D04:2 w2 */
+	{ 0xBB804160,  1, 1, 0 },	/* EEECR, B :1365; MEASURED DW BB804154 4, AL-D07:2 w4 */
+	{ 0xBB804500,  1, 1, 0 },	/* SBFCTR|SBFCR0 (one address, two names), B :1673-:1674; MEASURED DW BB804500 4, AL-D11:2 w1 */
+	{ 0xBB804704,  3, 1, 0 },	/* IBCR0 IBCR1 IBCR2, B :1831-:1833; MEASURED DW BB804700 4, AL-D12:2 w2-w4 */
+	{ 0xBB804754,  1, 1, 0 },	/* QNUMCR, B :1850; MEASURED DW BB804750 4, AL-D13:2 w2 */
+	{ 0xBB8048B0,  1, 6, 0x0C },	/* WFQRCRP0-WFQRCRP5, PSCR (B :2159) + 0x0B0 + 12p, B :2202 :2205 :2208 :2211 :2214 :2217; MEASURED DW BB8048B0 16, AL-D14:2-5, the dump's words 1, 4, 7, 10, 13 and 16 */
 };
 
 #define RTL819X_VIEW_NRUN11	ARRAY_SIZE(rtl819x_view_runs11)
@@ -777,7 +680,7 @@ static unsigned int rtl819x_view_nadmit11(void)
  *
  * `tbl l2` reads it by THE TABLE READ above, 1.0's protocol unchanged: per
  * slot, SWTACR polled to the same bound, then up to ten double reads of the
- * slot's eight words, the second buffer kept.  Its constants, 讀 in the
+ * slot's eight words, the second buffer kept.  Its constants, READ in the
  * tree that builds (drivers/net/rtl819x/AsicDriver/, whose Makefile builds
  * 96E/rtl865x_asicBasic.o and rtl865x_asicL2.o when CONFIG_RTL_8196E):
  *
@@ -801,11 +704,11 @@ static unsigned int rtl819x_view_nadmit11(void)
  *                :185), an entry's words 0-1 (rtl865x_asicL2.h:140-190; 2-7
  *                are reserved), and loads and compares all eight, as this does
  *
- * 量: none.  No committed capture has loaded an address in the window (a
+ * MEASURED: none.  No committed capture has loaded an address in the window (a
  * grep of bench/ for a DW or memory-node read of 0xBB000000-0xBB007FFF
  * finds none), and SWTAA has never read an address in it.  Type 0 rests on
  * B's enum, whose 4 and 6 SWTAA places (THE TABLE READ); the first `tbl l2`
- * on the die is its reading (推 until then).  An entry's fields are
+ * on the die is its reading (INFERRED until then).  An entry's fields are
  * tools/viewdecode.py's, from B alone.
  *
  * THE FILTER, AND THE PAGE
@@ -838,7 +741,7 @@ static unsigned int rtl819x_view_nadmit11(void)
  * 10,000 polls at every slot, and ten tries each -- it spends 1,024 x
  * 10,000 us = 10.24 s in udelay alone and makes 1,024 x 10,161 =
  * 10,404,864 loads.  Nothing on a SWCORE=n image issues a table command
- * (rlxfw issues none), so that case needs the vendor's driver (推); the six
+ * (rlxfw issues none), so that case needs the vendor's driver (INFERRED); the six
  * tbl pages committed so far read polls equal to slots, 72 slot reads with
  * SWTACR never busy (bench/2026-09-28: AV-TV, AR-TV, M2-VV, AV-TN, AR-TN,
  * M2-VN).  The standard /init arms no watchdog.

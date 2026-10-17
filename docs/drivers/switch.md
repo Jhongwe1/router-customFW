@@ -3,7 +3,8 @@
 Source: [`rtl819x-switch.c`](../../kernel/linux-2.6.30/drivers/net/rtl819x-switch.c), version 1.6,
 with the read-only [`rtl819x-view.c`](../../kernel/linux-2.6.30/drivers/net/rtl819x-view.c) ·
 reasoning and every reading: [`notes/switch-driver.md`](../../notes/switch-driver.md) ·
-the file heads until 2026-10-18, verbatim: [`rtl819x-switch.c`](switch-history.md)
+the file heads until 2026-10-18, verbatim: [`rtl819x-switch.c`](switch-history.md),
+[`rtl819x-view.c`](view-history.md)
 
 ## What it does
 
