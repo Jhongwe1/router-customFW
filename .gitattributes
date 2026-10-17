@@ -34,3 +34,16 @@ bench/**        -text
 # actually put on the wire. The `.build` file beside it records the capture's
 # own sha256, and a normalised capture does not match it.
 qemu/**         -text
+
+# GitHub's language bar, 2026-10-17 (P5e-4).
+#
+# tools/ is the instruments that check the firmware, not the firmware: 106
+# Python files and 5.3 MB of the tree, measured that day, against 1.98 MB of
+# C in src/ and kernel/ -- so with tools/ counted, GitHub reads the repository
+# as Python.  It leaves the bar and nothing else: tracked, searched and diffed
+# as before, and whatever indexes tools/ has to say the bar leaves it out.
+# bench/ and qemu/<date>/ are transcripts, records of what a device or an
+# emulator printed: generated, so out of the bar and collapsed in diffs.
+tools/**        linguist-detectable=false
+bench/**        linguist-generated
+qemu/20*/**     linguist-generated
