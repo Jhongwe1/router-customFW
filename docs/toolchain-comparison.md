@@ -85,7 +85,7 @@ toolchain on this disk:
 
 🔴 **The plan specifies this table's rows, and a deliverable that does not map
 onto its own specification cannot be checked against it.**
-`plan/router-rebuild-plan.md:389` is a three-row table headed *what to measure /
+The plan's `D1` (unpublished: [`method.md`](method.md) § *Quoting the plan*) holds a three-row table headed *what to measure /
 how / why this row is on the table*. Here is each row, where it is answered, and
 whether it is finished:
 
@@ -211,14 +211,14 @@ than to a build-flag choice.
 
 ## 3. 🔴 The row the plan calls the only one that can kill the project quietly
 
-`plan/router-rebuild-plan.md:1138-1140` requires `R2c`'s table to have three
+The plan's `R2c` paragraph requires `R2c`'s table to have three
 rows and says of the load-delay one that all three columns **must run on the
-silicon** — `R1f`'s fragment compiled once per toolchain — and § 389 of the same
-file marks that row as the only cell that can kill the project silently.
+silicon** — `R1f`'s fragment compiled once per toolchain — and the table in the
+plan's `D1` marks that row as the only cell that can kill the project silently.
 ⚠️ **The citation used to read `:1141` here and in two other files, and
-量 2026-09-16 that line is blank**; the sentence is at 1138-1140. Corrected in
-place rather than silently, because a citation that points one line past its
-subject is the failure mode `CITE-2` exists for.
+量 2026-09-16 that line was blank**, the sentence then at 1138-1140; 量 2026-10-17 it is at 1191, and
+1138-1140 hold another block. The plan is unversioned, so no tool can resolve a line in it,
+and it is cited by section now: a citation that points past its subject is `CITE-2`'s failure mode.
 
 ~~**§ 2.2 fills it at the desk in all three columns and on the die in one.** Two
 of the three columns have never had anything execute on this device, and that is
@@ -268,7 +268,7 @@ the die's own answer under it.
 
 ### 3.2 🔴 The plan's second refutation condition FIRED, and nothing recorded it
 
-`plan/router-rebuild-plan.md:415-416`, verbatim:
+The plan's `D1`, its second refutation condition, verbatim:
 
 > 🆕 **第二個推翻條件**：三條的矽片結果全部相同 → 這張表沒有鑑別力，
 > **那本身是一個要寫下來的結果**（它會說「這題核心對 codegen 的容忍度比預期高」）。
