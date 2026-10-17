@@ -17,7 +17,7 @@ drops say what Realtek's source does; the binary says what *this* build did.
 Where they disagree — and they do, twice — that is recorded as a disagreement.
 
 **The plan's grep path was wrong and would have returned a false zero.**
-`plan/router-rebuild-plan.md:415`–`433` greps `arch/mips/`. This SoC's port is
+The plan's `D2` table of one-line greps (unpublished: [`method.md`](../docs/method.md) § *Quoting the plan*) greps `arch/mips/`. This SoC's port is
 **`arch/rlx/`**, a sibling tree beside `arch/mips/` in all three drops. Every
 needle below was run against both, so `arch/mips/` is the scanner's own liveness
 control: it is present, it is not what was built, and the same grep finds hits in
