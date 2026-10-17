@@ -1,6 +1,6 @@
 # Bring-up — TOTOLINK N150RT / RTL8196E
 
-**Opened 2026-09-09** (forty-ninth segment), during `R5`. `plan` named this
+**Opened 2026-09-09** (forty-ninth segment), during `R5`. The plan (unpublished: [`method.md`](method.md) § *Quoting the plan*) named this
 file twice then: as the artefact `R5` opens, and as the place `D2`'s
 *comparison of the two binding models* goes. It names it a third time as `P3`,
 the board bring-up report, whose ten sections are §§ 6–15 below. It grows
@@ -91,8 +91,8 @@ owner, not to this file.
 
 ## Contents — the plan's ten sections, and where each one landed
 
-The left column is `plan/router-rebuild-plan.md` § 6, block *`P3` — Board
-Bring-Up 報告*, which lists exactly ten sections. §§ 1–5 and § 13.1 predate
+The left column is the plan's § 6, block *`P3` — Board
+Bring-Up 報告*, which lists exactly ten sections; the plan is unpublished, so this table is the only copy of their names. §§ 1–5 and § 13.1 predate
 `P3` and keep their numbers, because `docs/FINDINGS.md` cites `§ 3a` and a
 `SPEC.md` row owns § 13.1 — so `P3`'s ten start at § 6.
 
@@ -361,7 +361,7 @@ the source; on 2.6.30 it is an errno at run time.
 
 ## 6. Board overview
 
-`plan` § 6 `P3` section 1 — 板級概觀. Every row's owner is a `SPEC.md` id;
+The plan's `P3` section 1 — 板級概觀. Every row's owner is a `SPEC.md` id;
 this table is an index into §§ 1–7 of that file and holds no value of its own.
 **State: these rows are state-independent** — they are parts and markings, not
 register contents.
@@ -404,7 +404,7 @@ button; the rest is package ink, boot text and the datasheet.
 
 ## 7. Power tree — 🔴 what the plan asks for is 實測, and this is not it
 
-`plan` § 6 `P3` section 2 — 電源樹（實測，含 `S0b`）. **The plan asks for a
+The plan's `P3` section 2 — 電源樹（實測，含 `S0b`）. **The plan asks for a
 measured power tree. This section is a desk reconstruction, and the measurement
 it would need has a recorded decision not to take it.** `S0b` is `⊘`;
 `notes/power-and-programmer.md` is the owner of every number below and § 4 of
@@ -492,7 +492,7 @@ measured on this board.
 
 ## 8. Clock tree
 
-`plan` § 6 `P3` section 3 — 時脈樹. 🔴 **Every row carries the state it was
+The plan's `P3` section 3 — 時脈樹. 🔴 **Every row carries the state it was
 measured in. A loader-state rate does not predict the Linux-state rate on this
 part, and § 1.1 is the 76× price this project already paid for blending them.**
 
@@ -586,7 +586,7 @@ two clocks on this die are not known to share a divider.
 
 ## 9. Strapping
 
-`plan` § 6 `P3` section 4 — Strapping, pointing at the draft datasheet's
+The plan's `P3` section 4 — Strapping, pointing at the draft datasheet's
 **§ 6.1, *Configuration upon Power-On Strapping*** (讀 `SOURCES.json`, which
 records that section's title and `§ 6.2 Shared I/O Pin Mapping` beside it).
 🔴 **This section is a set of readings, not a strap table: no source in this
@@ -730,7 +730,7 @@ on `0xB8000000` or `0xB800000C`.
 
 ## 10. Pinmux
 
-`plan` § 6 `P3` section 5 — Pinmux 表, pointing at the draft datasheet's
+The plan's `P3` section 5 — Pinmux 表, pointing at the draft datasheet's
 **§ 6.2 *Shared I/O Pin Mapping*** beside § 6.1 (讀 `SOURCES.json`). 🔴 **This
 is a reading of the two mux words, not a pin table**: no source in this project
 decodes which bit selects which pin.
@@ -833,7 +833,7 @@ registers, not mux words; § 15.3 has the `PCRP0`–`PCRP4` loader-state row and
 
 ## 11. Memory map
 
-`plan` § 6 `P3` section 6 — 記憶體映射. **Three kinds of address appear below
+The plan's `P3` section 6 — 記憶體映射. **Three kinds of address appear below
 and they are never mixed in one column**: a **KSEG** virtual address (what code
 dereferences), a **physical** address, and a **flash offset** (what a
 programmer or the loader's `FLR` addresses). `SPEC.md` § 8 owns the first two
@@ -872,10 +872,10 @@ loader jumps to the KSEG1 alias of its own next instruction, so every loader-sta
 reading in this document was taken with the caches out of the picture, while
 every Linux-state reading was not. `notes/cache-model.md` owns the consequence.
 
-⚠️ **Four rows in that table have an ownership problem, and it is visible rather
+⚠️ **Three rows in that table have an ownership problem, and it is visible rather
 than fixed.** `MAP-01` **has no owner file at all** — `spec-check`'s C5 is how
-that was found. `MAP-03`'s owner is in `plan/`, which is gitignored, so it cannot
-be checked in a clone. `MAP-07` and `MAP-08` point at `SPEC.md` § 10 rather than
+that was found. `MAP-03`'s owner was the plan's table of ground facts, which is gitignored, so it could not
+be checked in a clone, until 2026-10-17 moved it to the readings that table summarised. `MAP-07` and `MAP-08` point at `SPEC.md` § 10 rather than
 at a file. And **`MAP-04` and `MAP-10` have the draft datasheet as their only
 source** — `MAP-10` is marked 文 accordingly, while `MAP-04` is marked 讀 though
 `SPEC.md` § 0 files that source under 文. Per § 0 ②, both are statements about a
@@ -999,7 +999,7 @@ from the vendor figure. Quoting one for the other is a 932 kB error.
 
 ## 12. Boot flow
 
-`plan` § 6 `P3` section 7 — 開機流程. **Every number is labelled with the stage
+The plan's `P3` section 7 — 開機流程. **Every number is labelled with the stage
 it belongs to and the reset class it was taken in** (cold = after a power press,
 warm = a reset with no power cycle). `docs/boot-time-table.md` §§ 2–5 own the
 per-class tables and `tools/boot-timeline.py` is the instrument; this section
@@ -1211,7 +1211,7 @@ authorisation table, so a refusal rests on the host's matrix
 
 ## 13. Peripheral census
 
-`plan` § 6 `P3` section 8 — 周邊盤點. **State: every row says which state it
+The plan's `P3` section 8 — 周邊盤點. **State: every row says which state it
 was read in.** § 13.1 below is the 2026-10-04 reading, kept where it was
 written because `SPEC.md` `FW-193` names it as its owner.
 
@@ -1367,7 +1367,7 @@ register contents, and it is measured in both states.
 
 ## 14. Errata and traps
 
-`plan` § 6 `P3` section 9 — Errata / 陷阱, and the plan calls it this report's
+The plan's `P3` section 9 — Errata / 陷阱, and the plan calls it this report's
 soul: a bring-up report holding only specification was copied, one holding where
 the part bites, how it was hit and how it was worked around was done. **So every
 row below carries how it was hit and how it was worked around — *not worked
@@ -1390,7 +1390,7 @@ by `git grep` outside `upstream/`: `F46` appears **nowhere in `SPEC.md`** or
 `qemu/README.md` name it for the substance, *qemu interlocks the load delay slot
 and this core does not*, without the `SPEC.md` id. The pairing is settled by git
 history — in the commit that created the table, `CPU-14`'s owner cell named
-`F46` in `plan/` — and `F`-ids live in `plan/`, which is gitignored, so **a
+`F46` in the planning directory — and `F`-ids live only there, in the plan's unpublished table of ground facts, so **a
 reader with only a clone cannot check the pairing.** That is why this section
 leads with the `SPEC.md` id.
 
@@ -1601,7 +1601,7 @@ what it does not establish is that entry's and `NET-173`'s.
 
 ## 15. Known-good register values — meaning *values this device returned*, per state
 
-`plan` § 6 `P3` section 10 — 已知良好的暫存器值. 🔴 **The title the plan gives
+The plan's `P3` section 10 — 已知良好的暫存器值. 🔴 **The title the plan gives
 this section cannot be delivered as written, because nothing in this project
 defines *good*.** What exists is a set of readings taken off this die, each in a
 known machine state. This section is those readings. It is **not** a
