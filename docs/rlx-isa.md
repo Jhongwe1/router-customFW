@@ -737,7 +737,7 @@ over each release's whole prebuilt `libc.a` at `TC-57` — **0 violations agains
 
 🔴 **But the refutation clause came nearer than a clean confirmation reads, and
 what kept it from firing is a date rather than an argument.** The silicon row —
-the one `plan/router-rebuild-plan.md:1138-1140` calls the only cell that can kill
+the one the plan's `D1` table (unpublished: [`method.md`](method.md) § *Quoting the plan*) calls the only cell that can kill
 the project silently — came back on 2026-09-14 with **no discriminating power at
 all**: at matched `-march` the three columns are identical, and the plan's own
 second refutation condition fired there and went unrecorded for two days
