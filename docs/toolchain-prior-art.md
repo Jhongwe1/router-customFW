@@ -124,7 +124,7 @@ gcc Lexra patch is public, a mirror of the rsdk-1.3.6 family is on GitHub, and
 Lexra's own history page states the unaligned-load story the whole `F34` thread
 rests on.
 
-A census that left that out would be the résumé failure this project keeps
+A census that left that out would be the overclaim, prior work counted as new, that this project keeps
 naming — so ⓟ is a column, it is counted, and **`p=y` means a public source
 *states this row's finding***, not that the material is public and not that
 someone could derive it. `tccensus check` `L11` refuses a `p=y` with no `pub=`

@@ -245,7 +245,7 @@ route-② row is always the third verdict cell.
 
 These are not population rows — none of them is an instruction whose existence
 is in question — and they are here because a census that re-measured them and
-presented the total as new work would be exactly the résumé failure this
+presented the total as new work would be exactly the overclaim, prior work counted as new, that this
 project keeps naming. All 量, all on this die.
 
 | | what it settled | where | seating |

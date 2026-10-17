@@ -66,7 +66,7 @@ below, because the axis is different -- see the routes.
          axes.  `R1-pub`'s claim is *this is not in public data*; on the die
          that holds, and on the TOOLCHAIN it largely does not -- the Lexra
          binutils patch is a public gist and the rsdk releases are on GitHub.
-         A census that leaves that out is the résumé failure this project
+         A census that leaves that out is the overclaim -- prior work counted as new -- that this project
          keeps naming, so it is a column and it is counted.
 
   `subj` -- whether the row is a statement about a TOOLCHAIN or about the DIE.
