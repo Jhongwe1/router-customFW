@@ -664,7 +664,7 @@ After the fix, one command ran `S2` → `S3` → `S8`:
 ```
 S2  build     rc=0   35.96 s
     recipe=b1434383  <- S8 will require the board to print this
-    staged tree=/home/key/fwre-work/rebuild/r3-4/cells/r44a/top  <- S3 assembles from this
+    staged tree=$FWRE_WORK/rebuild/r3-4/cells/r44a/top  <- S3 assembles from this
 S3  assemble  rc=0    3.19 s
 ...
 ok   A3 the id the build computed   board printed b1434383, build computed b1434383
@@ -788,7 +788,7 @@ built **at the same recipe id `229d2983`** with different `.config-installed`
 
 ```
 S2  build     rc=0   36.32 s      recipe=229d2983
-      staged tree=/home/key/fwre-work/rebuild/r3-4/cells/s31seam/top  <- S3 assembles from this
+      staged tree=$FWRE_WORK/rebuild/r3-4/cells/s31seam/top  <- S3 assembles from this
 S3  assemble  rc=0    2.93 s
 S4..S7        SKIPPED (mode=desk)
 ok A1 the eleven boot marks     ok A2 in declaration order

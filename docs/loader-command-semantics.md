@@ -1416,7 +1416,7 @@ is importing a measurement out of the conditions it was taken in.
 ## §11 — the command table's `argc` field is DEAD, and eight commands crash on a bare name — 2026-09-19
 
 **Everything in this section is 讀 unless marked 量**, and re-derived rather
-than quoted: `/home/key/fwre-work/stage2.bin`, **56,592 bytes**, `sha256
+than quoted: `$FWRE_WORK/stage2.bin`, **56,592 bytes**, `sha256
 f88869d108cdafdfcff5d9461b0ead5c061a6725effb0314bb954572c9c1b4ee` — the value
 §0 records — disassembled with
 `mips-linux-gnu-objdump -D -b binary -m mips:3000 -EB --adjust-vma=0x80400000`.
