@@ -27,6 +27,7 @@ true now is in the pages it links.
 ## Reference and record
 
 - [`spec/README.md`](spec/README.md) — how to read [`SPEC.md`](../SPEC.md), every number held about the device
+- [`decisions/README.md`](decisions/README.md) — the decisions that shaped rlxfw, one page each: why, what it cost, and the evidence
 - [`../notes/README.md`](../notes/README.md) — the engineering notes, one per subsystem
 - The loader: [`loader-command-semantics.md`](loader-command-semantics.md), [`loader-flash-write.md`](loader-flash-write.md), [`loader-phy-and-switch.md`](loader-phy-and-switch.md)
 - rlxfw's drivers against the vendor's: [`driver-diff.md`](driver-diff.md), [`nic-vendor-diff.md`](nic-vendor-diff.md), [`blind-write-ledger.md`](blind-write-ledger.md), [`vendor-modifications.md`](vendor-modifications.md)
