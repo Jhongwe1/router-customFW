@@ -1,6 +1,6 @@
 # `P2`'s table — boot time, network up and throughput, the vendor firmware beside rlxfw
 
-`P2`'s deliverable (`plan/router-rebuild-plan.md`, `P2`): the boot cut into segments from the
+`P2`'s deliverable (the plan's `P2` block, unpublished; the gate as opened is [`history/steps-P2.md`](history/steps-P2.md)): the boot cut into segments from the
 loader's first byte to a usable device, both firmwares, one script; every number with its method
 and its repetition count; the feature table beside it; throughput, sizes and memory. This file owns
 the table and its method. The findings behind the numbers are owned elsewhere — seating A's readings
