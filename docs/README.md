@@ -6,6 +6,8 @@ true now is in the pages it links.
 ## Start here
 
 - [`../README.md`](../README.md) — what rlxfw is
+- [`charter.md`](charter.md) — what rlxfw set out to do, its boundaries, and the rules every release follows
+- [`method.md`](method.md) — how a claim about the device is made and checked here
 - [`FINDINGS.md`](FINDINGS.md) — what was found, on one page
 - [`KNOWN-ISSUES.md`](KNOWN-ISSUES.md) — what does not work, and what each release does not establish
 - [`reports/README.md`](reports/README.md) — one row per gate result: its claim, and what it does not establish
@@ -30,6 +32,7 @@ true now is in the pages it links.
 - [`decisions/README.md`](decisions/README.md) — the decisions that shaped rlxfw, one page each: why, what it cost, and the evidence
 - rlxfw's drivers, one page each — what it does, its registers and their sources, what holds on the silicon, its limits: [timer](drivers/timer.md), [gpio](drivers/gpio.md), [keys](drivers/keys.md), [wdt](drivers/wdt.md), [spi](drivers/spi.md), [nic](drivers/nic.md), [switch](drivers/switch.md), [entropy](drivers/entropy.md)
 - [`../notes/README.md`](../notes/README.md) — the engineering notes, one per subsystem
+- [`flash.md`](flash.md) — the flash: which regions may be written, under whose yes, and why the kernel region is recoverable
 - The loader: [`loader-command-semantics.md`](loader-command-semantics.md), [`loader-flash-write.md`](loader-flash-write.md), [`loader-phy-and-switch.md`](loader-phy-and-switch.md)
 - rlxfw's drivers against the vendor's: [`driver-diff.md`](driver-diff.md), [`nic-vendor-diff.md`](nic-vendor-diff.md), [`blind-write-ledger.md`](blind-write-ledger.md), [`vendor-modifications.md`](vendor-modifications.md)
 - [`interrupt-map.md`](interrupt-map.md) — the interrupt map, and the layers a timer interrupt crosses
