@@ -4265,8 +4265,8 @@ never been in doubt; what keeps failing is the sentence about how it is known.
 ## 21. `R3-11`: the artefact, the write-up, and `R3`'s closing conditions read one by one
 
 **2026-08-31, twentieth session, desk, no power.** `R3-11` is the twelfth and
-last step of `R3`. It produces two things: the v0.2 artefact `plan/ARTIFACTS.md`
-§2 asks for, and this section — the comparison of what `R3` said it would
+last step of `R3`. It produces two things: the v0.2 artefact the plan's artefact list
+(§ 2, unpublished) asks for, and this section — the comparison of what `R3` said it would
 establish against what it did.
 
 ### 21.1 The artefact is a REEL, and the number that was wrong was wrong by being short
@@ -4294,7 +4294,7 @@ time lived in a comment inside it and in a sentence in `PROGRESS.md`.
 | 7 | `bench/2026-08-31c/K-J` — **the control** | 33.188 | 2.0 |
 | | | **44.749** | **15.000** |
 
-**TOTAL 59.749 s**, against `plan/ARTIFACTS.md` §2's **60 s**. `R16` is the
+**TOTAL 59.749 s**, against the **60 s** the plan's artefact list asks for. `R16` is the
 case that fires if an edit crosses it — 🔴 **and that is the direction nothing
 was watching**, because the row that had been wrong all week was wrong by being
 *short* (24 s against a spec of 60), and the repair proposed for a short reel
