@@ -1,0 +1,68 @@
+# build -- rlxfw's code, compiled and tested on a stock runner.
+#
+# WHY A WORKFLOW OF ITS OWN.  ci.yml (`instruments`) checks committed text and
+# runs the instruments; a red there says nothing about whether rlxfw compiles,
+# and a badge is per workflow.  So the code is here alone, and this file's badge
+# reports the code and nothing else.
+#
+# WHAT RUNS: `make test` at the top of the tree, exactly what a clone runs --
+# the six programs' host suites through src/Makefile's `test` (gcc-13 and
+# clang-18, plain and under ASan/UBSan, with each program's mutation controls)
+# and rlxboot's hosttest (its crypto, container and slot suites under gcc-13,
+# clang-18 and the sanitizers).  Each suite's output lands in
+# $RUNNER_TEMP/test/census/<suite>.out, and tools/ci-census.py checks it against
+# tools/ci-expected-build.tsv -- a table of its own, because ci.yml's census
+# reads the whole of tools/ci-expected.tsv and would read a suite it never ran
+# as missing.
+#
+# WHAT DOES NOT RUN HERE, and why:
+#   * the target build -- the six programs as big-endian MIPS ELFs, rlxboot's
+#     payload, the kernel image.  Each needs the pinned rsdk toolchain, a vendor
+#     binary no runner holds, and an image rebuilt here could not equal the
+#     release's by construction: the kernel banner carries user@host (P4A-1).
+#   * rlxboot's qemutest, whose compiler is that same rsdk gcc.
+#   * fuzzing.  The harnesses are built for afl++ by each program's `fuzz`
+#     target; a fuzzing run is a desk measurement with a pre-registration.
+#
+# The apt line declares what the suites use rather than assuming the runner
+# image carries it: gcc-13 and clang-18 are the two host compilers, clang's
+# sanitizer runtimes are in libclang-rt-18-dev (a Recommends of clang-18, not a
+# Depends), and python3 runs rlxboot's mkprodkey.py self-test.
+
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+
+      - name: apt
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-13 clang-18 libclang-rt-18-dev python3
+
+      - name: make test
+        id: test
+        run: make test O="$RUNNER_TEMP/test"
+
+      # Runs when the suites failed too: a red census beside a red suite says
+      # whether cases went missing as well as failing.
+      - name: census
+        if: "${{ !cancelled() }}"
+        run: /usr/bin/python3 tools/ci-census.py tools/ci-expected-build.tsv "$RUNNER_TEMP/test/census"
+
+      - uses: actions/upload-artifact@v4
+        if: "${{ !cancelled() }}"
+        with:
+          name: build-host-census
+          path: ${{ runner.temp }}/test/census/

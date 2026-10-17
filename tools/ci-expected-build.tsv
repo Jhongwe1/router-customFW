@@ -1,0 +1,25 @@
+# tools/ci-expected-build.tsv -- the allow-list tools/ci-census.py checks
+# .github/workflows/build.yml's one job, build-host, against.
+#
+# The format is tools/ci-expected.tsv's: one row per allowed skip, tab
+# separated -- suite, bench_total, allowed_skip_label, covers, reason.  That
+# table owns ci.yml's suites and this one owns build.yml's.  They are two files
+# because each workflow's census reads its table whole, with the not-run total
+# checked: ci.yml's census reading one table that held both would report every
+# suite here as producing no output, and `--only` turns the total's check off.
+# A suite cannot sit in both tables unnoticed -- in the table of a workflow
+# that does not run it, it reads RED, "no <suite>.out".
+#
+# The captures are what the top-level `make test` writes to $(O)/census/.
+#
+# not-run-total: 0
+#   0 on 2026-10-17 (P5e-4), and the zero is said out loud: both suites run in
+#   full on a stock runner and neither declares a skip.  What build-host does
+#   not run is outside this table, not inside a skip: the target build, the
+#   kernel image and rlxboot's qemutest each need the pinned rsdk gcc 3.4.6, a
+#   vendor binary no runner holds, and the fuzz harnesses are built for afl++.
+#   build.yml's header says so.
+#
+# suite	bench_total	allowed_skip_label	covers	reason
+host-userspace	62	-	0	arrives 2026-10-17 (P5e-4): `make -C src test`, run by the top-level `make test` -- init 4 (2 programs under gcc-13 and clang-18), cfgstore 20 (5 under gcc-13 and clang-18, plain and sanitized), brokerd 24 (8 under both compilers, then 8 sanitized), httpd 6, dnsfwd 4 (1 under both compilers, then its 2 mutation controls), ifupd 4 (2 under both compilers); one `ok` line per run, printed by each program's Makefile, which refuses below its measured floor.  量 2026-10-17, ext4 clone and main checkout: 62 ok, 0 FAIL, 0 skip, 0 unparsable by ci-census's own parser; the 417 lines its test programs print at column 0 (`ok 1 - ...`) are not cases here
+host-rlxboot	21	-	0	arrives 2026-10-17 (P5e-4): `make -C src/rlxboot hosttest`, run by the top-level `make test` -- 9 suite runs (t_crypto, t_container and t_slots under cc1, cc2 and san) printed by the Makefile's floor, 2 from run-host-tests.sh (the coreutils cross-check of 201 lengths and its negative control), 10 from mkprodkey.py --self-test (K1-K10).  量 2026-10-17: 21 ok, 0 FAIL, 0 skip, 0 unparsable
