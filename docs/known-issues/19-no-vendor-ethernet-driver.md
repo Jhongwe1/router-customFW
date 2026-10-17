@@ -12,8 +12,8 @@ the owner's ruling of 2026-09-26 that the `y` config build from every later tree
 
 **What depends on it**: `R9`'s differential test. The plan's `D16` builds the vendor's
 `drivers/net/rtl819x/` into rlxfw's kernel as a controlled variable, so that the network
-driver is the same vendor code in both columns of `R9`'s table (`plan/README.md`,
-gitignored: its v3 → v4 table, change 3; `RUNSHEET.md`'s `K6` calls it *D16's controlled
+driver is the same vendor code in both columns of `R9`'s table (the plan's index, unpublished:
+its v3 → v4 table, change 3; [`history/runsheet-2026-09-27.md`](../history/runsheet-2026-09-27.md)'s `K6` calls it *D16's controlled
 variable*). The mainline default no longer has that property: an image built with
 `--variant quiet` — `tools/looprun.py`'s default — carries rlxfw's NIC driver and not the
 vendor's, and an `R9` column built from it would add the NIC driver to what differs between
