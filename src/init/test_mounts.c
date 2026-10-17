@@ -132,7 +132,7 @@ static void t_policy(void)
 		 * filesystem turns out to be. */
 		CK((rows[i].flags & (unsigned long)MS_NOSUID) != 0);
 		CK((rows[i].flags & (unsigned long)MS_NODEV) != 0);
-		/* 🔴 No `size=`: ramfs's option table is `mode=%o` and its
+		/* NOTE: No `size=`: ramfs's option table is `mode=%o` and its
 		 * switch has no default, so `size=` is SILENTLY IGNORED and
 		 * would read as a limit that does not exist. */
 		if (rows[i].opts != NULL)

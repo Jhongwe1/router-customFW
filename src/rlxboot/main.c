@@ -51,8 +51,8 @@
  * DRAM (`CPU-35`), corrupting both victims 7 KiB apart.  `rlx_isc_inv` is
  * therefore not linked into this payload at all (RLX_ISC=0).
  *
- * ⚠️ AND WHAT IS STILL 推.  That `CCTL 0x002` is sufficient for this case is
- * 量 for probe1's victims -- a two-word patch inside the payload's own image --
+ * CAUTION: AND WHAT IS STILL INFERRED.  That `CCTL 0x002` is sufficient for this case is
+ * MEASURED for probe1's victims -- a two-word patch inside the payload's own image --
  * and this is a copy of up to 3 MiB to an address 19 MiB away.  Nothing has
  * measured the D-side writeback of 0x200 on this die at all: `notes/cache-model.md`
  * marks 0x100 `DWB` as a value whose effect no source records and which cell
@@ -129,7 +129,7 @@
  *
  * BOOT=ram ONLY.  The slots build always halts (D4: "HALT (spin), no reset
  * loop"): a reset there would come straight back through the stock loader's
- * scan to this same rlxboot and the same two slots, forever.  讀
+ * scan to this same rlxboot and the same two slots, forever.  READ
  * `docs/loader-command-semantics.md`: the loader's only two `WDTCNR` writes
  * are its own deliberate reboots, so nothing arms the watchdog under a spin
  * that this payload did not arm itself. */

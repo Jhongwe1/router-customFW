@@ -296,7 +296,7 @@ static void map_broker(struct http_rsp *rs, const struct bk_resp *br)
 		route_err(rs, 501, "notsup");
 		return;
 	case BK_NOENTROPY:
-		/* 量 2026-09-30 on this board: entropy_avail read 0 at 768 s and
+		/* MEASURED 2026-09-30 on this board: entropy_avail read 0 at 768 s and
 		 * at 1613 s of uptime, so this is the answer a password change
 		 * gets TODAY.  It is a 503 and it says why: the alternative is a
 		 * salt that is not random, and a weak salt that nobody is told

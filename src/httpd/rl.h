@@ -84,7 +84,7 @@ void rl_table_refund(struct rl_table *t, uint32_t ip);
 
 /* Logins, and these are the budget's numbers: 3 immediate, then one every 4 s
  * globally.  With one evaluation in flight at a time and a per-evaluation figure
- * of ~0.6 s (推, notes/httpd.md), the sustained share of brokerd an attacker can
+ * of ~0.6 s (INFERRED, notes/httpd.md), the sustained share of brokerd an attacker can
  * occupy with KDF work is 0.25 x 0.6 = 15 %. */
 #define RL_KDF_BURST         3
 #define RL_KDF_RATE_MILLI  250     /* one token per 4 s */

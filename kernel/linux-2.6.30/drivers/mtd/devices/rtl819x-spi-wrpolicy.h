@@ -19,7 +19,7 @@
  * The alternative -- a second copy of the bounds test in the harness -- is the
  * shape where a guard and its test agree with each other and both are wrong.
  *
- * ⚠️ WHAT THIS FILE DELIBERATELY DOES NOT HOLD: a register, an opcode, a
+ * CAUTION: WHAT THIS FILE DELIBERATELY DOES NOT HOLD: a register, an opcode, a
  * delay, a lock, or anything that touches the controller.  Those live in
  * rtl819x-spi.c beside the save/restore/read-back guard that already owns the
  * controller, because two owners of that guard would be worse than one
@@ -50,12 +50,12 @@
  * The geometry.
  * ------------------------------------------------------------------------ */
 
-/* FLS-14, 量: the part is 4,194,304 bytes and two committed dumps of it are
+/* FLS-14, MEASURED: the part is 4,194,304 bytes and two committed dumps of it are
  * byte-identical over all of it. */
 #define RLXFW_SPI_WR_CHIP	0x00400000u
 
 /*
- * 🔴 THE ERASE GRANULARITY, AND IT IS 未定.  THIS IS THE ONE LINE.
+ * NOTE: THE ERASE GRANULARITY, AND IT IS 未定.  THIS IS THE ONE LINE.
  *
  * SPEC.md `FW-187` 殘留 and `FW-191` 殘留: whether this part's erase opcode
  * clears 4,096 or 65,536 bytes is NOT settled, and the difference is a
@@ -65,12 +65,12 @@
  *
  * The two readings on hand, neither of them a measurement of this part:
  *
- *   讀  /proc/mtd reports `erasesize 00001000` on all three partitions
- *       (量 2026-10-04, bench/2026-10-04/PRE-MTD, `FW-187`) -- but that is
+ *   READ  /proc/mtd reports `erasesize 00001000` on all three partitions
+ *       (MEASURED 2026-10-04, bench/2026-10-04/PRE-MTD, `FW-187`) -- but that is
  *       rtl819x-spi.c's own RTL819X_SPI_ERASESIZE and the vendor map's
  *       partition constants, i.e. software, not something the chip said.
- *   讀  the vendor's UNKNOWN fallback.  `FW-191` measured the part as
- *       1C7016, and 量 2026-10-04 at the desk: 0x1C7016 appears NOWHERE in
+ *   READ  the vendor's UNKNOWN fallback.  `FW-191` measured the part as
+ *       1C7016, and MEASURED 2026-10-04 at the desk: 0x1C7016 appears NOWHERE in
  *       the GPL drop that builds -- the Eon entries are 1c3115, 1c3116,
  *       1c3015, 1c3016 -- so spi_regist() takes its UNKNOWN branch
  *       (spi_common.c:574) and calls set_flash_info(..., SIZE_064K,
@@ -80,7 +80,7 @@
  *       block_size it never uses.  That is the fallback's constant applied
  *       because the part was not recognised; it is not a reading of the part.
  *
- * The decisive 量 is an actual erase, which is a flash write, which belongs
+ * The decisive MEASURED is an actual erase, which is a flash write, which belongs
  * to R8b under the owner's dated yes for that exact payload.  Until then this
  * value is a PLACEHOLDER, and the guard against it being the wrong one is
  * rlxfw_spi_wr_chk_erase()'s mtd_erasesize conjunct below: a tree where this
@@ -95,7 +95,7 @@
 #define RLXFW_SPI_WR_ERASE_GRAIN	0x00001000u	/* 未定 FW-187/FW-191 */
 
 /*
- * The page-program length bound.  讀, from the vendor's own write path in the
+ * The page-program length bound.  READ, from the vendor's own write path in the
  * tree that builds: ComSrlCmd_ComWriteSector (spi_common.c:1003-1007) issues
  * pfPageWrite exactly page_cnt times with page_size bytes each, advancing the
  * address by page_size, and set_flash_info (:605-606) sets page_size from the
@@ -103,7 +103,7 @@
  * that table and the UNKNOWN fallback pass SIZE_256B.  So the vendor NEVER
  * issues a PP longer than 256 bytes, on any part it knows and on this one.
  *
- * ⚠️ 推, and the direction is the safe one: that a PP crossing a page
+ * CAUTION: INFERRED, and the direction is the safe one: that a PP crossing a page
  * boundary WRAPS to the start of the page rather than continuing is JEDEC's
  * definition of the opcode and this part's datasheet is not on hand (`FW-191`:
  * the draft datasheet here is the SoC's, not the flash's).  So the bound is
@@ -121,11 +121,11 @@
  * at 0x006000-0x007FFF (this unit's MAC and radio calibration, which no reset
  * restores).  They are adjacent, so one window is the whole rule.
  *
- * 🔴 THIS IS THE ONE THING THIS DRIVER HAS THAT THE VENDOR'S DOES NOT, and
- * the vendor's absence of it is 讀 rather than asserted: spi_cmd.c's
+ * NOTE: THIS IS THE ONE THING THIS DRIVER HAS THAT THE VENDOR'S DOES NOT, and
+ * the vendor's absence of it is READ rather than asserted: spi_cmd.c's
  * mtd_spi_erase() has its `skip 1st block erase` guard inside `#if 0`
  * (:46-53), so instr->addr = 0 is accepted and sector 0 is erased; and
- * docs/loader-flash-write.md 1 已 量 that the loader's burn() has no lower
+ * docs/loader-flash-write.md 1 已 MEASURED that the loader's burn() has no lower
  * bound either.
  */
 #define RLXFW_SPI_WR_NEVER_LO	0x00000000u
@@ -237,9 +237,9 @@ static inline int rlxfw_spi_wr_chk_prog(const struct rlxfw_spi_wr_arm *a,
  * An erase of `len` bytes at `addr`, at granularity `grain`, on a device
  * reporting `mtd_erasesize`.
  *
- * 🔴 IT REFUSES A NON-MULTIPLE LENGTH RATHER THAN WIDENING TO THE CONTAINING
+ * NOTE: IT REFUSES A NON-MULTIPLE LENGTH RATHER THAN WIDENING TO THE CONTAINING
  * BLOCK, and that is the deliberate difference from the code on this board.
- * 讀 spi_cmd.c mtd_spi_erase() in the tree that builds: its len-alignment
+ * READ spi_cmd.c mtd_spi_erase() in the tree that builds: its len-alignment
  * check is commented out (:57-60), and then :71-78 round len UP --
  * `len = len - (len & (mtd->erasesize-1)) + mtd->erasesize;` followed by
  * `if (len < mtd->erasesize) len = mtd->erasesize;`.  So asking the vendor's

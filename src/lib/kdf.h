@@ -38,7 +38,7 @@
  * pattern is password-dependent by design (that is what makes it memory-hard)
  * and this implementation makes no attempt to hide it from a local attacker.
  *
- * The time one evaluation takes on the device's own CPU is 推 until measured
+ * The time one evaluation takes on the device's own CPU is INFERRED until measured
  * on the silicon; figures taken under qemu are the emulator's timing and
  * bound nothing.
  */
@@ -93,7 +93,7 @@ size_t kdf_scrypt_peak(uint8_t log2n, uint16_t r, uint16_t p);
 /* ---------------------------------------------------------------------------
  * Names carried over from the -ENOSYS stub this file replaces.
  *
- * 讀 2026-09-30, the tree this lands in: another agent's src/lib/kdf.h already
+ * READ 2026-09-30, the tree this lands in: another agent's src/lib/kdf.h already
  * declares `kdf_scrypt` behind a `KDF_IMPLEMENTED` feature macro and defines the
  * blob's offsets, and src/cfgstore/main.c reads `if (!KDF_IMPLEMENTED)`.  This
  * file is the real implementation, so the stub is deleted when this patch is

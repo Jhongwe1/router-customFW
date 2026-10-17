@@ -9,13 +9,13 @@
  * call sites is a hard build failure -- which is the correct outcome and not
  * one to work around by dropping the prototype.
  *
- * 🔴 WHY THESE ARE MACROS AND NOT FUNCTIONS, WHICH IS NOT A STYLE CHOICE.
+ * NOTE: WHY THESE ARE MACROS AND NOT FUNCTIONS, WHICH IS NOT A STYLE CHOICE.
  * The first version took the tag as an argument:
  *
  *     void rlxfw_mark(const char *tag) { puts("RLXFW-"); puts(tag); ... }
  *
  * It compiled, it linked, `rlxfw-marks.py check` was green on the staged tree,
- * and it would have printed the right bytes on the wire.  量:
+ * and it would have printed the right bytes on the wire.  MEASURED:
  * `rlxfw-marks.py verify` read the built vmlinux and found the string
  * `RLXFW-B0` **zero** times -- because "RLXFW-" and "B0" are two separate
  * literals and the bytes are never contiguous in the image.

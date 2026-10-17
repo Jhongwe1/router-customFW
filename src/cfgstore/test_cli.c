@@ -290,7 +290,7 @@ int main(int argc, char **argv)
 		CHECK(rc == 0, "and then get works again, got %d", rc);
 	}
 
-	/* 🔴 `R7-8` REWROTE THIS GROUP.  It asserted that `passwd` refuses with
+	/* NOTE: `R7-8` REWROTE THIS GROUP.  It asserted that `passwd` refuses with
 	 * EX_IO and the words REFUSED/ENOSYS, which was right while src/lib/kdf.h
 	 * was a declaration returning -ENOSYS.  The real scrypt landed in the same
 	 * segment, KDF_IMPLEMENTED is 1, and cmd_passwd now derives and stores a

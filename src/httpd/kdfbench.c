@@ -20,7 +20,7 @@
  * time and no scaling of it is: qemu-user translates each guest instruction on a
  * host running at several GHz, while the device is a 400 MHz MIPS-I with no cache
  * hierarchy worth the name.  The two errors are in opposite directions and
- * neither is known, so the device figure stays 推 until the board prints it.
+ * neither is known, so the device figure stays INFERRED until the board prints it.
  * The peak RSS is more portable than the time -- the allocation is the same number
  * of bytes on both -- but even that is the allocation, not the resident set the
  * 2.6.30 kernel will actually show.

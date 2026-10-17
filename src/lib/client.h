@@ -37,7 +37,7 @@ void bk_set_timeouts(int connect_s, int io_s);
  *
  * httpd and dnsfwd were built in parallel with this file and each carried a
  * local stand-in that named SPEC-R7 § 6's ops and statuses `BK_*`; proto.h
- * names them `OP_*` and `ST_*`.  量 `R7-8`: the two sets agreed on every
+ * names them `OP_*` and `ST_*`.  MEASURED `R7-8`: the two sets agreed on every
  * value.  These are aliases, not a second transcription -- each expands to
  * proto.h's enumerator, so there is still exactly one place a number is
  * written, and a change to proto.h reaches these without an edit.

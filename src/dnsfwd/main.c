@@ -4,7 +4,7 @@
  * WHY IT EXISTS
  * ---------------------------------------------------------------------------
  *
- * 讀 SPEC.md FW-20: the vendor rootfs ships `bin/dnsmasq`, and it imports
+ * READ SPEC.md FW-20: the vendor rootfs ships `bin/dnsmasq`, and it imports
  * `popen`.  R7's pass condition is that the shipped rootfs imports `system`
  * and `popen` zero times, so keeping dnsmasq would fail the gate on its own.
  * The plan's ruling is to write the forwarder instead: UDP only, forward only,

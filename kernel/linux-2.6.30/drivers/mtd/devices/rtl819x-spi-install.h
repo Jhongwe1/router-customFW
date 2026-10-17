@@ -553,11 +553,11 @@ static inline int rlxfw_spi_inst_chk_rlxu(const u8 *img, u32 len, u32 base)
  * bytes (tools/rtkimage.py sum16, C-4).  An odd `len` is refused, as mkcr6c
  * refuses an odd binary.
  *
- * The signature is `cs6c`, never `cr6c`.  讀 this unit's stage2.bin: the
+ * The signature is `cs6c`, never `cr6c`.  READ this unit's stage2.bin: the
  * image locator (0x80408084) searches for a rootfs only when check_image()
  * returned 2 (`cr6c`) -- eleven candidates, 0x0E0000-0x180000, every one
  * inside slot A -- and returns 0 when none holds one; `cs6c` returns 1, skips
- * that search, and doBooting() (0x80408690) boots on any non-zero flag.  量
+ * that search, and doBooting() (0x80408690) boots on any non-zero flag.  MEASURED
  * 2026-10-07 (bench/2026-10-07 T1a, T2a): a `cr6c` rlxboot booted while the
  * vendor's squashfs sat at 0x180000 and stopped silently at <RealTek> once
  * slot A held a container.  So a `cr6c` here is refused: it installs an
@@ -743,7 +743,7 @@ static inline void rlxfw_spi_inst_cmp(const u8 *got, u32 off, u32 n,
  *     intact   intact   intact         0     the opcode cleared nothing
  *     anything else                   -1     no candidate fits: ANOMALY
  *
- * ⚠️ THREE SAMPLE POINTS BOUND THE SIZE; THEY DO NOT MEASURE IT.  The verdict
+ * CAUTION: THREE SAMPLE POINTS BOUND THE SIZE; THEY DO NOT MEASURE IT.  The verdict
  * separates FW-187's two candidates (4,096 and 65,536) and the common third
  * (32,768); it would read an 8 KiB or 16 KiB part as 32768 and a 2 KiB part as
  * 4096, and it cannot see past the block, so "65536" means at least 33,024.

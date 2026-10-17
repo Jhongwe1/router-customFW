@@ -30,7 +30,7 @@
  *
  * WHAT THIS FILE DOES NOT ESTABLISH.  It has never run on the device.  Every
  * number in the comments is either a limit this code enforces or a figure marked
- * 推 in notes/httpd.md.
+ * INFERRED in notes/httpd.md.
  */
 
 /* _GNU_SOURCE before the first include: uClibc 0.9.30 hides setgroups() behind
@@ -382,7 +382,7 @@ static struct kid kids[HTTP_CONN_MAX];
 /* ------------------------------------------------- the one KDF grant, and why
  * it is not a local of srv_loop() any more.
  *
- * 量 on the device on 2026-09-30 (image r78a): POST /api/login answered
+ * MEASURED on the device on 2026-09-30 (image r78a): POST /api/login answered
  * `429 {"ok":false,"error":"ratelimit","retry_s":2}` in 0.030 s and never
  * stopped -- 20 s of idle later, and a further 90 s later -- while
  * GET /api/status kept answering 200 from the same httpd.  The buckets in rl.c

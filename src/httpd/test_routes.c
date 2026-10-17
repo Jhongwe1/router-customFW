@@ -407,7 +407,7 @@ int main(void)
 	}
 
 	/* NOENTROPY must be visible to the user as its own reason, not as a
-	 * generic failure: 量 2026-09-30, entropy_avail read 0 on this board, so
+	 * generic failure: MEASURED 2026-09-30, entropy_avail read 0 on this board, so
 	 * this is the answer a password change gets today. */
 	fake_reset();
 	fake.status = BK_NOENTROPY;
@@ -665,7 +665,7 @@ int main(void)
 	t_ok(strstr(rs.body, "\"uptime_s\":768") != NULL, "STATUS uptime renders",
 	     rs.body);
 	t_ok(strstr(rs.body, "\"entropy_avail\":0") != NULL,
-	     "STATUS entropy_avail 0 renders (量 2026-09-30 on this board)",
+	     "STATUS entropy_avail 0 renders (MEASURED 2026-09-30 on this board)",
 	     rs.body);
 	t_ok(strstr(rs.body, "\"auth_ready\":false") != NULL,
 	     "STATUS auth_ready false renders", rs.body);

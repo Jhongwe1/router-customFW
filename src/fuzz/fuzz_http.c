@@ -73,7 +73,7 @@ int main(int argc, char **argv)
 			dl = http_decode_path((const char *)in + 1, tl, decoded,
 					      sizeof(decoded));
 		/* http_mime() is called with an attacker-controlled name in
-		 * routes.c, so it belongs in the fuzzer's reach.  量 2026-09-30:
+		 * routes.c, so it belongs in the fuzzer's reach.  MEASURED 2026-09-30:
 		 * the first version of this harness called neither it nor
 		 * http_reason() nor http_parse_all(), and those three functions
 		 * were 35 of the 63 unreached lines in http.c -- the reason the

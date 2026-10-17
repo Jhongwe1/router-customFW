@@ -180,7 +180,7 @@ static void say_errno(const char *a, const char *b, int e)
 /* ==========================================================================
  * The clock.
  *
- * `clock_gettime(CLOCK_MONOTONIC)` and NOT `times()`.  讀 the toolchain:
+ * `clock_gettime(CLOCK_MONOTONIC)` and NOT `times()`.  READ the toolchain:
  * `clock_gettime` is in `libc.a` itself (member `clock_gettime.os`, a bare
  * `__NR_clock_gettime` = 4263 syscall), so a static uClibc 0.9.30 link needs no
  * `-lrt`; and `CLOCK_MONOTONIC` is 1 in `bits/time.h`.
@@ -282,7 +282,7 @@ static pid_t sys_spawn(void *ctx, const struct sv_child *c)
 		 * /dev/console is the redirector; TIOCSCTTY on the redirector is
 		 * not something this kernel has been shown to honour.
 		 *
-		 * 🔄 `R7-8`: this said /dev/ttyS0 was NOT in the image and that
+		 * UPDATE: `R7-8`: this said /dev/ttyS0 was NOT in the image and that
 		 * the open would therefore fall back to /dev/console.  It IS in
 		 * the image now -- `nod /dev/ttyS0 c:4:64 0600`,
 		 * config/rlxfw-initramfs.tsv -- so the first open is expected to
@@ -290,9 +290,9 @@ static pid_t sys_spawn(void *ctx, const struct sv_child *c)
 		 * branch runs is 未定 until a boot says so: nothing has opened
 		 * this node on the device.
 		 *
-		 * 🔴 This changes bytes a tool depends on: `looprun.py`'s
+		 * NOTE: This changes bytes a tool depends on: `looprun.py`'s
 		 * DEFAULT_BOOT_UNTIL is "job control turned off[^#]{1,2}# ", and
-		 * a shell WITH a ctty never prints that (量 `R7-8`: the string
+		 * a shell WITH a ctty never prints that (MEASURED `R7-8`: the string
 		 * "can't access tty; job control turned off" is in this image's
 		 * busybox exactly once, so its absence from a capture is the
 		 * shell HAVING a ctty and not the string being unbuilt).  Pass
@@ -364,10 +364,10 @@ static void sys_sync(void *ctx)
 	sync();
 }
 
-/* 讀 `arch/rlx/bsp/setup.c`, and this matters at the bench:
+/* READ `arch/rlx/bsp/setup.c`, and this matters at the bench:
  *
  *   RB_AUTOBOOT    -> kernel_restart -> bsp_machine_restart, which sets
- *                     BSP_WDTCNR = 0 and spins: a watchdog bite.  量 (SPEC.md
+ *                     BSP_WDTCNR = 0 and spins: a watchdog bite.  MEASURED (SPEC.md
  *                     FW-37): `busybox reboot -f` resets this board and reaches
  *                     the loader prompt in 2.407 s.  This is the path that works.
  *   RB_POWER_OFF   -> bsp_machine_power_off, which is `while (1);`

@@ -4,7 +4,7 @@
  * THERE IS NO devtmpfs ON THIS KERNEL, AND "tmpfs" HERE IS ramfs
  * ---------------------------------------------------------------------------
  *
- * 讀, and measured at the desk against a positive control (Linux 5.4.27 in
+ * READ, and measured at the desk against a positive control (Linux 5.4.27 in
  * `src-vendor/shibajee-linux-rtl8196e`, which has all of it):
  *
  *   * devtmpfs was merged in 2.6.32.  `drivers/base/devtmpfs.c` does not exist
@@ -18,7 +18,7 @@
  *     `mount -t tmpfs` still works: `mm/shmem.c`'s `#else !CONFIG_SHMEM` branch
  *     registers a `tmpfs_fs_type` whose `get_sb` is `ramfs_get_sb`.  Confirmed
  *     in the built artefact by dumping the struct out of `vmlinux`'s `.data`.
- *   * 🔴 SO THERE IS NO SIZE LIMIT.  `fs/ramfs/inode.c`'s option table holds
+ *   * NOTE: SO THERE IS NO SIZE LIMIT.  `fs/ramfs/inode.c`'s option table holds
  *     `mode=%o` and nothing else, and its `switch` has no `default:` -- every
  *     other option is SILENTLY IGNORED.  A `size=512k` here would read like a
  *     limit and be none, so it is not written: the rows below pass `mode=` only.

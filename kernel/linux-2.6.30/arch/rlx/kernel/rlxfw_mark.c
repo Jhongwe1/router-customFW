@@ -6,10 +6,10 @@
  * call sites, one row each, with a reason per row.
  *
  * WHY THIS EXISTS AT ALL.
- * 讀 the built .config: `# CONFIG_PRINTK is not set`.  include/linux/kernel.h
+ * READ the built .config: `# CONFIG_PRINTK is not set`.  include/linux/kernel.h
  * then makes printk() `static inline int __cold printk(...) { return 0; }`, so
  * every call site compiles to nothing and its format string is dropped from
- * the image.  量 on the R3 vmlinux: printk is three 20-byte
+ * the image.  MEASURED on the R3 vmlinux: printk is three 20-byte
  * `move v0,zero / jr ra` stubs.  And this unit's own boot capture agrees --
  * bench/2026-08-24c/G6.log goes from `start address: 0x80003440` straight to
  * `Realtek WLAN driver - version 1.6` with nothing in between.  So between
@@ -17,7 +17,7 @@
  * bring-up completes" -- had no observable at all.
  *
  * WHY NOT early_printk(), WHICH LOOKS AVAILABLE.
- * CONFIG_EARLY_PRINTK=y is set, which is a trap.  量 on the R3 vmlinux,
+ * CONFIG_EARLY_PRINTK=y is set, which is a trap.  MEASURED on the R3 vmlinux,
  * early_printk is a WEAK 16-byte stub at 0x80013bec:
  *
  *      sw a1,4(sp) / sw a2,8(sp) / jr ra / sw a3,12(sp)
@@ -43,7 +43,7 @@
  * first C instruction of the kernel.
  *
  * WHAT IT ASSUMES, AND HOW THAT IS REFUTED.
- * 推: that the UART divisor the loader left behind is still 38400 8N1 when
+ * INFERRED: that the UART divisor the loader left behind is still 38400 8N1 when
  * these run.  The loader prints `decompressing kernel:` at 38400 through the
  * same UART0 and prom_putchar never touches the divisor, so it inherits
  * whatever is set.  REFUTED BY: garbage bytes where a mark should be.  B5 is

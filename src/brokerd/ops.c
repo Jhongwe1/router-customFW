@@ -607,7 +607,7 @@ static int op_pwset(struct broker *bk, const struct proto_req *rq, uid_t uid,
 
 /* `FW-184`.  brokerd used to read the store once, in main(), so a password set
  * with `cfgstore passwd` on the running image changed nothing until brokerd
- * restarted (量 on the device, `R7-8`) -- and a password REPLACED that way kept
+ * restarted (MEASURED on the device, `R7-8`) -- and a password REPLACED that way kept
  * working, with every session opened under it.  bk_dispatch() now calls this
  * before every request it has not already refused, so each request is
  * answered from the store as it is when the request arrives: the record a

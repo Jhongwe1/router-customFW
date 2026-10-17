@@ -2,7 +2,7 @@
  * randomness, the four sessions and the sixteen rate-limit buckets.
  *
  * ENTROPY IS FAIL-CLOSED, AND THAT IS NOT A HYPOTHETICAL ON THIS BOARD.
- * 量 2026-09-30 on the r6b8i image: /proc/sys/kernel/random/entropy_avail read
+ * MEASURED 2026-09-30 on the r6b8i image: /proc/sys/kernel/random/entropy_avail read
  * 0 at 768.26 s of uptime (bench/2026-09-30/SB-ENT.log) and 0 again at
  * 1613.27 s (SB-RT1.log), with poolsize 4096.  So with today's kernel this
  * file's gate NEVER opens and LOGIN/PWSET answer NOENTROPY forever.  That is

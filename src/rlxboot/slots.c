@@ -112,10 +112,10 @@ static void out_dec(const struct rlxb_io *io, unsigned long v)
 /* Copy words [from, to) of slot `s` into its buffer, `to` rounded up to a
  * word and capped at the slot; returns the byte count now in the buffer.
  *
- * WORD LOADS.  量 `FLS-11`: the window serves each uncached load as its own
+ * WORD LOADS.  MEASURED `FLS-11`: the window serves each uncached load as its own
  * transaction, 2.075 us at stride 4 and at stride 1,024 alike -- so the
  * transaction and not the byte is the unit of cost, and a byte loop would pay
- * it up to four times a word (推: probe3 timed `lw`, never `lbu`).  Every
+ * it up to four times a word (INFERRED: probe3 timed `lw`, never `lbu`).  Every
  * load is aligned: the slot bases are 64 KiB aligned, `from` is 0 or a value
  * this function returned, and an unaligned `lw` on this core is an AdEL, not
  * a slow path (`CPU-75`).  Big-endian load, big-endian store: the bytes land

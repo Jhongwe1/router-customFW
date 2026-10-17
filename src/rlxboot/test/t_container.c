@@ -171,7 +171,7 @@ static void test_fields(void)
 
 	spec_default(&s); s.magic = 0x524C5856UL; build(&s, -1);
 	expect("magic RLXV", CAP, RLXU_R_MAGIC);
-	/* 🔴 Format 1 is the OLD format -- the one with no signed flash
+	/* NOTE: Format 1 is the OLD format -- the one with no signed flash
 	 * destination -- and it must be refused BY NAME rather than
 	 * reinterpreted: its zero bytes at 64..67 would read as "declared
 	 * destination 0x000000", which is a sentence that container never said. */
@@ -339,7 +339,7 @@ static void test_flash(void)
 	s.flash_at = 0x3FFB60UL; build(&s, -1);
 	expect("flash_at 0x3FFB60 WHOL, ending exactly at the part's end",
 	       CAP, RLXU_OK);
-	/* 🔴 THE FORM CHANGES THE LENGTH, and this pair is where that is
+	/* NOTE: THE FORM CHANGES THE LENGTH, and this pair is where that is
 	 * visible: 0x3FFC00 fits the 1,024-byte PAYLOAD and does not fit the
 	 * 1,184-byte container.  Same base, same payload, opposite verdicts. */
 	spec_default(&s); s.flash_form = RLXU_FORM_PAYLOAD;
@@ -359,7 +359,7 @@ static void test_flash(void)
 	env.write_at = 0x030000UL;
 	expect("declared 0x020000, caller writing 0x030000", CAP,
 	       RLXU_R_FLASH_MATCH);
-	/* 🔴 THE FOURTH DECISION'S OWN CASE: the offset agrees and only the
+	/* NOTE: THE FOURTH DECISION'S OWN CASE: the offset agrees and only the
 	 * form differs.  If the form were signed but not compared, the writer
 	 * would choose whether the 160-byte prefix is stripped -- and that
 	 * choice is whether `rlxboot-rescue` can boot at all (FW-168). */
@@ -369,7 +369,7 @@ static void test_flash(void)
 	env.write_form = RLXU_FORM_NONE;
 	expect("declared 0x020000 PAYL, a caller that names no form", CAP,
 	       RLXU_R_FLASH_MATCH);
-	/* 🔴 The forgotten-field case: a zeroed `struct rlxu_env` says "I am
+	/* NOTE: The forgotten-field case: a zeroed `struct rlxu_env` says "I am
 	 * writing offset 0 in form none", and every container must be refused
 	 * against it.  That is why RLXU_FLASH_NONE is 0xFFFFFFFF and not 0. */
 	env.write_at = 0x000000UL; env.write_form = RLXU_FORM_NONE;

@@ -4,7 +4,7 @@
  * WHY THIS FILE EXISTS
  * ---------------------------------------------------------------------------
  *
- * The vendor's DNS forwarder is `dnsmasq`, and 讀 SPEC.md FW-20 it imports
+ * The vendor's DNS forwarder is `dnsmasq`, and READ SPEC.md FW-20 it imports
  * `popen`.  R7's pass condition is `system()`/`popen()` count = 0 over the
  * shipped rootfs, so shipping dnsmasq would fail the gate by itself.  The
  * plan's ruling (plan § R7f item 3) is to write the forwarder: UDP only,

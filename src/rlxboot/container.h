@@ -9,7 +9,7 @@
  * bytes at offset 64 and no flash destination anywhere in the container: the
  * destination was an optional argument to `tools/mkfw2.py` and entered no
  * signed byte, so a container built without one was indistinguishable from a
- * container whose destination had been checked -- 量, two builds differing
+ * container whose destination had been checked -- MEASURED, two builds differing
  * only in `--flash-at` had the same sha256.  Format 2 spends the first 8 of
  * those bytes and leaves 24 reserved:
  *
@@ -27,11 +27,11 @@
  * that form is refused, and so is one that declares nothing -- an undeclared
  * container may never be written to flash.
  *
- * WHY THE FORM IS A SECOND SIGNED FIELD AND NOT THE WRITER'S CHOICE.  讀
+ * WHY THE FORM IS A SECOND SIGNED FIELD AND NOT THE WRITER'S CHOICE.  READ
  * `notes/update-chain.md` s 5-6 and `FW-168`: `rlxboot-rescue` at `0x020000`
  * is one of the six 64 KiB candidates the stock loader scans, and it MUST
  * carry a `cr6c` header there or it cannot boot -- which is the whole point
- * of a rescue slot.  量 2026-10-04: a container built over a `cr6c`-headed
+ * of a rescue slot.  MEASURED 2026-10-04: a container built over a `cr6c`-headed
  * payload reads `RLXU` at offset 0 and `cr6c` at offset 160.  So if the
  * CONTAINER lands at `0x020000` the base reads `RLXU`, `check_image()`
  * returns 0, and the rescue never boots; if the PAYLOAD lands there it does.
@@ -83,12 +83,12 @@
 #define RLXU_FORM_PAYLOAD 0x5041594CUL   /* "PAYL" -- the payload lands     */
 
 /* THE TWO RANGES NO LICENCE, NO FLAG AND NO CALLER CAN OPEN, and the only
- * flash numbers in this file.  量 `FLS-21`: the part is 4 MiB.  讀 CLAUDE.md
+ * flash numbers in this file.  MEASURED `FLS-21`: the part is 4 MiB.  READ CLAUDE.md
  * s Never: `0x000000`-`0x005FFF` is the boot loader and `0x006000`-`0x007FFF`
  * is `H601`, this unit's MAC and radio calibration, which no reset restores.
  * They are adjacent, so one bound covers both.
  *
- * ⚠️ THIS IS A SECOND FENCE, NOT A COPY OF THE POLICY.  `tools/flashguard.py`
+ * CAUTION: THIS IS A SECOND FENCE, NOT A COPY OF THE POLICY.  `tools/flashguard.py`
  * owns the build-time ranges and this does not restate them: the rescue slot
  * and the other judgement calls are NOT here, because they are licensable and
  * this fence must not be.  What this fence covers is only the part CLAUDE.md

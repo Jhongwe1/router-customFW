@@ -26,7 +26,7 @@
  * ---------------------------------------------------------------------------
  *
  *  - Not timing.  It measures nothing; the cost of one evaluation on the
- *    RTL8196E is 推 until measured on the silicon, and a figure taken under
+ *    RTL8196E is INFERRED until measured on the silicon, and a figure taken under
  *    qemu is the emulator's.
  *  - Not the absence of side channels, and not that any `wipe` cleared DRAM.
  *  - `ok` on the 1 GiB RFC 7914 vector without `--big` means SKIPPED, which

@@ -43,7 +43,7 @@
  * (2,046, passed in by the call site as the literal 1.4 expression).  ph_len
  * is F + 4 in every setting, F = max(L, 60), and nic_xmit's zero-fill to 60
  * stays: padding content is not a length field.  `vendor` is the vendor's
- * and the loader's LENGTHS (讀 rtl865xc_swNic.c:713-721, NET-122), not their
+ * and the loader's LENGTHS (READ rtl865xc_swNic.c:713-721, NET-122), not their
  * bytes -- neither pads.  mlen and ext name which of the two fields matters;
  * d1..d3 grade m_len so that M1-cover8 makes a prediction (182 * d bad
  * lengths) no other surviving rule makes.  They are nobody's convention. */
@@ -75,7 +75,7 @@ static const struct nic15_len_row nic15_len_tab[NIC15_LEN_N] = {
 /* THE BOOT POLICY (1.6, R6b-10): the txlen a boot starts in.  Blocks 47 and
  * 48 ran `vendor` on the silicon -- E2 220 of 220 twice on each of two boots,
  * and a wire sweep over every length from 60 to 1,514 with JabberErr 0 --
- * while 1.4's lengths faulted beside it on the same boots (量, NET-128,
+ * while 1.4's lengths faulted beside it on the same boots (MEASURED, NET-128,
  * NET-132).  So `vendor` is where a boot starts, and `rlxfw` (1.4's lengths)
  * stays a verb setting, for regression.  This one macro is the whole change:
  * the kernel's static initialiser and nic15check's harness both read it, and
@@ -128,7 +128,7 @@ static inline u32 nic15_ext(u32 f, int pol, u32 ext14)
  * (nic_idle_ph, nic_idle_ring -- carved by every alloc), into a sink the CPU
  * alone reads.  So a bit-0 fix that bit 2 does not reproduce is about WHICH
  * words were read, not about the time or the bus traffic the loads cost.
- * 推, not established for the RLX4181: whether an uncached load waits for the
+ * INFERRED, not established for the RLX4181: whether an uncached load waits for the
  * write buffer to drain.  A read-back that returns the written value does not
  * prove the store reached DRAM; Q records what the load returned. */
 #define NIC15_RB_FIELDS		0x1	/* 12 slot words into Q, before OWN      */
@@ -364,7 +364,7 @@ static inline int nic15_parse_swshow(const char *a, u32 *l)
 }
 
 /* ------------------------------------------------------ the frame, as sent
- * What nic_do_tx writes at frame offset j (讀 :2226-2244): a broadcast
+ * What nic_do_tx writes at frame offset j (READ :2226-2244): a broadcast
  * destination, 02:52:4C:58:46:57, EtherType 0x88B5, "RLXFW-NIC ", the digit
  * '0' + n_tx % 10 taken before the call, then filler 0x40 + (k & 0x3F) where
  * k = j - 14.  A frame is OURS when bytes 6..13 (the source and the

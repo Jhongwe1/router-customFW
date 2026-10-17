@@ -16,7 +16,7 @@
  *   0xBD070000, 0xBD190000     slots A and B through it (BOOT=slots)
  *   0xBD3F0000                 the 512-byte anti-rollback bitmap
  *
- * ⚠️ 0x81000000 IS THE ONE ADDRESS IN RAM THIS PROJECT HAS MEASURED BEING
+ * CAUTION: 0x81000000 IS THE ONE ADDRESS IN RAM THIS PROJECT HAS MEASURED BEING
  * REWRITTEN.  `MEM-14`: word 1 of 0x81000000 is rewritten to 0x00000144 on every
  * boot, three times reproduced -- which is `tools/rlxprobe/Makefile`'s reason for
  * putting probe1's result block at 0x80A00000 instead.  Word 1 of a container is
@@ -44,7 +44,7 @@
  * rlxboot is willing to read from. */
 #define RLXB_CONTAINER_LIMIT  RLXB_CTR_RAM
 
-/* The flash MMIO read window.  量, `SPEC.md` `FLS-11`: 1,024 uncached loads
+/* The flash MMIO read window.  MEASURED, `SPEC.md` `FLS-11`: 1,024 uncached loads
  * through 0xBD000000 at the loader prompt from a bare-metal payload (`probe3`
  * Group F, seating 8), and independently the whole 4,194,304 bytes under Linux
  * byte-for-byte equal to the PIO path (`D3`, seating 16).  KSEG1, so uncached
@@ -80,7 +80,7 @@
 /* R8b's D28: the stock loader's own record of which flash candidate it
  * accepted -- the global its image locator writes on every candidate it tries
  * (`sw a0,-8900(s0)` at 0x804080C0), so after the scan it holds the one that
- * booted.  讀 only: `docs/loader-command-semantics.md` s a and s 8 row 1 (which
+ * booted.  READ only: `docs/loader-command-semantics.md` s a and s 8 row 1 (which
  * also predicts the value is the offset biased by 0x05000000), and
  * `PROGRESS.md` `C-1`.  A RAM address inside stage 2's data, NOT a flash
  * offset.  BOOT=slots prints it and nothing reads it for any decision. */

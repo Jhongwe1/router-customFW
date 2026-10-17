@@ -6,17 +6,17 @@
  * include/linux/ by tools/rlxfw-marks.py from kernel/; it is never
  * edited inside src-vendor/.
  *
- * WHY THIS EXISTS AT ALL.  量 2026-09-30 on image r6b8i (recipe 3685a3a4),
+ * WHY THIS EXISTS AT ALL.  MEASURED 2026-09-30 on image r6b8i (recipe 3685a3a4),
  * over the console: /proc/sys/kernel/random/entropy_avail reads 0 at 768 s of
  * uptime and 0 again at 1613 s, with poolsize 4096
- * (bench/2026-09-30/SB-ENT.log, bench/2026-09-30/SB-RT1.log).  讀 the reason,
+ * (bench/2026-09-30/SB-ENT.log, bench/2026-09-30/SB-RT1.log).  READ the reason,
  * in the tree that builds (src-vendor/rtl819x-toolchain/linux-2.6.30):
  *
  *   1. drivers/char/random.c:689 add_interrupt_randomness() is the only
  *      credit path an interrupt can reach, and kernel/irq/handle.c calls it
  *      only for a handler registered with IRQF_SAMPLE_RANDOM.  No driver in
  *      this image registers that flag.
- *   2. 🔴 THE OTHER TWO CREDIT PATHS EXIST AND ARE MERELY IDLE -- the first
+ *   2. NOTE: THE OTHER TWO CREDIT PATHS EXIST AND ARE MERELY IDLE -- the first
  *      draft of this header said they were absent, and that was wrong.
  *      add_input_randomness() is reached from drivers/input/input.c:308, and
  *      drivers/input/keyboard/rtl819x-keys.c registers a polled input device
@@ -28,7 +28,7 @@
  *      only because nothing issues mtdblock I/O.  A third path, the
  *      RNDADDTOENTCNT ioctl (random.c:1122-1127), credits with NO DATA for
  *      CAP_SYS_ADMIN.  Any experiment on this file must exclude all three.
- *   3. 🔴 AND THE FLAG WOULD NOT HAVE BEEN ENOUGH.  add_timer_randomness()
+ *   3. NOTE: AND THE FLAG WOULD NOT HAVE BEEN ENOUGH.  add_timer_randomness()
  *      (random.c:614) mixes `get_cycles()` and estimates the credit from
  *      jiffies deltas alone -- and arch/rlx/include/asm/timex.h defines
  *      get_cycles() as `return 0;`.  So on this core the pool would receive a

@@ -3,7 +3,7 @@
  * The ids WERE the numbers from SPEC-R7 § 4, transcribed here so that init did
  * not depend on another agent's spelling.  `R7-8` collapsed the four
  * transcriptions of that table onto src/lib/schema.h, which now carries the
- * CFGID_* spellings as aliases of its own CFG_ID_*; 量 that init's nine literals
+ * CFGID_* spellings as aliases of its own CFG_ID_*; MEASURED that init's nine literals
  * had agreed with it on all nine.  init still reaches the store only through
  * SPEC-R7 § 5's pinned functions.
  */
@@ -42,7 +42,7 @@
 
 /* ------------------------------------------------------------- interfaces */
 /*
- * 讀 config/rlxfw-init.sh: every seating since B30 brought the LAN up on
+ * READ config/rlxfw-init.sh: every seating since B30 brought the LAN up on
  * `rlx0`, which is rlxfw's own `rtl819x-nic` netdev.  未定: no netdev has been
  * shown to carry the WAN on an rlxfw image -- R6-6 (per-port VLAN) was not met,
  * so `RLXFW_WAN_IF` is a placeholder and `wan.mode` defaults to 0, which means

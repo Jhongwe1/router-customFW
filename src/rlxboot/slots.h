@@ -21,7 +21,7 @@
 #include "container.h"
 
 /* One progress dot per 64 KiB copied: 16,384 word loads through the window,
- * ~34 ms at `FLS-11`'s 2.075 us a load (推 for this loop -- that figure is
+ * ~34 ms at `FLS-11`'s 2.075 us a load (INFERRED for this loop -- that figure is
  * probe3's), so a copy that has stopped shows as dots that stopped. */
 #define RLXB_TICK_BYTES   0x10000UL
 

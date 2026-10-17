@@ -611,7 +611,7 @@ static int cmd_passwd(int argc, char **argv)
 
 		/* FAIL CLOSED ON ENTROPY, and before the store is touched.  A
 		 * salt drawn from a pool that is not ready is a salt an attacker
-		 * can guess, and this board's pool 量 0 at 768 s uptime on the
+		 * can guess, and this board's pool MEASURED 0 at 768 s uptime on the
 		 * previous image (SPEC-R7 § 6). pwhash_salt() makes the reading
 		 * itself, refuses below KDF_ENTROPY_MIN, and never returns a
 		 * weak salt; the reading is printed either way so that a refusal

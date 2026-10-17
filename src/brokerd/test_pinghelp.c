@@ -1,6 +1,6 @@
 /* src/brokerd/test_pinghelp.c -- a stand-in for this image's busybox `ping`.
  *
- * It ignores every argument -- 讀 config/image-commands.tsv, this image's
+ * It ignores every argument -- READ config/image-commands.tsv, this image's
  * `ping` ignores -c, so nothing the broker puts in argv stops it either -- and
  * then never exits.  Two builds, because the two ways a PING can end are
  * different mechanisms and each needs its own case:

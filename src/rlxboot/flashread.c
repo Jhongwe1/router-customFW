@@ -29,14 +29,14 @@
  * R8a's order and R8a's accesses: the magic as one word through KSEG0, the
  * bitmap as bytes, flash only when the magic does not read "RCNT".
  *
- * ⚠️ WHAT THIS FILE DOES NOT ESTABLISH.  That the window is live at the loader
- * prompt is 量 (`SPEC.md` `FLS-11`, probe3 Group F, 1,024 uncached loads, R =
+ * CAUTION: WHAT THIS FILE DOES NOT ESTABLISH.  That the window is live at the loader
+ * prompt is MEASURED (`SPEC.md` `FLS-11`, probe3 Group F, 1,024 uncached loads, R =
  * 1.0000 at two strides with three refutation controls) -- but that reading was
  * at 0xBD000000 and this one is at 0xBD3F0000, 4,128,768 bytes further in, and
  * nothing in this project has read THAT address through THIS window at the
  * prompt.  The decode size of the window is measured nowhere
  * (`tools/rlxprobe/rlxdefs.h` bounds every Group F leg to 64 KiB for exactly
- * that reason).  So the flash source is 推 until a seating reads it, and the
+ * that reason).  So the flash source is INFERRED until a seating reads it, and the
  * instrument that settles it is the card cell that prints
  * `RLXBOOT-CTRSRC flash` with `RLXBOOT-VER ctr=0`: an erased region reads 0,
  * and a window that is not decoded reads 0xFFFFFFFF-ish garbage -- which ALSO

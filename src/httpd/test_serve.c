@@ -237,7 +237,7 @@ int main(void)
 	}
 
 	/* ---------------------------------------- the parent's ONE KDF grant
-	 * 量 on the device on 2026-09-30, image r78a: POST /api/login answered
+	 * MEASURED on the device on 2026-09-30, image r78a: POST /api/login answered
 	 * `429 {"ok":false,"error":"ratelimit","retry_s":2}` in 0.030 s and went
 	 * on answering it -- after 20 s of idle, and after a further 90 s of no
 	 * requests at all -- while GET /api/status kept answering 200 from the

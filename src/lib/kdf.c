@@ -44,7 +44,7 @@
  * ---------------------------------------------------------------------------
  *
  *  - Nothing here is a measurement of the device.  Timings taken under qemu
- *    are qemu's, and the cost of one evaluation on the RTL8196E is 推 until
+ *    are qemu's, and the cost of one evaluation on the RTL8196E is INFERRED until
  *    it is measured on the silicon.
  *  - `pwhash_verify` is constant-time only in its final comparison.  The
  *    scrypt evaluation itself takes password-dependent time (it walks V at a

@@ -38,7 +38,7 @@ static void rl_refill(struct rl_bucket *b, uint32_t now_ms)
 	}
 	/* A rate of zero is a hard cap: the burst, and then never again.  Without
 	 * this line the saturating branch below would refill it to full after a
-	 * long enough gap, which is the opposite of what a zero rate means.  量 by
+	 * long enough gap, which is the opposite of what a zero rate means.  MEASURED by
 	 * test_rl.c's zero-rate case, which is why that case exists. */
 	if (b->rate_milli == 0) {
 		b->last_ms = now_ms;

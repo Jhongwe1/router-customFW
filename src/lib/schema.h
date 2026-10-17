@@ -45,7 +45,7 @@
 /* The `CFGID_*` spellings, for the programs that were written against SPEC-R7
  * § 4 directly rather than against this header.  `R7-8` found the same sixteen
  * ids transcribed in FOUR places: here, src/httpd/stub/cfgtab.c, src/init/init.h
- * (nine of them) and src/brokerd/stub/cfg.h (four).  量 all four agreed, on every
+ * (nine of them) and src/brokerd/stub/cfg.h (four).  MEASURED all four agreed, on every
  * id they carried.  They are aliases of the CFG_ID_* above, so the numbers are
  * still written exactly once. */
 #define CFGID_SYS_HOSTNAME  CFG_ID_HOSTNAME

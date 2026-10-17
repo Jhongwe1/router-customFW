@@ -47,7 +47,7 @@
  * N <= 4096 and log2N = 12 -- 4 MiB exactly.  A hash already on disk is
  * verified with ITS OWN parameters, read out of bytes [1..5]; these three only
  * decide what a PWSET writes.  Time on the device: 未定 (agent D's row). */
-/* 🔴 `R7-8`: this said `BK_KDF_R 8`.  src/lib/kdf.h's ruling is r = 7, and
+/* NOTE: `R7-8`: this said `BK_KDF_R 8`.  src/lib/kdf.h's ruling is r = 7, and
  * kdf_scrypt REFUSES any parameter set whose peak exceeds KDF_PEAK_CAP
  * (4,194,304 B); (12, 8, 1) peaks at 4,197,376, so PWSET would have failed
  * -KDFE_NOMEM on every call and a blob already carrying r = 8 could not be
