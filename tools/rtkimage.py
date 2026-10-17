@@ -289,7 +289,7 @@ class Image(object):
         self.nfjrom, self.memload = nfjrom, memload
         syms = elf_symbols(memload)
         if not syms or '__vmlinux_start' not in syms:
-            raise ValueError('%s: no __vmlinux_start symbol' % memload)
+            raise ValueError('%s: no __vmlinux_start symbol' % memload)  # SPEC.md FW-169: `check` does not catch this, so a wrong --memload is a traceback, not a refusal; recorded, not fixed
         self.vstart = syms['__vmlinux_start'][0] - LOAD_START_ADDR
         self.vend = syms['__vmlinux_end'][0] - LOAD_START_ADDR
         sec = self.raw[self.vstart:self.vend]

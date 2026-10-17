@@ -176,7 +176,7 @@ MARK_UNLEGENDED = {'算': 'the legend cannot gain a row until `CITE-2` replaces 
 # A value cell may legitimately hold no value.  Three of these are open
 # questions and must appear in section 17; the other two are not questions at
 # all, so they must not.
-BLANK_RX = re.compile(r'留白|未定|未讀')          # open -- section 17 owes an experiment
+BLANK_RX = re.compile(r'留白|未定|未讀')          # open -- section 17 owes an experiment.  A bare substring, so the 未定 inside 未定義 counts too: SPEC.md FW-173, recorded and not fixed
 NOTAVALUE_RX = re.compile(r'§18|選定')            # withheld, or chosen rather than measured
 
 # Backticked tokens that look like a path into this repository.
