@@ -832,7 +832,7 @@ line —
 ```
 
 — and the `-ENXIO` comes out of `drivers/gpio/gpiolib.c:1102`,
-`chip->to_irq ? chip->to_irq(...) : -ENXIO`, because `rtl819x-gpio.c:658` is
+`chip->to_irq ? chip->to_irq(...) : -ENXIO`, because `rtl819x-gpio.c:527` is
 `.to_irq = NULL`. **The value is produced by the data structure rather than
 typed**, and the day a `.to_irq` exists it starts returning a real irq with
 no second patch. `arch/x86/include/asm/gpio.h:44` is the shape § 10 described
@@ -1336,8 +1336,8 @@ third caller*. There isn't one.
 
 ### The four call sites are the four call sites
 
-`state_check` is called from exactly four places (`rtl819x-gpio.c:470` `.get`,
-`:565` `.direction_output`, `:637` `.set`, `:687` `read_proc`), and § 12 of this
+`state_check` is called from exactly four places (`rtl819x-gpio.c:339` `.get`,
+`:434` `.direction_output`, `:506` `.set`, `:556` `read_proc`), and § 12 of this
 file already said so. Three of them are excluded **by counters printed in the
 same snapshot as the anomaly**, not by argument: every occurrence has
 `Δn_get = 0`, `n_dirout_ok` frozen at 1, `n_set_ok` 0 and `n_writes` 2.

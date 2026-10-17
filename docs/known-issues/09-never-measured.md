@@ -177,7 +177,7 @@ not, two fresh stages give a byte-identical `vmlinux` (`TC-46`).
   gone. A loop that runs once is what exists; `R5` is six drivers. `LOOP-3`.
 * 🆕 **`gpio_to_irq()` on this die.** 2026-09-10 (`R5-8`).
   `config/host-compat/0006` aliases it to gpiolib's `__gpio_to_irq`, which
-  returns `-ENXIO` when `chip->to_irq` is `NULL`, and `rtl819x-gpio.c:658` is
+  returns `-ENXIO` when `chip->to_irq` is `NULL`, and `rtl819x-gpio.c:527` is
   `.to_irq = NULL` — but **that chain is READ, not measured on the silicon**.
   🔄 **2026-09-11 (`R5-9`): still not measured, and it is now an unmeasured thing rather than an unknown one.** `ggbruno/openwrt`'s
   `arch/mips/realtek/gpio.c` implements a full `irq_chip` on this SoC's GPIO with a chained parent handler, and `shibajee`'s SoC header names the three

@@ -75,7 +75,7 @@ WHERE THE VALUE COMES FROM, WHICH IS THE WHOLE REASON FOR THE FORM CHOSEN.
         return chip->to_irq ? chip->to_irq(chip, gpio - chip->base) : -ENXIO;
     }
 
-`drivers/gpio/rtl819x-gpio.c:658` is `.to_irq = NULL`.  So aliasing
+`drivers/gpio/rtl819x-gpio.c:527` is `.to_irq = NULL`.  So aliasing
 `gpio_to_irq` to `__gpio_to_irq` makes `gpio_to_irq(5)` return `-ENXIO`
 BECAUSE THIS CHIP HAS NO `to_irq` HOOK -- a value produced by the data
 structure, not a constant somebody typed.  The day an `rtl819x-gpio` with a

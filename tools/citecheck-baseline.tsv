@@ -30,7 +30,6 @@ M3	docs/GATE-RESULTS.md	kernel/linux-2.6.30/drivers/net/rtl819x-switch.c	93	5636
 M3	docs/rlx-cache-and-cp0.md	docs/probe3-cells.md	1293	68ec71163e2f0d85	docs/probe3-cells.md:1293 is a blank line
 M3	notes/switch-driver.md	kernel/linux-2.6.30/drivers/net/rtl819x-switch.c	93	5636dac03795413a	kernel/linux-2.6.30/drivers/net/rtl819x-switch.c:93 is a blank line
 ROT	SPEC.md	SOURCES.json	195	debb3001c59cec11	"cpu_claim": "'Embedded RISC CPU, RLX4181 with 16KB I-Cache, 8KB D-Cac
-ROT	SPEC.md	kernel/linux-2.6.30/drivers/gpio/rtl819x-gpio.c	120	4141c46181ee6c1a	* 1. WHICH PORT LETTER BIT 5 IS. PABCD packs four ports into one word
 ROT	SPEC.md	kernel/linux-2.6.30/drivers/clocksource/rtl819x-timer.c	471	c296bd9571bdf7ac	spin_lock_irqsave(&rtl819x_tc_lock, flags);
 ROT	SPEC.md	kernel/linux-2.6.30/drivers/net/rtl819x-switch.c	88	59da81f91d395eb6	* 1. It does not touch the CPU-port DMA rings, the interrupt, or any
 ROT	SPEC.md	kernel/linux-2.6.30/drivers/net/rtl819x-switch.c	93	40aea136852ec9fd	* 3. It writes a table in one verb only: 1.6's `vlan` (R6c, at the end

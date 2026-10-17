@@ -119,7 +119,7 @@ That is the hard floor on any sampling loop's period, and it makes such a loop
 
 ## 3. What the drivers actually expose
 
-**`/proc/rtl819x-gpio`** write verbs (`rtl819x-gpio.c:876-921`): `claim`,
+**`/proc/rtl819x-gpio`** write verbs (`rtl819x-gpio.c:745-790`): `claim`,
 `release`, `tryout <N>`, `unlock <N>`, `lock <N>`, `lock`, `probe04`, `sample`.
 Anything else is `-EINVAL`. Read handler prints 37 fields ending in `val04`,
 which is why `--until 'val04'` is safe on a gpio cell (it is the last `sprintf`
@@ -164,7 +164,7 @@ pressed+lit.
 |---|---|---|
 | `echo 1 > /proc/gpio` then read | `dat` **`0000003C`** | `FW-65`, `DAT &= ~0x40` |
 | same | `n_state_foreign` **+2** | `FW-64` (two `read_proc`) × the detector never updating its reference |
-| same | `foreign_seen 1`, `foreign_first 0000003C` | `rtl819x-gpio.c:407-410` |
+| same | `foreign_seen 1`, `foreign_first 0000003C` | `rtl819x-gpio.c:276-279` |
 | `echo 2` **before** the long hold | **the LED blinks** | `FW-65` 殘留 ② |
 | the long hold (≈8 s) | `/proc/load_default` → **`1`** | `FW-40`, ≥5 s branch |
 | `echo 2` **after** it | **no blink, steady** | `FW-62`'s once-per-boot timer |

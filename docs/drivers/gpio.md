@@ -1,7 +1,8 @@
 # `rtl819x-gpio` — a gpiolib chip on the PABCD port
 
 Source: [`rtl819x-gpio.c`](../../kernel/linux-2.6.30/drivers/gpio/rtl819x-gpio.c), version 1.1 ·
-reasoning and every reading: [`notes/gpio-driver.md`](../../notes/gpio-driver.md)
+reasoning and every reading: [`notes/gpio-driver.md`](../../notes/gpio-driver.md) ·
+the file head until 2026-10-18, verbatim: [`rtl819x-gpio.c`](gpio-history.md)
 
 ## What it does
 

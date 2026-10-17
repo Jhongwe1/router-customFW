@@ -778,7 +778,7 @@ only worth having if you can see what it used to say.**
    relocation sites including `.text.gpio_keys_isr+0x1c`, with it `rc=0`.
    🟢 **The failure moves to probe and carries the chip's own errno.** 讀
    `drivers/gpio/gpiolib.c:1102`, `chip->to_irq ? … : -ENXIO`, and
-   `drivers/gpio/rtl819x-gpio.c:658`, `.to_irq = NULL` — so
+   `drivers/gpio/rtl819x-gpio.c:527`, `.to_irq = NULL` — so
    `gpio_to_irq(5)` answers `-ENXIO` **because this chip supplies no
    mapping**, not because anybody typed the constant. 讀 `gpio_keys_probe`:
    `gpio_request` succeeds, `gpio_direction_input` succeeds, the irq lookup
