@@ -506,7 +506,7 @@ unit's own firmware, `$FWRE_WORK/extracted/unit-2018/` — `rootfs.squashfs`
 which the extraction does preserve. Every command and every script is kept in
 `$FWRE_WORK/rebuild/s121-r9-4/`. No power action and no flash verb.
 
-`plan/REVIEW-2026-08-22.md` item 14's row reads `chroot + 降權 … ❌（boa 是 root）`
+The plan's 2026-08-22 review (unpublished: [`method.md`](../docs/method.md) § *Quoting the plan*), item 14, has a row reading `chroot + 降權 … ❌（boa 是 root）`
 with `ps` in its evidence column. That is an assertion carrying an instrument
 that cannot run: the vendor firmware has no shell (`docs/GATE-RESULTS.md`, `P2`'s
 ⊘ Structural). Four sources below, then the verdict.
@@ -685,7 +685,7 @@ is uid 0 here.
   that route is the ⊘ above. Note the direction: that residue could only make
   the vendor's posture *better* than stated, never worse.
 * Not anything about exploitability. The 187 `system` GOT loads are a count of
-  linked references, and `plan/` § 8.1's `CVE-2014-8361` entry is the standing
+  linked references, and upstream's `P6-1` on `CVE-2014-8361` (`upstream/PROGRESS.md`) is the standing
   precedent for why code shape is not effect. Which of them a request reaches is
   `FW-20`'s question and is not answered here.
 * Not that `getpwnam`/`getgrnam`/`getuid`/`getgid` are unused — they are
@@ -778,8 +778,8 @@ three of them and 327 in two.
 
 讀 **The shipped vendor image carries zero setuid files and zero setgid files.
 160 of its 161 regular files are executable; the one that is not is
-`etc/version`.** `plan/REVIEW-2026-08-22.md` item 14's vendor `無 setuid binary`
-cell turns out to be right, and now has a reading under it instead of the word
+`etc/version`.** The vendor cell of the plan's 2026-08-22 review, item 14, `無 setuid binary`,
+turns out to be right, and now has a reading under it instead of the word
 `CI`.
 
 **What this does not establish.**
