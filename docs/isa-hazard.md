@@ -169,7 +169,7 @@ into this row gets the opposite conclusion.
 
 ## 4. 🔴 The build gate, and why it had to be inverted
 
-`plan/router-rebuild-plan.md:1038` requires `R1b`'s load-delay-slot test to be
+The plan's `R1b` block (unpublished: [`method.md`](method.md) § *Quoting the plan*) requires `R1b`'s load-delay-slot test to be
 
 > `lw` 後緊接讀取同一暫存器
 
@@ -185,7 +185,7 @@ loosened *and insists on exit 1 specifically* so a refusal for the wrong reason
 is caught, and with `cells.S:90 (a payload that built its victim instructions at)` foreclosing run-time construction on purpose.
 
 **The build gate prevented exactly the experiment the plan asks for, and no
-document in `plan/`, `docs/`, the Makefile or `hazlint` addressed it.**
+document in the plan, `docs/`, the Makefile or `hazlint` addressed it.**
 
 ### 4.1 The two resolutions that are wrong
 
@@ -281,7 +281,7 @@ needs a table of answers, not a sentence.
 
 ## 5. C4, and the trap in it
 
-`plan/DAY-ZERO.md:603`:
+The plan's day-zero list (unpublished), the item this section calls `C4`:
 
 > **負控制是強制的，而且 R1b 的形式很特別**：
 > **每個 hazard 測試在 qemu 下必須給出「有 interlock」的相反答案。**
