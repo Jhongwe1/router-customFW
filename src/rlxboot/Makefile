@@ -484,8 +484,31 @@ vectors:
 import-check:
 	@$(HERE)test/check-import.sh $(REPO)
 
+# THE FLOOR ON hosttest, and why it reads the build directory.  The script runs
+# t_crypto, t_container and t_slots under each of its three builds (cc1, cc2,
+# san) -- nine runs, MEASURED 2026-10-17 -- writes each run's output to
+# <build>/<suite>.out before it reads the run's status, and exits non-zero on the
+# first failure.  So after an exit 0 every <build>/t_*.out is a run that passed,
+# and fewer than nine is a suite that went missing: REFUSED, not passed.  The
+# directory is emptied first, so a file from an earlier run cannot be counted.
+# One `ok` line per run, indented by exactly two spaces: the shape
+# tools/ci-census.py counts in CI.
+HOSTTEST_MIN := 9
+
 hosttest:
+	@case "$(STAGE)" in /?*) ;; *) \
+	   echo "REFUSED: STAGE=$(STAGE) must be an absolute directory"; exit 1 ;; esac
+	@rm -rf $(STAGE)/hosttest
 	@$(HERE)test/run-host-tests.sh $(REPO) $(HOSTCC1) $(HOSTCC2) $(STAGE)/hosttest
+	@n=0; for f in $(STAGE)/hosttest/*/t_*.out; do \
+	   [ -f "$$f" ] || continue; \
+	   r=$${f#$(STAGE)/hosttest/}; printf '  ok    rlxboot/%s\n' "$${r%.out}"; \
+	   n=$$((n+1)); \
+	 done; \
+	 echo "rlxboot hosttest: $$n suite runs, each exited 0"; \
+	 [ $$n -ge $(HOSTTEST_MIN) ] || { \
+	   echo "REFUSED: $$n suite runs, fewer than the $(HOSTTEST_MIN) measured --" \
+	        "t_crypto, t_container and t_slots under cc1, cc2 and san"; exit 1; }
 
 # THE USER-MODE ARCH IS NOT THE BARE-METAL ONE, and this cost a debugging round.
 # `-G0 -mno-abicalls -fno-pic` are right for a payload linked at a fixed address

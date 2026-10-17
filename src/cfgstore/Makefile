@@ -121,13 +121,31 @@ $(HOSTOUT)/test_%: $(HOSTOBJ)/test_%.o $(HOSTLIBO)
 SANENV := ASAN_OPTIONS=detect_leaks=1:abort_on_error=0:exitcode=1 \
           UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
 
+# TESTS_MIN is the number of test programs, MEASURED 2026-10-17 (the five in
+# TESTNAMES) and typed rather than counted from the list it guards: a list that
+# loses one REFUSES in every configuration instead of passing with fewer.  Each
+# run prints one `ok` or `FAIL` line indented by exactly two spaces, the shape
+# tools/ci-census.py counts in CI; a failing run still stops the configuration.
+TESTS_MIN := 5
+CONF      := $(HOSTCC)$(if $(filter 1,$(SAN)),+san,)
+
 check-one: host
 	@echo "--- suite: CC=$(HOSTCC) SAN=$(SAN) out=$(HOSTOUT) ---"
-	$(SANENV) $(HOSTOUT)/test_crc32
-	$(SANENV) $(HOSTOUT)/test_tlv
-	$(SANENV) $(HOSTOUT)/test_schema
-	$(SANENV) $(HOSTOUT)/test_cfg $(HOSTOUT)
-	$(SANENV) $(HOSTOUT)/test_cli $(HOSTOUT)/$(PROG) $(HOSTOUT)
+	@set -e; ran=0; for t in $(TESTNAMES); do \
+	   case $$t in \
+	     test_cfg) set -- $(HOSTOUT) ;; \
+	     test_cli) set -- $(HOSTOUT)/$(PROG) $(HOSTOUT) ;; \
+	     *)        set -- ;; \
+	   esac; \
+	   echo "$(SANENV) $(HOSTOUT)/$$t $$*"; \
+	   if $(SANENV) $(HOSTOUT)/$$t "$$@"; then \
+	     printf '  ok    cfgstore/%s %s\n' "$$t" "$(CONF)"; \
+	   else printf '  FAIL  cfgstore/%s %s\n' "$$t" "$(CONF)"; exit 1; fi; \
+	   ran=$$((ran+1)); \
+	 done; \
+	 [ $$ran -ge $(TESTS_MIN) ] || { \
+	   echo "REFUSED: cfgstore ran $$ran test programs under $(CONF); the floor" \
+	        "is $(TESTS_MIN), the measured count"; exit 1; }
 	@echo "--- suite OK: CC=$(HOSTCC) SAN=$(SAN) ---"
 
 # Four configurations.  make stops at the first non-zero recipe line, so a red

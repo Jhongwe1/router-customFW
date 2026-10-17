@@ -50,19 +50,31 @@ host:
 	done
 	@echo "host build OK for: $(HOSTCCS)"
 
+# TESTS_MIN is the number of test programs, MEASURED 2026-10-17 (test_netutil,
+# test_ifupd), typed rather than counted from TEST_SRCS, the list it guards; see
+# src/init/Makefile, whose `test` this one mirrors.
+TESTS_MIN  := 2
+
 test: host
-	@set -e; rc=0; ran=0; \
+	@set -e; rc=0; ran=0; ncc=0; \
 	for cc in $(HOSTCCS); do \
+	  ncc=$$((ncc+1)); \
 	  for t in $(TEST_SRCS); do \
 	    b=$$(basename $$t .c); \
 	    printf '=== %s / %s ===\n' "$$cc" "$$b"; \
-	    ( cd $(O)/host/$$cc && ASAN_OPTIONS=detect_leaks=1 \
-	      UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 ./$$b ) || rc=1; \
+	    if ( cd $(O)/host/$$cc && ASAN_OPTIONS=detect_leaks=1 \
+	      UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 ./$$b ); then \
+	      printf '  ok    ifupd/%s %s\n' "$$b" "$$cc"; \
+	    else printf '  FAIL  ifupd/%s %s\n' "$$b" "$$cc"; rc=1; fi; \
 	    ran=$$((ran+1)); \
 	  done; \
 	done; \
+	need=$$(($(TESTS_MIN) * ncc)); \
 	echo "ifupd suite: $$ran test binaries ran, rc=$$rc"; \
-	[ $$ran -gt 0 ] || { echo "REFUSED: 0 test binaries ran"; exit 1; }; \
+	[ $$ran -gt 0 ] && [ $$ran -ge $$need ] || { \
+	  echo "REFUSED: ifupd ran $$ran test binaries; the floor is $$need --" \
+	       "$(TESTS_MIN) measured test programs under each of $$ncc compiler(s)"; \
+	  exit 1; }; \
 	exit $$rc
 
 # ===========================================================================

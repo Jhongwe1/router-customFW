@@ -102,19 +102,34 @@ host: which
 
 # `test` builds AND runs, under every host compiler, with both sanitizers on.
 # Exit status is the suite's; a tool's own totals line is never its verdict.
+#
+# TESTS_MIN is the number of test programs, MEASURED 2026-10-17 (test_supervise,
+# test_mounts) and typed here rather than counted from TEST_SRCS, the list it
+# guards: a list that loses a program REFUSES instead of passing with fewer, and
+# so does an empty HOSTCCS.  Each run prints one `ok` or `FAIL` line indented by
+# exactly two spaces, the shape tools/ci-census.py counts in CI.
+TESTS_MIN  := 2
+
 test: host
-	@set -e; rc=0; ran=0; \
+	@set -e; rc=0; ran=0; ncc=0; \
 	for cc in $(HOSTCCS); do \
+	  ncc=$$((ncc+1)); \
 	  for t in $(TEST_SRCS); do \
 	    b=$$(basename $$t .c); \
 	    printf '=== %s / %s ===\n' "$$cc" "$$b"; \
-	    ( cd $(O)/host/$$cc && ASAN_OPTIONS=detect_leaks=1 \
-	      UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 ./$$b ) || rc=1; \
+	    if ( cd $(O)/host/$$cc && ASAN_OPTIONS=detect_leaks=1 \
+	      UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 ./$$b ); then \
+	      printf '  ok    init/%s %s\n' "$$b" "$$cc"; \
+	    else printf '  FAIL  init/%s %s\n' "$$b" "$$cc"; rc=1; fi; \
 	    ran=$$((ran+1)); \
 	  done; \
 	done; \
+	need=$$(($(TESTS_MIN) * ncc)); \
 	echo "init suite: $$ran test binaries ran, rc=$$rc"; \
-	[ $$ran -gt 0 ] || { echo "REFUSED: 0 test binaries ran"; exit 1; }; \
+	[ $$ran -gt 0 ] && [ $$ran -ge $$need ] || { \
+	  echo "REFUSED: init ran $$ran test binaries; the floor is $$need --" \
+	       "$(TESTS_MIN) measured test programs under each of $$ncc compiler(s)"; \
+	  exit 1; }; \
 	exit $$rc
 
 # ===========================================================================

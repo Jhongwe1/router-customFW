@@ -109,27 +109,49 @@ $(O)/host/mut_qmatch:
 	$(HOSTCC1) $(HCFLAGS) -DDNSFWD_MUT_NO_QMATCH -I$(HERE) -o $@ \
 	    $(addprefix $(HERE),$(CORE) $(TESTS))
 
+# TESTS_MIN is the number of test programs, MEASURED 2026-10-17: test_dns, the
+# one in TESTS, run once per compiler.  The runner loops over TESTPROGS and the
+# floor is typed rather than counted from it, so a runner that finds no test
+# program REFUSES instead of passing.  Each run, and each mutation control,
+# prints one `ok` or `FAIL` line indented by exactly two spaces, the shape
+# tools/ci-census.py counts in CI.
+TESTS_MIN := 1
+TESTPROGS := $(basename $(TESTS))
+
 test: host
-	@echo '--- the suite, $(HOSTCC1), ASan + UBSan ---'
-	@$(SANENV) $(O)/host/test_dns.gcc
-	@echo '--- the suite, $(HOSTCC2), ASan + UBSan ---'
-	@$(SANENV) $(O)/host/test_dns.clang
+	@set -e; ran=0; for t in $(TESTPROGS); do \
+	   for c in gcc:$(HOSTCC1) clang:$(HOSTCC2); do \
+	     echo "--- the suite, $${c#*:}, ASan + UBSan ---"; \
+	     if $(SANENV) $(O)/host/$$t.$${c%%:*}; then \
+	       printf '  ok    dnsfwd/%s %s\n' "$$t" "$${c#*:}"; \
+	     else printf '  FAIL  dnsfwd/%s %s\n' "$$t" "$${c#*:}"; exit 1; fi; \
+	     ran=$$((ran+1)); \
+	   done; \
+	 done; \
+	 [ $$ran -ge $$((2 * $(TESTS_MIN))) ] || { \
+	   echo "REFUSED: dnsfwd ran $$ran test binaries; the floor is" \
+	        "$$((2 * $(TESTS_MIN))) -- $(TESTS_MIN) measured test program under" \
+	        "each of two compilers"; exit 1; }
 	@$(MAKE) --no-print-directory -f $(HERE)Makefile O=$(O) mutants
 
 # A green suite is a claim about its controls; this is what tests them.
 mutants: $(O)/host/mut_ptr $(O)/host/mut_qmatch
 	@echo '--- mutation control 1: the compression-pointer guards removed ---'
 	@if $(SANENV) $(O)/host/mut_ptr >$(O)/host/mut_ptr.out 2>&1; then \
+	   printf '  FAIL  dnsfwd/mutant ptr-guard stayed green\n'; \
 	   echo "REFUSED: the suite PASSED with the pointer guards removed, so"; \
 	   echo "         the battery does not test them."; exit 1; \
 	 else rc=$$?; echo "went red as required (exit $$rc):"; \
-	   grep -m2 -E 'TIMED OUT|^FAIL' $(O)/host/mut_ptr.out || true; fi
+	   grep -m2 -E 'TIMED OUT|^FAIL' $(O)/host/mut_ptr.out || true; \
+	   printf '  ok    dnsfwd/mutant ptr-guard went red\n'; fi
 	@echo '--- mutation control 2: the question half of the match removed ---'
 	@if $(SANENV) $(O)/host/mut_qmatch >$(O)/host/mut_qmatch.out 2>&1; then \
+	   printf '  FAIL  dnsfwd/mutant qmatch stayed green\n'; \
 	   echo "REFUSED: the suite PASSED without the question-section check,"; \
 	   echo "         so the anti-spoof cases do not test it."; exit 1; \
 	 else rc=$$?; echo "went red as required (exit $$rc):"; \
-	   grep -m2 -E '^FAIL' $(O)/host/mut_qmatch.out || true; fi
+	   grep -m2 -E '^FAIL' $(O)/host/mut_qmatch.out || true; \
+	   printf '  ok    dnsfwd/mutant qmatch went red\n'; fi
 
 mutant-guard-selftest:
 	@if $(MAKE) --no-print-directory -f $(HERE)Makefile O=$(O) \

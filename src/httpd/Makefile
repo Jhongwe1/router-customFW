@@ -101,17 +101,26 @@ host:
 	 else echo "note: src/lib/kdf.c or test_kdf.c absent -- test_kdf not built"; fi
 	@echo "host build in $(HOST_OUT) (CC=$(HOSTCC) EXTRA=$(EXTRA))"
 
+# TESTS_MIN is the number of test programs, MEASURED 2026-10-17: the six named in
+# `test`.  It read "fewer than five" until then, which let test_kdf -- built only
+# when src/lib/kdf.c and test_kdf.c exist -- go missing with no refusal.  Each
+# run prints one `ok` or `FAIL` line indented by exactly two spaces, the shape
+# tools/ci-census.py counts in CI.
+TESTS_MIN  := 6
+
 test: host
 	@fail=0; ran=0; \
 	 for b in test_json test_http test_rl test_routes test_serve test_kdf; do \
 	   [ -x $(HOST_OUT)/$$b ] || continue; \
 	   echo "=== $$b ==="; \
-	   $(HOST_OUT)/$$b || fail=1; \
+	   if $(HOST_OUT)/$$b; then printf '  ok    httpd/%s %s\n' "$$b" "$(HOSTCC)"; \
+	   else printf '  FAIL  httpd/%s %s\n' "$$b" "$(HOSTCC)"; fail=1; fi; \
 	   ran=$$((ran + 1)); \
 	 done; \
 	 echo "--- $$ran test programs ran ---"; \
-	 [ $$ran -ge 5 ] || { echo "REFUSED: fewer than five test programs ran"; \
-	                      exit 1; }; \
+	 [ $$ran -ge $(TESTS_MIN) ] || { \
+	   echo "REFUSED: fewer than $(TESTS_MIN) test programs ran, the measured count"; \
+	   exit 1; }; \
 	 [ $$fail = 0 ] || { echo "SUITE FAILED"; exit 1; }; \
 	 echo "SUITE PASSED ($$ran programs)"
 

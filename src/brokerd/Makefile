@@ -89,28 +89,45 @@ host: $(O)/host
 
 # `test` runs the suite twice: the plain build and the sanitizer build.  A
 # refusing suite is fast, so the count of what ran is printed beside the time.
+#
+# TESTS_MIN is the number of test programs, MEASURED 2026-10-17: the eight in
+# TESTS (test_pinghelp.c is test_ping's helper, not a test).  It is typed rather
+# than counted from TESTS, the list it guards, so a list that loses one REFUSES
+# -- per compiler here and in `sanitize` -- instead of passing with fewer.  Each
+# run prints one `ok` or `FAIL` line indented by exactly two spaces, the shape
+# tools/ci-census.py counts in CI; the first failure still stops the run.
+TESTS_MIN := 8
+
 test: host
 	@set -e; n=0; \
 	 for t in $(TESTS); do \
 	   echo "=== $$t (gcc-13) ==="; \
 	   case $$t in \
-	     test_ping) $(O)/host/$$t $(O)/host/pinghelp $(O)/host/pinghelp_slow ;; \
-	     test_wire) $(O)/host/$$t $(O)/host/brokerd ;; \
-	     test_reload) $(O)/host/$$t $(O)/host/cfgstore ;; \
-	     *)         $(O)/host/$$t ;; \
+	     test_ping) set -- $(O)/host/$$t $(O)/host/pinghelp $(O)/host/pinghelp_slow ;; \
+	     test_wire) set -- $(O)/host/$$t $(O)/host/brokerd ;; \
+	     test_reload) set -- $(O)/host/$$t $(O)/host/cfgstore ;; \
+	     *)         set -- $(O)/host/$$t ;; \
 	   esac; \
+	   if "$$@"; then printf '  ok    brokerd/%s %s\n' "$$t" "$(HOSTCC)"; \
+	   else printf '  FAIL  brokerd/%s %s\n' "$$t" "$(HOSTCC)"; exit 1; fi; \
 	   n=$$((n+1)); \
 	 done; \
 	 for t in $(TESTS); do \
 	   echo "=== $$t (clang-18) ==="; \
 	   case $$t in \
-	     test_ping) $(O)/host/$$t.clang $(O)/host/pinghelp $(O)/host/pinghelp_slow ;; \
-	     test_wire) $(O)/host/$$t.clang $(O)/host/brokerd.clang ;; \
-	     test_reload) $(O)/host/$$t.clang $(O)/host/cfgstore ;; \
-	     *)         $(O)/host/$$t.clang ;; \
+	     test_ping) set -- $(O)/host/$$t.clang $(O)/host/pinghelp $(O)/host/pinghelp_slow ;; \
+	     test_wire) set -- $(O)/host/$$t.clang $(O)/host/brokerd.clang ;; \
+	     test_reload) set -- $(O)/host/$$t.clang $(O)/host/cfgstore ;; \
+	     *)         set -- $(O)/host/$$t.clang ;; \
 	   esac; \
+	   if "$$@"; then printf '  ok    brokerd/%s %s\n' "$$t" "$(HOSTCC2)"; \
+	   else printf '  FAIL  brokerd/%s %s\n' "$$t" "$(HOSTCC2)"; exit 1; fi; \
 	   n=$$((n+1)); \
 	 done; \
+	 [ $$n -ge $$((2 * $(TESTS_MIN))) ] || { \
+	   echo "REFUSED: brokerd ran $$n test binaries; the floor is" \
+	        "$$((2 * $(TESTS_MIN))) -- $(TESTS_MIN) measured test programs under" \
+	        "each of two compilers"; exit 1; }; \
 	 echo "PASS: $$n test binaries ran (both compilers)"
 	@$(MAKE) --no-print-directory -f $(HERE)Makefile O=$(O) sanitize
 
@@ -128,13 +145,18 @@ sanitize: $(O)/host
 	 for t in $(TESTS); do \
 	   echo "=== $$t (clang-18 asan+ubsan) ==="; \
 	   case $$t in \
-	     test_ping) $(O)/host/$$t.san $(O)/host/pinghelp.san $(O)/host/pinghelp_slow.san ;; \
-	     test_wire) $(O)/host/$$t.san $(O)/host/brokerd.san ;; \
-	     test_reload) $(O)/host/$$t.san $(O)/host/cfgstore.san ;; \
-	     *)         $(O)/host/$$t.san ;; \
+	     test_ping) set -- $(O)/host/$$t.san $(O)/host/pinghelp.san $(O)/host/pinghelp_slow.san ;; \
+	     test_wire) set -- $(O)/host/$$t.san $(O)/host/brokerd.san ;; \
+	     test_reload) set -- $(O)/host/$$t.san $(O)/host/cfgstore.san ;; \
+	     *)         set -- $(O)/host/$$t.san ;; \
 	   esac; \
+	   if "$$@"; then printf '  ok    brokerd/%s %s+san\n' "$$t" "$(HOSTCC2)"; \
+	   else printf '  FAIL  brokerd/%s %s+san\n' "$$t" "$(HOSTCC2)"; exit 1; fi; \
 	   n=$$((n+1)); \
 	 done; \
+	 [ $$n -ge $(TESTS_MIN) ] || { \
+	   echo "REFUSED: brokerd ran $$n sanitized test binaries; the floor is" \
+	        "$(TESTS_MIN), the measured count"; exit 1; }; \
 	 echo "PASS: $$n test binaries ran under -fsanitize=address,undefined"
 
 # ------------------------------------------------------------- the mutations
