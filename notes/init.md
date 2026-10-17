@@ -17,9 +17,9 @@ silicon is quoted from `SPEC.md` and marked.
 `config/rlxfw-init.sh` — four commands and an `exec /bin/sh`, the `/init` of
 every seating since R3 rung 1 — is replaced by a compiled `/init`.  The old
 script and `config/rlxfw-init-quiet.sh` are left in the tree; the image stops
-pointing at them.  `plan/` § D7 is the reason: the claim R7 is built to support
+pointing at them.  The plan's `D7` (unpublished; [ADR-004](../docs/decisions/ADR-004-init-never-execs-shell.md) records the decision) is the reason: the claim R7 is built to support
 is `system()`/`popen()` = 0 across the rootfs, and the plan's own baseline
-sentence puts shebang files and shell scripts beside it (`plan` L1479-1482).
+sentence puts shebang files and shell scripts beside it (its `R7` block).
 A `#!/bin/sh` `/init` is a shell script in the shipped image.
 
 ## 2. The boot sequence
@@ -310,7 +310,7 @@ reason.
   `brokerd` and `httpd` after a `kill`, and three hand-fed leases, one applied
   and two refused (`docs/GATE-RESULTS.md` entry 17).  Every other claim here is
   讀 or a host measurement.  The host tests run on little-endian x86-64 with
-  glibc; the target is big-endian MIPS-I with uClibc 0.9.30, and `plan` D14 is
+  glibc; the target is big-endian MIPS-I with uClibc 0.9.30, and the plan's `D14` ([`method.md`](../docs/method.md) § *Codegen and the ISA: bare metal only*) is
   explicit that a host test verifies logic and not codegen.
 * **No service dependency ordering beyond start order.**  Children start in
   table order and nothing waits for anything.  `brokerd` may not have its socket
