@@ -17,9 +17,9 @@
 #
 # THE PASS CLAUSE THIS REGISTER IS BUILT AGAINST
 # ==============================================
-# `PROGRESS.md`'s `R9` re-specification, not `plan/` § 8's wording.  The plan's
+# `PROGRESS.md`'s `R9` re-specification, not the plan's § 8 wording (unpublished).  The plan's
 # distinctive clause -- 「修不掉」那欄不是空的 -- is satisfied by SEVEN rows
-# committed in `plan/` § 8.2 before `R9` existed (NX, ASLR, seccomp /
+# written in the plan's § 8.2, by its own date before `R9` (NX, ASLR, seccomp /
 # no_new_privs, real secure boot, the physical attacker, the vendor WiFi driver,
 # the loader's unauthenticated TFTP rescue), so no `R9` outcome can leave the
 # column empty.  Replaced per-row by:
@@ -178,14 +178,14 @@
 # publishable (`D-6` published), `D-7` not a finding yet, `D-8` two of three
 # resolved.
 #
-# 🔴 `plan/` § 15 and `PROGRESS.md`'s `R9` re-specification both say FOUR are
+# 🔴 The plan's § 15 and `PROGRESS.md`'s `R9` re-specification both say FOUR are
 # held (`D-4`, `D-11`, `D-15`, `D-19`).  AT THE PIN THE COUNT IS THIRTEEN.  This
-# register follows the pin, because `plan/` § 15's own rule is *a named fix
+# register follows the pin, because the disclosure rule (`docs/charter.md` § Disclosure) says *a named fix
 # follows upstream's disclosure state* and the pin IS upstream's state.  The
 # discrepancy is a finding against the two state files, not against the pin, and
 # it widens `R9-8`'s DoD from four ids to thirteen.
 #
-# `plan/` § 15's three tiers, applied: a CLASS-LEVEL fix ("my rootfs has no
+# `docs/charter.md` § Disclosure's three tiers, applied: a CLASS-LEVEL fix ("my rootfs has no
 # `system()`") is publishable; a NAMED fix follows upstream's state, so held
 # means do not write it; a REPRODUCTION never appears in this repository while
 # the row says held.  So every `held = true` row carries a class-level title and
@@ -213,10 +213,10 @@
 #   `rsdk-1.5.5` accepts `-fstack-protector` and emits no guard while exiting 0,
 #   and `_FORTIFY_SOURCE` has nowhere to land (0 `__*_chk` entry points in all
 #   three `libc.a`).  `config/rlxfw-cflags` carries exactly one flag,
-#   `-fno-if-conversion`, and it is a kernel flag.  So `plan/` § 8's
+#   `-fno-if-conversion`, and it is a kernel flag.  So the plan's § 8
 #   memory-safety row claims compiler hardening this repository has measured as
 #   unavailable, and every 有界化 row rests on the parser's own bounds alone.
-#   A finding against `plan/` § 8, recorded rather than papered over.
+#   A finding against the plan's § 8, recorded rather than papered over.
 # * 讀 `notes/httpd.md` § 10 and `docs/KNOWN-ISSUES.md`: **no TLS** -- every
 #   password sent to rlxfw's httpd crosses the LAN in clear.  So `P8-17`'s class
 #   is one rlxfw does NOT fix.
@@ -227,7 +227,7 @@
 # * 量 `FW-182` and `FW-184`: two defects were found in rlxfw's own
 #   authentication path ON THE DEVICE, and `notes/httpd.md` § 11.7 says the fix
 #   has not run on the device.
-# * THE CLOSED SET HAS NO SLOT FOR "rlxfw does not fix this".  `plan/` § 8.2's
+# * THE CLOSED SET HAS NO SLOT FOR "rlxfw does not fix this".  The plan's (§ 8.2)
 #   seven platform limits, and `P8-17`'s missing TLS, have no member of
 #   <架構性 / 有界化 / 服務不存在 / 不適用> that fits; they are filed 不適用
 #   with the limit named in `residual`, which is the least wrong cell and not a
@@ -251,7 +251,7 @@ upstream_freeze_rule = "sha256 over the sorted (id, predict, refute) triples of 
 # sha256 over the sorted (upstream_id, refutation, opposite_check,
 # opposite_check_reading) tuples of every row.  `R9-1`'s DoD: editing a
 # prediction changes the digest in the same commit, where the diff shows it.
-sha256 = "15157ab54a2653de6cd6f915fa67f679c740cb461dc5124ca4be83160e0624d1"
+sha256 = "08b750e739f4d95c93ed91dc74063536cc676ebcfdc9f8b3a663550d4bf3353f"
 
 [partition.mechanism_class]
 "架構性" = 35
@@ -296,7 +296,7 @@ same_instrument_pair = "none needed"
 opposite_check = "a reading showing the instrument's output depends on which firmware is under test would move the row out of 不適用"
 opposite_check_reading = "量 the instruments in question are controlled in their own suites, each with a mutation that must go red: `tools/test-config-gates.sh` (`M1` a missing source skipped -> `A2` red; `M3` the `unit` tag unchecked -> `A5` red; `M5` the manifest digest over the path rather than the bytes -> `A11` red), `tools/test-uspacescan.sh` 70 of 70, `tools/cardcheck.py`'s `A11` running the whole committed block-3 card and requiring exactly the two cells that failed at the bench"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "rlxfw's independent second read path is its own MTD driver; plan/ § 17 item 5 names two release conditions and ① is free, being already `R5b`'s acceptance condition"
+residual = "rlxfw's independent second read path is its own MTD driver; docs/method.md § Deliberately not done, item 5, names two release conditions and ① is free, being already `R5b`'s acceptance condition"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -408,7 +408,7 @@ same_instrument_pair = "none needed"
 opposite_check = "a reading showing the loader differs between the two firmwares would refute the claim that it is the same program"
 opposite_check_reading = "量 `docs/GATE-RESULTS.md` entry 16 (`R8a`): the `FLR` bracket stays at 1,024 of 4,194,304 bytes = **0.0244 %**, `FLS-26`'s ledger does not move, and the three maps bracketing the nine vendor boots compare 31 groups the same and 1 `DIFFER`, the expected group 0, over 4,186,112 B with `H601` not hashed (`FLS-31`). They cannot see two writes that cancel, `H601`, or any byte outside the 4,186,112 -- so this reading bounds the loader's immutability, it does not prove it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "the loader is permanently out of rlxfw's reach -- CLAUDE.md § Never forbids touching `0x000000-0x005FFF` -- so this row is *not comparable*, never a win. plan/ § 8.2 books the loader's unauthenticated TFTP rescue as 修不掉 AND as a feature: removing it bricks the unit, and the threat model accepts physical or LAN access = full control"
+residual = "the loader is permanently out of rlxfw's reach -- CLAUDE.md § Never forbids touching `0x000000-0x005FFF` -- so this row is *not comparable*, never a win. the plan's § 8.2 (unpublished) books the loader's unauthenticated TFTP rescue as 修不掉 AND as a feature: removing it bricks the unit, and the threat model accepts physical or LAN access = full control"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -660,7 +660,7 @@ same_instrument_pair = "complete"
 opposite_check = "the vendor side of this instrument must NAME the daemon -- a capture that named none would make rlxfw's shorter list an instrument zero rather than a reading"
 opposite_check_reading = "量 the positive control is in the same capture set as every claim: 9 of 9 in both seatings for boa, MiniIGD, WiFi Simple Config, iwcontrol, IAPP, StartDnsSpoof and the NTP daemon, against 0 of 9 for telnetd, syslogd/klogd and the DNS relay -- so a 0 in this instrument is distinguishable from a dead instrument. ⚠️ each `V*-BOOT` capture is a `--until \"port 80\"` run of 1,789 bytes and stops at boa's third line, so V-C cannot see a service that starts after boa; and a banner is 量 evidence that a binary was exec'd, not that its socket is open later"
 refutation = "REFUTED IF the service is found running on rlxfw's image, or its port found answering -- or if the vendor side of the same instrument fails to name the service, which would make rlxfw's absence an instrument zero rather than a reading. Written before the reading."
-residual = "plan/ § 8.2 books the vendor WiFi driver as 修不掉: twenty thousand lines neither written nor auditable here, in a monolithic kernel, so containment is near zero. rlxfw ships no wireless USERSPACE, which is a narrower claim than fixing the driver -- and 讀 `docs/KNOWN-ISSUES.md`, at `SWCORE=n` the WLAN driver is the same source and not the same object, so it is listed as a difference regardless -- 🔄 2026-10-04 (FW-204): this clause read `40 symbols gone, shorter sk_buff` and the 40 is RETRACTED. 量 the loss is 11 symbol-table entries and 6 undefined references; 推 the 40 was the kconfig count read as an ELF-symbol count. `sk_buff` IS shorter and the amount is now measured: 8 bytes (FW-203), against 12 bytes of declared field, with the remaining 4 undetermined. The sentence this supported -- same source, not the same object -- stands and is a number now instead of an estimate"
+residual = "the plan's § 8.2 (unpublished) books the vendor WiFi driver as 修不掉: twenty thousand lines neither written nor auditable here, in a monolithic kernel, so containment is near zero. rlxfw ships no wireless USERSPACE, which is a narrower claim than fixing the driver -- and 讀 `docs/KNOWN-ISSUES.md`, at `SWCORE=n` the WLAN driver is the same source and not the same object, so it is listed as a difference regardless -- 🔄 2026-10-04 (FW-204): this clause read `40 symbols gone, shorter sk_buff` and the 40 is RETRACTED. 量 the loss is 11 symbol-table entries and 6 undefined references; 推 the 40 was the kconfig count read as an ELF-symbol count. `sk_buff` IS shorter and the amount is now measured: 8 bytes (FW-203), against 12 bytes of declared field, with the remaining 4 undetermined. The sentence this supported -- same source, not the same object -- stands and is a number now instead of an estimate"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -1052,7 +1052,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "break one bound in the shipped parser and require the matching test case to go red; and require the privilege drop's own step 8 -- `setuid(0)` must FAIL -- to be observed"
 opposite_check_reading = "量 2026-09-30, host: mutation `hdrcap` goes **RED on 1 case** (33 header lines refused with 431), and `traversal`, `linebound` and `offbyone` are the other three mutation controls; `test_http` 105 cases, `test_routes` 133 cases; `rootcheck` 24 of 24 run as root, with `/proc/<pid>/root` read back as the web root and the 5th connection from one address getting 503; five login POSTs give `503 503 503 429 429`; a traversal battery of 34 targets; 256 truncations and 2,022 corruptions with 0 crashes and the invariant `body_len == clen <= 4096` holding on every accepted parse. 量 on the die 2026-09-30: `dnsfwd` printed `setuid(0) refused (Operation not permitted)` (`FW-175`). ⚠️ `notes/httpd.md` § 7.1's own caveat: the planted off-by-one on the 1,024-byte line bound is INTRA-STRUCT, and ASan returns 0 on it -- \"ASan's silence about an intra-struct overflow is not evidence\""
 refutation = "REFUTED IF a construct that could carry this class is found in rlxfw's shipped bytes by the same instrument that read the vendor side: for the shell class, one implementation of a process-starting name other than the one named exemption; for authentication and authorisation, one route reachable without its declared session or CSRF check, or one comparison that is not exact-match; for escaping, one byte of a request appearing in a response body or header. Written before the reading."
-residual = "the vendor-side mechanism is upstream's held `D-4`, named at class level only. rlxfw refuses to issue a token before the entropy pool is credited -- plan/ § 8.3's fail-closed row -- and 量 `FW-160` says the pool on this board is empty and stays empty, so fail-closed is the load-bearing half and not the seed file"
+residual = "the vendor-side mechanism is upstream's held `D-4`, named at class level only. rlxfw refuses to issue a token before the entropy pool is credited -- the plan's § 8.3 (unpublished) fail-closed row -- and 量 `FW-160` says the pool on this board is empty and stays empty, so fail-closed is the load-bearing half and not the seed file"
 held = true
 held_disclosure_ids = ["D-4"]
 instrument_substituted = true
@@ -1071,7 +1071,7 @@ evidence_tier = "V-D"
 tier_basis_field = "cut_reason"
 tier_basis = "cut upstream; by need it is action inside the running system after root"
 tier_payable = false
-blocker = "cut upstream; plan/ § 17 voluntary out-of-scope item 3"
+blocker = "cut upstream; docs/method.md § Deliberately not done, voluntary item 3"
 anchor = "I-CUT"
 same_instrument = "none -- the upstream case was cut before it ran, so there is no reading on either side to pair"
 vendor_evidence = "⊘ no reading: the upstream case carries `cut_reason` and no result. 讀 `upstream/tools/rtcase.py`: a cut case may not carry a result, and that refusal is mechanical"
@@ -1080,7 +1080,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 17's voluntary out-of-scope item 3 keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
+residual = "docs/method.md § Deliberately not done, voluntary item 3, keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -1099,7 +1099,7 @@ evidence_tier = "V-D"
 tier_basis_field = "cut_reason"
 tier_basis = "cut upstream; by need it is harvesting from inside the running system"
 tier_payable = false
-blocker = "cut upstream; plan/ § 17 voluntary out-of-scope item 3"
+blocker = "cut upstream; docs/method.md § Deliberately not done, voluntary item 3"
 anchor = "I-CUT"
 same_instrument = "none -- the upstream case was cut before it ran, so there is no reading on either side to pair"
 vendor_evidence = "⊘ no reading: the upstream case carries `cut_reason` and no result. 讀 `upstream/tools/rtcase.py`: a cut case may not carry a result, and that refusal is mechanical"
@@ -1108,7 +1108,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 17's voluntary out-of-scope item 3 keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
+residual = "docs/method.md § Deliberately not done, voluntary item 3, keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -1155,7 +1155,7 @@ evidence_tier = "V-D"
 tier_basis_field = "cut_reason"
 tier_basis = "cut upstream; by need it is reconfiguration from inside the running system"
 tier_payable = false
-blocker = "cut upstream; plan/ § 17 voluntary out-of-scope item 3"
+blocker = "cut upstream; docs/method.md § Deliberately not done, voluntary item 3"
 anchor = "I-CUT"
 same_instrument = "none -- the upstream case was cut before it ran, so there is no reading on either side to pair"
 vendor_evidence = "⊘ no reading: the upstream case carries `cut_reason` and no result. 讀 `upstream/tools/rtcase.py`: a cut case may not carry a result, and that refusal is mechanical"
@@ -1164,7 +1164,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 17's voluntary out-of-scope item 3 keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
+residual = "docs/method.md § Deliberately not done, voluntary item 3, keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -1183,7 +1183,7 @@ evidence_tier = "V-D"
 tier_basis_field = "cut_reason"
 tier_basis = "cut upstream; by need it is anti-forensics inside the running system"
 tier_payable = false
-blocker = "cut upstream; plan/ § 17 voluntary out-of-scope item 3"
+blocker = "cut upstream; docs/method.md § Deliberately not done, voluntary item 3"
 anchor = "I-CUT"
 same_instrument = "none -- the upstream case was cut before it ran, so there is no reading on either side to pair"
 vendor_evidence = "⊘ no reading: the upstream case carries `cut_reason` and no result. 讀 `upstream/tools/rtcase.py`: a cut case may not carry a result, and that refusal is mechanical"
@@ -1192,7 +1192,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 17's voluntary out-of-scope item 3 keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
+residual = "docs/method.md § Deliberately not done, voluntary item 3, keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -1948,7 +1948,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "break one bound in the shipped parser and require the matching test case to go red; and require the privilege drop's own step 8 -- `setuid(0)` must FAIL -- to be observed"
 opposite_check_reading = "量 2026-09-30, host: mutation `hdrcap` goes **RED on 1 case** (33 header lines refused with 431), and `traversal`, `linebound` and `offbyone` are the other three mutation controls; `test_http` 105 cases, `test_routes` 133 cases; `rootcheck` 24 of 24 run as root, with `/proc/<pid>/root` read back as the web root and the 5th connection from one address getting 503; five login POSTs give `503 503 503 429 429`; a traversal battery of 34 targets; 256 truncations and 2,022 corruptions with 0 crashes and the invariant `body_len == clen <= 4096` holding on every accepted parse. 量 on the die 2026-09-30: `dnsfwd` printed `setuid(0) refused (Operation not permitted)` (`FW-175`). ⚠️ `notes/httpd.md` § 7.1's own caveat: the planted off-by-one on the 1,024-byte line bound is INTRA-STRUCT, and ASan returns 0 on it -- \"ASan's silence about an intra-struct overflow is not evidence\""
 refutation = "REFUTED IF an input accepted past the stated bound reaches the same effect the vendor case describes, or if the bound is absent from the SHIPPED ARTEFACT rather than only from the note. The bound's NUMBER is the claim, so a bound quoted without its number refutes this row too. Written before the reading."
-residual = "量 `TC-53` says this toolchain cannot give rlxfw a stack canary, so the bound is the PARSER's own and not the compiler's. That is the honest reading of plan/ § 8's memory-safety row, which claims `-fstack-protector-strong` this repository has measured as refused"
+residual = "量 `TC-53` says this toolchain cannot give rlxfw a stack canary, so the bound is the PARSER's own and not the compiler's. That is the honest reading of the plan's § 8 (unpublished) memory-safety row, which claims `-fstack-protector-strong` this repository has measured as refused"
 held = false
 held_disclosure_ids = []
 instrument_substituted = true
@@ -2060,7 +2060,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "none is constructible inside this gate: `PROGRESS.md` `VDR-1` -- every evidenced path into vendor userspace opens with a flash write, and the only evidenced entry is boa's `formSysCmd`, which 量 `P10-10` writes `SYSCMD_SELECT` to `COMPCS` at flash `0x00C000`"
 opposite_check_reading = "未定 -- no executable refutation exists under this gate's own zero-flash-write rule. SETTLED BY: the whole chain rehearsed under `qemu-mips-static -L squashfs-root`, which `VDR-1` itself names as the cheapest decisive experiment and which costs neither flash nor power; or the owner's dated yes for one flash write, which `R9-11` books as ⊘ with the conflict named"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 8.2 books the exploitation mitigations as 修不掉 and all three stand: no NX (per-page execute-inhibit is MIPS32r3, this core is MIPS-I class), no ASLR (2.6.30's MIPS has no randomised `arch_pick_mmap_layout`), no seccomp or `PR_SET_NO_NEW_PRIVS` (3.x and 3.5+). 量 `TC-53` adds that no canary and no FORTIFY are available on this toolchain either. So rlxfw does NOT fix this row: the vulnerable PROGRAM is gone, the exploitation primitive is not"
+residual = "the plan's § 8.2 (unpublished) books the exploitation mitigations as 修不掉 and all three stand: no NX (per-page execute-inhibit is MIPS32r3, this core is MIPS-I class), no ASLR (2.6.30's MIPS has no randomised `arch_pick_mmap_layout`), no seccomp or `PR_SET_NO_NEW_PRIVS` (3.x and 3.5+). 量 `TC-53` adds that no canary and no FORTIFY are available on this toolchain either. So rlxfw does NOT fix this row: the vulnerable PROGRAM is gone, the exploitation primitive is not"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -2200,7 +2200,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "none is constructible inside this gate: `PROGRESS.md` `VDR-1` -- every evidenced path into vendor userspace opens with a flash write, and the only evidenced entry is boa's `formSysCmd`, which 量 `P10-10` writes `SYSCMD_SELECT` to `COMPCS` at flash `0x00C000`"
 opposite_check_reading = "未定 -- no executable refutation exists under this gate's own zero-flash-write rule. SETTLED BY: the whole chain rehearsed under `qemu-mips-static -L squashfs-root`, which `VDR-1` itself names as the cheapest decisive experiment and which costs neither flash nor power; or the owner's dated yes for one flash write, which `R9-11` books as ⊘ with the conflict named"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 8.2 books the exploitation mitigations as 修不掉 and all three stand: no NX (per-page execute-inhibit is MIPS32r3, this core is MIPS-I class), no ASLR (2.6.30's MIPS has no randomised `arch_pick_mmap_layout`), no seccomp or `PR_SET_NO_NEW_PRIVS` (3.x and 3.5+). 量 `TC-53` adds that no canary and no FORTIFY are available on this toolchain either. So rlxfw does NOT fix this row: the vulnerable PROGRAM is gone, the exploitation primitive is not"
+residual = "the plan's § 8.2 (unpublished) books the exploitation mitigations as 修不掉 and all three stand: no NX (per-page execute-inhibit is MIPS32r3, this core is MIPS-I class), no ASLR (2.6.30's MIPS has no randomised `arch_pick_mmap_layout`), no seccomp or `PR_SET_NO_NEW_PRIVS` (3.x and 3.5+). 量 `TC-53` adds that no canary and no FORTIFY are available on this toolchain either. So rlxfw does NOT fix this row: the vulnerable PROGRAM is gone, the exploitation primitive is not"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -2228,7 +2228,7 @@ same_instrument_pair = "complete"
 opposite_check = "the probe must find the flag working somewhere, or its refusal is the instrument's and not the toolchain's"
 opposite_check_reading = "量 2026-09-13 `TC-53`: the same fixture through host gcc emits `U __stack_chk_fail` and through `mips-linux-gnu-gcc-12` emits **2**, so the instrument is good and this is not \"MIPS cannot\"; `-fzzz-not-a-flag` is refused by all three, so \"accepted\" is recognition and not blanket acceptance; `memcpy` reads **1** in the same scan that reads 0 `__*_chk`, so the denominator is non-zero"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 8.2 books the exploitation mitigations as 修不掉 and all three stand: no NX (per-page execute-inhibit is MIPS32r3, this core is MIPS-I class), no ASLR (2.6.30's MIPS has no randomised `arch_pick_mmap_layout`), no seccomp or `PR_SET_NO_NEW_PRIVS` (3.x and 3.5+). 量 `TC-53` adds that no canary and no FORTIFY are available on this toolchain either. So rlxfw does NOT fix this row: the vulnerable PROGRAM is gone, the exploitation primitive is not. rlxfw's own programs are statically linked with no `PT_DYNAMIC` and no `PT_INTERP`, which removes the dynamic-linker half of the technique but not the technique"
+residual = "the plan's § 8.2 (unpublished) books the exploitation mitigations as 修不掉 and all three stand: no NX (per-page execute-inhibit is MIPS32r3, this core is MIPS-I class), no ASLR (2.6.30's MIPS has no randomised `arch_pick_mmap_layout`), no seccomp or `PR_SET_NO_NEW_PRIVS` (3.x and 3.5+). 量 `TC-53` adds that no canary and no FORTIFY are available on this toolchain either. So rlxfw does NOT fix this row: the vulnerable PROGRAM is gone, the exploitation primitive is not. rlxfw's own programs are statically linked with no `PT_DYNAMIC` and no `PT_INTERP`, which removes the dynamic-linker half of the technique but not the technique"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -2396,7 +2396,7 @@ same_instrument_pair = "complete"
 opposite_check = "the census must find ports open where they are open -- a scan that found nothing on both firmwares would make rlxfw's zero an instrument zero"
 opposite_check_reading = "量 the same `V1-NMAP` run that reads 23 closed reads **80, 52869 and 52881 open**, in both seatings: the positive control is inside the claim's own scan. 讀 `docs/boot-time-table.md` § 6: `D4`'s refutation did not fire -- every open port maps to a daemon the scripts start and the console announces. ⚠️ the census is TCP only, so DHCP, the DNS relay and NTP are neither confirmed nor refuted by a port, and 52869/52881 ownership is 推 (`NET-118`)"
 refutation = "REFUTED IF the service is found running on rlxfw's image, or its port found answering -- or if the vendor side of the same instrument fails to name the service, which would make rlxfw's absence an instrument zero rather than a reading. Written before the reading."
-residual = "rlxfw ships no UPnP daemon. plan/ § 8 books this as 服務縮減: a service that does not exist has no attack surface, with every daemon that runs named in the threat model with a reason. The vendor-side mechanism is upstream's held `D-16`, named at class level only, and plan/ § 8.1 already records that its CODE SHAPE is present while its EFFECT is absent -- the ICMP oracle stayed silent and `miniigd` terminated instead"
+residual = "rlxfw ships no UPnP daemon. the plan's § 8 (unpublished) books this as 服務縮減: a service that does not exist has no attack surface, with every daemon that runs named in the threat model with a reason. The vendor-side mechanism is upstream's held `D-16`, named at class level only, and upstream's `P6-1` (`upstream/PROGRESS.md`) already records that its CODE SHAPE is present while its EFFECT is absent -- the ICMP oracle stayed silent and `miniigd` terminated instead"
 held = true
 held_disclosure_ids = ["D-16"]
 instrument_substituted = false
@@ -2592,7 +2592,7 @@ same_instrument_pair = "none needed"
 opposite_check = "a reading showing the instrument's output depends on which firmware is under test would move the row out of 不適用"
 opposite_check_reading = "量 the instruments in question are controlled in their own suites, each with a mutation that must go red: `tools/test-config-gates.sh` (`M1` a missing source skipped -> `A2` red; `M3` the `unit` tag unchecked -> `A5` red; `M5` the manifest digest over the path rather than the bytes -> `A11` red), `tools/test-uspacescan.sh` 70 of 70, `tools/cardcheck.py`'s `A11` running the whole committed block-3 card and requiring exactly the two cells that failed at the bench"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 8.1 marks this not-applicable with evidence rather than as unfixed: the analysis targets the eCos branch, `/proc/sys/net/netfilter/` has no SIP entry and `/proc/modules` does not exist on this build"
+residual = "the plan's § 8.1 (unpublished) marks this not-applicable with evidence rather than as unfixed: the analysis targets the eCos branch, `/proc/sys/net/netfilter/` has no SIP entry and `/proc/modules` does not exist on this build"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -2732,7 +2732,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 8.2 books the vendor WiFi driver as 修不掉 and says so in the threat model"
+residual = "the plan's § 8.2 (unpublished) books the vendor WiFi driver as 修不掉 and says so in the threat model"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -2835,7 +2835,7 @@ evidence_tier = "V-A"
 tier_basis_field = "cut_reason"
 tier_basis = "cut upstream; by need it is an over-the-air stimulus"
 tier_payable = false
-blocker = "cut upstream; plan/ § 17 item 1 also keeps beacon injection voluntarily out of scope -- a broadcast reaches every device in range"
+blocker = "cut upstream; docs/method.md § Deliberately not done, item 1, also keeps beacon injection voluntarily out of scope -- a broadcast reaches every device in range"
 anchor = "I-CUT"
 same_instrument = "none -- the upstream case was cut before it ran, so there is no reading on either side to pair"
 vendor_evidence = "⊘ no reading: the upstream case carries `cut_reason` and no result. 讀 `upstream/tools/rtcase.py`: a cut case may not carry a result, and that refusal is mechanical"
@@ -2844,7 +2844,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 17 item 1 keeps beacon-injection experiments voluntarily out of scope: a malformed beacon is a broadcast and reaches every device in range"
+residual = "docs/method.md § Deliberately not done, item 1, keeps beacon-injection experiments voluntarily out of scope: a malformed beacon is a broadcast and reaches every device in range"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -2951,12 +2951,12 @@ blocker = ""
 anchor = "I-CRED"
 same_instrument = "a static read of the shipped tree's own credential files -- the vendor's from the tree carved out of this unit's dump, rlxfw's from its declared manifest"
 vendor_evidence = "讀 `FW-16`: the vendor's `/etc/passwd.org` carries `root:123456` and `onlime_r:12345`, both uid 0, byte-identical since 2015, and this unit's `TELNET_ENABLED` reads 0"
-rlxfw_evidence = "讀 `config/rlxfw-initramfs.tsv`: `/etc` holds only `passwd` and `group`, both tagged `rlxfw`, and **every shell field is `/bin/false`** -- 量 `R78-pw` on the board read all three rows that way. There is no factory password: plan/ § 8 names 'no factory password, forced at first boot, no factory account exists'"
+rlxfw_evidence = "讀 `config/rlxfw-initramfs.tsv`: `/etc` holds only `passwd` and `group`, both tagged `rlxfw`, and **every shell field is `/bin/false`** -- 量 `R78-pw` on the board read all three rows that way. There is no factory password: the plan's § 8 (unpublished) names 'no factory password, forced at first boot, no factory account exists'"
 same_instrument_pair = "complete"
 opposite_check = "the manifest tool must refuse an entry whose tag does not match its source path, and must refuse a missing source rather than skipping it -- otherwise a declared `/etc` proves nothing about the shipped one"
 opposite_check_reading = "量 `tools/test-config-gates.sh`: `M1` (a missing source file skipped instead of refused) requires `A2` to fail, `M3` (the `unit` tag stops being checked) requires `A5` to fail, `M4` (the `unit` counterpart check becomes a no-op) requires `A13` to fail, and `M5` (the manifest digest taken over the path rather than the bytes) requires `A11` to fail. ⚠️ and the half that is NOT fixed: 量 `FW-160`, the entropy pool on this board is empty and stays empty, so rlxfw's answer at first boot is a fail-closed refusal to issue a token, not a good key"
 refutation = "REFUTED IF a construct that could carry this class is found in rlxfw's shipped bytes by the same instrument that read the vendor side: for the shell class, one implementation of a process-starting name other than the one named exemption; for authentication and authorisation, one route reachable without its declared session or CSRF check, or one comparison that is not exact-match; for escaping, one byte of a request appearing in a response body or header. Written before the reading."
-residual = "rlxfw ships no factory credential of any kind: plan/ § 8 names no factory password, forced at first boot, no factory account exists. ⚠️ and the half that is not fixed: 量 `FW-160`, the entropy pool on this board is empty and stays empty, so rlxfw's answer is fail-closed refusal rather than a good key"
+residual = "rlxfw ships no factory credential of any kind: the plan's § 8 (unpublished) names no factory password, forced at first boot, no factory account exists. ⚠️ and the half that is not fixed: 量 `FW-160`, the entropy pool on this board is empty and stays empty, so rlxfw's answer is fail-closed refusal rather than a good key"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -3040,7 +3040,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "break one bound in the shipped parser and require the matching test case to go red; and require the privilege drop's own step 8 -- `setuid(0)` must FAIL -- to be observed"
 opposite_check_reading = "量 2026-09-30, host: mutation `hdrcap` goes **RED on 1 case** (33 header lines refused with 431), and `traversal`, `linebound` and `offbyone` are the other three mutation controls; `test_http` 105 cases, `test_routes` 133 cases; `rootcheck` 24 of 24 run as root, with `/proc/<pid>/root` read back as the web root and the 5th connection from one address getting 503; five login POSTs give `503 503 503 429 429`; a traversal battery of 34 targets; 256 truncations and 2,022 corruptions with 0 crashes and the invariant `body_len == clen <= 4096` holding on every accepted parse. 量 on the die 2026-09-30: `dnsfwd` printed `setuid(0) refused (Operation not permitted)` (`FW-175`). ⚠️ `notes/httpd.md` § 7.1's own caveat: the planted off-by-one on the 1,024-byte line bound is INTRA-STRUCT, and ASan returns 0 on it -- \"ASan's silence about an intra-struct overflow is not evidence\""
 refutation = "REFUTED IF a construct that could carry this class is found in rlxfw's shipped bytes by the same instrument that read the vendor side: for the shell class, one implementation of a process-starting name other than the one named exemption; for authentication and authorisation, one route reachable without its declared session or CSRF check, or one comparison that is not exact-match; for escaping, one byte of a request appearing in a response body or header. Written before the reading."
-residual = "plan/ § 8: the vendor has about thirty renderers using raw `%s`; rlxfw has a single template layer that escapes by default. 讀 `notes/httpd.md` § 6.3: the error tokens are a closed set of string literals selected by a switch, and no response body or header in the program contains a byte from the request. ⚠️ that last sentence carries no 量 token in its own file"
+residual = "the plan's § 8 (unpublished): the vendor has about thirty renderers using raw `%s`; rlxfw has a single template layer that escapes by default. 讀 `notes/httpd.md` § 6.3: the error tokens are a closed set of string literals selected by a switch, and no response body or header in the program contains a byte from the request. ⚠️ that last sentence carries no 量 token in its own file"
 held = false
 held_disclosure_ids = []
 instrument_substituted = true
@@ -3068,7 +3068,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "break one bound in the shipped parser and require the matching test case to go red; and require the privilege drop's own step 8 -- `setuid(0)` must FAIL -- to be observed"
 opposite_check_reading = "量 2026-09-30, host: mutation `hdrcap` goes **RED on 1 case** (33 header lines refused with 431), and `traversal`, `linebound` and `offbyone` are the other three mutation controls; `test_http` 105 cases, `test_routes` 133 cases; `rootcheck` 24 of 24 run as root, with `/proc/<pid>/root` read back as the web root and the 5th connection from one address getting 503; five login POSTs give `503 503 503 429 429`; a traversal battery of 34 targets; 256 truncations and 2,022 corruptions with 0 crashes and the invariant `body_len == clen <= 4096` holding on every accepted parse. 量 on the die 2026-09-30: `dnsfwd` printed `setuid(0) refused (Operation not permitted)` (`FW-175`). ⚠️ `notes/httpd.md` § 7.1's own caveat: the planted off-by-one on the 1,024-byte line bound is INTRA-STRUCT, and ASan returns 0 on it -- \"ASan's silence about an intra-struct overflow is not evidence\""
 refutation = "REFUTED IF a construct that could carry this class is found in rlxfw's shipped bytes by the same instrument that read the vendor side: for the shell class, one implementation of a process-starting name other than the one named exemption; for authentication and authorisation, one route reachable without its declared session or CSRF check, or one comparison that is not exact-match; for escaping, one byte of a request appearing in a response body or header. Written before the reading."
-residual = "the vendor-side mechanism is upstream's held `D-12`, named at class level only. plan/ § 8: rlxfw's update is uploaded locally only, Ed25519-signed, with anti-rollback and verify-before-erase; 量 `FW-166` is the container format and its public key and 量 `FW-170` is `R8a`'s three pass conditions met with zero flash bytes written. ⚠️ `/api/firmware` has no broker op at all today: it answers 501 after the same checks as any other write"
+residual = "the vendor-side mechanism is upstream's held `D-12`, named at class level only. the plan's § 8 (unpublished): rlxfw's update is uploaded locally only, Ed25519-signed, with anti-rollback and verify-before-erase; 量 `FW-166` is the container format and its public key and 量 `FW-170` is `R8a`'s three pass conditions met with zero flash bytes written. ⚠️ `/api/firmware` has no broker op at all today: it answers 501 after the same checks as any other write"
 held = true
 held_disclosure_ids = ["D-12"]
 instrument_substituted = true
@@ -3143,7 +3143,7 @@ evidence_tier = "V-A"
 tier_basis_field = "cut_reason"
 tier_basis = "cut upstream; by need it is a social stimulus outside this project's devices"
 tier_payable = false
-blocker = "cut upstream; plan/ § 17 voluntary out-of-scope item 2"
+blocker = "cut upstream; docs/method.md § Deliberately not done, voluntary item 2"
 anchor = "I-CUT"
 same_instrument = "none -- the upstream case was cut before it ran, so there is no reading on either side to pair"
 vendor_evidence = "⊘ no reading: the upstream case carries `cut_reason` and no result. 讀 `upstream/tools/rtcase.py`: a cut case may not carry a result, and that refusal is mechanical"
@@ -3152,7 +3152,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 17 voluntary out-of-scope item 2: no testing against a device that is not this project's own"
+residual = "docs/method.md § Deliberately not done, voluntary item 2: no testing against a device that is not this project's own"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -3264,7 +3264,7 @@ same_instrument_pair = "none needed"
 opposite_check = "a reading showing the instrument's output depends on which firmware is under test would move the row out of 不適用"
 opposite_check_reading = "量 the instruments in question are controlled in their own suites, each with a mutation that must go red: `tools/test-config-gates.sh` (`M1` a missing source skipped -> `A2` red; `M3` the `unit` tag unchecked -> `A5` red; `M5` the manifest digest over the path rather than the bytes -> `A11` red), `tools/test-uspacescan.sh` 70 of 70, `tools/cardcheck.py`'s `A11` running the whole committed block-3 card and requiring exactly the two cells that failed at the bench"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "🔴 **rlxfw does NOT fix this row.** 讀 `notes/httpd.md` § 10 and `docs/known-issues/v1.0.md`, carried from `v0.6` unchanged (the words quoted are v0.6's, in `docs/history/known-issues-closed.md` § What `v0.6` does not establish): *No TLS. HTTP only: every password on this port crosses the LAN in clear.* plan/ § 8 books management-interface TLS as CONDITIONAL on the size budget, so the transport row is not settled and this case has no slot in the closed set -- see the header's note on the missing fifth class"
+residual = "🔴 **rlxfw does NOT fix this row.** 讀 `notes/httpd.md` § 10 and `docs/known-issues/v1.0.md`, carried from `v0.6` unchanged (the words quoted are v0.6's, in `docs/history/known-issues-closed.md` § What `v0.6` does not establish): *No TLS. HTTP only: every password on this port crosses the LAN in clear.* the plan's § 8 (unpublished) books management-interface TLS as CONDITIONAL on the size budget (docs/flash.md), so the transport row is not settled and this case has no slot in the closed set -- see the header's note on the missing fifth class"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -3488,7 +3488,7 @@ same_instrument_pair = "complete"
 opposite_check = "the vendor side of this instrument must NAME the daemon -- a capture that named none would make rlxfw's shorter list an instrument zero rather than a reading"
 opposite_check_reading = "量 the positive control is in the same capture set as every claim: 9 of 9 in both seatings for boa, MiniIGD, WiFi Simple Config, iwcontrol, IAPP, StartDnsSpoof and the NTP daemon, against 0 of 9 for telnetd, syslogd/klogd and the DNS relay -- so a 0 in this instrument is distinguishable from a dead instrument. ⚠️ each `V*-BOOT` capture is a `--until \"port 80\"` run of 1,789 bytes and stops at boa's third line, so V-C cannot see a service that starts after boa; and a banner is 量 evidence that a binary was exec'd, not that its socket is open later"
 refutation = "REFUTED IF a construct that could carry this class is found in rlxfw's shipped bytes by the same instrument that read the vendor side: for the shell class, one implementation of a process-starting name other than the one named exemption; for authentication and authorisation, one route reachable without its declared session or CSRF check, or one comparison that is not exact-match; for escaping, one byte of a request appearing in a response body or header. Written before the reading."
-residual = "the vendor-side mechanism is upstream's held `D-13`, named at class level only. plan/ § 8: rlxfw's answer to both regions invalid is recovery that accepts a signed image only, not defaults plus telnet. ⚠️ rlxfw has no MIB layer and no second settings region, so there is no equivalent fail-open state to measure"
+residual = "the vendor-side mechanism is upstream's held `D-13`, named at class level only. the plan's § 8 (unpublished): rlxfw's answer to both regions invalid is recovery that accepts a signed image only, not defaults plus telnet. ⚠️ rlxfw has no MIB layer and no second settings region, so there is no equivalent fail-open state to measure"
 held = true
 held_disclosure_ids = ["D-13"]
 instrument_substituted = false
@@ -3675,7 +3675,7 @@ evidence_tier = "V-D"
 tier_basis_field = "cut_reason"
 tier_basis = "cut upstream; by need it is persistence inside the running system"
 tier_payable = false
-blocker = "cut upstream; plan/ § 17 voluntary out-of-scope item 3 keeps tradecraft out entirely"
+blocker = "cut upstream; docs/method.md § Deliberately not done, voluntary item 3, keeps tradecraft out entirely"
 anchor = "I-CUT"
 same_instrument = "none -- the upstream case was cut before it ran, so there is no reading on either side to pair"
 vendor_evidence = "⊘ no reading: the upstream case carries `cut_reason` and no result. 讀 `upstream/tools/rtcase.py`: a cut case may not carry a result, and that refusal is mechanical"
@@ -3684,7 +3684,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 17's voluntary out-of-scope item 3 keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
+residual = "docs/method.md § Deliberately not done, voluntary item 3, keeps tradecraft -- persistence, anti-forensics, lateral movement -- out of scope entirely: no gate needs it"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -3712,7 +3712,7 @@ same_instrument_pair = "none needed"
 opposite_check = "a reading showing the loader differs between the two firmwares would refute the claim that it is the same program"
 opposite_check_reading = "量 `docs/GATE-RESULTS.md` entry 16 (`R8a`): the `FLR` bracket stays at 1,024 of 4,194,304 bytes = **0.0244 %**, `FLS-26`'s ledger does not move, and the three maps bracketing the nine vendor boots compare 31 groups the same and 1 `DIFFER`, the expected group 0, over 4,186,112 B with `H601` not hashed (`FLS-31`). They cannot see two writes that cancel, `H601`, or any byte outside the 4,186,112 -- so this reading bounds the loader's immutability, it does not prove it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "量 `PROGRESS.md` `VDR-1` / `docs/history/progress-carried-forward.md` `R1C-1`: the loader has no `init=` and no `bootargs` mechanism -- 13 probes, 0 hits. the loader is permanently out of rlxfw's reach -- CLAUDE.md § Never forbids touching `0x000000-0x005FFF` -- so this row is *not comparable*, never a win. plan/ § 8.2 books the loader's unauthenticated TFTP rescue as 修不掉 AND as a feature: removing it bricks the unit, and the threat model accepts physical or LAN access = full control"
+residual = "量 `PROGRESS.md` `VDR-1` / `docs/history/progress-carried-forward.md` `R1C-1`: the loader has no `init=` and no `bootargs` mechanism -- 13 probes, 0 hits. the loader is permanently out of rlxfw's reach -- CLAUDE.md § Never forbids touching `0x000000-0x005FFF` -- so this row is *not comparable*, never a win. the plan's § 8.2 (unpublished) books the loader's unauthenticated TFTP rescue as 修不掉 AND as a feature: removing it bricks the unit, and the threat model accepts physical or LAN access = full control"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -4048,7 +4048,7 @@ same_instrument_pair = "none needed"
 opposite_check = "a reading showing the loader differs between the two firmwares would refute the claim that it is the same program"
 opposite_check_reading = "量 `docs/GATE-RESULTS.md` entry 16 (`R8a`): the `FLR` bracket stays at 1,024 of 4,194,304 bytes = **0.0244 %**, `FLS-26`'s ledger does not move, and the three maps bracketing the nine vendor boots compare 31 groups the same and 1 `DIFFER`, the expected group 0, over 4,186,112 B with `H601` not hashed (`FLS-31`). They cannot see two writes that cancel, `H601`, or any byte outside the 4,186,112 -- so this reading bounds the loader's immutability, it does not prove it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "the loader is permanently out of rlxfw's reach -- CLAUDE.md § Never forbids touching `0x000000-0x005FFF` -- so this row is *not comparable*, never a win. plan/ § 8.2 books the loader's unauthenticated TFTP rescue as 修不掉 AND as a feature: removing it bricks the unit, and the threat model accepts physical or LAN access = full control"
+residual = "the loader is permanently out of rlxfw's reach -- CLAUDE.md § Never forbids touching `0x000000-0x005FFF` -- so this row is *not comparable*, never a win. the plan's § 8.2 (unpublished) books the loader's unauthenticated TFTP rescue as 修不掉 AND as a feature: removing it bricks the unit, and the threat model accepts physical or LAN access = full control"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -4076,7 +4076,7 @@ same_instrument_pair = "none needed"
 opposite_check = "a reading showing the loader differs between the two firmwares would refute the claim that it is the same program"
 opposite_check_reading = "量 `docs/GATE-RESULTS.md` entry 16 (`R8a`): the `FLR` bracket stays at 1,024 of 4,194,304 bytes = **0.0244 %**, `FLS-26`'s ledger does not move, and the three maps bracketing the nine vendor boots compare 31 groups the same and 1 `DIFFER`, the expected group 0, over 4,186,112 B with `H601` not hashed (`FLS-31`). They cannot see two writes that cancel, `H601`, or any byte outside the 4,186,112 -- so this reading bounds the loader's immutability, it does not prove it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "CLAUDE.md forbids leaving the loader at its prompt unattended (`NET-165`). the loader is permanently out of rlxfw's reach -- CLAUDE.md § Never forbids touching `0x000000-0x005FFF` -- so this row is *not comparable*, never a win. plan/ § 8.2 books the loader's unauthenticated TFTP rescue as 修不掉 AND as a feature: removing it bricks the unit, and the threat model accepts physical or LAN access = full control"
+residual = "CLAUDE.md forbids leaving the loader at its prompt unattended (`NET-165`). the loader is permanently out of rlxfw's reach -- CLAUDE.md § Never forbids touching `0x000000-0x005FFF` -- so this row is *not comparable*, never a win. the plan's § 8.2 (unpublished) books the loader's unauthenticated TFTP rescue as 修不掉 AND as a feature: removing it bricks the unit, and the threat model accepts physical or LAN access = full control"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -4095,7 +4095,7 @@ evidence_tier = "V-B"
 tier_basis_field = "cut_reason"
 tier_basis = "cut upstream; by need it is a second physical read instrument over the flash part"
 tier_payable = false
-blocker = "cut upstream; plan/ § 17 item 5 names its two release conditions"
+blocker = "cut upstream; docs/method.md § Deliberately not done, item 5, names its two release conditions"
 anchor = "I-CUT"
 same_instrument = "none -- the upstream case was cut before it ran, so there is no reading on either side to pair"
 vendor_evidence = "⊘ no reading: the upstream case carries `cut_reason` and no result. 讀 `upstream/tools/rtcase.py`: a cut case may not carry a result, and that refusal is mechanical"
@@ -4104,7 +4104,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 17 item 5: two release conditions, either sufficient, and ① is free -- rlxfw's own MTD driver reading 4 MiB that matches `dumps/`'s sha256 is a completely independent read path and is already `R5b`'s acceptance condition"
+residual = "docs/method.md § Deliberately not done, item 5: two release conditions, either sufficient, and ① is free -- rlxfw's own MTD driver reading 4 MiB that matches `dumps/`'s sha256 is a completely independent read path and is already `R5b`'s acceptance condition"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -4151,7 +4151,7 @@ evidence_tier = "V-B"
 tier_basis_field = "cut_reason"
 tier_basis = "cut upstream; by need it is a direct SPI read of the part's identity"
 tier_payable = false
-blocker = "cut upstream; `R5b`'s MTD driver reads the JEDEC ID at probe, which retired plan/ § 17's item 4"
+blocker = "cut upstream; `R5b`'s MTD driver reads the JEDEC ID at probe, which retired docs/method.md § Deliberately not done, item 4"
 anchor = "I-CUT"
 same_instrument = "none -- the upstream case was cut before it ran, so there is no reading on either side to pair"
 vendor_evidence = "⊘ no reading: the upstream case carries `cut_reason` and no result. 讀 `upstream/tools/rtcase.py`: a cut case may not carry a result, and that refusal is mechanical"
@@ -4160,7 +4160,7 @@ same_instrument_pair = "incomplete"
 opposite_check = "whatever the cut case would have measured, which is upstream's to define"
 opposite_check_reading = "未定 -- the case was cut upstream, so no reading exists on either side. SETTLED BY: upstream running the case and recording a result, which is upstream's decision and not this gate's; this row exists so that the partition covers the whole population rather than the convenient part of it"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
-residual = "plan/ § 17's item 4 was removed in v4 because `R5b`'s MTD driver reads the JEDEC ID at probe"
+residual = "docs/method.md § Deliberately not done, item 4, was removed in the plan's fourth version because `R5b`'s MTD driver reads the JEDEC ID at probe"
 held = false
 held_disclosure_ids = []
 instrument_substituted = false
@@ -4211,10 +4211,10 @@ blocker = "the configuration-afterwards half is a flash read, and the vendor's o
 anchor = "I-PHYS"
 same_instrument = "none -- the case's subject is the board, which is the same board under both firmwares, so there is nothing to pair"
 vendor_evidence = "⊘ not a firmware behaviour: the case is about the hardware both firmwares run on"
-rlxfw_evidence = "⊘ the same hardware. plan/ § 8.2 books the physical attacker as 修不掉: the SPI flash is a SOIC-8 and with no TRNG and no secure storage full-disk encryption buys nothing"
+rlxfw_evidence = "⊘ the same hardware. the plan's § 8.2 (unpublished) books the physical attacker as 修不掉: the SPI flash is a SOIC-8 and with no TRNG and no secure storage full-disk encryption buys nothing"
 same_instrument_pair = "none needed"
 opposite_check = "a reading showing the effect depends on which firmware is running would move the row out of 不適用"
-opposite_check_reading = "未定 -- not measured either way and this gate does not measure it. SETTLED BY: plan/ § 17 item 5's two release conditions, either of which suffices, and ① is free because it is already `R5b`'s acceptance condition -- rlxfw's own MTD driver reading 4 MiB that matches `dumps/`'s sha256 is a completely independent read path"
+opposite_check_reading = "未定 -- not measured either way and this gate does not measure it. SETTLED BY: docs/method.md § Deliberately not done, item 5, and its two release conditions, either of which suffices, and ① is free because it is already `R5b`'s acceptance condition -- rlxfw's own MTD driver reading 4 MiB that matches `dumps/`'s sha256 is a completely independent read path"
 refutation = "REFUTED IF a reading shows the case's subject depends on which firmware is running, i.e. if it turns out to describe a behaviour either firmware serves. For a cut case, refuted the moment upstream runs it and records a result. Written before the reading."
 residual = "the vendor-side consequence is upstream's held `D-10`, named at class level only. CLAUDE.md: `H601` is this unit's MAC and radio calibration and NO reset restores it, so the button's reach is bounded below as well as above. 量 `FW-40`: a hold of 5 s or more writes `'1'` into `default_flag`, so the kernel does not write flash on this path -- the vendor's userspace would, and rlxfw's image has none"
 held = true

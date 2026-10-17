@@ -170,7 +170,7 @@
 #
 # B. Held upstream, and the discriminator IS the reproduction (7 rows).  讀
 #    `upstream/docs/disclosure.md` at the pin: 13 of 19 rows read `held` --
-#    `D-3`, `D-4`, `D-9` through `D-19`.  `plan/` § 15: a reproduction never
+#    `D-3`, `D-4`, `D-9` through `D-19`.  `docs/charter.md` § Disclosure: a reproduction never
 #    appears here while the row says held.  Every one of these also needs a
 #    gated path, so `R1` refuses it independently:
 #      FC-028 FC-037 FC-042 FC-044 FC-077 FC-100 FC-118
@@ -189,7 +189,7 @@
 #
 # D. Cut upstream, and no instrument here either (12 rows).  Eleven are 802.11
 #    and one is social engineering kept voluntarily out of scope by
-#    `plan/` § 17:
+#    `docs/method.md` § Deliberately not done:
 #      FC-088 FC-089 FC-090 FC-091 FC-092 FC-093 FC-094 FC-095 FC-097 FC-098
 #      FC-103 FC-070
 #    `FC-070` is not cut but belongs to the same reason: its instrument is a
