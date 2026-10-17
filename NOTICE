@@ -179,7 +179,7 @@ by its author. Nothing in this repository settles it (`docs/sbom.md` § 9).
 | `config/rlxfw-passwd`, `config/rlxfw-group`, `config/rlxfw-initramfs.tsv`, `config/rlxfw-busybox.config`, `config/image-commands.tsv` and the rest of `config/` that is not § 2's or § 3's | configuration and declarations (`U15`) |
 | `tools/` | every tool and test in this repository |
 | `dt/README.md`, `dt/unmatched-allow.tsv` | 量 `dt/` has 10 tracked files and **8 already carry their own SPDX tags** — six bindings `GPL-2.0-only OR BSD-2-Clause`, the `.dtsi` and the `.dts` `GPL-2.0-only OR MIT`. **Those 8 keep their own tags** (the kernel's dual-licensing convention for device trees), and 量 none of them is in any image. MIT covers only the other two |
-| `README.md`, `CLAUDE.md`, `PROGRESS.md`, `SPEC.md`, `LOG.md`, `CHANGELOG.md`, `RUNSHEET.md`, `SOURCES.json`, `docs/`, `notes/`, `study/`, `bench/` | the documents and the bench records |
+| `README.md`, `CLAUDE.md`, `PROGRESS.md`, `SPEC.md`, `LOG.md`, `CHANGELOG.md`, `SOURCES.json`, `docs/` (the bench procedure that was `RUNSHEET.md` included, now `docs/history/runsheet-2026-09-27.md`), `notes/`, `study/`, `bench/` | the documents and the bench records |
 
 **Why MIT, as a compatibility argument rather than a preference.** The image
 links these programs with two other people's licences and nothing else:
