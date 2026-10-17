@@ -594,7 +594,7 @@ landing's); two examples recomputed by the main session with plain
 
 What this does not establish: where a row that grew in place lives now — a
 row-identity reading, as `FW-110`'s, would find most of the 26; anything under
-`upstream/`, `src-vendor/` or `plan/`; extensionless files, a bare `:NNN`,
+`upstream/`, `src-vendor/` or the planning directory; extensionless files, a bare `:NNN`,
 fenced citations, or a thousands comma, which reads as two lines.
 
 ## 5.8 The records moved out, and the checkers taught to follow them — 量 2026-09-30 (`R1y-4`, `R1y-5`)
