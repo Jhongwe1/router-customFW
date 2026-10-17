@@ -3945,8 +3945,8 @@ mainline.
 ## 18.6 `R9`'s controlled variable (`docs/KNOWN-ISSUES.md`)
 
 The plan's `D16` builds the vendor's `drivers/net/rtl819x/` into rlxfw's kernel so that the network
-driver is the same vendor code in both columns of `R9`'s table (`plan/README.md`, gitignored: its
-v3 → v4 table, change 3), and `RUNSHEET.md`'s `K6` calls it *D16's controlled variable*. The
+driver is the same vendor code in both columns of `R9`'s table (the plan's index, unpublished: its
+v3 → v4 table, change 3), and [`docs/history/runsheet-2026-09-27.md`](../docs/history/runsheet-2026-09-27.md)'s `K6` calls it *D16's controlled variable*. The
 mainline default no longer carries it: `--variant quiet`, `tools/looprun.py`'s default, builds an
 image whose only Ethernet driver is `rtl819x-nic`. The new entry in `docs/KNOWN-ISSUES.md` says so,
 and that `R9` must build from `quiet-swcore`, the variant that still carries the vendor's driver.
