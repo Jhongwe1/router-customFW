@@ -678,7 +678,7 @@ jobs:
       # narrowed until it went green. The logs are what the DEVICE said, and
       # they are what could carry its identity -- 0 hits over all of them.
       # `*.meta.json` and `*.timing` are what the INSTRUMENT recorded about the
-      # host: they carry the bench's own 10.1.1.0/24 and `/home/key`, 25 hits,
+      # host: they carry the bench's own 10.1.1.0/24 and its home path, 25 hits,
       # every one of them a property of the operator's machine and none of them
       # of the unit. Two different questions, and only the first is this gate's.
       # 🔴 leakscan --self-test, and ONLY the self-test.

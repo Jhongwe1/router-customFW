@@ -174,7 +174,7 @@ def _load(name):
 
 
 def fwre_work():
-    return os.environ.get("FWRE_WORK") or "/home/key/fwre-work"
+    return os.environ.get("FWRE_WORK") or os.path.expanduser("~/fwre-work")
 
 
 def _under(path, parent):

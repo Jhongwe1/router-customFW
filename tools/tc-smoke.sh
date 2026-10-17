@@ -102,7 +102,7 @@ done
 say () { [ "$QUIET" -eq 1 ] || printf '%s\n' "$*"; }
 
 if [ ${#TCS[@]} -eq 0 ]; then
-    ROOT="${FWRE_WORK:-/home/key/fwre-work}/rebuild/src-vendor"
+    ROOT="${FWRE_WORK:-$HOME/fwre-work}/rebuild/src-vendor"
     # Each drop ships its own copy of the same rsdk releases. 量 2026-08-28:
     # three drops x three releases = nine directories and three distinct
     # toolchains. Testing the same release once per drop would treble the run
@@ -119,7 +119,7 @@ if [ ${#TCS[@]} -eq 0 ]; then
 fi
 
 if [ ${#TCS[@]} -eq 0 ]; then
-    echo "tc-smoke.sh: SKIPPED  no rsdk toolchain under \${FWRE_WORK:-/home/key/fwre-work}/rebuild/src-vendor" >&2
+    echo "tc-smoke.sh: SKIPPED  no rsdk toolchain under \${FWRE_WORK:-\$HOME/fwre-work}/rebuild/src-vendor" >&2
     exit 3
 fi
 

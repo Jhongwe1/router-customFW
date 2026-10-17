@@ -47,7 +47,7 @@ set -o nounset
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HAZ="$HERE/hazlint"
 PY="${PYTHON:-python3}"
-WORK="${FWRE_WORK:-/home/key/fwre-work}"
+WORK="${FWRE_WORK:-$HOME/fwre-work}"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 

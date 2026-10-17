@@ -54,7 +54,7 @@ REPO="$(cd "$HERE/.." && pwd)"
 KD="$HERE/kconfig-delta.py"
 MK="$HERE/mkinitramfs.py"
 PY="${PYTHON:-python3}"
-WORK="${FWRE_WORK:-/home/key/fwre-work}"
+WORK="${FWRE_WORK:-$HOME/fwre-work}"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 

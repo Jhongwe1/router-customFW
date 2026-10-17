@@ -74,7 +74,7 @@ if [ -z "$AS" ]; then
     # selected a binary that rejects every instruction -- which the POS control
     # then reported as eight columns of `.`. The control was right and the
     # search was wrong; both are fixed, and the control stays.
-    ROOT="${FWRE_WORK:-/home/key/fwre-work}/rebuild/src-vendor"
+    ROOT="${FWRE_WORK:-$HOME/fwre-work}/rebuild/src-vendor"
     for cand in "$ROOT"/*/toolchain/*/bin/rsdk-linux-as \
                 "$ROOT"/*/*/toolchain/*/bin/rsdk-linux-as; do
         [ -x "$cand" ] || continue

@@ -67,7 +67,7 @@ HERE  := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 REPO  := $(abspath $(HERE)../..)
 PROBE := $(REPO)/tools/rlxprobe
 
-FWRE_WORK ?= /home/key/fwre-work
+FWRE_WORK ?= $(HOME)/fwre-work
 STAGE     ?= $(FWRE_WORK)/rebuild/rlxboot
 SD        := $(STAGE)/src
 BD        := $(STAGE)/build

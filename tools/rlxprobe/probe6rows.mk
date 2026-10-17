@@ -3,7 +3,7 @@
 P6_ROWS      := 12
 RB_WORDS_probe6 := 129
 
-FWRE_WORK    ?= /home/key/fwre-work
+FWRE_WORK    ?= $(HOME)/fwre-work
 TCROOT       ?= $(FWRE_WORK)/rebuild/r2ab/tc
 FRAG_CFLAGS  := -O2 -mabi=32 -msoft-float -EB -G0 -mno-abicalls -fno-pic
 

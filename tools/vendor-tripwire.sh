@@ -107,7 +107,7 @@ verdict () { printf '%s\n' "$*"; }
 detail () { [ "$QUIET" -eq 1 ] || printf '%s\n' "$*"; }
 
 if [ ${#TREES[@]} -eq 0 ]; then
-    ROOT="${FWRE_WORK:-/home/key/fwre-work}/rebuild/src-vendor"
+    ROOT="${FWRE_WORK:-$HOME/fwre-work}/rebuild/src-vendor"
     for d in "$ROOT"/*/; do
         [ -d "$d/.git" ] || continue
         TREES+=("${d%/}")
@@ -115,7 +115,7 @@ if [ ${#TREES[@]} -eq 0 ]; then
 fi
 
 if [ ${#TREES[@]} -eq 0 ]; then
-    echo "VENDOR-TRIPWIRE: SKIPPED  no git repository under \${FWRE_WORK:-/home/key/fwre-work}/rebuild/src-vendor" >&2
+    echo "VENDOR-TRIPWIRE: SKIPPED  no git repository under \${FWRE_WORK:-\$HOME/fwre-work}/rebuild/src-vendor" >&2
     exit 3
 fi
 for t in "${TREES[@]}"; do

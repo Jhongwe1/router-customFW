@@ -1078,7 +1078,7 @@ def self_test() -> int:
                  "reporting CLEAN")
 
         # --- R1/R2/R3 the real material, THROUGH THE COMMAND LINE ---------
-        work = os.environ.get("FWRE_WORK", "/home/key/fwre-work")
+        work = os.environ.get("FWRE_WORK", os.path.expanduser("~/fwre-work"))
         d2p = os.path.join(work, "dumps", "flash-n150rt-console-2.bin")
         d1p = os.path.join(work, "dumps", "flash-n150rt-console-1.bin")
         cap0 = os.path.join(root, REAL0)

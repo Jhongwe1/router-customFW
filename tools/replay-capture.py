@@ -468,7 +468,7 @@ def run_controls():
         # R18 -- the rule the reel file states in its first paragraph, and
         # which nothing enforced: a segment must be a committed capture.
         outside = mkreel("outside.tsv",
-                         "/home/key/fwre-work/x\ttitle\t1.0\n")
+                         "/home/user/fwre-work/x\ttitle\t1.0\n")
         try:
             read_reel(outside)
             row("R18", "a segment outside bench/ is refused", False,

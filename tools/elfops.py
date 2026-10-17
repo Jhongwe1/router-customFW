@@ -373,7 +373,7 @@ def self_test():
     # number.  `tools/hazlint`'s K6a pins `stage2.bin` at movz 12 / movn 6;
     # this decoder was written without reading that code.  Two
     # implementations, one artefact, one expected pair.
-    stage2 = os.path.join(os.environ.get("FWRE_WORK", "/home/key/fwre-work"),
+    stage2 = os.path.join(os.environ.get("FWRE_WORK", os.path.expanduser("~/fwre-work")),
                           "stage2.bin")
     if os.path.exists(stage2):
         def c7():

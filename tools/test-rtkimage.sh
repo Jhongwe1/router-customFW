@@ -39,7 +39,7 @@ set -o nounset
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOL="$HERE/rtkimage.py"
 PY="${PYTHON:-python3}"
-WORK="${FWRE_WORK:-/home/key/fwre-work}"
+WORK="${FWRE_WORK:-$HOME/fwre-work}"
 DROP="$WORK/rebuild/src-vendor/rtl819x-toolchain"
 if [ -n "${TESTTMP:-}" ]; then T="$TESTTMP"; mkdir -p "$T"
 else T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT; fi

@@ -79,8 +79,10 @@ import os
 import re
 import sys
 
-DEFAULT_SRC = ("/home/key/fwre-work/rebuild/src-vendor/rtl819x-toolchain/"
-               "linux-2.6.30/drivers/net/rtl819x/rtl865x_proc_debug.c")
+DEFAULT_SRC = os.path.join(
+    os.environ.get("FWRE_WORK", os.path.expanduser("~/fwre-work")),
+    "rebuild/src-vendor/rtl819x-toolchain/"
+    "linux-2.6.30/drivers/net/rtl819x/rtl865x_proc_debug.c")
 
 #: rlxfw's own entry: a positive control that is not the vendor's.
 OWN = "rtl819x-switch"

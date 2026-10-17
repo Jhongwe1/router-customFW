@@ -1921,7 +1921,7 @@ def find_kernel(explicit=None):
     cands = []
     if explicit:
         cands.append(explicit)
-    work = os.environ.get('FWRE_WORK', '/home/key/fwre-work')
+    work = os.environ.get('FWRE_WORK', os.path.expanduser('~/fwre-work'))
     cands += [os.path.join(work, 'rebuild', 'r2d', 'vmlinux.bin'),
               os.path.join(work, 'rebuild', 'work-item4', 'vmlinux.bin'),
               os.path.join(work, 'rebuild', 'b4c-desk', 'vmlinux-rederived.bin')]
@@ -1935,7 +1935,7 @@ def find_stage2(explicit):
     cands = []
     if explicit:
         cands.append(explicit)
-    work = os.environ.get('FWRE_WORK', '/home/key/fwre-work')
+    work = os.environ.get('FWRE_WORK', os.path.expanduser('~/fwre-work'))
     cands += [os.path.join(work, 'stage2.bin'),
               os.path.join(work, 'rebuild', 'work-item4', 'stage2.bin')]
     for c in cands:
@@ -2316,7 +2316,7 @@ def run_controls(stage2_path, waive_population, want_isa):
         detail = ('NOT RUN -- stage2.bin was not found. Looked under $FWRE_WORK '
                   '(%s). Pass --stage2 PATH, or --no-population-control to look '
                   'at a file without certifying it'
-                  % os.environ.get('FWRE_WORK', '/home/key/fwre-work'))
+                  % os.environ.get('FWRE_WORK', os.path.expanduser('~/fwre-work')))
         if waive_population:
             c.add('K4  population control  stage2.bin', True,
                   'WAIVED by --no-population-control. Nothing this run says can '
@@ -2423,7 +2423,7 @@ def run_controls(stage2_path, waive_population, want_isa):
               '$FWRE_WORK (%s). It is 3.3 MB carved from one physical device '
               'and cannot be committed. K4 still ran, so this is a smaller '
               'population, not none: the exit code is unaffected'
-              % os.environ.get('FWRE_WORK', '/home/key/fwre-work'))
+              % os.environ.get('FWRE_WORK', os.path.expanduser('~/fwre-work')))
     else:
         bk = open(kpath, 'rb').read()
         ksha = hashlib.sha256(bk).hexdigest()

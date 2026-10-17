@@ -53,7 +53,7 @@
 # `rsdk-linux-*` is a wrapper that writes `offset.tmp` into the current
 # directory.  On 2026-08-28 one landed in the repository root, which no vendor-tree check watches.
 set -o nounset
-FWRE_WORK=${FWRE_WORK:-/home/key/fwre-work}
+FWRE_WORK=${FWRE_WORK:-$HOME/fwre-work}
 SV="$FWRE_WORK/rebuild/src-vendor"
 DROP="$SV/rtl819x-toolchain"
 R="$FWRE_WORK/rebuild/r3-4"

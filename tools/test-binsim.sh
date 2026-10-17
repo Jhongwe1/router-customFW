@@ -32,7 +32,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN="$HERE/binsim.py"
 export BINSIM_DIR="$HERE"
 PY="${PYTHON:-python3}"
-WORK="${FWRE_WORK:-/home/key/fwre-work}"
+WORK="${FWRE_WORK:-$HOME/fwre-work}"
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 

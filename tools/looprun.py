@@ -2779,22 +2779,22 @@ def selftest(out=sys.stdout):
 
     # ---- C11/C12: the chaining itself, on the driver's real output shape
     real = ("== i3: applied 16 declared row(s) from config/rlxfw-marks.tsv\n"
-            "== i3: make -C /home/key/fwre-work/rebuild/r3-4/cells/i3/top/"
+            "== i3: make -C /home/user/fwre-work/rebuild/r3-4/cells/i3/top/"
             "linux-2.6.30 -j4 vmlinux CFLAGS_KERNEL=-fno-if-conversion\n"
             "== OUTPUT 3968240 bytes  sha256 c788348d7b7f9886\n")
     mt = CELLTOP_RX.search(real)
     ck("C11", "the staged tree is read out of the driver's own `make -C` line",
-       "/home/key/fwre-work/rebuild/r3-4/cells/i3/top", mt.group(1) if mt else None)
+       "/home/user/fwre-work/rebuild/r3-4/cells/i3/top", mt.group(1) if mt else None)
     ck("C12", "🔴 and a driver run that printed no such line yields nothing, so "
               "S2 raises rather than S3 assembling from somewhere else",
        None, CELLTOP_RX.search(real.replace("make -C", "MAKE -c")))
 
     # C13/C14: the manifest line, same shape as C11/C12 and for the same
     # reason -- the path is read out of the driver's own output, never guessed.
-    real2 = real + "== i3: manifest -> /home/key/fwre-work/rebuild/r3-4/out/i3.manifest\n"
+    real2 = real + "== i3: manifest -> /home/user/fwre-work/rebuild/r3-4/out/i3.manifest\n"
     m13 = MANIFEST_RX.search(real2)
     ck("C13", "the provenance record's path is read out of the driver's own "
-              "`manifest ->` line", "/home/key/fwre-work/rebuild/r3-4/out/i3.manifest",
+              "`manifest ->` line", "/home/user/fwre-work/rebuild/r3-4/out/i3.manifest",
        m13.group(1) if m13 else None)
     ck("C14", "🔴 and a driver run that printed no such line yields nothing, so "
               "S2 raises rather than the build leaving no provenance",

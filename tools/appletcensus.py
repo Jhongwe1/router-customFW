@@ -457,7 +457,7 @@ def cmd_extract(args):
 
 
 def default_binary():
-    work = os.environ.get("FWRE_WORK", "/home/key/fwre-work")
+    work = os.environ.get("FWRE_WORK", os.path.expanduser("~/fwre-work"))
     return os.path.join(work, "extracted", "unit-2018", "squashfs-root",
                         "bin", "busybox")
 

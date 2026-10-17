@@ -513,6 +513,16 @@ def write_atomic(path, text):
 
 # ---------------------------------------------------------------- population
 
+def shown_tree(tree):
+    """The build tree as the fixture's `# build` line records it: relative to
+    $FWRE_WORK (default ~/fwre-work) and spelled `$FWRE_WORK/...` when it lies
+    under it, the absolute path otherwise."""
+    work = os.path.abspath(os.environ.get("FWRE_WORK",
+                                          os.path.expanduser("~/fwre-work")))
+    rel = os.path.relpath(tree, work)
+    return tree if rel == ".." or rel.startswith("../") else "$FWRE_WORK/" + rel
+
+
 def population(tree, out_path):
     tree = os.path.abspath(tree)
     vm = os.path.join(tree, "vmlinux")
@@ -614,8 +624,11 @@ def population(tree, out_path):
         raise Refusal("no vendor-unique /proc name: the string census "
                       "would have no positive control")
 
+    # The build tree is written as `$FWRE_WORK/...` when it lies under the
+    # work directory, so a committed fixture names no home directory
+    # (entrycheck E19).  test-ethcensus compares fixtures without this line.
     head = [MAGIC,
-            "# build %s" % tree,
+            "# build %s" % shown_tree(tree),
             "# vmlinux %s %d" % (sha256(vm), os.path.getsize(vm)),
             "# scope %s + %s" % (SCOPE_DIR, SCOPE_OBJ),
             "# leaves %d links %d scope %d" % (len(leaves), links, len(scope)),

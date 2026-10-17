@@ -53,7 +53,7 @@
 # measured `grep` present and `grep -E` absent on the vendor build.
 set -o nounset
 
-FWRE_WORK=${FWRE_WORK:-/home/key/fwre-work}
+FWRE_WORK=${FWRE_WORK:-$HOME/fwre-work}
 SV="$FWRE_WORK/rebuild/src-vendor"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="${RLXFW_REPO:-$(cd "$HERE/.." && pwd)}"

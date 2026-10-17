@@ -258,7 +258,7 @@ def mac_bytes(txt):
 
 
 def dump_path():
-    work = os.environ.get("FWRE_WORK", "/home/key/fwre-work")
+    work = os.environ.get("FWRE_WORK", os.path.expanduser("~/fwre-work"))
     return os.path.join(work, DUMP_REL)
 
 

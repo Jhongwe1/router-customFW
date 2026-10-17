@@ -50,7 +50,7 @@ set -o nounset
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ME="$HERE/vendor-tripwire.sh"
-ROOT="${FWRE_WORK:-/home/key/fwre-work}/rebuild/src-vendor"
+ROOT="${FWRE_WORK:-$HOME/fwre-work}/rebuild/src-vendor"
 LIVE=0
 [ "${1:-}" = "--live" ] && LIVE=1
 

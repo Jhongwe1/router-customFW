@@ -1093,7 +1093,7 @@ def self_test():
              "--echo-dir", os.path.join(root, "bench", "k"), "--dw-dir",
              os.path.join(root, "bench", "k"), "--pre-dir", pre])
     try:
-        refuse_args(kargs("/home/key/fwre-work/rebuild/bench-only/k1"))
+        refuse_args(kargs("/home/user/fwre-work/rebuild/bench-only/k1"))
         good("K1 refuse_args permits a run whose pre-read lands outside the "
              "repository, reading no file")
     except Refused as e:

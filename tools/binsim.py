@@ -2261,7 +2261,7 @@ def main(argv):
     sweep = False
     urandom = False
     manifest = os.path.join(os.path.dirname(os.path.abspath(__file__)), "binsim-corpus.tsv")
-    root = os.path.join(os.environ.get("FWRE_WORK", "/home/key/fwre-work"), "extracted")
+    root = os.path.join(os.environ.get("FWRE_WORK", os.path.expanduser("~/fwre-work")), "extracted")
     files = []
 
     i = 0

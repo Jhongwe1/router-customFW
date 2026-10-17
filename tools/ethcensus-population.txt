@@ -1,5 +1,5 @@
 # ethcensus-population 1
-# build /home/key/fwre-work/rebuild/r3-4/cells/r6b6q2/top/linux-2.6.30
+# build $FWRE_WORK/rebuild/r3-4/cells/r6b6q2/top/linux-2.6.30
 # vmlinux 9e0ff326ae8bc9ccd7b66f8d58755246a4e8640a7df0011c24f6e84c73095134 4486315
 # scope drivers/net/rtl819x/ + drivers/net/rtk_vlan.o
 # leaves 627 links 89 scope 22

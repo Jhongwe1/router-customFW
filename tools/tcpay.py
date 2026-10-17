@@ -425,7 +425,7 @@ def emit_rows_mk(rows):
     a("P6_ROWS      := %d" % len(rows))
     a("RB_WORDS_probe6 := %d" % rb_words(rows))
     a("")
-    a("FWRE_WORK    ?= /home/key/fwre-work")
+    a("FWRE_WORK    ?= $(HOME)/fwre-work")
     a("TCROOT       ?= $(FWRE_WORK)/rebuild/r2ab/tc")
     a("FRAG_CFLAGS  := %s" % FRAG_CFLAGS)
     a("")

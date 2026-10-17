@@ -38,7 +38,7 @@
 
 set -e
 
-UNIT=${RLXFW_UNIT_ROOT:-/home/key/fwre-work/extracted/unit-2018/squashfs-root}
+UNIT=${RLXFW_UNIT_ROOT:-${FWRE_WORK:-$HOME/fwre-work}/extracted/unit-2018/squashfs-root}
 QEMU=${RLXFW_QEMU:-qemu-mips-static}
 
 # Refuse rather than fall back.  A wrapper that silently ran the HOST's shell

@@ -65,7 +65,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "tools", "leakscan.py")
 ABL = os.path.join(ROOT, "tools", "audit-bench-log.py")
 TSV = os.path.join(ROOT, "tools", "ci-expected.tsv")
-DUMP = os.path.join(os.environ.get("FWRE_WORK", "/home/key/fwre-work"),
+DUMP = os.path.join(os.environ.get("FWRE_WORK", os.path.expanduser("~/fwre-work")),
                     "dumps", "flash-n150rt-console-2.bin")
 H601_MAC_OFF = 0x006007          # 量 2026-08-30; offsets only, never the value
 

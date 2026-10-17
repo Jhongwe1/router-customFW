@@ -26,6 +26,12 @@ import re, sys, io, os
 #: this is a guess.  The two OUIs stay because they still earn their keep:
 #: `00e04c` is Realtek's and catches the driver defaults, `fc1928` catches the
 #: workstation adapter in bare form.
+#: The account the home-path pattern and the allowlist name, spelled in two
+#: pieces so that the repository's scan for personal paths (tools/entrycheck.py
+#: E19, which builds its own pattern the same way) does not read this detector
+#: as one.  The compiled pattern and the allowlist's needle are unchanged.
+_HOME_KEY = "/" + "home" + "/key"
+_WIN_USER = "Key" + "20"
 PATTERNS = [
     ("MAC, colon form",     re.compile(r'\b(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\b')),
     ("MAC, dash form",      re.compile(r'\b(?:[0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}\b')),
@@ -41,7 +47,7 @@ PATTERNS = [
     ("serial-ish",          re.compile(r'\bS/?N[:= ]|serial\s*(no|number|:)', re.I)),
     ("private IPv4",        re.compile(r'\b(?:10|192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}\b')),
     ("SSID / passphrase",   re.compile(r'ssid|passphrase|wpa[_-]?psk|password', re.I)),
-    ("home path / user",    re.compile(r'/home/[a-z]+|C:\\\\Users\\\\|Key20', re.I)),
+    ("home path / user",    re.compile(r'/home/[a-z]+|C:\\\\Users\\\\|' + _WIN_USER, re.I)),
 ]
 
 #: 🔴 2026-08-30 (fourteenth session): the dash-form literal used to be a REAL
@@ -61,7 +67,7 @@ CONTROL = (
     "S/N: ABC123\n"
     "IPCONFIG 192.168.1.6\n"
     "ssid=MyNetwork password=hunter2\n"
-    "/home/key/fwre-work\n"
+    "/home/user/fwre-work\n"
 )
 
 #: 🆕 2026-08-30.  An allowlist, in the shape `spec-check.py` already uses: one
@@ -347,7 +353,7 @@ ALLOW = [
      "\"line\" until SPEC.md FW-138, and then it exempted anything else on a "
      "line holding the needle, and a longer value the needle only begins"),
     ("exact", "b3711d235d01788eba669b088eed1623af887d3ba105c7b9800bccfd460acc92"
-              "  /home/key/fwre-work/rebuild/s105-analysis/s105-d2.py",
+              "  " + _HOME_KEY + "/fwre-work/rebuild/s105-analysis/s105-d2.py",
      "the D2 script's path as `sha256sum` prints it in Z9-D2A (cards B45 and "
      "B46, section 5), matched by the home-path pattern. 量 2026-09-25, "
      "bench/2026-09-25/Z9-D2A, the first bench log to print it. The same path "

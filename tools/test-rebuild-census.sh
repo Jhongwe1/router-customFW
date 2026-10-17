@@ -64,7 +64,7 @@ ck "A6b and it says so in those words" 1 \
    "$(grep -c 'will not substitute another' "$T/missing.out")"
 
 # ------------------------------------------------------- A7/A8: real material
-FW="${FWRE_WORK:-/home/key/fwre-work}"
+FW="${FWRE_WORK:-$HOME/fwre-work}"
 REF="$FW/extracted/unit-2018/squashfs-root/bin/boa"
 REB="$FW/rebuild/r2ab/out/bin"
 if [ -f "$REF" ] && [ -d "$REB" ]; then

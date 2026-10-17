@@ -550,7 +550,7 @@ class CandidateSet:
 # --------------------------------------------------------------------------
 
 def default_dump() -> str:
-    return os.path.join(os.environ.get("FWRE_WORK", "/home/key/fwre-work"),
+    return os.path.join(os.environ.get("FWRE_WORK", os.path.expanduser("~/fwre-work")),
                         DUMP_REL)
 
 

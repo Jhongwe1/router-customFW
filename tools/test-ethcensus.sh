@@ -32,7 +32,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EC="$HERE/ethcensus.py"
 FX="$HERE/ethcensus-population.txt"
 PY="${PYTHON:-/usr/bin/python3}"
-REF="${ETHCENSUS_REF:-/home/key/fwre-work/rebuild/r3-4/cells/r6b6q2/top/linux-2.6.30}"
+REF="${ETHCENSUS_REF:-${FWRE_WORK:-$HOME/fwre-work}/rebuild/r3-4/cells/r6b6q2/top/linux-2.6.30}"
 SEAM=drivers/net/rlxfw-seam.o
 export PYTHONDONTWRITEBYTECODE=1
 

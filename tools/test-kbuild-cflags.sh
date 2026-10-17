@@ -46,7 +46,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/.." && pwd)"
 K="$HERE/rlxfw-kbuild.sh"
 CF="$REPO/config/rlxfw-cflags"
-WORK="${FWRE_WORK:-/home/key/fwre-work}"
+WORK="${FWRE_WORK:-$HOME/fwre-work}"
 DROP="$WORK/rebuild/src-vendor/rtl819x-toolchain"
 
 pass=0; fail=0; skip=0

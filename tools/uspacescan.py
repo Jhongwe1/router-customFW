@@ -154,7 +154,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 DEFAULT_TABLE = os.path.join(HERE, "uspacescan-names.tsv")
 DEFAULT_TC = os.path.join(
-    os.environ.get("FWRE_WORK", "/home/key/fwre-work"),
+    os.environ.get("FWRE_WORK", os.path.expanduser("~/fwre-work")),
     "rebuild", "src-vendor", "rtl819x-toolchain", "toolchain",
     "rsdk-1.3.6-4181-EB-2.6.30-0.9.30")
 DEFAULT_TRIP = os.path.join(REPO, "tools", "vendor-tripwire.sh")

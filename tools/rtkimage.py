@@ -106,7 +106,7 @@ LOAD_START_ADDR = 0x80500000
 CEILING = 5242880            # notes/kernel-build.md §3.4: 0x80500000 - 0x80000000
 
 DROP = os.environ.get('RLXFW_DROP') or os.path.join(
-    os.environ.get('FWRE_WORK', '/home/key/fwre-work'),
+    os.environ.get('FWRE_WORK', os.path.expanduser('~/fwre-work')),
     'rebuild/src-vendor/rtl819x-toolchain')
 
 # The vendor's own artefacts, and the numbers notes/kernel-build.md §3.1/§3.2
