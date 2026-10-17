@@ -417,8 +417,8 @@ Per `SPEC-R8a.md` § 6, and each of these is a claim this work does **not** make
   key that never enters this repository and never enters `$FWRE_WORK`, which is
   shared with another checkout; rotation is a rebuild, because this format has no
   key list and no revocation;
-* that `rlxboot` resists an attacker who can already write flash — plan § D6 is
-  explicit that it cannot. It defends the remote update path, not physical access;
+* that `rlxboot` resists an attacker who can already write flash — the plan's boundary, which
+  [`docs/flash.md`](../docs/flash.md) § *`rlxboot`* states, is that it cannot. It defends the remote update path, not physical access;
 * that this hardware has secure boot. There is **no** evidence of OTP or eFuse for
   a public-key hash on this part, and nothing here may imply there is: the stock
   loader still runs first, unverified, and can still be replaced by anyone with

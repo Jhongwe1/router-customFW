@@ -34,7 +34,7 @@ closed step lists, earlier states of its sections, closed rows — is indexed in
 
 ## Gate board
 
-Status: `·` not started · `~` in progress · `✓` closed (needs an evidence link) · `⊘` deliberately not done (needs a reason and a category — plan §17)
+Status: `·` not started · `~` in progress · `✓` closed (needs an evidence link) · `⊘` deliberately not done (needs a reason and a category — [`docs/method.md`](docs/method.md) § *Deliberately not done*)
 
 | Gate | What closing it means | Actual | Status | Evidence |
 |---|---|---:|:---:|---|

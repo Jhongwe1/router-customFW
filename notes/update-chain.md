@@ -257,7 +257,7 @@ the vendor kernel, and § 6 is that argument.
 
 ## 5. The stock loader does not recognise a container
 
-Plan § D6's requirement, and it is a requirement rather than a nicety. The stock
+A requirement of the plan's, published in [`docs/flash.md`](../docs/flash.md) § *`rlxboot`*, and a requirement rather than a nicety. The stock
 loader scans `0x010000`, `0x020000`, `0x030000`, `0x040000`, `0x050000`,
 `0x060000` and boots the **lowest** that passes `check_image()`. That path does
 not go through `rlxboot`, so it goes through neither the signature check nor the
@@ -560,8 +560,8 @@ Stated as `SPEC-R8a.md` § 6 requires:
   command-supplied counter, not against flash.
 - **That the key management is production-grade.** The development key is in the
   tree on purpose; § 3 says what `R8b` needs instead.
-- **That `rlxboot` resists an attacker who can already write flash.** Plan § D6
-  is explicit that it cannot. It defends the remote update path, not physical
+- **That `rlxboot` resists an attacker who can already write flash.** The plan's boundary,
+  which [`docs/flash.md`](../docs/flash.md) § *`rlxboot`* states, is that it cannot. It defends the remote update path, not physical
   access — and § 6's erased barrier is a defence against *corruption* reaching a
   bootable header, not against someone who can choose what those bytes are.
 - **That this hardware has secure boot.** There is no evidence of OTP or eFuse

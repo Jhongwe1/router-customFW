@@ -3,7 +3,7 @@
 `DAY-ZERO` item 8. `R1` runs bare metal and not under Linux, because MIPS Linux
 **emulates** `ll`/`sc` and the FPU in its Reserved Instruction handler — so
 measuring the ISA under it returns false positives on exactly the two rows the
-toolchain decision rests on (plan D15).
+toolchain decision rests on ([`docs/method.md`](../../docs/method.md) § *Codegen and the ISA: bare metal only*).
 
 ## The one thing to understand about the build
 
