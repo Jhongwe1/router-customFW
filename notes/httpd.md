@@ -2,8 +2,8 @@
 
 rlxfw's web server, the flat JSON reader it sits on, and the scrypt parameters the
 stored password uses. What the gate asks of this half is in `SPEC-R7.md` §§ 3, 4.2
-and 7; the privilege-separation argument is `plan/` § `D7` and the KDF budget is
-§ `D8`'s v6 ruling 4.
+and 7; the privilege-separation argument is the plan's `D7` (unpublished; [`broker.md`](broker.md) realises it) and the KDF budget is
+its `D8`'s v6 ruling 4, quoted in § 5.
 
 Marks: **量** measured, **讀** read out of code or a document, **推** inferred and
 pending a measurement. 🔄 **2026-10-04: this line read *Nothing in this note has
@@ -252,7 +252,7 @@ and allowed: it is the one door out of the chroot, by design.
 
 ## 5. The KDF, and where the parameters come from
 
-`plan/` § `D8` v6 ruling 4 is the brief: **scrypt on this machine is a DoS path, and
+The plan's `D8`, v6 ruling 4 (unpublished), is the brief: **scrypt on this machine is a DoS path, and
 the parameters are decided by an anti-DoS budget, not by a performance
 measurement.** The whole value of scrypt is memory hardness, and this device has
 26,052 kB of RAM in total (`MEM-06`), one CPU at 400 MHz (`CPU-11`, 量) and no
@@ -264,7 +264,7 @@ of victim is not predictable.
 
 | # | line of the budget | value | where it comes from |
 |---|---|---|---|
-| B1 | concurrent evaluations × bytes per evaluation | **≤ 4,194,304 bytes** | `plan` D8 ruling 1, written before any measurement. Not changed to make a result fit |
+| B1 | concurrent evaluations × bytes per evaluation | **≤ 4,194,304 bytes** | the plan's `D8` ruling 1, written before any measurement by the plan's account, which git cannot check: this row and the first scrypt measurement entered together, `f353b7b8`. Not changed to make a result fit |
 | B2 | concurrent evaluations | **1** | ruling 3: the KDF runs only in brokerd, one at a time. So B1 becomes "≤ 4 MiB per evaluation" |
 | B3 | seconds one evaluation may occupy brokerd | **≤ 1.0 s** | mine. brokerd serves one op at a time, so an evaluation is head-of-line blocking for every other client; a status poll must not visibly stall |
 | B4 | what one connection buys an attacker | **exactly one evaluation** | `Connection: close`, one request per connection |
@@ -342,7 +342,7 @@ The reasoning, in the order it decides:
 * `(12,8,1)` is the canonical parameter set and it is **rejected**, by 3,072 bytes
   out of 4,194,304. That is 0.073 %, and widening the cap to admit it is the one
   thing not allowed: the cap was written in the plan before any measurement
-  (`plan` D8 ruling 1). If the owner ratifies the cap as applying to the `V` array
+  (the plan's `D8` ruling 1, unpublished). If the owner ratifies the cap as applying to the `V` array
   rather than the whole allocation, `(12,8,1)` becomes the recommendation and
   nothing else changes — the two differ by 14 % of CPU work. That is a decision
   about the cap, and it is his, not a measurement.
@@ -792,7 +792,7 @@ and it was a compile error rather than a silent behaviour change only by luck.
   and response structs and `h_password()` zeroes its body, but a compiler may delete
   a store nothing reads, and nothing here verifies the store survived.
 * **The D8 acceptance test is not done.** § 4's `rootcheck` shows the 429 arriving
-  after the burst on this host, but the acceptance test `plan` § D8 asks for is the
+  after the burst on this host, but the acceptance test the plan's `D8` (unpublished) asks for is the
   **memory high-water mark** under N concurrent login attempts with a real broker
   doing real scrypt — and its refutation control, the same test with the limiter
   removed making the machine lose responsiveness. Both need the device and
@@ -944,7 +944,7 @@ still refuse a second asker while one evaluation is genuinely in flight, and mus
 still refuse it ten minutes later if that holder is still alive — because the
 bound on a running evaluation is the child's own `alarm()`, not a timer in the
 parent, and a "fix" that expired the grant on a clock would have passed the
-reproduction while breaking plan D8 ruling 3.
+reproduction while breaking the plan's `D8` ruling 3.
 
 ### 11.5 A second, smaller defect, found while proving the first
 
