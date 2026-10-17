@@ -3,7 +3,7 @@
 R7's root daemon: the only process that touches the config store and the only
 holder of sessions. `httpd` (uid 100) and `dnsfwd` (uid 101) reach it over one
 `AF_UNIX`/`SOCK_STREAM` socket and may do only what the op table lets them.
-Realises `plan/router-rebuild-plan.md` § `D7`: the vendor's Boa ran as root and
+Realises the plan's `D7` (unpublished: [`method.md`](../docs/method.md) § *Quoting the plan*): the vendor's Boa ran as root and
 handed request strings to `system()`; here the privileged side accepts typed
 requests only, and the only external program it starts is started with
 `execve` and a fixed `argv`.
@@ -145,7 +145,7 @@ remaining wait. That is fail-closed, at the stated cost of refusing logins from
 new addresses while the table is saturated.
 
 KDF parameters written into a **new** `admin.pwhash`: `log2N = 12, r = 8,
-p = 1` — from plan § D8's anti-DoS budget, `1 evaluation × 128·N·r ≤ 4 MiB`, so
+p = 1` — from the plan's `D8` anti-DoS budget, `1 evaluation × 128·N·r ≤ 4 MiB`, so
 `N ≤ 4096`; 4 MiB exactly. A hash already on disk is verified with its own
 parameters out of bytes `[1..5]`. Time on the device: **未定** (agent D's row).
 
@@ -186,7 +186,7 @@ holds all eight slots with silent peers and a normal `bk_call` is still served.
 
 **What still blocks, stated rather than hidden:** the KDF and `PING` run
 synchronously inside `bk_dispatch`, so one `LOGIN` stalls the loop for one
-scrypt and one `PING` for up to 10 s. For the KDF that is deliberate (plan § D8
+scrypt and one `PING` for up to 10 s. For the KDF that is deliberate (the plan's `D8`
 ruling 3 wants one in flight). For `PING` it is a real latency hole and is not
 fixed here.
 
