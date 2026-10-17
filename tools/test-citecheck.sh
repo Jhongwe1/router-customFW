@@ -192,19 +192,32 @@ ck "HEAD is clean against the committed baseline" 0 "$rc"
 
 # The corpus-invariance property, as a measurement rather than a comment: two
 # different states of the real corpus, different citation counts, SAME number
-# of case lines.
-run "$T/old.out" --sweep-only --rev HEAD~30 --root "$ROOT" --baseline "$T/absent.tsv"
+# of case lines.  The older state is chosen by its CONTENT, not its position:
+# the first of HEAD~30, ~60, ... ~150 whose corpus differs from HEAD's.  A fixed
+# HEAD~30 went red in run 39050520921 with nothing wrong in citecheck: 79fc1345
+# and its HEAD~30 both read 507 citations over 343 tracked, because the thirty
+# commits between them re-pointed prose and added neither a citation nor a file.
+# Citations and files together: 36bfff8 and 3e72889 each carry 450 citations at
+# HEAD and at HEAD~30 (203 and 192 files), so the count alone read two different
+# corpora as one.
+c_new="$(sed -n 's/.*  \([0-9]* citations over [0-9]* tracked\).*/\1/p' "$T/head.out")"
+for back in 30 60 90 120 150; do
+    run "$T/old.out" --sweep-only --rev "HEAD~$back" --root "$ROOT" --baseline "$T/absent.tsv"
+    if [ "$rc" = 2 ]; then
+        break
+    fi
+    c_old="$(sed -n 's/.*  \([0-9]* citations over [0-9]* tracked\).*/\1/p' "$T/old.out")"
+    if [ "$c_new" != "$c_old" ]; then
+        break
+    fi
+done
 if [ "$rc" = 2 ]; then
     printf '  skip   %-52s %s\n' "deep history" \
-        "HEAD~30 is not reachable from this checkout (covers 2)"
+        "HEAD~$back is not reachable from this checkout (covers 2)"
 else
     n_new="$(grep -cE '^ {2}(ok|FAIL)\b' "$T/head.out" || true)"
     n_old="$(grep -cE '^ {2}(ok|FAIL)\b' "$T/old.out" || true)"
-    # Citations and files together: 36bfff8 and 3e72889 each carry 450
-    # citations at HEAD and at HEAD~30 (203 and 192 files), so the count
-    # alone read two different corpora as one.
-    c_new="$(sed -n 's/.*  \([0-9]* citations over [0-9]* tracked\).*/\1/p' "$T/head.out")"
-    c_old="$(sed -n 's/.*  \([0-9]* citations over [0-9]* tracked\).*/\1/p' "$T/old.out")"
+    printf '    corpus  HEAD: %s; HEAD~%s: %s\n' "$c_new" "$back" "$c_old"
     ck "case count invariant to corpus size" "$n_new" "$n_old"
     ck "and the two corpora really differ"   1 \
        "$([ "$c_new" != "$c_old" ] && echo 1 || echo 0)"
