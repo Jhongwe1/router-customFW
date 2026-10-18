@@ -954,7 +954,7 @@ injected command line on this device runs one typo away from an unrecoverable
 brick. And 讀 `notes/kernel-build.md` **used to say** gate `R0`'s vendor kernel
 *"reached a shell"*; **no capture supports it**, every `--send` in the four `R0`
 directories is a loader command, and `README.md`, `PROGRESS.md` and
-`CHANGELOG.md` all correctly say *reached userspace*. It was the one place in
+`CHANGELOG.md` all correctly said *reached userspace*. It was the one place in
 the repository that overstated it. 🔄 **Corrected in the same commit as this
 paragraph — which is why the sentence above is past tense now: the first draft
 pointed a present-tense `notes/kernel-build.md:701-702` at a line the same

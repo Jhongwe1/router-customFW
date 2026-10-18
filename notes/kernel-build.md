@@ -713,7 +713,7 @@ thing that has already happened.
 > with no prompt, and the vendor's `/etc/inittab` has **every console line
 > commented out** — no getty, no login, no `askfirst` shell (`SPEC.md` `FW-05`).
 > The ping was issued host to board and the vendor stack answered it.
-> `README.md`, `CHANGELOG.md` and `PROGRESS.md`'s `R0` row all say *reached
+> `README.md`, `CHANGELOG.md` and `PROGRESS.md`'s `R0` row all said *reached
 > userspace*, which is correct; this file is the one that overstated it.
 > 🟢 **The conclusion survives and the premise is what moved** — answering ping
 > from userspace requires the idle loop just as serving a shell would, so `K9`
