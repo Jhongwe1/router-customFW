@@ -675,6 +675,20 @@ separate, plain inconsistency.
 > took to compile it is the whole difference, and it is recorded here rather
 > than quietly corrected.
 
+**Reported upstream, 2026-10-19.** ① went to `shibajee/linux-rtl8196e` as pull request #1
+(<https://github.com/shibajee/linux-rtl8196e/pull/1>, opened 2026-10-18T17:59:46Z, the four
+declarations `u16` → `u32`), after a re-check at that repository's current head, `ef14875f`
+(2020-03-27): the four functions and every line number above unchanged, the fix applying with
+no offset, and on a host model `-Wconversion` flagging eight lines, the four reads and the four
+`|=`. ② and the `TCIR` write-back of § 3.4.2 are named in the request and not changed by it;
+issues are disabled there. 讀 the same helpers in the RTL8186 timer RFC v2 posted to linux-mips
+on 2018-10-01 (<https://marc.info/?l=linux-mips&m=153838990531466>) hold `TCCNR` in a `u16`
+correctly, because there the bits are `BIT((t) * 2)` and `BIT((t) * 2 + 1)`, inside 7:0, and
+that series' irqchip (`m=153838988231460`) defines `RTL8186_NR_IRQS 11`, so its shift is defined:
+both defects arrived when the bits moved and the types and constants did not. Not established:
+any effect on a booted `shibajee` kernel, which is read from the code, and the outcome, which
+`P5e-7` records when it comes or after 30 days.
+
 ### 3.6 The scoreboard
 
 | driver | `shibajee` | `ggbruno` | L1 | L2 rows with a verdict | L2 rows 未定 |
