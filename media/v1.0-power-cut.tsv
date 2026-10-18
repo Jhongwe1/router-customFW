@@ -1,0 +1,20 @@
+# The power cut during a slot write, REPLAYED from committed captures: the part of
+# P5e-6's longer video the owner chose to show as a replay rather than film (2026-10-19).
+# One row per segment, prefix<TAB>title<TAB>pause-seconds (tools/replay-capture.py
+# read_reel).  Every segment is R8b's, 2026-10-07, on that gate's image, RLXFW-ID0
+# F9ADC9E8 -- not v1.0's 9BB2BEC7 -- and every title says REPLAY: a replay renders
+# committed bytes and is not a recording.
+#
+#   /usr/bin/python3 tools/replay-capture.py reel media/v1.0-power-cut.tsv
+#
+# What a clean clone regenerates, measured 2026-10-19 before this file was used: each
+# segment's .replay.typescript and .replay.timing (`build`), byte-identical across two
+# builds in the working tree and one in a `git archive HEAD` tree, 8 of 8 files.  A
+# screen recording of the replay is neither: its encoder and the tool's per-record
+# sleeps (each at least as long as asked) are not reproducible.  The tool's own model
+# of the running time is 64.661 s, 54.661 s of capture and 10.0 s of pauses; its
+# 60 s ceiling belongs to v0.2's take, not to this clip.
+bench/2026-10-07/B1Pb	REPLAY of 2026-10-07 (R8b): slot B is being written, paced -- then the power is cut	2.0
+bench/2026-10-07/B1B	REPLAY: power back -- rlxboot finds slot B torn (bad=magic) and boots slot A	3.0
+bench/2026-10-07/A1Pb	REPLAY: now slot A is being written -- and the power is cut again	2.0
+bench/2026-10-07/A1B	REPLAY: rlxboot finds slot A torn and boots slot B -- ten of ten cuts booted the other slot	3.0
