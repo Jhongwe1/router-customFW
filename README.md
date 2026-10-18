@@ -101,6 +101,7 @@ reader's version is [`docs/method.md`](docs/method.md).
 | SoC and core | Realtek RTL8196E; Lexra `RLX4181`, `PRId` `0x0000CD01` measured. The name is read from a table in the vendor's kernel headers: one header copied three times, read by no code, and encoded so that it breaks for `0xdc01` and `0xdc02` |
 | Memory | big-endian; 32 MiB SDRAM, 26,052 kB of it given to Linux; 4 MiB SPI NOR flash |
 | Caches | I-cache 16 KiB, two-way; D-cache 8 KiB; 16-byte lines; the D-cache is not coherent with DMA |
+| On the bench | ![The N150RT's board in the bottom half of its case, on the bench](media/bench.jpg) |
 
 ## How it was built
 
