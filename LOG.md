@@ -1460,3 +1460,5 @@ study 草稿放進 `study/20261017-study.md`（gitignored；與暫存區的草�
 **這一段不建立的。** 工具組沒有任何一格在板子上跑過；影片沒拍。mermaid 在 GitHub 上的渲染沒有看。`P5e-7` 的「計時器在板子上沒被打開」是從程式碼讀的。外部讀者測試（否證條件）還沒安排。
 
 **收工**（第一百三十九段）：這一段 3 個 commit 加這個收工 commit：`ddede10c` 已推，`74144f98`、`e5915318` 與這一個還沒推 —— 推送要擁有者當下的 yes。`ddede10c` 的 `build` `39151059398` success、`instruments` `39151059408` success（四個 job 都 success）。收工掃描（`s139/kept/closeout-scan.sh`，在 `e5915318`、樹乾淨，02:08:11–02:20:18，跑完 porcelain 0 行）：`flashwin` rc 0（18,515 檔、113 個探針、CLEAN）；`digestscan scan` rc 0（17,759／17,760、CLEAN、16 exempt）、`check` rc 0；`xcheck sweep` rc 0（4,793 個產物、0 不一致）；`capdate` rc 0（95 張卡：27 OK、1 KNOWN、0 RED、0 STALE、1 EXEMPT、66 UNDECL）；`ledgerscan check`、`quarantine` rc 0；`test-file-modes` rc 0。`citecheck --rev`：`ddede10c`、`e5915318` 都 rc 0、48 passed、0 suspended。完整的 desk-sweep 沒有跑（沒有關 gate）。
+
+**收工之後，擁有者的一個指示。** `README.md` 的 *How it was built* 拿掉「Five defects the author caught」那一段與它的五條（14 行，149 → 135 行）。`PROGRESS.md` 裡 `P5e-5` 那一列的產出欄寫著它，同一個 commit 改掉，那一列的 DoD 欄不受影響。五條原文在 git 歷史裡（`bad5d6d6` 的 README）與第一百三十八段那一則；它們引的 `FW-64`、`NET-98`、`NET-101`、`NET-171`、`NET-173`、`FW-112` 都還在各自的擁有檔。

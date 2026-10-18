@@ -114,20 +114,6 @@ and the tools refuse one without it (`FW-113`). The author opens each gate, sets
 every act outside the repository: each push, tag, release and report. The agent proposes, writes and measures; a claim
 reaches a committed file only with its source marked and its refutation condition written first.
 
-**Five defects the author caught**, each opened by what the author said:
-
-1. *"Should those four be re-tested, or did I misread them?"* The card's counting identities missed a
-   factor of 2: on this core one `cat` of a `/proc` file is two `read_proc` calls (`FW-64`).
-2. *"Can't you read the dump and work out the engine?"* The proposed deeper transmit ring had no basis: the
-   loader drives the same four entries without stalling, and then served as the test bench for a
-   one-variable comparison (`NET-98`) and for the ring's recovery path (`NET-101`).
-3. *"Is it the watchdog?"* The two-by-two built to answer it put the failure on the loader's path, not the
-   reset: booted from flash, the loader skips the switch's VLAN setup (`NET-171`, `NET-173`).
-4. *"The comments keep piling up, like tape."* `CLAUDE.md` had grown from 81 to 1,450 lines; the documents
-   were split into state, record and finding, with size budgets (`FW-112`).
-5. *"I don't see your `v0.4` release on GitHub."* The tag was pushed and the release never made, for the
-   second time; the closeout audit asked which file owns each result, and a release is not a file.
-
 ## Versions
 
 This table owns which gates define each version; `PROGRESS.md` owns which have shipped, `CHANGELOG.md` their contents.
