@@ -60,6 +60,7 @@ fourteen by `R1y-4` on 2026-09-30 from `e274ccb`, each later one in its gate's c
 | [readme-2026-10-04.md](readme-2026-10-04.md) | the same three places through `v0.5` | 2026-10-04, at `v0.6`'s release |
 | [readme-2026-10-05.md](readme-2026-10-05.md) | `README.md`'s control counts and census paragraph, as they stood at `c0349701` | 2026-10-05, when `README-1` and `CI-4` closed |
 | [readme-2026-10-09.md](readme-2026-10-09.md) | `README.md`'s lead and `Status` row through `v0.6` | 2026-10-09, at `v1.0`'s release |
+| [readme-2026-10-18.md](readme-2026-10-18.md) | `README.md` whole, 1,003 lines as last changed at `e949311f`, when `P5e-5` rewrote the file | by `P5e-5`, 2026-10-18, with `git mv` |
 | [changelog-through-v1.0.md](changelog-through-v1.0.md) | `CHANGELOG.md` whole, through `v1.0`: the per-segment entries and every release's section | by `P5e-2`, 2026-10-09, with `git mv` |
 | [runsheet-2026-09-27.md](runsheet-2026-09-27.md) | `RUNSHEET.md` whole: the bench procedure and the safety rules that outlive a seating; from 2026-09-16 each seating's card under `bench/` owned what was typed | by `P5e-2`, 2026-10-09, with `git mv` |
 
