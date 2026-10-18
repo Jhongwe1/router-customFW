@@ -6,6 +6,7 @@ true now is in the pages it links.
 ## Start here
 
 - [`../README.md`](../README.md) — what rlxfw is
+- [`architecture.md`](architecture.md) — how it boots, where it sits in the flash, and what runs with which privileges, in three diagrams
 - [`charter.md`](charter.md) — what rlxfw set out to do, its boundaries, and the rules every release follows
 - [`method.md`](method.md) — how a claim about the device is made and checked here
 - [`FINDINGS.md`](FINDINGS.md) — what was found, on one page
