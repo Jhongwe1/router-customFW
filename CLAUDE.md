@@ -118,8 +118,8 @@ agree: name the tool that could be lying and the second source that settles it.
   A finding lands in its owning file first and in `SPEC.md` in the same commit, and
   any number produced, changed or refuted changes `SPEC.md` in that commit. Check
   that a new id is unused before using it anywhere.
-- Committed files are written for an engineer, never for a hiring panel: the
-  finding, the artefact, stop — no résumé bullets, no "this proves I can X".
+- Committed files are written for an engineer: the finding, the artefact,
+  stop — no self-promotion, no "this proves I can X".
   English, except `LOG.md` and `SPEC.md`. Only `plan/` may address me. Commit
   messages say why; the diff says what.
 - Every result states what it does not establish.
@@ -182,7 +182,7 @@ agree: name the tool that could be lying and the second source that settles it.
   the loader prompt is caught instead of the vendor firmware booting; prove the
   prompt was caught before handing the board to `looprun`.
 - Reset with `busybox reboot -f`, a watchdog bite (`FW-37`); plain `reboot` signals
-  PID 1, which is a shell script. Keep `CONFIG_RTL_WTDOG=n` in any image carrying
+  PID 1, which since `R7` is the compiled `/init`: its SIGTERM is an orderly reboot (讀 `src/init/main.c`), not yet measured as a bench reset. Keep `CONFIG_RTL_WTDOG=n` in any image carrying
   rlxfw's `/dev/watchdog`.
 - Name `bench/<date>/` for the day the captures are taken (`tools/capdate.py`), and
   stage every image the card uploads before power.
