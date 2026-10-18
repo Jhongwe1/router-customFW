@@ -30,8 +30,7 @@ device trace to console captures committed unedited under `bench/`.
 
 ## What works
 
-Measured on the device unless the row says otherwise. Each gate's result, with what it does not establish,
-is indexed in [`docs/reports/README.md`](docs/reports/README.md); how the parts fit is [`docs/architecture.md`](docs/architecture.md).
+Measured on the device unless the row says otherwise; each gate's result, with what it does not establish, is indexed in [`docs/reports/README.md`](docs/reports/README.md).
 
 | Layer | rlxfw's own | Measured | Gate |
 |---|---|---|---|
@@ -59,7 +58,7 @@ is indexed in [`docs/reports/README.md`](docs/reports/README.md); how the parts 
 | | |
 |---|---|
 | Release image | 1,110,016 bytes; a slot holds 1,179,648 |
-| Kernel boot, cold | rlxfw 9.4 s, the vendor's 7.1 s; the vendor's userspace then takes 18.7 s (`P2`, one script for both) |
+| Kernel boot, cold | rlxfw 9.4 s, the vendor's 7.1 s; the vendor's userspace then takes 18.7 s (`P2`'s images, one script for both) |
 | TCP through rlxfw's Ethernet driver | 16.9 Mbit/s received by the board, 21.6–22.4 sent, three runs each (`R6b`); the vendor's driver on the same kernel, 24.6 and 26.1 (`P2`) |
 | Traffic with no stall | 31 minutes, 2,363,511 frames of every length from 60 to 1,514 bytes; the driver's recovery fired 0 times (`R6b`) |
 | Power cuts during a slot write | 10 of 10 booted the other slot (`R8b`) |
@@ -79,19 +78,20 @@ not a `make` goal; which regions may be written, and under whose yes, is [`docs/
 |---|---|
 | [`kernel/`](kernel) · [`src/`](src) | rlxfw's own kernel files, its drivers among them · the six programs, their shared code, `rlxboot` and the fuzz harnesses |
 | [`config/`](config) · [`tools/`](tools) | every other build input, declared · the instruments that build, drive the bench, check and count |
-| [`docs/`](docs) · [`notes/`](notes) | entry pages, reports, decisions and a page per driver, from [`docs/README.md`](docs/README.md) · an engineering note per subsystem |
+| [`docs/`](docs) · [`notes/`](notes) | entry pages, reports, decisions and a page per driver, from [`docs/README.md`](docs/README.md); the design in three diagrams, [`docs/architecture.md`](docs/architecture.md) · an engineering note per subsystem |
 | [`bench/`](bench) · [`qemu/`](qemu) · [`dt/`](dt) · [`srv/`](srv) · [`refs/`](refs) | every console capture, unedited, with the bench cards · emulator runs, which are not measurements · device-tree bindings · the pages `httpd` serves · where the uncommitted datasheets go |
 | [`upstream/`](https://github.com/Jhongwe1/router-firmware-re) | the reverse-engineering project, the comparison's baseline, pinned read-only at `4d3ff26` |
 | `SPEC.md` · `PROGRESS.md` · `LOG.md` · `CHANGELOG.md` | every number held about the device, in Chinese ([English entry](docs/spec/README.md)) · where the work is · the log, in Chinese · what each release contains |
 
 ## How it was verified
 
-Every sentence about the device carries a mark: 量 measured on this unit, 讀 read out of code or a dump, 推
-inferred and waiting for a measurement. A result counts only if the condition that would refute it was written
-first, and a bench card's predictions are written before power. Every instrument here ships with the controls
-that show it can fail, because a tool reporting 0 is making a claim. Two workflows run on every push to `main`: `build`
-runs the host suites, and `instruments` the tools' self-tests, their mutation suites and the text checks. The
-rules are [`CLAUDE.md`](CLAUDE.md)'s; the reader's version is [`docs/method.md`](docs/method.md).
+In the files that own the findings, every sentence about the device is marked 量 measured on this unit, 讀 read out
+of code or a dump, or 推 inferred, pending a measurement; what this page calls measured is 量. A result counts only if
+what would refute it was written first; bench cards carried predictions frozen before power until the author relaxed
+that ([ADR-010](docs/decisions/ADR-010-bench-card-predictions.md)). Every instrument here ships with the controls that
+show it can fail, because a tool reporting 0 is making a claim. On every push to `main`, `build` runs the host suites
+and `instruments` the tools' self-tests, mutation suites and text checks. The rules are [`CLAUDE.md`](CLAUDE.md)'s; the
+reader's version is [`docs/method.md`](docs/method.md).
 
 ## Hardware
 
