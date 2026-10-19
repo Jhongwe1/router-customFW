@@ -103,7 +103,14 @@ BUDGET = {
     #   section Closeout and docs/log/ in four rules. 量 24,416 B after that commit;
     #   x 1.03 = 25,148.5, three significant figures up = 25,200.
     "CLAUDE.md:maxline": 647,
-    "PROGRESS.md:bytes": 62300,  # 2026-10-17, P5e-2 (4): the file cut to its
+    "PROGRESS.md:bytes": 78300,  # 2026-10-20, P6r's opening commit: its step
+    #   list after P5e's at the end of the file, the board row, section Now
+    #   rewritten for two gates, LA-1's owner cell.  量 75,996 B after this commit;
+    #   x 1.03 = 78,275.88, three significant figures up = 78,300; the floor, 39,150,
+    #   is below the file.  P5e-8 moves P5e's list to docs/history/steps-P5e.md
+    #   and lowers this in that commit.  The previous budget's reasoning, kept
+    #   as it was:
+    #   2026-10-17, P5e-2 (4): the file cut to its
     #   state -- the board one line per gate with its Est. column deleted,
     #   section Release clock to its table, section Carried forward to its
     #   open rows, the rest moved verbatim to docs/history/ -- with P5e's step
