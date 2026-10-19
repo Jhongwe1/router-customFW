@@ -1,0 +1,19 @@
+# maltarun-pins.tsv -- every input `make run` fetches or derives, each pinned.
+# Read by tools/maltarun.py, which refuses an input whose size or sha256
+# differs.  docs/run.md lists the same rows for a reader; this file owns them.
+#
+# name	bytes	sha256	source
+#   sha256 "manifest": read from the line for this file in the release's
+#     SHA256SUMS (the row `manifest`), never typed here.
+#   source "cut:image": derived from the image, not fetched.
+#
+# Provenance of the two Debian pins (2026-10-20): each equals its entry in
+# buster's main/binary-mips/Packages.xz (sha256 a70504de8a16fee8c103e223d28b1426d2f521a63052ef0166135e26425cc8f3,
+# 7,632,456 bytes), whose sha256 is the one buster's Release lists; Release's
+# signatures verified with gpgv against debian-archive-keyring 2023.4ubuntu1,
+# itself fetched through Ubuntu's signed archive.  docs/run.md, "Prerequisites".
+manifest	1884	5622a5105c41ae1184647714f8a5c76aec90e0aabd2ad074cd18334124d862d3	https://github.com/Jhongwe1/router-customFW/releases/download/v1.0/SHA256SUMS
+image	1110016	manifest	https://github.com/Jhongwe1/router-customFW/releases/download/v1.0/mainline-9bb2bec7.img
+kernel-deb	35569888	2866a3f2bd33f43b3619cd10b60a9f730c3dd4384db65ab042feb1c8a521ecfb	https://archive.debian.org/debian/pool/main/l/linux/linux-image-4.19.0-21-4kc-malta_4.19.249-2_mips.deb
+busybox-deb	869600	7dcb0c063198fe3e2651f3bf72a6cd9c3668317b913b65fbdc4702deac0c354f	https://archive.debian.org/debian/pool/main/b/busybox/busybox-static_1.30.1-4_mips.deb
+v10-cpio	1265664	c4a04b7b962a9e965e78777a6c6efe80fb33b43ad246d238f97ca8af5dec1f10	cut:image

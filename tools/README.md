@@ -8,14 +8,14 @@ The instruments that build, drive and check rlxfw: not the firmware.
 C in `src/` and `kernel/`. Nothing else changes: these files are tracked,
 searched and diffed like any other.
 
-Every one of the 200 files tracked under `tools/`, this README aside, is
+Every one of the 203 files tracked under `tools/`, this README aside, is
 listed below once, in one of four classes. A tool's data files and fixtures sit
 in its class, beside it.
 
 | class | what it does | files |
 |---|---|---:|
 | [bench](#bench) | used at a seating, or reads what one captured: drives the console, the loader or the board, prepares or runs a card, decodes a capture; the bare-metal probe payloads | 60 |
-| [build](#build) | produces something: an image, an initramfs, a container, a generated probe table, the source archive | 13 |
+| [build](#build) | produces something: an image, an initramfs, a container, a generated probe table, the source archive, the emulator run of `make run` | 16 |
 | [check](#check) | answers yes or no about committed text, an artefact or another tool, with no board: the repository's own gates, the leak and flash-window scans, every test and mutation suite | 96 |
 | [census](#census) | counts a population and derives the numbers other files quote | 31 |
 
@@ -96,6 +96,9 @@ every suite ran the number of cases `tools/ci-expected.tsv` declares.
 | [`fetch-sources.sh`](fetch-sources.sh) | Fetches every external input SOURCES.json declares, and verifies it |
 | [`hazpay.py`](hazpay.py) | Generate and check `probe5`, `R1b`'s hazard ladder |
 | [`isapay.py`](isapay.py) | `R1a`'s payload, generated from one table and checked three ways |
+| [`maltarun-pins.tsv`](maltarun-pins.tsv) | Every input `make run` fetches or derives, each pinned by size and sha256 |
+| [`maltarun-rdinit.sh`](maltarun-rdinit.sh) | The loader `make run` appends in a second cpio; it runs only as the emulated guest's `rdinit` |
+| [`maltarun.py`](maltarun.py) | `make run`: `v1.0`'s userspace, cut from the release image, on `qemu-system-mips -M malta` -- a simulation -- and its host test |
 | [`mkbusybox.sh`](mkbusybox.sh) | Builds rlxfw's own busybox 1.13.4 for the RTL8196E (`R7`) |
 | [`mkcr6c.py`](mkcr6c.py) | Produce the `cs6c` image the stock loader must find, and prove nothing else boots |
 | [`mkfw2.py`](mkfw2.py) | Build and verify an `RLXU` update container -- the host side of gate `R8a` |

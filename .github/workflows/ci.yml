@@ -1700,6 +1700,23 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: /usr/bin/python3 tools/viewdecode.py --self-test 2>&1 | tee ci-out/viewdecode.out; exit "${PIPESTATUS[0]}"
 
+      # maltarun (P6r-1, docs/run.md): the pure half of `make run`, 23 cases --
+      # the newc round trip and a truncated archive refused (C1-C2); the overlap
+      # check that refuses a boot when the appended cpio names a path v1.0's
+      # holds (C3-C4); BK_VERSION_STR read from the header (C5-C6); the S and A
+      # verdicts and both red controls, whose --omit takes only brokerd or
+      # httpd, against stand-in answers (C7-C10, C15, C20-C21); the cut out of
+      # the image's LZMA stream, and a flipped bit
+      # refused (C13-C14); the pins, the manifest and .deb members (C11-C12,
+      # C19, C22); restricted user networking with one hostfwd on 127.0.0.1 and
+      # no port below 20000 (C16-C17); and C18, which holds docs/run.md's copy
+      # of the pins equal to tools/maltarun-pins.tsv in both directions, with
+      # C23 testing that checker. No network, no qemu, no download: the full
+      # `make run-test` needs all three and about six minutes, at the desk.
+      - name: maltarun
+        if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
+        run: /usr/bin/python3 tools/maltarun.py --self-test 2>&1 | tee ci-out/maltarun.out; exit "${PIPESTATUS[0]}"
+
       - uses: actions/upload-artifact@v4
         if: "${{ !cancelled() }}"
         with:

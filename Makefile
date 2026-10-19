@@ -9,6 +9,12 @@
 #                   "The build a recipient runs") once its inputs are present.
 #                   It builds nothing itself.
 #   make docs       spec-check, citecheck and docsize, as CI's text job runs them.
+#   make run        v1.0's userspace, cut byte for byte from the release image,
+#                   booted on qemu-system-mips -M malta: a simulation, not a
+#                   measurement (docs/run.md).  The web API answers on
+#                   127.0.0.1:$(RUN_PORT); the console is this terminal.
+#   make run-test   the host test of `make run`, then its two red controls,
+#                   one qemu at a time.
 #   make help       this list.
 #
 # A goal that cannot run here REFUSES and says what is missing, before it
@@ -39,7 +45,12 @@ TC        ?=
 FWRE_WORK ?= $(HOME)/fwre-work
 DROP      := $(FWRE_WORK)/rebuild/src-vendor/rtl819x-toolchain
 
-.PHONY: help test test-ready userspace userspace-ready image docs
+RUN_PORT  ?= 20080
+RUN_CAP   ?= 120
+RUN_GREEN ?= 1
+RUN_CACHE ?= $(O)/run-cache
+
+.PHONY: help test test-ready userspace userspace-ready image docs run run-test run-ready
 .DEFAULT_GOAL := help
 
 help:
@@ -47,6 +58,9 @@ help:
 	@echo "make userspace  the six programs for the target; needs TC=<rsdk root>"
 	@echo "make image      prints the build a recipient runs; refuses without its inputs"
 	@echo "make docs       spec-check, citecheck and docsize, as CI's text job runs them"
+	@echo "make run        v1.0's userspace on qemu-system-mips -M malta, API on 127.0.0.1:$(RUN_PORT):"
+	@echo "                a simulation, not a measurement (docs/run.md)"
+	@echo "make run-test   the host test of make run, and its two red controls"
 	@echo "O=$(O)"
 
 # THE MODE PROBE, and why `test` refuses a directory rather than warning.
@@ -114,6 +128,29 @@ image:
 	@echo
 	@echo "with <name>.spec a tools/mkinitramfs.py spec whose content record sits"
 	@echo "beside it.  docs/release-process.md says what the verdict means."
+
+# `run` and `run-test` fetch four pinned inputs into RUN_CACHE (the release's
+# SHA256SUMS and image, two Debian buster packages: tools/maltarun-pins.tsv),
+# refuse any whose sha256 differs, and boot v1.0's initramfs, cut from the
+# image, on Debian's kernel.  Nothing is compiled.  The tag v1.0 must be in the
+# clone: the host test reads BK_VERSION_STR from it.  tools/maltarun.py
+# refuses, with the reason, whatever else is missing.
+run-ready:
+	@case "$(O)" in /?*) ;; *) \
+	   echo "REFUSED: O=$(O) must be an absolute directory"; exit 1 ;; esac
+	@miss=; [ -x "$(PYTHON)" ] || miss="$$miss $(PYTHON)"; \
+	 command -v qemu-system-mips >/dev/null 2>&1 || miss="$$miss qemu-system-mips"; \
+	 [ -z "$$miss" ] || { echo "REFUSED: make run needs$$miss" \
+	   "(Ubuntu 24.04: apt-get install qemu-system-mips python3)"; exit 1; }
+	@git rev-parse -q --verify 'v1.0^{commit}' >/dev/null || { \
+	   echo "REFUSED: no tag v1.0 in this clone (git fetch --tags)"; exit 1; }
+
+run: run-ready
+	$(PYTHON) tools/maltarun.py run --cache $(RUN_CACHE) --out $(O)/run --port $(RUN_PORT)
+
+run-test: run-ready
+	$(PYTHON) tools/maltarun.py test --cache $(RUN_CACHE) --out $(O)/run \
+	  --port $(RUN_PORT) --cap $(RUN_CAP) --green $(RUN_GREEN)
 
 # spec-check reads the owners SPEC.md names, most of them under upstream/, and
 # citecheck reads history: a clone needs --recurse-submodules and no --depth.
