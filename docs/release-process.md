@@ -115,18 +115,21 @@ Its verdict is `recipient`, never `green`: exit 7, a last line starting
 manifest rows `verdict recipient` and `recipient`, and no `manifest ->` line, so
 `looprun` refuses it and it is never the image B1 pins. 量 2026-10-05 the flag's
 refusals and verdicts hold on synthetic inputs (`test-kbuild-cflags` Y1–Y7b and
-Z0–Z7); no `--recipient` kernel build has run.
+Z0–Z7). 量 2026-10-20 the first `--recipient` kernel build, from `v1.0`'s archive
+([`REPRODUCE.md`](../REPRODUCE.md) layer 1), ended exactly so, with a `vmlinux`
+byte-equal to the release build's.
 
 ---
 
 ## What this process does not establish
 
-- **That the archive rebuilds the image.** 量 `P4a` closed at Level 1; a third
-  party's rebuild differs at least in the kernel banner's `(key@K)` (`P4A-1`).
-  The archive leaves out the toolchain and the drop's prebuilt host programs
-  (`rtkload/lzma-26`, `rtkload/cvimg`), which a rebuild takes from the pinned drop;
-  only a rebuild in an empty directory would test sufficiency, and none is a
-  step here.
+- **That the archive rebuilds the image off this desk.** 量 `P4a` closed at Level
+  1; a third party's rebuild differs at least in the kernel banner's `(key@K)`
+  (`P4A-1`). The archive leaves out the toolchain and the drop's prebuilt host
+  programs (`rtkload/lzma-26`, `rtkload/cvimg`), which a rebuild takes from the
+  pinned drop. 量 2026-10-20 a rebuild in an empty directory on this desk is the
+  released image byte for byte, with steps the archive does not supply, which
+  [`REPRODUCE.md`](../REPRODUCE.md) lists; it is not a step of this process.
 - **Anything legal.** The licence readings are `NOTICE`'s and are not legal
   advice.
 - **That a recipient can tell the tag is the owner's.** The tag is unsigned; what

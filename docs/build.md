@@ -47,12 +47,12 @@ downloads its documents, refusing any whose sha256 differs from the declared one
 ## What this page does not establish
 
 - **That the drop `fetch-sources.sh` clones is the pinned one.** 讀 it clones
-  each tree with `--depth 1` at its branch's tip and records the head it got in
-  `src-vendor/CLONED.tsv`; it does not check out `SOURCES.json`'s pin, so a
-  branch that has moved since 2026-08-26 yields another revision. `make image`
-  refuses that drop; nothing fetches the pin for you.
-- **That a recipient's kernel build succeeds.** 讀 `release-process.md`: no
-  `--recipient` kernel build has run.
-- **That a rebuilt image equals a released one.** 讀 a third party's build
-  differs at least in the kernel banner's user and host (`P4A-1`;
-  [`notes/reproducible-build.md`](../notes/reproducible-build.md)).
+  each tree with `--depth 1` at its branch's tip, records the head it got in
+  `src-vendor/CLONED.tsv` and does not check out `SOURCES.json`'s pin. `make
+  image` refuses another revision by its `HEAD`, and `tools/reproduce-l1.sh` by
+  `HEAD` and a clean `git status`; [`REPRODUCE.md`](../REPRODUCE.md) gives the commands for the pin.
+- **That a recipient's kernel build succeeds off this desk.** 量 2026-10-20 one
+  `--recipient` build ran here, layer 1 of [`REPRODUCE.md`](../REPRODUCE.md).
+- **That a rebuilt image equals a released one off this desk.** 量 2026-10-20
+  one does here (layer 1); 讀 a third party's build differs at least in the kernel
+  banner's user and host (`P4A-1`; [`notes/reproducible-build.md`](../notes/reproducible-build.md)).

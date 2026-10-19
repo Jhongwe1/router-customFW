@@ -79,8 +79,8 @@ every other:
 
 The build then ends with exit 7 and a line starting `RECIPIENT BUILD`, never
 the `manifest ->` line this project uploads from (`docs/release-process.md`,
-*The build a recipient runs*). 推 Nothing else in the build needs this desk; no
-`--recipient` kernel build has run to show it.
+*The build a recipient runs*). 量 2026-10-20 the first one ran, from this archive; it also needed an
+empty `--unit` tree, a second drop and, for the shipped bytes, `iperf3`'s directory ([`REPRODUCE.md`](../REPRODUCE.md)).
 
 ---
 

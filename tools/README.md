@@ -8,15 +8,15 @@ The instruments that build, drive and check rlxfw: not the firmware.
 C in `src/` and `kernel/`. Nothing else changes: these files are tracked,
 searched and diffed like any other.
 
-Every one of the 197 files tracked under `tools/`, this README aside, is
+Every one of the 200 files tracked under `tools/`, this README aside, is
 listed below once, in one of four classes. A tool's data files and fixtures sit
 in its class, beside it.
 
 | class | what it does | files |
 |---|---|---:|
 | [bench](#bench) | used at a seating, or reads what one captured: drives the console, the loader or the board, prepares or runs a card, decodes a capture; the bare-metal probe payloads | 60 |
-| [build](#build) | produces something: an image, an initramfs, a container, a generated probe table, the source archive | 12 |
-| [check](#check) | answers yes or no about committed text, an artefact or another tool, with no board: the repository's own gates, the leak and flash-window scans, every test and mutation suite | 94 |
+| [build](#build) | produces something: an image, an initramfs, a container, a generated probe table, the source archive | 13 |
+| [check](#check) | answers yes or no about committed text, an artefact or another tool, with no board: the repository's own gates, the leak and flash-window scans, every test and mutation suite | 96 |
 | [census](#census) | counts a population and derives the numbers other files quote | 31 |
 
 Run Python tools with `/usr/bin/python3`; most take `--self-test`. CI runs them
@@ -100,6 +100,7 @@ every suite ran the number of cases `tools/ci-expected.tsv` declares.
 | [`mkcr6c.py`](mkcr6c.py) | Produce the `cs6c` image the stock loader must find, and prove nothing else boots |
 | [`mkfw2.py`](mkfw2.py) | Build and verify an `RLXU` update container -- the host side of gate `R8a` |
 | [`mkinitramfs.py`](mkinitramfs.py) | Build R3's initramfs from a declaration, and refuse rather than substitute |
+| [`reproduce-l1.sh`](reproduce-l1.sh) | `REPRODUCE.md` layer 1: rebuild a release's image from its corresponding-source archive in an empty directory, and compare |
 | [`rlxfw-kbuild.sh`](rlxfw-kbuild.sh) | Stages a kernel tree from src-vendor and builds it: the kernel's build driver |
 | [`rlxsign.py`](rlxsign.py) | Ed25519 (RFC 8032) keygen-from-seed, sign and verify, in pure Python |
 | [`rtkimage.py`](rtkimage.py) | Run Realtek's `rtkload` pipeline, and read what it produced |
@@ -146,7 +147,9 @@ every suite ran the number of cases `tools/ci-expected.tsv` declares.
 | [`mfginject.py`](mfginject.py) | The injection harness for config/mfgtest.sh (`P1-2`) |
 | [`mustrun.py`](mustrun.py) | Which CI suites read files that changed, so a skipped full sweep is auditable instead of invisible |
 | [`nic15check.py`](nic15check.py) | Rtl819x-nic 1.5's pure half, compiled and driven on the host |
+| [`relimage.py`](relimage.py) | What a released image holds -- its kernel image, banner and initramfs files -- read from its bytes alone |
 | [`repdiff.py`](repdiff.py) | Where do two builds of the same tree differ, and what are the bytes? |
+| [`reproduce-l0.py`](reproduce-l0.py) | `REPRODUCE.md` layer 0: are these the files the release published, by its manifest, GitHub's digests and the tag's own text? |
 | [`rlxfw-marks-absent.tsv`](rlxfw-marks-absent.tsv) | The vendor kernels `rlxfw-marks.py verify` reads as `--absent`, declared by path, size and sha256 |
 | [`rlxfw-marks.py`](rlxfw-marks.py) | Are rlxfw's boot marks in the tree that was built, and only there? |
 | [`spec-check.py`](spec-check.py) | Checks SPEC.md against the properties it claims about itself |

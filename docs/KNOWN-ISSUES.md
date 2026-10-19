@@ -36,7 +36,7 @@ One line per limit; the full text, and the image it names by sha256, is
 - Carried from `v0.6`, unchanged: no TLS, four unbounded ramfs mounts, an entropy result that is accounting and not strength, and an `rlxboot` cache flush not shown necessary. ([full text](known-issues/v1.0.md))
 - `R9`'s table does not say rlxfw is more secure. ([full text](known-issues/v1.0.md))
 - The bring-up report's power tree is a desk reconstruction, and no interrupt latency was taken by logic analyser. ([full text](known-issues/v1.0.md))
-- The corresponding source does not rebuild the image bit for bit, and two parts of it are missing. ([full text](known-issues/v1.0.md))
+- The corresponding source rebuilds the image bit for bit only on the machine and as the user that built it, and two parts of it are missing. ([full text](known-issues/v1.0.md))
 - `iperf3` rebuilds to the shipped bytes only at the path it was first built at. ([full text](known-issues/v1.0.md))
 - The tag is unsigned. ([full text](known-issues/v1.0.md))
 - Flash: three seatings wrote slots through the armed image's install path, each under the owner's dated yes; the `FLR` bracket stays at 1,024 of 4,194,304 bytes. ([full text](known-issues/v1.0.md))
