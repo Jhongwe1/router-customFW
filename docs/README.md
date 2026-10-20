@@ -28,6 +28,7 @@ true now is in the pages it links.
 - [`emulation-surface.md`](emulation-surface.md) — where the emulator and the silicon disagree
 - [`mfgtest.md`](mfgtest.md) — the manufacturing test
 - [`threat-model.md`](threat-model.md) and [`hardening-matrix.md`](hardening-matrix.md) — the positions this device is attacked from, and the mitigations on this part
+- [`disclosure.md`](disclosure.md) — how the vendor defects the reverse-engineering project holds are handled here: the rule, the contact and the clock, and not one finding
 
 ## Reference and record
 

@@ -37,7 +37,7 @@
       "test-cases.toml (58 registered tests with pre-written refutation conditions)",
       "reports/*.json (74 measured reports across three builds)",
       "notes/*.md (the findings, with addresses)",
-      "docs/disclosure.md (which findings are held and why)",
+      "upstream's own docs/disclosure.md, its register of which findings are held and why (this repository's docs/disclosure.md is how rlxfw follows it)",
       "tools/ (loader-tftp, mkramboot, console-lint, console-dump, loader-unpack, mkflash, rtcase, the CI checkers)",
       "ghidra/scripts/*.java (BoaFormTable, BoaMnemonics, BoaStringXrefs, ...)"
     ],
