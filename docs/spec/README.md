@@ -16,7 +16,7 @@ sources; `擁有者`, the file that owns the finding (`同上`: the row above's 
 
 | Mark | Meaning |
 |:-:|---|
-| 量 | measured on this unit; the value names the capture |
+| 量 | measured, naming the capture and where: on this unit, or at the desk (a build, a tool, an emulator). A claim about how this unit behaves is 量 only from this unit; a desk reading establishes what its run produced, and the step from it to the unit is marked 讀 or 推 |
 | 讀 | read out of code or a dump; static, true of the named artefact |
 | 推 | inferred, pending a measurement |
 | 文 | read in a document (datasheet, vendor header); never enough on its own for a value in code |
@@ -27,7 +27,9 @@ Sources: **A** this unit's flash dump and binaries cut from it; **B** vendor GPL
 different SDK generation, which explains a constant but never replaces A; **C** `upstream/`
 at `4d3ff26`, measurements on this same unit; **D** a draft datasheet for the embedded-DRAM
 variants, not this chip; **E** vendor Linux headers; **P** this unit's markings and photos;
-**S** this repository's bench transcripts; **X** third-party specs, listed to be refuted.
+**S** this project's own transcripts — the unit's committed captures under `bench/`; dumps,
+uncommitted captures and desk runs under `$FWRE_WORK/`, outside the repository, where the
+value or source cell says which; **X** third-party specs, listed to be refuted.
 A row naming one source has not met the house rule of two. One row, whole:
 
     | `IDN-06` | PCB 日期標 | `18.15` —— 2018 年第 15 週 | 量 | 推 | P | 同上 §6 |

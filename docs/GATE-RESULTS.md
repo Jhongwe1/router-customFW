@@ -17,8 +17,8 @@ can be read against the evidence.
 **Three claims is a deliberate cap.** Being able to write five usually means
 two of them have no evidence and only sound right.
 
-Marked the way the rest of the repository is: **量** measured on the device ·
-**讀** read out of code, a dump or a document · **推** inferred, pending a
+Marked the way the rest of the repository is: **量** measured, on the device or at
+the desk · **讀** read out of code, a dump or a document · **推** inferred, pending a
 measurement.
 
 ---

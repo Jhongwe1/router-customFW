@@ -3,8 +3,8 @@
 What this project found about one TOTOLINK N150RT (RTL8196E SoC, Lexra `RLX4181` core) that
 changed what it did next, one line each: the finding, why it mattered, and the file that owns
 it, which wins wherever the two disagree. Marked as the rest of the repository is: **量**
-measured on this unit, **讀** read out of code or a dump, **推** inferred, pending a
-measurement.
+measured, on this unit or, for a build or a tool, at the desk, **讀** read out of code or a
+dump, **推** inferred, pending a measurement.
 
 | | Finding | Why it mattered | Owner |
 |:-:|---|---|---|

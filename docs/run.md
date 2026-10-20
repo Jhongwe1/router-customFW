@@ -5,9 +5,9 @@ byte for byte out of the release image, on `qemu-system-mips -M malta`, so that 
 without the board can send them a request. Nothing it prints is a reading of the device,
 and no sentence on this page about what the emulator did is one either: the CPU is not
 the board's, the kernel is not rlxfw's, the network card is not the board's. The marks
-量 (measured on the board), 讀 (read out of code or a dump) and 推 (inferred) are on
-sentences about the board, each the one its owner gives, and 讀 also marks a value read
-out of a source file; nothing the emulator did carries a mark.
+量 (measured, on the board or, for the image, at the desk), 讀 (read out of code or a dump) and
+推 (inferred) are on sentences about the board and the image, each the one its owner gives, and
+讀 also marks a value read out of a source file; nothing the emulator did carries a mark.
 [`qemu/README.md`](../qemu/README.md) holds the rule — a capture from the emulator is not
 a measurement of this device — and [`emulation-surface.md`](emulation-surface.md) § 8.1
 one reason: 34 of 75 payload rows disagree between the die and `qemu-mips-static`.

@@ -10,8 +10,8 @@ resting on the one before it.
 | 1 | does the release's corresponding-source archive rebuild its image, byte for byte, in an empty directory? | [`tools/reproduce-l1.sh`](tools/reproduce-l1.sh) | run 2026-10-20, on the host and as the user that built the release |
 | 2 | does layer 1 hold in a container pinned by digest, with no network, on any host? | [`tools/reproduce-l2.sh`](tools/reproduce-l2.sh) | run 2026-10-20 in rootless Podman, on the host that built the release |
 
-**Marks.** 量 is a desk measurement, 讀 is read out of a file, 推 is inferred and
-says what would settle it. No digest of a release file is typed on this page or
+**Marks.** 量 is measured, and on this page always at the desk ([`SPEC.md`](SPEC.md) § 0);
+讀 is read out of a file; 推 is inferred and says what would settle it. No digest of a release file is typed on this page or
 in the two scripts: each is read from the release's own manifest, from GitHub,
 or from the tree the tag names.
 
