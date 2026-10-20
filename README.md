@@ -26,7 +26,8 @@ serial console opens a root shell without a login. The full list is [`docs/KNOWN
 what was found along the way is [`docs/FINDINGS.md`](docs/FINDINGS.md).
 
 **To check it.** `make test` runs the host suites CI runs on every push to `main`, and the claims about the
-device trace to console captures committed unedited under `bench/`.
+device trace to console captures committed unedited under `bench/`. [`REPRODUCE.md`](REPRODUCE.md) rebuilds
+the release image from its corresponding source, byte for byte.
 
 ## What works
 
@@ -67,8 +68,9 @@ Measured on the device unless the row says otherwise; each gate's result, with w
 ## Build and flash
 
 `make test` builds the six programs and their tests with the host's gcc and clang, runs them plain and
-under ASan and UBSan, then runs `rlxboot`'s host suite; it is what CI runs on every push to `main`. `make userspace`
-and `make image` need the vendor's GPL drop at its pinned commit, which is not in this repository. What
+under ASan and UBSan, then runs `rlxboot`'s host suite; it is what CI runs on every push to `main`. `make run`
+boots the programs `v1.0` shipped on an emulated board, a simulation rather than a measurement ([`docs/run.md`](docs/run.md)).
+`make userspace` and `make image` need the vendor's GPL drop at its pinned commit, which is not in this repository. What
 each goal needs, and what has been run that way: [`docs/build.md`](docs/build.md). Writing the flash is
 not a `make` goal; which regions may be written, and under whose yes, is [`docs/flash.md`](docs/flash.md).
 
@@ -91,7 +93,8 @@ what would refute it was written first; bench cards carried predictions frozen b
 that ([ADR-010](docs/decisions/ADR-010-bench-card-predictions.md)). Every instrument here ships with the controls that
 show it can fail, because a tool reporting 0 is making a claim. On every push to `main`, `build` runs the host suites
 and `instruments` the tools' self-tests, mutation suites and text checks. The rules are [`CLAUDE.md`](CLAUDE.md)'s; the
-reader's version is [`docs/method.md`](docs/method.md).
+reader's version is [`docs/method.md`](docs/method.md). Five defects, each told from its dated record — the first
+hypothesis, the cut, the cause and the check left behind — are in [`docs/cases/`](docs/cases/README.md).
 
 ## Hardware
 
