@@ -4264,7 +4264,7 @@ the owner's, and this is the measurement it did not have.
 
 ## 20. 🆕 2026-10-08 (127th segment): booted from flash, the switch is in its reset state and `rlx0` receives nothing
 
-**The finding.** 量 The release image (`RLXFW-ID0=6A11DE02`), booted from flash through
+**The finding.** 量 `v1.0`'s candidate image (`RLXFW-ID0=6A11DE02`), booted from flash through
 `rlxboot` — the stock loader autobooting, no ESC — brings `rlx0` up with `10.1.1.1` and
 receives no frame. Across a three-packet host ping, `rlx0`'s RX and TX stay 0 in `ifconfig`
 and in `/proc/net/dev`, and the host's neighbour entry goes `INCOMPLETE` → `FAILED`

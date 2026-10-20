@@ -19,6 +19,7 @@ true now is in the pages it links.
 ## Reports
 
 - [`GATE-RESULTS.md`](GATE-RESULTS.md) — every gate's result, as written when it closed
+- [`cases/README.md`](cases/README.md) — five defects, each from its dated record: the first hypothesis, the cut, the cause and the check left behind
 - [`boot-time-table.md`](boot-time-table.md) — boot time, network up and throughput, the vendor firmware beside rlxfw
 - [`differential.md`](differential.md) — the vendor firmware against rlxfw, by mechanism class
 - [`rlx-isa.md`](rlx-isa.md) — the Lexra RLX4181 instruction set, measured on one die
