@@ -1497,7 +1497,7 @@ jobs:
         run: /usr/bin/python3 tools/marchcmp.py --self-test 2>&1 | tee ci-out/marchcmp.out; exit "${PIPESTATUS[0]}"
 
       # Skips cleanly with no cross compiler: one skip line standing for all
-      # 202 cases, which the census prints rather than hides.
+      # 224 cases, which the census prints rather than hides.
       - name: test-rlxprobe
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-rlxprobe.sh 2>&1 | tee ci-out/test-rlxprobe.out; exit "${PIPESTATUS[0]}"

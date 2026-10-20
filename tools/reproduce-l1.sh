@@ -4,10 +4,13 @@
 # image the release published.
 #
 #   reproduce-l1.sh pincheck --name NAME --tree DIR
+#   reproduce-l1.sh iperf3-dir --assets DIR
 #   reproduce-l1.sh build --assets DIR --release-json FILE --drop DIR
 #                         --ref-drop DIR --root DIR [--release-vmlinux FILE]
-#                         [--control-iperf3-path]
+#                         [--control-iperf3-path | --iperf3-in-place]
 #
+# `iperf3-dir` prints the directory the released /bin/iperf3 was compiled in,
+# read from the image the manifest in DIR lists, as `build` reads it.
 # `pincheck` answers one question: is DIR the tree REPRODUCE.md pins as NAME --
 # HEAD the pinned commit, and `git status` empty, ignored files included?  A
 # tree at the right commit with a file deleted or a build product left in it
@@ -44,6 +47,11 @@
 # the directory is not written, and if it holds files their digest is compared
 # before and after.  The directory has to exist on this host to be a mount
 # point: where it does not, the build refuses and says so.
+#
+# --iperf3-in-place is layer 2's: the directory must exist, be empty and be
+# writable by this user, as `tools/reproduce-l2.sh` creates it inside the
+# container.  The staged tree is copied into it and built there, with no
+# namespace, which a container's default seccomp profile may refuse.
 #
 # TWO CONTROLS, because an equal digest is a claim about the comparison too.
 #   * Before anything is built, no file under the unpacked archive or the two
@@ -132,15 +140,27 @@ pincheck() {   # pincheck NAME DIR -> 0, or a refusal naming what differs
     return 0
 }
 
+# The directory the released /bin/iperf3 was compiled in: three of its source
+# files' __FILE__ strings, read from the image the manifest lists.
+iperf3_dir() {   # iperf3_dir ASSETS -> the directory, or rc != 0
+    local img
+    img=$(awk '$2 ~ /\.img$/ { print $2 }' "$1/SHA256SUMS")
+    [ "$(printf '%s\n' "$img" | grep -c .)" = 1 ] || { say "the manifest in $1 lists no single image"; return 1; }
+    "$PY" -I "$REPO/tools/relimage.py" srcdir --image "$1/$img" --member /bin/iperf3 \
+        --names net.c,tcp_window_size.c,units.c
+}
+
 usage() { say "usage: reproduce-l1.sh pincheck --name NAME --tree DIR"
-          say "       reproduce-l1.sh build --assets DIR --release-json FILE --drop DIR --ref-drop DIR --root DIR [--release-vmlinux FILE] [--control-iperf3-path]"
+          say "       reproduce-l1.sh iperf3-dir --assets DIR"
+          say "       reproduce-l1.sh build --assets DIR --release-json FILE --drop DIR --ref-drop DIR --root DIR [--release-vmlinux FILE] [--control-iperf3-path | --iperf3-in-place]"
           exit 3; }
 
 VERB=${1:-}; [ $# -gt 0 ] && shift
-NAME=""; TREE=""; ASSETS=""; RJSON=""; DROP=""; REFDROP=""; ROOT=""; RELVM=""; CTL_IPERF=0
+NAME=""; TREE=""; ASSETS=""; RJSON=""; DROP=""; REFDROP=""; ROOT=""; RELVM=""; CTL_IPERF=0; IN_PLACE=0
 ARGS=("$@")
 while [ $# -gt 0 ]; do
     if [ "$1" = --control-iperf3-path ]; then CTL_IPERF=1; shift; continue; fi
+    if [ "$1" = --iperf3-in-place ]; then IN_PLACE=1; shift; continue; fi
     [ $# -ge 2 ] || usage
     case "$1" in
         --name)            NAME=$2 ;;
@@ -160,11 +180,16 @@ case "$VERB" in
     pincheck)
         [ -n "$NAME" ] && [ -n "$TREE" ] || usage
         pincheck "$NAME" "$TREE"; exit $? ;;
+    iperf3-dir)
+        [ -n "$ASSETS" ] && [ -f "$ASSETS/SHA256SUMS" ] || usage
+        iperf3_dir "$ASSETS" || exit 1
+        exit 0 ;;
     build) ;;
     *) usage ;;
 esac
 
 [ -n "$ASSETS" ] && [ -n "$RJSON" ] && [ -n "$DROP" ] && [ -n "$REFDROP" ] && [ -n "$ROOT" ] || usage
+[ "$CTL_IPERF$IN_PLACE" != 11 ] || refuse "--control-iperf3-path and --iperf3-in-place exclude each other"
 for v in ASSETS RJSON DROP REFDROP ROOT RELVM; do
     p=${!v}; [ -z "$p" ] && continue
     case "$p" in /*) ;; *) refuse "$p is not an absolute path: every path argument must be" ;; esac
@@ -193,6 +218,7 @@ exec > >(tee -a "$L/reproduce-l1.log") 2>&1
 step "layer 1 starts at $(date -u '+%F %T') UTC in $ROOT"
 say "environment: $(env | cut -d= -f1 | sort | tr '\n' ' ')"
 say "host: $(uname -srm); $(git --version); $(make --version | head -1); $($PY --version 2>&1); gcc $(gcc -dumpfullversion 2>/dev/null)"
+say "builder: $(whoami)@$(hostname), the names the drop's scripts/mkcompile_h writes into the kernel banner; umask $(umask)"
 t=$ROOT/tmp/mode-probe; : > "$t"; chmod 0644 "$t"
 [ "$(stat -c %a "$t")" = 644 ] || refuse "$ROOT does not keep file modes (0644 reads back $(stat -c %a "$t"))"; rm -f "$t"
 o=$(pgrep -af 'mips-linux-gcc|rlxfw-kbuild|rtkimage.py build|mkbusybox|rsdk-linux-gcc|make -C .*linux-2.6.30' | grep -v -e pgrep -e reproduce-l1)
@@ -354,9 +380,19 @@ if [ "$CTL_IPERF" = 1 ]; then
         STAGE="$O/iperf3" INSTALL="$R/build/rlxfw-user/iperf3" show) > "$L/iperf3.log" 2>&1 \
         || { tail -15 "$L/iperf3.log"; failed "the iperf3 build"; }
     grep -a 'VENDOR-TRIPWIRE' "$L/iperf3.log" | sed 's/^/  /'
+elif [ "$IN_PLACE" = 1 ]; then
+    SRCDIR=$(iperf3_dir "$ASSETS") || failed "relimage could not read iperf3's source directory: $SRCDIR"
+    say "the released /bin/iperf3 was compiled from a directory of $(printf '%s' "$SRCDIR" | wc -c) characters (read from its assert strings)"
+    [ -d "$SRCDIR" ] && [ -w "$SRCDIR" ] && [ -z "$(ls -A "$SRCDIR")" ] \
+        || failed "--iperf3-in-place needs that directory to exist, be empty and be writable by $(whoami)"
+    cp -a "$T/src/." "$SRCDIR/" || failed "could not copy the staged tree into the directory"
+    say "  IN PLACE: the staged tree copied into the directory, which was empty ($(find "$SRCDIR" -type f | grep -c .) files now)"
+    (cd "$SC" && bash "$TW" -- make -f "$R/config/rlxfw-user/iperf3/Makefile" -j4 TC="$TC" SRC="$SRCDIR" \
+        STAGE="$O/iperf3" INSTALL="$R/build/rlxfw-user/iperf3" show) > "$L/iperf3.log" 2>&1 \
+        || { tail -15 "$L/iperf3.log"; failed "the iperf3 build"; }
+    grep -a 'VENDOR-TRIPWIRE' "$L/iperf3.log" | sed 's/^/  /'
 else
-    SRCDIR=$("$PY" -I "$REPO/tools/relimage.py" srcdir --image "$ASSETS/$IMG" --member /bin/iperf3 \
-             --names net.c,tcp_window_size.c,units.c) || failed "relimage could not read iperf3's source directory: $SRCDIR"
+    SRCDIR=$(iperf3_dir "$ASSETS") || failed "relimage could not read iperf3's source directory: $SRCDIR"
     say "the released /bin/iperf3 was compiled from a directory of $(printf '%s' "$SRCDIR" | wc -c) characters (read from its assert strings)"
     [ -d "$SRCDIR" ] || failed "that directory does not exist on this host, so it cannot be a mount point here: layer 2 creates it"
     digest_dir() { (cd "$1" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum | sha256sum | cut -c1-16); }

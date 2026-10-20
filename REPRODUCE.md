@@ -8,7 +8,7 @@ resting on the one before it.
 |---|---|---|---|
 | 0 | are these the files the release published? | [`tools/reproduce-l0.py`](tools/reproduce-l0.py) | run 2026-10-20 |
 | 1 | does the release's corresponding-source archive rebuild its image, byte for byte, in an empty directory? | [`tools/reproduce-l1.sh`](tools/reproduce-l1.sh) | run 2026-10-20, on the host and as the user that built the release |
-| 2 | does layer 1 hold in a container pinned by digest, with no network, on any host? | not written | the next step |
+| 2 | does layer 1 hold in a container pinned by digest, with no network, on any host? | [`tools/reproduce-l2.sh`](tools/reproduce-l2.sh) | run 2026-10-20 in rootless Podman, on the host that built the release |
 
 **Marks.** 量 is a desk measurement, 讀 is read out of a file, 推 is inferred and
 says what would settle it. No digest of a release file is typed on this page or
@@ -123,7 +123,7 @@ typed value, and builds in a private mount namespace (`unshare --user
 marker file proves the bind before the build; outside the namespace the
 directory is not written, and its content digest is compared before and after.
 It has to exist on the host to be a mount point; where it does not, the build
-stops and says so. Layer 2 creates it inside the container.
+stops and says so. Layer 2 creates it, empty, and builds in it (`--iperf3-in-place`).
 
 量 2026-10-20, on the machine that built `v1.0`, in an empty directory whose
 path is not the release build's: **the rebuilt image is the released one, byte
@@ -192,27 +192,110 @@ kernel banner carries the builder's user and host names, here this machine's
 which is not a release asset; nor the toolchain's provenance, trusted by its
 pin; nor that the archive suffices alone (items 7 and 8); nor that the build is
 independent of the filesystem it runs on: every run was on this desk's ext4,
-where 推 a new directory's listing order depends on the names and the
-filesystem's hash seed, not on the directory; nor anything about the device.
+which 量 lists thirteen names in one order in two new directories (layer 2), so
+every run had one listing order, and layer 2 measures a second; nor anything
+about the device.
 
-## Layer 2 — the next step, not built
+## Layer 2 — layer 1 in a container pinned by digest
 
-Layer 1 inside a container, so that what layer 1 cannot pin — the host, its
-packages, its user and its host name — is pinned too:
+    bash tools/reproduce-l2.sh image
+    bash tools/reproduce-l2.sh build --assets <layer 0's dir> --release-json <file> \
+         --drop <rtl819x-toolchain at its pin> --ref-drop <saturn49-wecb at its pin> \
+         --out <a new, empty directory> [--tmpfs <size>] [--release-vmlinux <file>]
 
-- the base image named by digest, and every package by exact version or from a
-  dated snapshot;
-- run with no network, with only the release's files, the two pinned trees and
-  this repository mounted read-only, and `--root` on a volume of its own;
-- the user and host names the kernel banner carries read by a script from the
-  released image (`tools/relimage.py info` prints the banner) and given to the
-  container as its user and its host name, never typed: the drop's
-  `scripts/mkcompile_h` takes them from `whoami` and `hostname` and has no
-  variable for either (`notes/reproducible-build.md` § 6, `L2-1`);
-- `iperf3`'s directory created inside the container, where no namespace is
-  needed;
-- with a tree withheld, it stops and names the tree.
+Layer 1 inside a container, so that what layer 1 takes from the host — its
+packages, its user and host names, its network — is pinned or removed. A host
+needs Linux on amd64, `podman` or `docker` (`--engine` picks), `bash`, `git`
+and coreutils, and the network for `image` alone. The engine here is rootless
+Podman 4.9.3, installed 2026-10-20 because `docker` on this desk's WSL is
+Docker Desktop's shim with its WSL integration off (量 2026-10-19).
 
-It passes when it reproduces layer 1's sha256. It is not built yet. Its engine
-here is rootless Podman 4.9.3, installed 2026-10-20 because `docker` on this
-desk's WSL is Docker Desktop's shim with its WSL integration off (量 2026-10-19).
+**The image** is [`tools/reproduce-l2.Containerfile`](tools/reproduce-l2.Containerfile):
+Ubuntu 24.04's linux/amd64 image named by digest, and fourteen packages from
+one dated snapshot of the Ubuntu archive (`snapshot.ubuntu.com`, 2026-10-19
+00:00 UTC), each at the exact version that snapshot serves. Both pins, because
+neither holds alone: the archive's indexes list only the newest version of a
+package, so a version pinned against the live archive installs until an update
+lands and is refused after; and a snapshot alone writes no version down, so
+nothing would say if it ever served others. `image` builds it from an empty
+context — nothing of this repository, the release or the drops is copied in —
+tags it with the first twelve hex digits of the file's sha256, and reads the
+fourteen versions back out of the built image with no network.
+
+**The run** is two containers of that image, both with `--network=none`:
+
+1. The first mounts this repository and the release's files read-only, and
+   reads from the released image the kernel banner's user and host names
+   (`tools/relimage.py info`) and `iperf3`'s directory
+   (`tools/reproduce-l1.sh iperf3-dir`).
+2. The second mounts read-only exactly this repository (the scripts, the pins
+   and the tag layer 0 reads), the release's files and description, the two
+   trees and, when given, the release build's `vmlinux`; and one writable
+   directory for the results, which must be empty and which the build user
+   cannot write. Its root creates the build user, named as the banner names
+   the builder (uid 10001; the banner holds no uid), in a container
+   `--hostname` names as the banner names the host, and requires the user's
+   `whoami@hostname` to read back the banner's names: the drop's
+   `scripts/mkcompile_h` takes them from those two commands and has no
+   variable for either (`notes/reproducible-build.md` § 6, `L2-1`). It creates
+   `iperf3`'s directory empty and hands it to that user, who runs
+   `tools/reproduce-l1.sh build --iperf3-in-place`: layer 1, except that the
+   staged tree is copied into the directory instead of bind-mounted over it in
+   a namespace, which an engine's default seccomp profile may refuse. Then it
+   prints the order in which `find` read two trees of the build, and copies
+   the log, the image and the `vmlinux` out.
+
+The rebuilt image is compared with the manifest's entry twice: by layer 1
+inside, and by the script outside, on the copy in `--out`. The build runs on
+the container's own filesystem, overlay with its upper layer on the host's, or
+with `--tmpfs` on a tmpfs of that size, `iperf3`'s directory on a second one.
+The builder's user and host names are one more input the archive does not
+carry, of item 4's kind: no build input in it sets them, and the released
+banner is their record. Layer 1 takes the host's; layer 2 reads the banner's.
+
+量 2026-10-20, rootless Podman 4.9.3 on this desk's WSL (Linux 6.6.87.2), from
+image `rlxfw-reproduce-l2:ef56bfd818df` with 176 packages installed:
+
+| run | the build directory | thirteen names, created `f07 f03 f11 …`, listed as | the image | exit | wall clock |
+|---|---|---|---|---|---|
+| overlay | overlay, its upper layer on this desk's ext4 | `f12 f08 f01 f09 …`, as in a new directory on the host | the manifest's entry | 0 | 2 min 53 s |
+| tmpfs | a 3 GiB tmpfs, sized from an overlay run's 2,218,452 KiB | `f08 f06 f10 f04 …`, newest first | the manifest's entry | 0 | 2 min 13 s |
+| drop withheld | overlay, an empty directory in the drop's place | — | none | 3 | 5 s |
+
+Each row is a run of the scripts as committed. Two earlier runs of each,
+from drafts that differ in the checks and logging around layer 1 and not in
+layer 1, gave the same images, orders and exits, in 2 min 53 s and 5 min
+21 s on the overlay and 2 min 21 s and 2 min 23 s on the tmpfs.
+
+In both builds the `vmlinux` differs from the release build's in 0 of
+4,621,952 bytes (`tools/repdiff.py`), all 17 initramfs files equal the released
+ones, and the kernel build exits 7 with its `RECIPIENT BUILD` line. The two
+builds read the same trees in different orders: `find` over the unpacked
+archive (28,930 paths) and over the drop's kernel tree (21,242) gives the same
+paths once sorted, and a different sequence in each tree in the order the
+filesystem returned them. So for these two orders `readdir` does not reach the
+image ([`notes/reproducible-build.md`](notes/reproducible-build.md) § 6,
+`L2-7`).
+
+The controls. With the drop withheld the run stops at layer 1's pin check,
+`PIN rtl819x-toolchain: /l2/drop is not a git checkout`, exit 3, with no
+traceback and no image; without `--drop` the script refuses before any
+container starts, naming the drop. The image holds no `mips-linux-gcc`,
+`lzma-26` or `cvimg` and sees no network interface but `lo`. Run with neither
+the build user nor `--hostname`, it names itself `root@<container ID>`, so the
+names in the rebuilt banner are the ones read from the released image. A
+`noexec` build directory is refused before layer 1 starts, and an `exec` one
+is not: 讀 Docker documents `noexec` as its `--tmpfs` default, and 量 Podman
+4.9.3 mounts one `rw,nosuid,nodev`.
+
+**It does not establish** a rebuild on another machine or by another user
+(`P4A-1`'s Level 2): every run was on the machine that built `v1.0`, from its
+copies of the two trees, and a container shares its host's kernel, which the
+build reads — 讀 the drop's `rtkload/lzma` picks its compressor by `uname -r`;
+nor that Docker runs it, the commands being written for both CLIs and run with
+Podman alone; nor that the image can be built again later, its base and its
+snapshot being served by Docker Hub and Canonical; nor that the image itself
+is reproducible: its ID changes with every build, and what `image` checks is
+the fourteen versions; nor independence from directory order beyond the two
+orders measured; nor a difference located without the release build's
+`vmlinux`; nor the toolchain's provenance; nor anything about the device.

@@ -8,14 +8,14 @@ The instruments that build, drive and check rlxfw: not the firmware.
 C in `src/` and `kernel/`. Nothing else changes: these files are tracked,
 searched and diffed like any other.
 
-Every one of the 203 files tracked under `tools/`, this README aside, is
+Every one of the 205 files tracked under `tools/`, this README aside, is
 listed below once, in one of four classes. A tool's data files and fixtures sit
 in its class, beside it.
 
 | class | what it does | files |
 |---|---|---:|
 | [bench](#bench) | used at a seating, or reads what one captured: drives the console, the loader or the board, prepares or runs a card, decodes a capture; the bare-metal probe payloads | 60 |
-| [build](#build) | produces something: an image, an initramfs, a container, a generated probe table, the source archive, the emulator run of `make run` | 16 |
+| [build](#build) | produces something: an image, an initramfs, a container, a generated probe table, the source archive, the emulator run of `make run` | 18 |
 | [check](#check) | answers yes or no about committed text, an artefact or another tool, with no board: the repository's own gates, the leak and flash-window scans, every test and mutation suite | 96 |
 | [census](#census) | counts a population and derives the numbers other files quote | 31 |
 
@@ -104,6 +104,8 @@ every suite ran the number of cases `tools/ci-expected.tsv` declares.
 | [`mkfw2.py`](mkfw2.py) | Build and verify an `RLXU` update container -- the host side of gate `R8a` |
 | [`mkinitramfs.py`](mkinitramfs.py) | Build R3's initramfs from a declaration, and refuse rather than substitute |
 | [`reproduce-l1.sh`](reproduce-l1.sh) | `REPRODUCE.md` layer 1: rebuild a release's image from its corresponding-source archive in an empty directory, and compare |
+| [`reproduce-l2.Containerfile`](reproduce-l2.Containerfile) | `REPRODUCE.md` layer 2's image: Ubuntu 24.04 by digest, its packages from one dated snapshot at exact versions |
+| [`reproduce-l2.sh`](reproduce-l2.sh) | `REPRODUCE.md` layer 2: build that image, then run layer 1 in it with no network and read-only inputs, as the user and host the released banner names |
 | [`rlxfw-kbuild.sh`](rlxfw-kbuild.sh) | Stages a kernel tree from src-vendor and builds it: the kernel's build driver |
 | [`rlxsign.py`](rlxsign.py) | Ed25519 (RFC 8032) keygen-from-seed, sign and verify, in pure Python |
 | [`rtkimage.py`](rtkimage.py) | Run Realtek's `rtkload` pipeline, and read what it produced |

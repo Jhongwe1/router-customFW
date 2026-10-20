@@ -54,5 +54,5 @@ downloads its documents, refusing any whose sha256 differs from the declared one
 - **That a recipient's kernel build succeeds off this desk.** 量 2026-10-20 one
   `--recipient` build ran here, layer 1 of [`REPRODUCE.md`](../REPRODUCE.md).
 - **That a rebuilt image equals a released one off this desk.** 量 2026-10-20
-  one does here (layer 1); 讀 a third party's build differs at least in the kernel
-  banner's user and host (`P4A-1`; [`notes/reproducible-build.md`](../notes/reproducible-build.md)).
+  one does here, on the host and in a container pinned by digest (layers 1 and 2); 讀 outside
+  such a container a build differs at least in the kernel banner's user and host (`P4A-1`; [`notes/reproducible-build.md`](../notes/reproducible-build.md)).
