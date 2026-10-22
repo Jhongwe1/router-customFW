@@ -10,8 +10,9 @@ pending a measurement. 🔄 **2026-10-04: this line read *Nothing in this note h
 run on the device*, and §§ 10 and 11 refute it.** `httpd` ran on the silicon on
 2026-09-30 as uid 100 inside a chroot, and § 11 is a defect only the device
 found. The narrower sentence that survives: every number in §§ 1–9 is 量 on the
-host or in qemu, or 讀 out of an ELF, and § 11 is the device's. Owners of the
-device half: `SPEC.md` `FW-175`, `FW-176`, `notes/userspace-integration.md`,
+host or in qemu, or 讀 out of an ELF, except the device's login cost in §§ 5.1
+and 5.4 (🔄 2026-10-23), and § 11 is the device's. Owners of the device half:
+`SPEC.md` `FW-175`, `FW-176`, `FW-181`, `notes/userspace-integration.md`,
 `docs/GATE-RESULTS.md` entry 17.
 
 ---
@@ -284,8 +285,14 @@ not a bound.** What bounds the rate is the global bucket, in httpd's parent:
 | connections, per address | 16 | 8 /s | |
 
 0.25 login/s × 1.0 s per evaluation (B3) = **25 % of brokerd's time**, worst case,
-from an attacker with unlimited addresses. At the measured-class figure below
-(~0.3 s) it is 7.5 %.
+from an attacker with unlimited addresses. At the device's measured cost (量, § 5.4,
+`FW-181`) it is 0.25 login/s × 0.902 s = **22.55 %**, and 22.8 % at the slowest
+device login, 0.912 s. **B3 and B5 both hold, and each is within 10 % of its cap**:
+B3 by 98 ms at 0.902 s and 88 ms at 0.912 s, and B5 by the same fraction, because
+its cap is B3 times this rate, so evaluations more than 9.6 % slower than 0.912 s
+break both at once. 推: under a flood each evaluation shares the one CPU with
+httpd's children, and its time there is not measured (§ 10, the `D8` acceptance
+test). Superseded: 7.5 %, at § 5.4's pre-measurement estimate of ~0.3 s.
 
 ### 5.2 Why the limiter lives in the parent
 
@@ -390,18 +397,20 @@ against a request difference of 512.4 KiB, and 12/7/1 − 11/8/1 = 1,536 kB agai
 1,535.6 KiB. Slope 1.000. The absolute figure to use is the allocation, which is
 `3,672,704 bytes = 3,586 KiB` for the recommended set, not an RSS reading.
 
-**推, the device**: ≈ 0.3 s per evaluation, with a range of 0.15 s to 0.8 s.
-Derivation, so the range can be argued with: `2N = 8,192` BlockMix calls, each
-`2r = 14` Salsa20/8 cores of ≈ 400 instructions plus ≈ 896 bytes of XOR ≈ 900
-instructions, so ≈ 57 M instructions; at 400 MHz (`CPU-11`, 量) and CPI 2 that is
-0.29 s, at CPI 4 it is 0.57 s. The memory side agrees in order: ≈ 3.5 MiB written
-sequentially plus 4,096 random 896-byte reads plus the XOR traffic ≈ 11 MB of DRAM
-traffic, which at 40–100 MB/s is 0.11–0.28 s. Both paths land in the same range,
-which is why the range is quoted and not a number. **This stays 推 until the board
-prints it**: the cell is `kdfbench eval 12 7 1` on the console with the elapsed
-from the program's own `CLOCK_MONOTONIC`, and `VmHWM` from
-`/proc/self/status` in the same run. If it comes out above 1.0 s, B3 is violated
-and the answer is `log2N = 11` (2,100,224 bytes, half the work), not a wider B3.
+**量, the device, 2026-09-30** (`FW-181`): a login costs **0.902 s** on image
+`r78a` — 0.902410 s and 0.902122 s for the right password (HTTP 200), 0.901743 s
+for a wrong one (401) — each the whole request timed from the host
+(`bench/2026-09-30/R78-relogin.txt`). Every device login that took the KDF path,
+thirteen in `bench/`, reads 0.892–0.912 s (`FW-181`, `FW-182`, `FW-184`). Under
+1.0 s, so B3 holds and this section's rule — above 1.0 s the answer is
+`log2N = 11`, not a wider B3 — did not fire, by 88 ms at the slowest. **It is not
+the cell this section names, `kdfbench eval 12 7 1` on the console**: 讀, no
+capture in `bench/` holds `kdfbench` output and no image manifest has ever named
+the program, so the evaluation's own `CLOCK_MONOTONIC` time and its `VmHWM` on the
+device are not read; a whole request bounds the time from above and says nothing
+of the memory. Superseded: **推 ≈ 0.3 s, range 0.15–0.8 s**, from ≈ 57 M
+instructions at CPI 2–4 and ≈ 11 MB of DRAM traffic; the board read three times
+that, outside the range (`FW-181`).
 
 ### 5.5 Entropy: the refusal is the current behaviour, not a corner case
 
@@ -771,7 +780,7 @@ and it was a compile error rather than a silent behaviour change only by luck.
   two boots, no power action: the privilege drop **is** measured on the die
   (`ps` shows `httpd`'s USER column as `httpd`, and the boot prints
   `httpd: uid=100 gid=100 root=/srv/www`; `SPEC.md` `FW-175`), and **the KDF has
-  a device number for the first time** (`FW-176`; `docs/GATE-RESULTS.md`
+  a device number for the first time** (§ 5.4, `FW-181`; `docs/GATE-RESULTS.md`
   entry 17). **What survives**: image `r78a` served `/api/status` and refused
   `/api/login` on the silicon, and that refusal was a defect (§ 11); the qemu
   figures are measurements of qemu, and § 5.4 contains the evidence that they
