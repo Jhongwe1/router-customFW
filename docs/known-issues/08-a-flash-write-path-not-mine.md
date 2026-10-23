@@ -37,8 +37,8 @@ and no write-up may use the first to imply the second. `rtl819x-spi`'s own
 device is stricter than the vendor's partitions — `MTD_CAP_ROM` means
 `mtd_open` refuses it at `:94` on **either** minor, where `/dev/mtd0` is an even
 minor and passes `:73` — but that is a statement about `mtd2`, not about the
-image.
+image. 🔄 2026-10-23: the `D4` sentence holds only for images built before the `MK5` ruling (`notes/self-update.md` § 2.9): every image from the next build links rlxfw's own write path, the install path, and `D4`'s build-time layer is retired; the vendor's path above is unchanged.
 
 ⚠️ And `D4`'s positive control is a control **over stubs**: the write TU's two
 entry points return `-EPERM` and contain no SPI transaction, deliberately,
-because mainline is zero-write through `R9`.
+because mainline is zero-write through `R9`. 🔄 2026-10-23: not since `R8b` item 4 (2026-10-04, `SPEC.md` `FW-207`): the write TU is a policy layer whose entry points, once armed, issue real transactions through `rtl819x-spi.c`'s engine.

@@ -1524,7 +1524,7 @@ negative. 🔴 And `n_writes` reading 0 is **only a counter not moving**: what
 actually stands, in every committed image, is that this driver's write and
 erase paths are **refusing stubs** (`FW-142`, `FW-210` ③). Since 2026-10-04
 the write path exists in source behind `CONFIG_MTD_RTL819X_WRITE`, which
-`config/rlxfw-kernel.delta` pins `n`, so no committed image links it (`FW-207`);
+`config/rlxfw-kernel.delta` pins `n`, so no committed image links it (`FW-207`; 🔄 2026-10-23: the row is `y` since the `MK5` ruling, `notes/self-update.md` § 2.9, so every image from the next build links it and is such an image);
 in an image built `=y`, `rtl819x_spi_note_write()` increments the counter and
 its 0 starts to carry information — and it stays blind to the vendor's own
 write path (`FW-210` ③). ⚠️ A prefix digest finds the **first** difference and

@@ -21,11 +21,16 @@ not its own, with a `wedge` verb as their positive control (notes § 4).
 and through the memory-mapped window and compare the two; both skip `H601`
 (`0x006000`–`0x007FFF`) by rule.
 
-Writing is refused three ways in every committed image: the write path is a separate
-translation unit that is not compiled (`CONFIG_MTD_RTL819X_WRITE=n`), `mtd->write` and
-`mtd->erase` are stubs that return `-EOPNOTSUPP`, and `mtd->flags` is `MTD_CAP_ROM`
-(notes § 5, § 12). Only an armed image, RAM-booted through the loader for `R8b`, built
-the slot install path, which takes region names compiled in, never an address.
+Writing is refused at run time in every image: `mtd->write` and `mtd->erase` refuse until
+armed by a typed verb, the loader and `H601` windows are refused whatever the arm, and
+`mtd->flags` is `MTD_CAP_ROM` (notes § 5, § 12). Until 2026-10-23 the write path was a
+separate translation unit that no committed image compiled (`CONFIG_MTD_RTL819X_WRITE=n`),
+and only an armed image, RAM-booted through the loader for `R8b`, built it. By the `MK5`
+ruling ([`notes/self-update.md`](../../notes/self-update.md) § 2.9) every image from the
+next build carries it, with the slot install path, which takes region names compiled in,
+never an address: the shipped table names nothing below `0x070000`, an install never
+writes the slot `rlxboot` booted, and `ctr` advances the counter only to the version
+`rlxboot` handed over.
 
 ## Registers
 
@@ -58,7 +63,9 @@ the loader prompt; Linux reprograms the controller (`REG-38`).
   are installed unconditionally, and what keeps them unreached is the userspace
   surface ([known issue 08](../known-issues/08-a-flash-write-path-not-mine.md), `FW-44`).
 - `n_writes` reads 0 in every committed version because none increments it, so a 0
-  carries no information about writes (`FW-142`).
+  carries no information about writes (`FW-142`). From the next build every image
+  increments it (`FW-210` ③), and `MT-FLASH-2`'s `n_writes == 0` conjunct, unchanged,
+  then fails on a boot that wrote before `trywrite` ran (notes/self-update.md § 2.9).
 - An unaligned read is refused with `-EINVAL` rather than served by an untested
   partial-word path (notes § 8).
 - The map shows that the flash matches the 2026-08-16 dump except in two 4 KiB units,

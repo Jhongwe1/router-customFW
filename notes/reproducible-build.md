@@ -460,7 +460,7 @@ paragraph is so that it stays that way. `notes/incremental-build.md` § 7.3.
 **Why this comparison exists.** `R8b`'s seating (`bench/2026-10-07`) ran mainline recipe `f9adc9e8`,
 the image containers P, Q and R wrap. The commit that made `rlxboot` and its rescue copy `cs6c`,
 `f257a848`, changed one file under `config/` — the install guard, which compiles only under
-`CONFIG_MTD_RTL819X_WRITE=y` and so never into mainline — and every byte under `config/` is an
+`CONFIG_MTD_RTL819X_WRITE=y` and so never into mainline (🔄 2026-10-23: until the `MK5` ruling, `notes/self-update.md` § 2.9; from the next build every image compiles it) — and every byte under `config/` is an
 input of `RECIPE_ID`, so the mainline recipe moved to `6a11de02`. `docs/release-process.md` A1/B1
 tie the release image to the release commit's recipe, so `v1.0` ships a `6a11de02` image (🔄 since `R6c`, `9bb2bec7`: § 10), and the
 question is how far it is from the bytes that were tested. `SPEC.md` `FW-236` is the precedent: an

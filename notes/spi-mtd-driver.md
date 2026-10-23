@@ -354,7 +354,7 @@ dead weight, so it is written down here rather than left to look tidy.
 
 ### 5.1 🔴 What `D4` proves, said plainly, and what it does not
 
-`D4` proves that **rlxfw contributes no flash-write code to this image**.
+`D4` proves that **rlxfw contributes no flash-write code to this image**. 🔄 2026-10-23: of images before the `MK5` ruling only (`notes/self-update.md` § 2.9): from the next build every image links rlxfw's write TU and install path, and `D4`'s build-time layer is retired.
 
 It does **not** prove that this image cannot write flash. 量: the vendor's
 write path is here and always has been — `mtd_spi_write` / `mtd_spi_erase`
@@ -367,7 +367,7 @@ the userspace surface (`/dev/mtd0ro`'s odd minor; `/dev/mtdblock1` declared
 points return `-EPERM` and contain no SPI transaction, deliberately, because
 mainline is zero-write through `R9` and a working page-program in this tree
 would be one make-level override from being aimed. Both sentences are true and
-only the pair is honest.
+only the pair is honest. 🔄 2026-10-23: the second has not held since `R8b` item 4 (2026-10-04, § 12): the write TU is a policy layer whose entry points issue real transactions through `rtl819x-spi.c`'s engine.
 
 ---
 
@@ -969,7 +969,7 @@ kconfig symbol nothing declared, `mtd->write`/`mtd->erase` were refusing stubs,
 and `mtd->flags` was `MTD_CAP_ROM`. This section is the four decisions that
 change that, each with its alternative rejected and its refutation condition, and
 the closing statement that matters more than any of them: **not one line of what
-follows has run anywhere.**
+follows has run anywhere.** 🔄 2026-10-23: § 14 ran it on the die from RAM in the armed image (2026-10-07), and the `MK5` ruling (`notes/self-update.md` § 2.9) puts it in every image from the next build.
 
 ### 12.1 The three layers, re-measured rather than quoted
 
@@ -1005,7 +1005,7 @@ from `n` to `y` needs either `MK5` converted to an unconditional `obj-y` row
 with a `sym:` witness (which retires `D4`'s build-time layer), or the pairing
 rule taught to read the delta's value for the symbol. The second keeps the
 refusal and makes `rlxfw-marks.py` a second reader of
-`config/rlxfw-kernel.delta`; the choice between them is the owner's.
+`config/rlxfw-kernel.delta`; the choice between them is the owner's. 🔄 2026-10-23: the owner delegated it, and the first route was taken: `MK5` is `obj-y` with `sym:rtl819x_spi_write_page` (`notes/self-update.md` § 2.9).
 
 #### 🆕 2026-10-04 (123rd segment): the owner chose a third, and the exemption lives in the run's own argv
 
@@ -1018,7 +1018,7 @@ already owns, and it would make a row's verdict depend on a file the row does
 not name, so a delta edit could turn a containment check green with no diff in
 `config/rlxfw-marks.tsv` at all. The first was rejected because it puts the
 write translation unit in **every** image for good and retires `D4`'s
-build-time layer with it.
+build-time layer with it. 🔄 2026-10-23: that is the route the delegated ruling took; Remedy C below stays in the tool, and the committed declaration no longer has a row it can name (`tools/test-kbuild-cflags.sh` `X5b`).
 
 Remedy C adds `verify --expect-present ROW-ID`, which **inverts one named
 row's `absent:` assertion for one run**. The table keeps saying the TU is not
@@ -1549,7 +1549,7 @@ images only. **Not one line of it has run on the die.** Everything below is 讀
 and the compiler, not about this part. 🔄 2026-10-05: the 123rd segment's *"no
 tool question is left undecided"* missed this gap and its twin in `rlxboot`;
 `SPEC.md` `FW-230` indexes both, and § 12.1's L3 and § 12.3's `W4` are the
-reading that no userspace path reached the engine before this section.
+reading that no userspace path reached the engine before this section. 🔄 2026-10-23: § 14 ran it on the die (2026-10-07), and since the `MK5` ruling every image from the next build is a `CONFIG_MTD_RTL819X_WRITE` image (`notes/self-update.md` § 2.9).
 
 ### 13.1 What a mainline image sees: nothing
 
@@ -1572,7 +1572,7 @@ files compared are the committed pair —
 `CONFIG_` (§ 12.1, L1) and was not part of this comparison, and
 `rtl819x-spi-install.h` is included only inside the `#ifdef`. The mainline
 build's `rlxfw-marks verify` still confirms `MK5`'s `rtl819x_spi_write_page`
-ABSENT.
+ABSENT (🔄 until 2026-10-23; since the `MK5` ruling the witness is `sym:` and reads it PRESENT, 量 `mine:1` on the first build, `SPEC.md` `FW-267`).
 
 量 at image level, from the saved builds (2026-10-05): the mainline `vmlinux`
 built before this item (`c7716fbe`, embedded recipe id `630eb5de`) against two
@@ -1756,7 +1756,7 @@ the verb that does.
 * Builds through a shadow `FWRE_WORK` (a pin-identical sparse clone; tripwire
   CLEAN and TRIPPED both ways; `diff -rq` against the canonical tree empty, with
   a one-byte control): mainline green with `MK5` absent, armed green under
-  `--expect-present MK5`, no compiler warning naming either TU.
+  `--expect-present MK5`, no compiler warning naming either TU. 🔄 2026-10-23: that pair is gone with the `MK5` ruling: every build links the TU, `MK5`'s `sym:` is the check, and `--expect-present MK5` is refused (`notes/self-update.md` § 2.9).
 
 ### 13.7 What § 13 does not establish
 

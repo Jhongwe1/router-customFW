@@ -5,9 +5,11 @@ exists: nothing here was built, run on the device or measured for this note, and
 or written. Marks: **量** measured on the device, with its capture or `SPEC.md` row; **讀** read
 from code, a dump or an artefact, with `file:line`; **推** inferred, with what would settle it. A
 number with no mark and no source is not in this file; estimates are labelled guesses. Line
-numbers are at `5dedaee2`. Vendor files are cited under `src-vendor/rtl819x-toolchain/`, the drop
+numbers are at `948ff614`. Vendor files are cited under `src-vendor/rtl819x-toolchain/`, the drop
 at its pin; paths under `$FWRE_WORK` are named where they are used. Once the code lands, the code
-and its host tests own what it does, and this note keeps the reasons.
+and its host tests own what it does, and this note keeps the reasons. 🔄 2026-10-23: §§ 1–2 landed
+in `948ff614` (phase 1: the handoff and the install path, built at the desk, run on no die); where
+the code differs from the design, the section says so in a dated note, and §§ 3–5 are still design.
 
 The DoD designed to is `PROGRESS.md` rows `P6r-10` and `P6r-11`, amended in `25268298` before
 any work where this design showed the first text unmeetable (§ 0.2). The rulings it follows were
@@ -23,7 +25,7 @@ shell (§ 3.8); no card publishes the working admin password (§ 6.4).
 | piece | files | what it does | § |
 |---|---|---|---|
 | handoff, loader | `src/rlxboot/jump.S`, `main.c`, `rlxboot.h`, new `handoff.h` | `rlxboot` leaves magic, slot, version and a check word in a0–a3 at the jump | 1.2 |
-| handoff, decompressor | new `config/host-compat/0011-rtkload-boot-handoff.patch`; `tools/rtkimage.py:621` | `rtkload` saves a0–a3 at entry and reloads them in `start_kernel` | 1.3 |
+| handoff, decompressor | new `config/host-compat/0011-rtkload-boot-handoff.patch`; `tools/rtkimage.py:789`, `:814` | `rtkload` saves a0–a3 at entry and reloads them in `start_kernel` | 1.3 |
 | handoff, kernel | new `kernel/linux-2.6.30/arch/rlx/kernel/rlxfw-boot.c`, `include/linux/rlxfw-handoff.h`, one marks row | `/proc/rlxfw-boot` reads `slot B ver 6` or `none` | 1.4 |
 | install path | `rtl819x-spi-install.h`, `rtl819x-spi.c`, `config/rlxfw-kernel.delta`, `MK5` | in the shipped image; regions `cfg0`/`cfg1`; verbs `ctr`, `ctrloop`, `erase cfgN`, `repeat=`; a running-slot fence | 2 |
 | store | `src/lib/cfg.c`, new `src/lib/cfgflash.c`, `cfg.h`; `cfgstore`, `brokerd`, `init` paths | reads through `/dev/mtd2ro`, writes one slot through stage → arm → `install cfgN` | 3 |
@@ -76,10 +78,11 @@ shell (§ 3.8); no card publishes the working admin password (§ 6.4).
 
 ### 1.1 What kills a register handoff today
 
-- 讀 `rlxboot` zeroes a0–a3 at the jump: `src/rlxboot/jump.S:43-48` moves the entry to t0, zeroes
-  a0, a1, a2 and fills `jr`'s delay slot with `a3 = 0`. The file has one commit, `457b2314`
-  (`git log -- src/rlxboot/jump.S`), so build `127a71cf` at `0x010000` and `0x020000` does the
-  same (`LOG.md:945`, `:971`; `notes/rlxboot.md:746-748`).
+- 讀 `rlxboot` zeroes a0–a3 at the jump: `src/rlxboot/jump.S:57-62` moves the entry to t0, zeroes
+  a0, a1, a2 and fills `jr`'s delay slot with `a3 = 0`. Until `948ff614` the file had one commit,
+  `457b2314` (`git log -- src/rlxboot/jump.S`), so build `127a71cf` at `0x010000` and `0x020000`
+  does the same (`LOG.md:945`, `:971`; `notes/rlxboot.md:746-748`). 🔄 2026-10-23: that entry,
+  `rlxboot_jump`, is what `BOOT=ram` still takes; a slot boot takes `rlxboot_jump_handoff` (§ 1.2).
 - 讀 `rlxboot` does not enter the kernel: it enters `rtkload`, the decompressor at the head of the
   image, at `0x80500000` (`notes/update-chain.md:490-493`, `FW-23`).
 - 讀 `rtkload` as built clobbers a0 before `main()` and zeroes a0–a2 before the kernel. In the
@@ -98,9 +101,12 @@ shell (§ 3.8); no card publishes the working admin password (§ 6.4).
   release image's digest, `docs/known-issues/v1.0.md:9`) disassembled at `0x80500000` by the
   host's `mips-linux-gnu-objdump`: `0x80500000` `nop`; `0x80500004`–`08`
   `move s0,zero; mtc0 s0,c0_sr`; `0x80500018`–`38` the `.bss` loop over `0x8060F000`–`0x80617858`;
-  `0x80500048` `move a0,t0`; `0x8050004C` `j 0x80500200`; `0x80500064`–`78`
-  `move t0,a0; li a0,0; li a1,0; li a2,0; jr t0; nop`. No instruction of the `#if 0` block is
-  there. `SPEC.md` `FW-261` indexes this and § 1.4.
+  `0x80500048` `move a0,t0`; `0x8050004C` `j 0x80500200`; `0x80500064`–`7C`
+  `move t0,a0; li a0,0; li a1,0; li a2,0; jr t0; nop; nop`. No instruction of the `#if 0` block is
+  there. `SPEC.md` `FW-261` indexes this and § 1.4. 🔄 2026-10-23 (1C): seven words, not the six
+  this listed until then: the reorder-mode assembler fills `jr`'s delay slot with a `nop` of its
+  own and the source's `nop` follows it at `0x8050007C`; 讀 again the same day with the host
+  `objdump`, the next word, `0x80500080`, is `lui t1,0xbd01`.
 
 ### 1.2 The `rlxboot` side
 
@@ -117,11 +123,12 @@ shell (§ 3.8); no card publishes the working admin password (§ 6.4).
 
 **`src/rlxboot/jump.S`**, a second entry beside `rlxboot_jump` (which stays, unchanged, for
 `BOOT=ram`). Every instruction written by hand under the file's existing
-`.set noreorder`/`noat`/`nomacro` (`src/rlxboot/jump.S:9-11`); no load, so nothing for
+`.set noreorder`/`noat`/`nomacro` (`src/rlxboot/jump.S:23-25`); no load, so nothing for
 `tools/hazlint`. The new entry sits under `#if RLXBOOT_SLOTS`, and `ASFLAGS` gains `$(BOOT_DEF)`:
-讀 today it carries no `RLXBOOT_SLOTS` (`src/rlxboot/Makefile:108-109`; `CFLAGS` does, `:107`),
-so without the change the RAM build would assemble the magic too and the census row below would
-read it there:
+讀 until `948ff614` it carried no `RLXBOOT_SLOTS` (`CFLAGS` does, `src/rlxboot/Makefile:107`);
+🔄 2026-10-23 it does (`:113-114`, the reason at `:108-112`), and `jump.S` refuses an undefined
+`RLXBOOT_SLOTS` with an `#error` (`src/rlxboot/jump.S:19-21`). Without the change the RAM build
+would assemble the magic too and the census row below would read it there:
 
 ```asm
 #include "handoff.h"
@@ -143,13 +150,15 @@ rlxboot_jump_handoff:
 in the snippet, not included from `handoff.h` (desk only,
 `$FWRE_WORK/rebuild/s142/design/check/jump-handoff.S`): `00804021 3c04524c 01000008 34845848`.
 a0 reaches `rtkload` holding a kuseg value either way, 0 before and the magic now, so what
-`src/rlxboot/jump.S:27-30` says about a fault dereferencing a0 is unchanged.
+`src/rlxboot/jump.S:41-44` says about a fault dereferencing a0 is unchanged. 🔄 2026-10-23 (1C):
+the vendor's assembler emits the same four words in the linked slots image, by the vendor
+`objdump`, and the payload gate now reads them back from it (`src/rlxboot/Makefile:343-362`).
 
-**`src/rlxboot/main.c`**: `boot_verified()` (`src/rlxboot/main.c:233-266`) gains a `slot`
-argument. The slots build passes `win->name` (`src/rlxboot/main.c:402`; `'A'` or `'B'`,
+**`src/rlxboot/main.c`**: `boot_verified()` (`src/rlxboot/main.c:242-296`) gains a `slot`
+argument. The slots build passes `win->name` (`src/rlxboot/main.c:438-439`; `'A'` or `'B'`,
 `src/rlxboot/slots.h:29`); the RAM build passes 0. Before the UART drain
-(`src/rlxboot/main.c:257-263`) a slot boot prints one more line, so the capture says what was
-handed over:
+(`src/rlxboot/main.c:280-286`) a slot boot prints one more line (`:263-274`), so the capture says
+what was handed over:
 
 ```
 RLXBOOT-BOOT load=80500000 entry=80500000
@@ -158,33 +167,39 @@ RLXBOOT-HANDOFF slot=B ver=6
 
 and jumps with `rlxboot_jump_handoff(r->entry_addr, slot, r->version,
 RLXB_HANDOFF_CHECK(slot, r->version))`; slot 0 keeps `rlxboot_jump(r->entry_addr)`. The payload
-gate (`src/rlxboot/Makefile:309-327`) gains one census row: the slots image must form
+gate (`src/rlxboot/Makefile:315-342`) gains one census row: the slots image must form
 `0x524C5848`, the RAM image must not — each the other's control, the pattern `D28` already uses.
 讀 the census can see it: `src/rlxboot/test/flashscan.py:14-16` rebuilds a `lui` followed by an
-`ori` into the combined value.
+`ori` into the combined value. 🔄 2026-10-23 (1C), beyond the design: the gate also pins the four
+words at `rlxboot_jump_handoff` in the linked image (`src/rlxboot/Makefile:343-362`), and `main.c`
+does not compile unless `'A'`/`'B'` equal `RLXB_HANDOFF_SLOT_A`/`_B` (`src/rlxboot/main.c:330-334`).
 
 **What moves.** `BUILD_ID` hashes every source in `MY_C`, `MY_S` and `MY_HDR`
-(`src/rlxboot/Makefile:184-189`), so `handoff.h` joins `MY_HDR` or the id would not cover it; with
-it the new `rlxboot` has a new id. `hazlint`, `flashsafe` and the no-signer gate run on it as on
-every build (`src/rlxboot/Makefile:258-266`, `:302-308`, `:474-475`). The rescue copy at
-`0x020000` stays build `127a71cf` (§ 1.7).
+(`src/rlxboot/Makefile:190-195`), so `handoff.h` joins `MY_HDR` (`:182`) or the id would not cover
+it; with it the new `rlxboot` has a new id. `hazlint`, `flashsafe` and the no-signer gate run on it
+as on every build (`src/rlxboot/Makefile:264-272`, `:308-314`, `:509-510`). The rescue copy at
+`0x020000` stays build `127a71cf` (§ 1.7). 🔄 2026-10-23 (1C, at its tree): the production slots
+id went `8ddddcfc` → `3b7474de`, and `make rescue` now makes `3b7474de` images; `8ddddcfc` already
+differed from the flashed `127a71cf`, through the comment-only commit `e9f0ff27`.
 
 ### 1.3 The `rtkload` side
 
 **Vehicle.** Vendor code changes only through `config/rlxfw-marks.tsv` or `config/host-compat/`
 (`CLAUDE.md` § Never). 讀 the marks vocabulary is closed at mark calls, `obj-y` lines (plain or
 conditional) and one exact include (`tools/rlxfw-marks.py:115-137`), so assembly needs a patch:
-`config/host-compat/0011-rtkload-boot-handoff.patch`, the next free number (`0001`–`0010` exist).
-讀 `tools/rlxfw-kbuild.sh` stages the whole `linux-2.6.30/` (`tools/rlxfw-kbuild.sh:539`) and
-applies every patch with `patch -p1 --forward` inside it (`:568-576`), so a patch to
-`rtkload/start.S` reaches the **cell's** copy.
+`config/host-compat/0011-rtkload-boot-handoff.patch`, the next free number (`0001`–`0010` existed;
+🔄 2026-10-23 `0001`–`0011` do). 讀 `tools/rlxfw-kbuild.sh` stages the whole `linux-2.6.30/`
+(`tools/rlxfw-kbuild.sh:539`) and applies every patch with `patch -p1 --forward` inside it
+(`:568-576`; 🔄 since `948ff614` with `--fuzz=0`, so a hunk whose context drifted is refused, not
+applied nearby: all eleven apply that way), so a patch to `rtkload/start.S` reaches the **cell's** copy.
 
-🔴 **And the cell's copy is not what builds the image.** 讀 `tools/rtkimage.py:621`:
-`shutil.copytree(os.path.join(DROP, 'linux-2.6.30/rtkload'), rtk)` — `rtkload` is copied from
-the pristine drop; only `include/`, `arch/` and `lib/` are linked from the cell (`:609-610`). The
-patch would show as applied in the tree and be absent from the `nfjrom`. So `tools/rtkimage.py:621`
-changes to copy `<cell>/top/linux-2.6.30/rtkload`, which `cp -a` already holds
-(`tools/rlxfw-kbuild.sh:539`; `SPEC.md` `FW-262`).
+🔴 **And the cell's copy was not what built the image.** 讀 until `948ff614` `tools/rtkimage.py`
+copied `rtkload` from the pristine drop (`shutil.copytree(os.path.join(DROP, 'linux-2.6.30/rtkload'),
+rtk)`, then its line 621); only `include/`, `arch/` and `lib/` are linked from the cell
+(`tools/rtkimage.py:802-803`). The patch would have shown as applied in the tree and been absent from
+the `nfjrom` (`SPEC.md` `FW-262`). 🔄 2026-10-23: `rtkimage` 1.1 copies the cell's `rtkload/`
+(`tools/rtkimage.py:789`, `:814`), which `cp -a` already holds (`tools/rlxfw-kbuild.sh:539`), and
+records it as `rtkload_source`; 量 the first build's record names the cell's copy (`FW-264`).
 
 **The patch.** 讀 the hunks below are `diff -u` output, made by
 `$FWRE_WORK/rebuild/s142/design/check/mkpatch.py` from a copy of the pinned `start.S` (sha256
@@ -283,7 +298,9 @@ assembled by the host `as` at `-march=r3000`: it assembles, and `hazlint` reads 
 loads (the pinned file: 0 in 5). ⚠️ That object is the host assembler's, not the vendor's: the host
 `as` scheduled the vendor's reorder-mode `move a0,t0` into `j main`'s slot where the drop's
 2.16-era `as` left `nop` (compare `0x80500048`–`50` above). Only the artefact the vendor toolchain
-makes counts, and § 1.3's gate reads it.
+makes counts, and § 1.3's gate reads it. 🔄 2026-10-23 (1C), vendor-built: `hazlint` reads the
+patched `start.o` 0 violations in 9 loads and its linked `memload-full` 0 in 277 (the pristine
+stub: 0 in 5, 0 in 273), and a planted `lw a3; jr a3`, vendor-built, 1.
 
 **Why `.set reorder` and `macro` are restored, not pushed.** 讀 `start.S` holds no `.set`
 directive (`grep -c '\.set'` reads 0; the same grep finds its 4 `.globl` lines), so the file runs
@@ -301,6 +318,8 @@ and its heap (from the stack top up, `src-vendor/rtl819x-toolchain/linux-2.6.30/
 above `.bss`) never reach it. 讀 `start.o` is first in the link
 (`$(START_FILE) $(LOADER_FILES) …`, `src-vendor/rtl819x-toolchain/linux-2.6.30/rtkload/Makefile:223`),
 so `__start` stays at `0x80500000` and, 推, the array at `_fdata`; the gate below reads both.
+🔄 2026-10-23: 量 on the first build it read both: `rlxfw_rtk_handoff` at `0x805028A0`, which is
+`_fdata`, and `__start` at `0x80500000` (`SPEC.md` `FW-264`).
 
 **The artefact gate** (what `rlxfw-marks verify` cannot do: it reads the kernel ELF and
 `System.map`, `tools/rlxfw-marks.py:25-34`, `:75-80`, and `rtkload` is in neither).
@@ -308,7 +327,7 @@ so `__start` stays at `0x80500000` and, 推, the array at `_fdata`; the gate bel
 
 | check | the built image | the control, read the same way |
 |---|---|---|
-| `memload-full`'s `.symtab` has `rlxfw_rtk_handoff`, 16 bytes, 16-aligned, at or above `_fdata` and below `__vmlinux_start` — all three from the same table (`elf_symbols`, `tools/rtkimage.py:248-273`, which gives values and sizes, not sections) | present | the drop's `rtkload/memload-full` (`CTL_MEMLOAD`, `:116`): absent |
+| `memload-full`'s `.symtab` has `rlxfw_rtk_handoff`, 16 bytes, 16-aligned, at or above `_fdata` and below `__vmlinux_start` — all three from the same table (`elf_symbols`, `tools/rtkimage.py:273-298`, which gives values and sizes, not sections) | present | the drop's `rtkload/memload-full` (`CTL_MEMLOAD`, `:141`): absent |
 | `__start` = `0x80500000` | equal | — |
 | the five words `00804021 24040000 24050000 24060000 01000008` in the first 16 KiB of `nfjrom` | 0 | the drop's `image/nfjrom` (`CTL_NFJROM`): 1 |
 | the bytes `RLXFW-RTKH1` in `nfjrom` | exactly 1 | the drop's: 0 |
@@ -317,12 +336,19 @@ so `__start` stays at `0x80500000` and, 推, the array at `_fdata`; the gate bel
 re-run 2026-10-23: `v1.0`'s `nfjrom` zero sequence 1, witness 0; the drop's `image/nfjrom` and
 `rtkload/nfjrom` (two copies of one file, 854,016 B, sha256 `5cc8d61d…`) zero sequence 1, witness
 0 — so the control fires on both reference images today; a 31-byte file built to hold the sequence
-and the witness once each reads 1 and 1, so the counter can see both.
+and the witness once each reads 1 and 1, so the counter can see both. 🔄 2026-10-23 (1C, desk):
+the gate as built passes a stub made with `0011` around `v1.0`'s `vmlinux` and refuses the pristine
+stub on three conditions, whose `nfjrom` is `v1.0`'s `295d4f6a…` byte for byte; a refused `build`
+writes no record, so `R3-2`'s positive control can no longer pass `build` (an inverted-gate mode
+would restore it; not built).
 
-**Cost.** 讀 13 more instructions (52 B: 8 at entry, 11 in place of 6 in `start_kernel`) and 27 B
+**Cost.** 讀 12 more instructions (48 B: 8 at entry, 11 in place of `start_kernel`'s 7 words, § 1.1;
+🔄 2026-10-23, 1C: this read 13 and 52 B, from the 6 source lines) and 27 B
 of `.data` plus its 16-byte alignment; the image grows in 1,024-byte steps
 (`src-vendor/rtl819x-toolchain/linux-2.6.30/rtkload/ld.script:33`, `:37`), so 推 this costs 0 or
-1,024 B of image depending on where `.data` ends.
+1,024 B of image depending on where `.data` ends. 🔄 2026-10-23: 量 0 for `v1.0`'s kernel, whose
+`nfjrom` built with `0011` keeps 1,110,016 B (1C); 讀 in the first build's `nfjrom` `start_kernel`
+is at `0x80500084`, not `0x80500064`, and the next vendor word moved 48 B (`0x80500080` → `0x805000B0`).
 
 ### 1.4 The kernel side
 
@@ -339,7 +365,8 @@ the build that reproduces `v1.0`'s image, `$FWRE_WORK/rebuild/s132/p5e1/art/p5e1
 symbols at `0x803F0524`–`0x803F0530`, inside `__bss_start` `0x803F0000` … `__bss_stop`
 `0x8053F040`).
 
-讀 **nothing in the built kernel reads them.** Over the drop's whole `linux-2.6.30/` and
+讀 **nothing in the vendor's built kernel reads them** (🔄 2026-10-23: rlxfw's `rlxfw-boot.c`, below,
+does since `948ff614`, by design, and is their one reader). Over the drop's whole `linux-2.6.30/` and
 `boards/rtl8196e/`, the only readers of `fw_arg0..3` outside `arch/mips/` (another architecture,
 never built here) are `src-vendor/rtl819x-toolchain/linux-2.6.30/arch/rlx/fw/arc/init.c:30-32`
 and `src-vendor/rtl819x-toolchain/linux-2.6.30/arch/rlx/fw/sni/sniprom.c:139-140`, and
@@ -352,7 +379,11 @@ four `fw_arg` symbols. So non-zero a0–a3 at kernel entry change nothing the ke
 for `prom_argc` and `_prom_argv` — the kind of reading `rlxfw-marks verify` makes, though its
 pairing rule ties `absent:` to conditional Kbuild rows (`tools/rlxfw-marks.py:92-96`), so the check
 needs a home of its own: the kernel build's post-build checks, beside the step that runs `verify`
-with the build's `System.map` (`tools/rlxfw-kbuild.sh:954-960`).
+with the build's `System.map` (`tools/rlxfw-kbuild.sh:965-971`). 🔄 2026-10-23: that home is
+`fwarg_check` (`tools/rlxfw-kbuild.sh:1010-1031`), called at the end of `run_gates` (`:989`) on the
+same map, with `fw_arg0..3` as its control; its verdict is in the manifest and in the build's
+verdict, and a red or refused one exits 6 (`tools/test-kbuild-cflags.sh` `F1`–`F7`). 量 green on the
+first build: `fw_arg0..3` at `0x803F8524`–`0x803F8530`, no `prom_argc` or `_prom_argv` (`FW-264`).
 
 **`include/linux/rlxfw-handoff.h`** (new, pure, no `#include`, the shape of
 `rtl819x-spi-install.h`): the three constants of `handoff.h` restated, and
@@ -376,15 +407,24 @@ the file itself lives in `kernel/linux-2.6.30/`, mirroring the staged layout, as
 `kernel/linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c` does, whose `rlxfw_puts` (`:85`) prints the line):
 an `arch_initcall` parses `fw_arg0..3` once, latches the result, prints one console line, and
 creates `/proc/rlxfw-boot` (mode 0444, one `read_proc` well inside one page); it exports
-`int rlxfw_boot_handoff(u32 *slot, u32 *ver)`, `-ENOENT` for none, for § 2.
+`int rlxfw_boot_handoff(u32 *slot, u32 *ver)`, `-ENOENT` for none, for § 2. 🔄 2026-10-23, as built
+and ruled: the row is `MK14` (`config/rlxfw-marks.tsv:279`), anchored after `MK`'s own
+`obj-y += rlxfw_mark.o`, and its witness is `sym:rlxfw_boot_handoff`: `str:rlxfw-boot` would stop
+being able to fail once a program that reads `/proc/rlxfw-boot` is in the initramfs, which the ELF
+carries uncompressed. The function is a plain global, not `EXPORT_SYMBOL`'d (`CONFIG_MODULES` is
+not set). 量 the first build: `rlxfw_boot_handoff` at `8000b0e4` (`T`), `MK14` `sym:` `mine:1`.
 
 | boot | console (`rlxfw_puts`) | `/proc/rlxfw-boot` |
 |---|---|---|
-| handoff valid | `RLXFW-BOOT slot=B ver=6` | `slot B ver 6` |
-| anything else | `RLXFW-BOOT none why=magic a0=00000000` (`why` ∈ magic, check, slot, version) | `none` |
+| handoff valid | `RLXFW-HANDOFF slot=B ver=6` | `slot B ver 6` |
+| anything else | `RLXFW-HANDOFF none why=magic a0=00000000` (`why` ∈ magic, check, slot, version) | `none` |
 
 A gate reads `/proc/rlxfw-boot`, never the console line (`CLAUDE.md` § At the bench). The raw
 `a0` on the `none` line costs nothing to print and answers an open question (§ 9, item 2).
+🔄 2026-10-23: the line is `RLXFW-HANDOFF`, renamed from this design's `RLXFW-BOOT`, which is one
+glyph from the boot ladder's `RLXFW-B00`; 量 the first build's `vmlinux` holds both formats and no
+`RLXFW-BOOT`. Every boot capture from the next image gains this line and `RLXFW-SW0=` (§ 2.9), so
+a prediction of a boot's console bytes moves with them.
 
 ### 1.5 Why it is fresh
 
@@ -393,7 +433,7 @@ A gate reads `/proc/rlxfw-boot`, never the console line (`CLAUDE.md` § At the b
   `ori` (§ 1.2).
 - In memory they live for one boot only, in `rtkload`'s own `.data`, and **that location is
   rewritten every boot before the save**: 讀 `rlxboot` copies the payload — this array's initial
-  zeros included — to `load_addr` from its verified buffer (`src/rlxboot/main.c:239`) and only
+  zeros included — to `load_addr` from its verified buffer (`src/rlxboot/main.c:250`) and only
   then jumps. So if the entry store were somehow lost, `start_kernel` would read the image's zeros
   and the kernel would read `none`; 推 no path makes it read a previous boot's handoff, which is
   the `MEM-17` hazard (`SPEC.md` `MEM-17`, 量: written DRAM survives a power cycle). The loader's
@@ -410,7 +450,7 @@ A gate reads `/proc/rlxfw-boot`, never the console line (`CLAUDE.md` § At the b
   one 16-byte line of its own (4 words a line,
   `src-vendor/rtl819x-toolchain/linux-2.6.30/rtkload/cache.c:24`; `.align 4`), and nothing reads or
   writes it through KSEG0. The one assumption kept is the one every `rlxboot` boot already rests
-  on: that `rlxboot`'s own `0x200` before its jump (`src/rlxboot/main.c:244`) leaves no dirty line
+  on: that `rlxboot`'s own `0x200` before its jump (`src/rlxboot/main.c:255`) leaves no dirty line
   of the payload copy to be written back later over the array. If it did, the write-back would
   land after the entry store and `start_kernel` would read the image's zeros: the kernel reads
   `none`, the fail-closed case, and B2 (§ 6.3) would show it.
@@ -432,7 +472,7 @@ unmeasured (`docs/loader-command-semantics.md` § d says only that the target ca
 | path | a0–a3 at `rtkload` | `/proc/rlxfw-boot` on the new image | |
 |---|---|---|---|
 | new `rlxboot` at `0x010000`, slot boot | magic, slot, version, check | `slot X ver N` | 讀 § 1.2–1.4 |
-| rescue copy at `0x020000` (`127a71cf`) | 0, 0, 0, 0 (`src/rlxboot/jump.S:43-48`, one commit) | `none` (`why=magic`) — **the fail-closed case** | 讀 |
+| rescue copy at `0x020000` (`127a71cf`) | 0, 0, 0, 0 (`src/rlxboot/jump.S:57-62`, `rlxboot_jump`; the file's one commit until `948ff614`) | `none` (`why=magic`) — **the fail-closed case** | 讀 |
 | `rlxboot` built `BOOT=ram` (`J 81800000`) | 0, 0, 0, 0 | `none` | 讀 |
 | the loader's `J 80500000` after a TFTP upload | whatever the loader leaves | `none`, 推 | 推 |
 | new `rlxboot` booting an **old** image (T, S) | handoff registers | — T's `rtkload` overwrites a0 at `src-vendor/rtl819x-toolchain/linux-2.6.30/rtkload/start.S:144` and zeroes a0–a2 at `:159-161`; T's kernel reads no `fw_arg` | 讀 |
@@ -496,7 +536,7 @@ SEs, no programs, `:863-864`).
 bytes in address order; a zero after the first one is *malformed*, and then the value is the
 **total** zero count, never below the leading run. 讀 `rlxboot` reads it through the window at
 `0xBD3F0000`, byte loads (`src/rlxboot/flashread.c:99-100`), once per boot
-(`src/rlxboot/main.c:337-344`), and refuses `version < counter` (`src/rlxboot/container.c:401-403`).
+(`src/rlxboot/main.c:373-380`), and refuses `version < counter` (`src/rlxboot/container.c:401-403`).
 
 #### 2.4.2 Semantics
 
@@ -504,7 +544,7 @@ bytes in address order; a zero after the first one is *malformed*, and then the 
 reaches the range check), after exactly one space, nothing trailing; no address anywhere (the
 bitmap's place is the compile-time `RLXFW_SPI_INST_STATE`,
 `kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:54`). 讀 the `/proc` handler hands
-a line to the install parser by prefix (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3018`)
+a line to the install parser by prefix (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3425-3427`)
 and the parser reads the first token whole
 (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:481-500`), which is how
 `eraseprobe` is told from `erase` today; `ctr` and `ctrloop` take the same path, so `ctrloop`
@@ -536,12 +576,42 @@ never reaches `ctr`'s grammar (§ 2.8, group B). Under `rtl819x_spi_lock`, in th
 0 → 6, `+1` for 6 → 7). Console: `RLXFW-SC-GO cur=<c> new=<n>` before the first op and
 `RLXFW-SC-END <reason> cur=<c> new=<n> read=<r> pp=<k> ms=<t>` after. `/proc/rtl819x-spi` gains
 `ctr_ran ctr_cur ctr_new ctr_read ctr_pp ctr_reason ctr_attempts ctr_refused ctr_failed`; the page
-budget (`RLXFW_SPI_INST_PROC_MAX`, 1,152,
-`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:1284`) is re-measured by the host
+budget (`RLXFW_SPI_INST_PROC_MAX`, 1,152 in 1.1, 1,183 since 1.2,
+`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:1301`) is re-measured by the host
 test, as now.
 
+🔄 2026-10-23, as built (`rtl819x-spi-install` 1.2, `948ff614`):
+
+- **`n_writes` counts page programs**, one per program the primitive completed
+  (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2894`), not bits cleared: on a faithful
+  part the two are equal; a stuck bit is a program counted and no bit cleared (1B: six programs for
+  five bits), which step 7 reports as `CTR_CMP`.
+- **Every reason has an errno** (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2323-2330`;
+  1.1's eight new reasons had none and all read `-EPROTO`, `ARM_READ`'s): `HDR_SEQ` `-ENOEXEC`,
+  `REPEAT_ONLY_SLOT` `-EINVAL`, `RUNNING_SLOT` `-EBUSY`, `CTR_ABOVE` and `CTR_BELOW` `-ERANGE`,
+  `CTR_HANDOFF` `-EPERM`, `CTR_MALFORMED` `-EILSEQ`, `CTR_CMP` `-EIO`; a glue case checks every
+  reason has a row.
+- **The counter block** prints `ctr_attempts ctr_done ctr_refused ctr_failed ctr_ran ctr_reason
+  ctr_cur ctr_malformed ctr_new ctr_read ctr_pp ctr_ms`, `ctrloop`'s `loop_*` and `ctrscratch_*`
+  (§ 2.7), and its own `ctr_truncated 0`; the install block ends `inst_truncated 0`. Each block's
+  maximum is the host test's measurement at the widest every field's type can print, asserted
+  equal: `RLXFW_SPI_INST_PROC_MAX` **1,183** (the shipped table 1,181) and
+  `RLXFW_SPI_INST_CTR_PROC_MAX` **501**
+  (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:1301`, `:1509`). 1.1's 1,152
+  was measured with products that wrapped to 1, so two fields printed one digit, and it left out
+  the block's own `inst_truncated` line (`SPEC.md` `FW-265`).
+- **The counter block prints first**, under the page budget of 3,584
+  (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:214`, `:3249-3261`): at `read_proc`'s
+  widest prefix by its own comments, 2,323 B, the counter block prints whole and the install block
+  says `inst_truncated 1`; at the armed image's measured 1,304 both print.
+- **Machine readers get `/proc/rtl819x-spi-inst`**, mode 0400
+  (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3539`): `n_writes <N>`, the install block
+  and the counter block, nothing else, at most `RLXFW_SPI_INST_NODE_MAX` = 20 + 1,183 + 501 = 1,704 B,
+  asserted at compile time to fit one `read(2)` (`PAGE_SIZE − 1024`); 量 on the host its widest is
+  1,692 B (1B v3). Not in the first kernel build (`FW-267`).
+
 **No arm, and the verb still ends disarmed.** Like every write verb it disarms on exit
-(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2808-2810`), so every caller takes the
+(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3162-3164`), so every caller takes the
 flash lock (§ 3.2) to keep it out of
 another process's arm → install pair. With the tie, the two statements `D6` asks to agree are the
 typed value and the version `rlxboot` handed over; without it (if the tie is declined) the verb
@@ -598,7 +668,13 @@ denial), unless `rlxboot` booted a version-4,096 image — 推 root keeps anothe
 `rlxfw_boot_handoff()` names that slot. The update path never needs to write the slot it runs
 from (§ 4), so this costs nothing and makes it a kernel property. A RAM boot reads `none`, so the
 bench's own installs (§ 6) are unaffected. Glue-only reason, exempt by name in the pure suite
-(the mechanism of `tools/test-spi-install.c:22-26`).
+(the mechanism of `tools/test-spi-install.c:22-26`). 🔄 2026-10-23: not glue-only, and not
+exempt: since 1.1 the pure `rlxfw_spi_inst_fence`
+(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:1245-1254`) produces it, the pure
+suite drives it, and its exemption list does not name it (`tools/test-spi-install.c:2230-2234`).
+The glue calls the fence before it reads the arm
+(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2664-2669`), so an unarmed install of the
+running slot reads `RUNNING_SLOT`.
 
 ### 2.6 `install <slot> sha=<64> repeat=<k>` (for the unpaced-write cut rounds)
 
@@ -609,7 +685,10 @@ hand-timed cut needs a window of at least 40 s (`CLAUDE.md` § At the bench) and
 write lasts 10.26–11.24 s (量 `FW-246`); `install slotB sha=<64> repeat=5` is 91 characters, so it
 stays one `--send` under 127 that `cardcheck` can see. The alternative, a shell loop, does not fit
 in 127 characters and puts the verb in a file `cardcheck` cannot read (`FW-113`'s old boundary,
-`notes/spi-mtd-driver.md:1742-1745`). `n_writes` = `k × (288 + ⌈len/256⌉)`.
+`notes/spi-mtd-driver.md:1742-1745`). `n_writes` = `k × (288 + ⌈len/256⌉)`. 🔄 2026-10-23, as
+built (1B; the design did not fix these, the glue suite drives each): `RLXFW-SI-REP i/k` comes
+before repetitions 2…k only; under `repeat=` the counters accumulate and `committed` resets at
+each repetition.
 
 ### 2.7 The scratch loop `ctrloop` (for the counter's cut rounds)
 
@@ -629,11 +708,27 @@ ends and a budget, `:2166-2188`):
 What it measures and what it cannot (`P6r-11`'s own *does not establish*): the routine under a
 cut, and how often a re-programmed page reads back right (§ 9 item 4) — not the state block.
 
+🔄 2026-10-23, as built (1B; the design did not fix these, and the glue suite drives each):
+`RLXFW-SL p=` is the pure plan's 0-based pass, and the final `SE` prints `p=<passes>`; `bit=` is
+the bits cleared so far in the pass (256 … 4,096); after every `SE` the 512-byte bitmap is read
+back and must be erased, else `PROBE_UNCLEAN` (which catches an `SE` that does nothing); after
+every pass the bitmap must read 4,096, well-formed, else `CTR_CMP`; the final check reads the
+whole 64 KiB probe block; a failure stops at once, with no clean-up erase; `ctrloop` attempts
+are not counted in `ctr_attempts`, and every dispatched verb, `show` included, ends disarmed.
+**`show` lands in `/proc`**, so a card gates on a field, not on its console line (`FW-47`):
+`ctrscratch_shows` (attempts since boot), `ctrscratch_rc`, `ctrscratch_value`,
+`ctrscratch_malformed` and `ctrscratch_erased`, the last over the whole 4 KiB sector; a failed read
+records its errno and clears the three values. For `ctr` itself: `SAME` prints no GO line, and
+`ctr_read` is step 7's read-back, `cur` for `SAME`, else 0.
+
 ### 2.8 Host test cases to add to `tools/test-spi-install.c` (each refusing and permitting)
 
 In the file's groups (`tools/test-spi-install.c:164`, `:262`, `:431`, `:498`, `:543`, `:643`,
-`:926`, `:952`, `:1070`, `:1188`: A, B, C, E, F/G, H/I, J, L, K, M), every reason produced by a case
-and every case under `--mutate`:
+`:926`, `:952`, `:1070`, `:1244`: A, B, C, E, F/G, H/I, J, L, K, M), every reason produced by a case
+and every case under `--mutate`. 🔄 2026-10-23: they landed beside those groups, as `P6r-10: the
+store's payload` (`:1311`), `P6r-11: ctr, ctrloop, repeat=` (`:1390`) and a second group `M`, the
+boot handoff's second source (`:1959`); `RUNNING_SLOT` and `CTR_HANDOFF` are produced by pure
+functions (§ 2.5, `rlxfw_spi_inst_ctr_tie`), so neither is glue-only below:
 
 | group | permits | refuses |
 |---|---|---|
@@ -652,10 +747,15 @@ and every case under `--mutate`:
 valid and a `none` handoff (`CTR_HANDOFF`, glue-only), `n_writes` = bits cleared, a stuck bit, a
 cut inside op `k`; `install slotA` refused `RUNNING_SLOT` when the handoff names `A` and permitted
 when it names `B` or is `none`; `repeat=3` writing the region three times; `ctrloop 2` under a cut.
+🔄 2026-10-23: `CTR_HANDOFF` is not glue-only (above), and `n_writes` counts programs (§ 2.4.2). 量
+`tools/test-spi-install.sh` at `948ff614`'s code: 930 pure + 710 shipped + 302 glue + 300 shipped
+glue cases, the glue built against both region tables because the shipped one is what the device
+will run (1B v3, `$FWRE_WORK/rebuild/s144/1b/`; `948ff614`'s message records the same four counts).
 
 ### 2.9 Shipping the install path: the blast radius
 
-- **`MK5` is retired, by ruling.** 讀 `config/rlxfw-kernel.delta:59`: flipping
+- **`MK5` is retired, by ruling.** 讀 `config/rlxfw-kernel.delta:59`, its reason until `948ff614`
+  (the row now reads `y` and records the ruling): flipping
   `CONFIG_MTD_RTL819X_WRITE` to `y` turns `MK5`'s `absent:rtl819x_spi_write_page` red, and it
   "CANNOT be re-witnessed without either retiring D4's build-time layer or relaxing
   tools/rlxfw-marks.py's pairing rule, which is a choice about a containment check and therefore
@@ -669,6 +769,16 @@ when it names `B` or is `none`; `repeat=3` writing the region three times; `ctrl
   still reds a build that drops the path. Containment moves to the run-time layers: the table's
   compile-time asserts, the single-use arm, the typed digest, `brokerd`'s signature check,
   `rlxboot`'s boot-time check, the running-slot fence (§ 2.5), and `cardcheck` at the bench.
+  🔄 2026-10-23, 量 by 2M with planted faults: the ruling's blast radius in the checkers was wider
+  than this list — `tools/test-config-gates.sh` `G4d` (twice) and `G4e`, and
+  `tools/test-kbuild-cflags.sh` `X6` and `X8`, go red on the ruled declaration and were rewritten
+  (`G4f` is now `G4d`'s positive control; `X6`–`X8` drive the flag through a fixture row, and `X5b`
+  pins that `--expect-present MK5` is refused); `X7`, guessed red, is not, because its
+  `--target none` refusal fires first. The delta's row back at `n` stops the build at compile time,
+  at `rtl819x-spi-write.c`'s `#error`
+  (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-write.c:48-50`), not at link (量 both
+  ways with the armed cell's kbuild command for that object). And the write TU's `late_initcall`
+  prints `RLXFW-SW0=<grain>` (`:359-365`): every image from the next build has that boot line.
 - `unarmed_rc` reads `-EACCES` instead of `-EOPNOTSUPP`
   (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:324-333`); `MT-FLASH-2` already
   compares against the image's own constant, and in a write image expects `-EPERM` (`docs/mfgtest.md`,
@@ -677,15 +787,28 @@ when it names `B` or is `none`; `repeat=3` writing the region three times; `ctrl
   committed image increments the counter. In an image that writes, a boot that has stored a record
   or advanced the counter before `trywrite` runs reads `n_writes` above 0 and the row goes red on
   a correct image, so the conjunct becomes `n_writes == w0` alone, or the row states when in the
-  boot it runs.
+  boot it runs. 🔄 2026-10-23: 讀 not done in `948ff614`: `trywrite` still asserts
+  `n_writes == 0` (`:2144`) and so does `config/mfgtest.sh:392-396`. Phase 1 adds no writer
+  that runs at boot, so the conjunct holds on its images; the first image whose boot writes before
+  `trywrite` runs — § 5's counter advance — fails `MT-FLASH-2` on a correct refusal.
 - `cardcheck` must learn every new write verb (`ctr`, `ctrloop`, `erase cfgN`, `repeat=`) — its
   `A56`–`A62`/`B16` scope names `install`, `erase`, `eraseprobe` today
   (`notes/spi-mtd-driver.md:1728-1732`) — **and** the writes no `--send` names: a `cfgstore`
   command, an HTTP upload, and the boot of an image whose `init` advances the counter.
+  🔄 2026-10-23: 🔴 讀 not done in `948ff614`, and half of it is now live: `tools/cardcheck.py`
+  refuses a driver write only when the echoed line begins `install` or `erase`
+  (`tools/cardcheck.py:977`), which covers `erase cfgN` and `repeat=`, while the driver hands
+  every line beginning `ctr` to the install parser
+  (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3425-3427`). So on every image from the
+  next build a card's `ctr <N>` or `ctrloop <p>` programs flash and passes `cardcheck` with no
+  owner-yes; the tie limits `ctr` to the booted version, and `ctrloop` to the probe block.
 - `docs/known-issues/v1.0.md:32-38` ("the image in the slots has no install path"), `docs/sbom.md`
   (the armed image not covered), `notes/spi-mtd-driver.md`, `docs/drivers/spi.md`,
   `docs/threat-model.md` (§§ 3, 9, 10, for `T2`, `T8`, `T9`; § 7 below) and `REPRODUCE.md` move
-  with it.
+  with it. 🔄 2026-10-23 (2M): so do `NOTICE` § 2, `kernel/README.md`, `docs/mfgtest.md`'s
+  `MT-FLASH-2`, `docs/known-issues/08`, `docs/bringup.md`, `notes/kernel-build.md`'s armed recipe,
+  `notes/reproducible-build.md` § 9, `SPEC.md` `FW-44`, `FW-207`, `FW-210` and `FW-228`, and two
+  comments, `tools/cardcheck.py`'s write-verb block and `tools/test-spi-wrpolicy.c`'s head.
 - The `/dev/mtd*ro` nodes stay (§ 3.1 needs `mtd2ro`), and busybox `nc` stays out of the shipped
   image: 讀 the armed image drops the nodes to carry `nc` (`notes/update-chain.md:520-525`), and
   `mkinitramfs`'s `check_no_h601_dumper` is the reason the two do not mix
@@ -702,7 +825,7 @@ row a guess:
 |---|---|---|---|
 | install path + write TU in the shipped kernel | `rtl819x-spi.o` `.text` 10,208 → 22,608 B (objects read at the desk, `notes/spi-mtd-driver.md:1562`), plus the write TU | about 6 KB | 讀 the artefacts: armed `8dce09c5` 1,117,184 B − `9bb2bec7` 1,110,016 B = 7,168 B (`LOG.md:1045`), which also carries busybox `nc` (+2,232 B uncompressed, `notes/update-chain.md:525-526`) and three fewer nodes |
 | handoff TU, `ctr`, `ctrloop`, `K_CFG`, fence, `repeat` | 3–4 KB | 1.5–2 KB | 推 |
-| `rtkload` patch | 13 more instructions (52 B), 27 B of `.data` | 0 or 1,024 B (the step) | § 1.3 |
+| `rtkload` patch | 12 more instructions (48 B; 🔄 2026-10-23, this read 13 and 52 B), 27 B of `.data` | 0 or 1,024 B (the step); 量 0 for `v1.0`'s kernel | § 1.3 |
 | `brokerd`: `container.c`, `slots.c`, `sha256b.c`, `ed25519.c`, `sha512.c` | 13–15 KB | 6–8 KB | 推 from `rlxboot`'s `.text` 13,808 B (`notes/rlxboot.md:524-526`), which is mostly this code |
 | `brokerd` update ops, flash I/O | 3–4 KB | 1.5–2 KB | 推 |
 | `httpd` streaming route | 2–3 KB | 1–1.5 KB | 推 |
@@ -715,6 +838,20 @@ programs in this desk's `build/rlxfw-user/` (not tracked) are `linkprobe` at 16,
 at 23,164 B (Sep 30 builds), against about 4 KB for § 5's helper inside `init` — so nothing here
 adds one. The image is measured by the build; the table is a guess to be refuted by it.
 
+🔄 2026-10-23, 量 the first build (`s144k1`, recipe `b1c23023`, built from `0446468c`: phase 1
+without `/proc/rtl819x-spi-inst`, with `CONFIG_FILE_LOCKING`, around `v1.0`'s userspace, whose
+manifest differs from `v1.0`'s only in `/bin/mfgtest`, 32,620 → 32,619 B): `nfjrom` 1,124,352 B,
+1,098 steps — **14 steps (14,336 B) above `v1.0`'s 1,084, and 53 steps (54,272 B) below the
+slot's 1,151**; `vmlinux.elf` 4,659,342 B, +37,390; the decompressed image 4,161,536 B of the
+5,242,880-byte ceiling, 79.4 %. The kernel rows above guessed 7.5–9 KB in the image, about 8–9
+steps, for what took 14 together with `CONFIG_FILE_LOCKING`, which the table did not have
+(`fs/locks.o` is 14,460 B of text and read-only data by the host's `size`, § 3.2). 量 by 1B,
+`rtl819x-spi.o`'s `.text` grew 24,092 → 31,300 B (+7,208) for the glue alone, compiled with the
+armed cell's flags, against the 3–4 KB guessed for the glue and the handoff TU together; in
+`s144k1` its `.text*` sections total 31,716 B, and `rlxfw-boot.o`'s 292 B with 460 B of
+`.init.text`, freed after boot. The userspace rows are still guesses (§§ 3–5 are unbuilt).
+`SPEC.md` `FW-267` holds the numbers.
+
 ## 3. The store on flash
 
 ### 3.1 Reading: `/dev/mtd2ro`, and why nothing else
@@ -723,7 +860,7 @@ adds one. The image is measured by the build; the table is a guess to be refuted
 
 | path | serialised with the install path? | verdict |
 |---|---|---|
-| `/dev/mtd2ro` (`c 90 5`, mode 0400, `config/rlxfw-initramfs.tsv:303`): `rtl819x_spi_mtd_read` | yes — it takes `rtl819x_spi_lock` for the whole read (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:1230-1243`), the mutex an install holds from its arm check to its disarm (`:2806-2811`) | **used**; 4-byte-aligned offset and length (`:1227-1228`): `0x3C0000`, `0x3D0000`, 4,096 ✓ |
+| `/dev/mtd2ro` (`c 90 5`, mode 0400, `config/rlxfw-initramfs.tsv:303`): `rtl819x_spi_mtd_read` | yes — it takes `rtl819x_spi_lock` for the whole read (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:1230-1243`), the mutex an install holds from its arm check to its disarm (`:3153-3165`) | **used**; 4-byte-aligned offset and length (`:1227-1228`): `0x3C0000`, `0x3D0000`, 4,096 ✓ |
 | `/dev/mtd0ro`, `/dev/mtd1ro` | no — the vendor's driver, "which drives the same four registers with no lock" (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:11-13`) | not used: a read during an install would share the controller unlocked |
 | `/proc/rtl819x-spi-map` | — | digests only, by design (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:37-42`) |
 | the window at `0xBD000000`, the install's read-back | — | kernel-only; no `nod` row declares `/dev/mem`, and the declared nodes are the only ones the image can hold (`config/rlxfw-initramfs.tsv:197-204`) |
@@ -751,10 +888,14 @@ whole record (`cfg_slot_image`, `:454-469`), read back and parse — and replace
    `LOCK_NB` retries, else `-CFGE_IO`. Every writer of `/proc/rtl819x-spi` verbs takes it
    (`cfgstore`, `brokerd`, `init`'s helper), so one process's `img reset` → stage → arm → install
    cannot interleave with another's (`D20`'s lock is per verb; the staging buffer and the arm are
-   shared state between verbs).
-2. `disarm`, `img reset` (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3013-3021`).
+   shared state between verbs). 🔄 2026-10-23: 讀 no kernel built here could take it:
+   `CONFIG_FILE_LOCKING` was not set in any of them, `v1.0`'s included, so `flock(2)` returned
+   `-ENOSYS` and a writer following this design would have failed closed on every store write.
+   Ruled: the delta sets it (`config/rlxfw-kernel.delta:427`); 量 the first build carries it and
+   `flock_lock_file_wait` (`SPEC.md` `FW-266`).
+2. `disarm`, `img reset` (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3420-3429`).
 3. one `write(2)` of 4,096 bytes to `/proc/rtl819x-spi-img`; it returns only after
-   `copy_from_user` under the mutex (`:2831-2872`).
+   `copy_from_user` under the mutex (`:3185-3226`).
 4. read `/proc/rtl819x-spi`: `img_len 4096`, `img_err none`, and `n_writes` noted.
 5. `arm 0x3c0000 0x3d0000 0x10000` (or `0x3d0000 0x3e0000`).
 6. `install cfgN sha=<64 hex>` — the digest computed by the writer with `src/lib/sha256.c`, already
@@ -765,7 +906,7 @@ whole record (`cfg_slot_image`, `:454-469`), read back and parse — and replace
 7. read `/proc/rtl819x-spi`: `inst_reason OK`, `inst_cmp_ok 1`, `inst_cmp_diff 0`, and
    `n_writes` moved by exactly **32**; anything else is `-CFGE_IO` with the reason logged.
 8. `img reset` (frees the staging buffer,
-   `kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2817-2826`), release the lock; then
+   `kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3171-3180`), release the lock; then
    `cfg_store`'s own read-back through `/dev/mtd2ro` and `cfg_parse_record`
    (`src/lib/cfg.c:677-691`).
 
@@ -778,7 +919,7 @@ refused write) does not arise, and `/proc` keeps the reason of the call this cod
 (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:847-866`): `ne = 65,536 / 4,096 =
 16` erases (the grain is 4,096, 量 `FW-244`), `np = ⌈4,096 / 256⌉ = 16` programs — **32 per store
 write**, the header page last (`:873-907`), the whole 64 KiB read back
-(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2756-2774`). `erase cfgN`: 16. 推 a store
+(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2802-2820`). `erase cfgN`: 16. 推 a store
 write lasts about 0.4–0.5 s: 量 `FW-246`, a 64 KiB region with 89 ops took 480–510 ms; this has 32.
 
 ### 3.4 Which programs change
@@ -921,7 +1062,7 @@ The DoD asks for `rlxboot`'s checks in `rlxboot`'s order with no second implemen
 (`src/rlxboot/container.h:49-53`), and it already builds three ways —
 
 - for the device, `-ffreestanding -O2 -Werror` by the rsdk gcc 3.4.6 (`src/rlxboot/Makefile:101-107`,
-  `:232-235`);
+  `:238-241`);
 - for the host, gcc-13 and clang-18 at `-Werror`, and under ASan/UBSan
   (`src/rlxboot/test/run-host-tests.sh:27-28`, `:40-63`, `:79`);
 - **as a Linux user-mode program by the same rsdk gcc, statically linked against uClibc**,
@@ -937,13 +1078,13 @@ matter and none an edit to a `BUILD_ID` input:
   -fno-builtin -fno-strict-aliasing -fno-common` (`src/brokerd/Makefile:288-289`); 推 the files
   that compile clean at `-O2 -Werror` under the same gcc (`rlxboot`'s payload) do at `-Os`; the
   first build settles it.
-- `ed25519.c` needs its one exemption, `-Wno-sign-compare` (`src/rlxboot/Makefile:122-129`), and
+- `ed25519.c` needs its one exemption, `-Wno-sign-compare` (`src/rlxboot/Makefile:127-134`), and
   `brokerd`'s target loop compiles every source with one flag set (`src/brokerd/Makefile:350-356`).
 - `src/rlxboot/container.c:75` includes `"../lib/ed25519.h"`, and `brokerd`'s target build stages
   its sources flat (`src/brokerd/Makefile:308-315`): the staging keeps `rlxboot/` and `lib/` as
   directories.
 - `brokerd` defines neither `ED25519_SIGN` nor `ED25519_KEYGEN`, and a gate reads the artefact for
-  a signer, as `rlxboot`'s does (`src/rlxboot/Makefile:302-308`).
+  a signer, as `rlxboot`'s does (`src/rlxboot/Makefile:308-314`).
 
 The production key is the same file `rlxboot` compiles in, `src/rlxboot/prodkey.h` (public key
 `4a6eda72…096e`), never a copy. The host build of `brokerd` uses the development key, as
@@ -964,9 +1105,9 @@ The production key is the same file `rlxboot` compiles in, `src/rlxboot/prodkey.
    only if it begins `RLXU` and its length fits (`src/rlxboot/slots.c:182-198`) — into one reused
    buffer, and verified by `rlxu_verify` with `rlxboot`'s own environment: RAM
    `0x80000000`–`0x82000000`, the stage-2 window, the slot's own RAM buffer and base, form `WHOL`
-   (`src/rlxboot/slots.c:169-173`, `src/rlxboot/main.c:346-375`, `src/rlxboot/rlxboot.h:33-36`,
+   (`src/rlxboot/slots.c:169-173`, `src/rlxboot/main.c:382-411`, `src/rlxboot/rlxboot.h:33-36`,
    `:74-78`), the counter of step 3, the production key. One deliberate difference: `rlxboot`'s own
-   range comes from its linker symbols (`src/rlxboot/main.c:348-349`), which `brokerd` cannot see,
+   range comes from its linker symbols (`src/rlxboot/main.c:384-385`), which `brokerd` cannot see,
    so `brokerd` uses `0x81800000`–`0x818FFFFF` (`notes/update-chain.md:102-105`), a superset —
    stricter, never looser. **Fallback, taken only on a measured timeout**: if `UPDATE_END`'s time
    on the die (§ 9 item 6) does not fit the deadline of § 4.1 step 4, the destination slot — the
@@ -1006,9 +1147,9 @@ neither; the host suite asserts that every refusal leaves the stub `/proc` direc
    socket buffer while the device's `nc` still drained them (`notes/spi-mtd-driver.md:1860-1867`).
    Here the writer is the only writer (the lock) and each `write(2)` returns after
    `copy_from_user` under the mutex
-   (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2838-2870`), so 推 `img_len` is final
+   (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3192-3224`), so 推 `img_len` is final
    when the last call returns. It is still read back — `img_len` equal to the staged length,
-   `img_err none` — before the arm, and the install's `sha=` is the last net (`:2666-2676`;
+   `img_err none` — before the arm, and the install's `sha=` is the last net (`:2707-2717`;
    `notes/spi-mtd-driver.md:1864-1865`: "an early read costs a refusal, never a wrong write").
 3. `arm <base> <base+0x120000> 0x120000`; `install slot<X> sha=<sha256 of the staging>`.
 4. Read `/proc/rtl819x-spi`: `inst_reason OK`, `inst_cmp_ok 1`, `inst_cmp_diff 0`, `n_writes`
@@ -1157,6 +1298,12 @@ row needs the owner's dated `owner-yes` naming what the column says.
 
 The `W`, `B`, `C`, `R` and `K` ids are this note's own; the card numbers its cells.
 
+🔄 2026-10-23, ruled (1B's item 8): no install has issued a one-byte `PP` on this die — the tail
+path of `pp_page` with no full word before it, which is every program `ctr` makes; 1B read the
+vendor's `ComSrlCmd_ComWrite` for a one-byte write and found the same register sequence. So the card
+runs `ctrloop` on the probe block (`0x3E0000`) before the first `ctr` on the state block, which in
+the table above is `B2`/`W3`: a one-byte-`PP` defect then shows on scratch, never at `0x3F0000`.
+
 ### 6.4 The password a card sets (ruled 2026-10-23; the DoD as amended)
 
 讀 `tools/console-capture.py` writes every `--send` into the committed `.meta.json` as `sent` and
@@ -1217,7 +1364,7 @@ the container cross the LAN in clear (`P6r-12`).
 (`docs/threat-model.md:58`) to: verified twice — by `brokerd` with `rlxboot`'s own code before any write, by `rlxboot` at
 boot — and the rollback half read from flash once the counter moves (§ 6.3 B3). The kernel's
 install path still does not verify signatures (`D7`,
-`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2259-2263`), so the write is
+`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2269-2273`), so the write is
 authorised by `brokerd`'s verdict alone, and root can stage anything (`rlxboot` refuses it at
 boot). The handoff can be forged only by code that runs before the kernel, a position that already
 writes flash (§ 1.6). A key compromise is total, as before.
@@ -1225,8 +1372,8 @@ writes flash (§ 1.6). A key compromise is total, as before.
 **`T9`, a peer that already holds a uid (§ 10).** uid 100 (`httpd`, if taken over) reaches the
 update ops only with a session token, as `T2`; it cannot open `/proc/rtl819x-spi` for writing
 (0644), `/proc/rtl819x-spi-img` (0200; both
-`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3090`, `:3121`), `/dev/mtd2ro` (0400) or
-`/run`'s lock, and inside its
+`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3498`, `:3529`), `/dev/mtd2ro` (0400) or
+`/run`'s lock (🔄 2026-10-23: nor read `/proc/rtl819x-spi-inst`, 0400, `:3539`), and inside its
 chroot it sees none of them (`src/httpd/serve.c:154-208`). uid 101 unchanged. **Root** gains a flash write
 path one `echo` away: every region the shipped table names — with § 2.1's shrink, the slots, the
 store regions and the probe, not `rlxboot` or the rescue — and the counter only to the booted
@@ -1241,8 +1388,11 @@ operation).
 ## 8. What this design does not establish
 
 - That any of it runs on the die: nothing here was built or measured; every timing is 推 (§ 4.7).
+  🔄 2026-10-23: §§ 1–2 are built and gated at the desk (`SPEC.md` `FW-264`, `FW-267`); none of it
+  has run on the die, and the chain `rlxboot` → `rtkload` → kernel has not run even in emulation.
 - That the vendor toolchain assembles the patch as the host's binutils did, or that `start.o` is
-  first in the link; the artefact gate (§ 1.3) reads both.
+  first in the link; the artefact gate (§ 1.3) reads both. 🔄 2026-10-23: 量 on the first build,
+  both as designed (§ 1.3).
 - What the loader's `J` leaves in a0–a3 (§ 1.6).
 - That a page programmed one bit at a time 2,048 times between erases reads back right on this
   part: the datasheet is not in hand (`FW-191`); `ctrloop` measures the scratch block, not the state
@@ -1253,6 +1403,8 @@ operation).
 - That `brokerd`'s 2.4 MB peak fits on `v1.0`'s userspace: `MEM-19`/`MEM-20` predate it.
 - That an update from the WAN side works (`P6r-9`).
 - That the headroom table is right: it is a guess to be refuted by the first build (§ 2.9).
+  🔄 2026-10-23: refuted for the kernel side, which took 14 steps (§ 2.9); the userspace rows wait
+  for their build.
 
 ## 9. Open questions only a measurement settles
 
@@ -1268,6 +1420,7 @@ operation).
    before and after).
 6. `UPDATE_END`'s time with userspace SHA-256 and Ed25519 on the 4181 (R1–R5, W6).
 7. A store write's duration and `n_writes` +32 (W4).
-8. The image's actual growth against § 2.9 (the first build).
+8. The image's actual growth against § 2.9 (the first build). 🔄 2026-10-23: the kernel's is 14
+   steps, 53 left (§ 2.9, `FW-267`); the userspace's is open.
 9. `MemFree` on V with `brokerd` holding a staging (W6).
 10. The time from the upload's first byte to `lan up` (W6/B4).

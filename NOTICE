@@ -66,12 +66,15 @@ is not this file's to settle; MIT was chosen so that nothing turns on it.
 ones declared and not built (`rtl819x-spi-write.c`, behind
 `CONFIG_MTD_RTL819X_WRITE`, which the mainline configuration does not set) and
 the headers. The directory is the unit, and no count of it is kept here: one
-went stale the day a header was added.
+went stale the day a header was added. 🔄 2026-10-23: since the `MK5` ruling the
+configuration sets it, so every image from the next build compiles
+`rtl819x-spi-write.c` (`notes/self-update.md` § 2.9).
 
 The 12 compiled sources are `rlxfw-devices`, `rlxfw_mark`, `rlxfw-entropy`,
 `rtl819x-timer`, `rtl819x-gpio`, `rtl819x-keys`, `rtl819x-spi`, `rtl819x-wdt`,
 `rtl819x-nic`, `rtl819x-switch`, `rtl819x-view` and `rlxfw-seam`
-(`docs/sbom.md` row `K6`).
+(`docs/sbom.md` row `K6`, which describes `v1.0`'s image). From the next build
+there are 14: those, `rtl819x-spi-write` and `rlxfw-boot` (`P6r-10`).
 
 **Why GPL-2.0-*only* and not "or later".**
 
@@ -134,8 +137,9 @@ carries weight is *it is not `0e45c61d`*, not the exact eight hex digits.)
 `config/rlxfw-kernel.delta`.
 
 These four files are not copies of vendor source; they are declarations of how
-to change it. 量 they describe changes to **24 distinct vendor files**: 11
-through 28 rows of `config/rlxfw-marks.tsv`, 10 through the 10 patches in
+to change it. 量 they describe changes to **25 distinct vendor files** (🔄 2026-10-23:
+24 until `P6r-10`'s `0011` added `rtkload/start.S`): 11
+through 29 rows of `config/rlxfw-marks.tsv`, 11 through the 11 patches in
 `config/host-compat/`, 2 through the busybox patch, and 1 — the board
 configuration template `boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW` —
 through `config/rlxfw-kernel.delta`. `tools/modrecord.py` generates the per-file

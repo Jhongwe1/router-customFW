@@ -32,7 +32,11 @@ Every patch to the vendor's kernel source is here, applied by
   `gpio_to_irq()`, vendor Ethernet interfaces that can be made un-openable, the
   NIC header's operating-mode constants outside the layered driver, one entropy
   input in `drivers/char/random.c`, and the MTD write option declared
-  `default n`.
+  `default n` (which `rlxfw-kernel.delta` sets to `y` since 2026-10-23).
+- `0011` changes the loader stub at the head of the image, not the kernel:
+  `rtkload` saves a0..a3 at entry and hands them to the kernel, the boot handoff
+  ([`notes/self-update.md`](../notes/self-update.md) § 1.3). Every patch here
+  applies with `--fuzz=0`.
 
 The directory keeps its name: the build driver and the records cite it by path.
 

@@ -336,8 +336,8 @@ negative-array-size idiom, because gcc 3.4.6 has no `_Static_assert`.
 ## 8. Counts
 
 🔄 2026-10-05: these are `R8a`'s counts (`BOOT=ram`, format 1 at the time); the
-suites today are `t_crypto` 36, `t_container` 99 and `t_slots` 61, in the last
-section.
+suites today are `t_crypto` 36, `t_container` 99 and `t_slots` 72 (61 in the last
+section; 🔄 2026-10-23, `P6r-10`'s handoff checks, `notes/self-update.md` § 1.2).
 
 | | |
 |---|---|

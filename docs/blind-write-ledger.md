@@ -1588,3 +1588,19 @@ non-zero a0–a3 at kernel entry change nothing (`notes/self-update.md` § 1.4,
 | path | depth | origin | what was taken |
 |---|---|---|---|
 | `arch/rlx/fw/sni/sniprom.c` | line | vendor | `:139-140`, `fw_arg0` and `fw_arg1` read by `prom_init()` — one of the two readers of the firmware arguments in `arch/rlx`, both under `arch/rlx/fw/`, which no Makefile builds (`arch/rlx/Makefile:116`); the citation is the evidence that the reader exists and is not linked |
+
+### `P6r-10`'s kernel side, `rlxfw-boot.c`, 2026-10-23 (144th segment)
+
+`kernel/linux-2.6.30/arch/rlx/kernel/rlxfw-boot.c` is rlxfw's own file, and three of its
+decisions rest on vendor code read to make them (1A): what it reads, how that is declared, and
+when it may run. 🔄 The section above said *nothing from it is in any code*; that held for the
+143rd segment's reading and stops holding here.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `arch/rlx/kernel/head.S` | line | vendor | `:141-144`, `LONG_S a0..a3` into `fw_arg0..fw_arg3`, after the `.bss` clear at `:133-139`: the four words `kernel_entry` stores once, before anything else uses the registers, are what `rlxfw-boot.c` reads, each once. **decision-layer**: the file reads those four words and no register |
+| `arch/rlx/include/asm/bootinfo.h` | line | vendor | `:70`, `extern unsigned long fw_arg0, fw_arg1, fw_arg2, fw_arg3;` — `unsigned long`, so `rlxfw-boot.c` includes the header by name and casts each word to `u32` rather than declaring its own |
+| `init/main.c` | line | generic | the drop's copy: `:689`, `proc_root_init()` inside `start_kernel`, before `rest_init()` at `:703` and so before every initcall — why an `arch_initcall` may create `/proc/rlxfw-boot`; the install path that calls `rlxfw_boot_handoff()` is a `late_initcall` driver, later still |
+
+The diff of `rlxfw-boot.c` is not called blind: its parse is rlxfw's (`include/linux/rlxfw-handoff.h`),
+and its reading of the registers is the vendor's entry code, read to the line.

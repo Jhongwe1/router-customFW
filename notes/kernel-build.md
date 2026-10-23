@@ -4666,7 +4666,10 @@ mainline `0x630EB5DE` at both, armed `0xD293F25B` at both — and each manifest'
 `recipe_id` says the same (`630eb5de`, `d293f25b`). The armed build passed
 `rlxfw-marks verify` under `--expect-present MK5` with one witness confirmed
 PRESENT (`1d6f6dcc`'s flag), the mainline build with `MK5` confirmed ABSENT; the
-images are 4,588,247 and 4,622,059 bytes.
+images are 4,588,247 and 4,622,059 bytes. 🔄 2026-10-23: no armed flip is left to derive. Since
+the `MK5` ruling (`notes/self-update.md` § 2.9) the row is `y` in every variant, and
+`verify --expect-present MK5` is refused, exit 3, because `MK5` is no longer an `absent:` row
+(`tools/test-kbuild-cflags.sh` `X5b`).
 
 **A full build is 600 `CC`, not 592.** 量, counting the `^  CC ` lines of each
 fresh stage-and-build log: mainline **600**, armed **601** (the write translation
@@ -4744,6 +4747,16 @@ tag is frozen, and three files cite its lines; a workstation defect that one
 command from the owner removes is not a property of a release. `PROGRESS.md`
 § Now carries the state sentence and says the restoring is the owner's, which
 leaves the reading to a finding file.
+
+**🆕 2026-10-23 (144th segment): a suite that reads green on the dirty tree.** 量 by 2M:
+with the canonical tree as `$FWRE_WORK`'s drop, `tools/test-kbuild-cflags.sh` passes `C1`
+(*the declared flags reach the build*) while its stage never built: the cell's oldconfig log,
+`$FWRE_WORK/rebuild/r3-4/out/gcf-c1.oldconfig.log`, is the tripwire's refusal, 312 bytes ending
+*the command was NOT run*. 讀 `C1` greps the driver's output for the `CFLAGS_KERNEL=[…]` line,
+which `rlxfw-kbuild.sh` prints before it stages anything, so `C1` cannot tell a build that ran
+from one that never started. On the pin-identical shadow root the same suite read 150/0 with the
+oldconfig log 2,636 bytes and no *NOT run*: the same verdict both ways. Not fixed. `SPEC.md`
+`FW-268`.
 
 ### The decompression ceiling: what refuses it and what only warns
 

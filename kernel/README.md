@@ -24,7 +24,7 @@ build identity the image prints at boot.
 | [`drivers/input/keyboard/rtl819x-keys.c`](linux-2.6.30/drivers/input/keyboard/rtl819x-keys.c) | the board's buttons, polled, as an input device | [gpio-driver](../notes/gpio-driver.md) §§ 10–13 | [keys](../docs/drivers/keys.md) |
 | [`drivers/watchdog/rtl819x-wdt.c`](linux-2.6.30/drivers/watchdog/rtl819x-wdt.c) | a `/dev/watchdog` on `WDTCNR` | [watchdog-driver](../notes/watchdog-driver.md) | [wdt](../docs/drivers/wdt.md) |
 | [`drivers/mtd/devices/rtl819x-spi.c`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c) | a read-only MTD device on the SPI flash controller, by programmed I/O | [spi-mtd-driver](../notes/spi-mtd-driver.md) | [spi](../docs/drivers/spi.md) |
-| [`drivers/mtd/devices/rtl819x-spi-write.c`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-write.c) | the flash write path: its policy, its counters, two MTD entry points; off in every committed image | [spi-mtd-driver](../notes/spi-mtd-driver.md) | [spi](../docs/drivers/spi.md) |
+| [`drivers/mtd/devices/rtl819x-spi-write.c`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-write.c) | the flash write path: its policy, its counters, two MTD entry points; off in every image built before 2026-10-23, and linked into every image since the `MK5` ruling ([self-update](../notes/self-update.md) § 2.9) | [spi-mtd-driver](../notes/spi-mtd-driver.md) | [spi](../docs/drivers/spi.md) |
 | [`drivers/mtd/devices/rtl819x-spi-wrpolicy.h`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-wrpolicy.h) | every refusal the write path makes, as pure arithmetic | | [spi](../docs/drivers/spi.md) |
 | [`drivers/mtd/devices/rtl819x-spi-install.h`](linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h) | every decision the slot install path makes, as pure functions | | [spi](../docs/drivers/spi.md) |
 | [`drivers/net/rtl819x-nic.c`](linux-2.6.30/drivers/net/rtl819x-nic.c) | the CPU-port DMA driver | [nic-driver](../notes/nic-driver.md) | [nic](../docs/drivers/nic.md) |
@@ -40,5 +40,7 @@ build identity the image prints at boot.
 |---|---|
 | [`arch/rlx/kernel/rlxfw-devices.c`](linux-2.6.30/arch/rlx/kernel/rlxfw-devices.c) | the board's platform devices |
 | [`arch/rlx/kernel/rlxfw_mark.c`](linux-2.6.30/arch/rlx/kernel/rlxfw_mark.c) | rlxfw's boot marks, and the reasoning behind them |
+| [`arch/rlx/kernel/rlxfw-boot.c`](linux-2.6.30/arch/rlx/kernel/rlxfw-boot.c) | the kernel side of the boot handoff: reads `fw_arg0..3` once, prints `RLXFW-HANDOFF`, serves `/proc/rlxfw-boot` ([self-update](../notes/self-update.md) § 1.4) |
+| [`include/linux/rlxfw-handoff.h`](linux-2.6.30/include/linux/rlxfw-handoff.h) | the handoff's constants and its pure parse, shared with the host tests |
 | [`include/linux/rlxfw-mark.h`](linux-2.6.30/include/linux/rlxfw-mark.h) | the boot marks' header |
 | [`include/linux/rlxfw-entropy.h`](linux-2.6.30/include/linux/rlxfw-entropy.h) | the interface between rlxfw's drivers and its entropy accounting |
