@@ -5,7 +5,7 @@ exists: nothing here was built, run on the device or measured for this note, and
 or written. Marks: **量** measured on the device, with its capture or `SPEC.md` row; **讀** read
 from code, a dump or an artefact, with `file:line`; **推** inferred, with what would settle it. A
 number with no mark and no source is not in this file; estimates are labelled guesses. Line
-numbers are at `91b2de29`. Vendor files are cited under `src-vendor/rtl819x-toolchain/`, the drop
+numbers are at `5dedaee2`. Vendor files are cited under `src-vendor/rtl819x-toolchain/`, the drop
 at its pin; paths under `$FWRE_WORK` are named where they are used. Once the code lands, the code
 and its host tests own what it does, and this note keeps the reasons.
 
@@ -443,21 +443,23 @@ The last row is what makes `W1` (§ 6) safe while slot A still holds T.
 
 ### 2.1 Two regions, `cfg0` and `cfg1`
 
-讀 the table today (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:128-142`)
-holds six regions, ascending, asserted at compile time (`:81-111`), the last (`probe`,
-`0x3E0000`, `:67-68`) ending exactly at the state block (`:107-108`). Two rows join it between
-`slotB` and `probe`:
+讀 before 1.1 the table held six regions, ascending, asserted at compile time, the last
+(`probe`, `0x3E0000`) ending exactly at the state block. Since 1.1 (`5dedaee2`) it is
+`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:182-202`, asserted at `:102-151`,
+the probe (`:76-77`) still ending at the state block (`:128-129`), and two rows have joined it
+between `slotB` and `probe`:
 
 | name | base | size | kind | why there |
 |---|---|---|---|---|
-| `cfg0` | `0x3C0000` | 65,536 | `K_CFG` | 讀 inside the tail the 2026-08-16 dump read erased (`0x34C000`–`0x3FFFFF`, `notes/update-chain.md:318`); 推 still erased — no install-path region names it (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:128-142`) and no `FLW`/`EW`/`EB` was issued at any seating since `v0.6` (`docs/known-issues/v1.0.md:103-108`), but writers nobody identified exist (`FLS-26`), so the card pre-reads it; the top of the free area, so `0x2B0000`–`0x3BFFFF` stays free for larger slots |
+| `cfg0` | `0x3C0000` | 65,536 | `K_CFG` | 讀 inside the tail the 2026-08-16 dump read erased (`0x34C000`–`0x3FFFFF`, `notes/update-chain.md:318`); 推 still erased — no install-path region named it before 1.1, and no `FLW`/`EW`/`EB` was issued at any seating since `v0.6` (`docs/known-issues/v1.0.md:103-108`), but writers nobody identified exist (`FLS-26`), so the card pre-reads it; the top of the free area, so `0x2B0000`–`0x3BFFFF` stays free for larger slots |
 | `cfg1` | `0x3D0000` | 65,536 | `K_CFG` | its own 64 KiB block: no erase of one can reach the other at either candidate grain (`FW-187`); 量 the grain is 4,096 (`FW-244`) |
 
 New compile-time asserts, beside `:81-111`: each of `cfg0`, `cfg1` 64 KiB-aligned and exactly
 `RLXFW_SPI_INST_BLOCK`; `SLOTB_END <= CFG0_BASE`; `CFG0_END <= CFG1_BASE`;
 `CFG1_END <= PROBE_BASE`; `CFG0_BASE >= 0x2B0000` and `CFG1_END <= 0x3E0000` (the DoD's
-window); `IMG_CAP >= CFG sizes`. `RLXFW_SPI_INST_NREGIONS` 6 → 8, and the host test's index enum
-(`tools/test-spi-install.c:56`) and its `NREG == 6` row (`:196-202`) move with it.
+window); `IMG_CAP >= CFG sizes`. `RLXFW_SPI_INST_NREGIONS` is 8 in the provisioning table and 5 in the shipped one, and
+the host test's index enums (`tools/test-spi-install.c:69-74`) and its region-count row
+(`:246-252`) follow it (1.1).
 
 **Chosen: a shipped table without `rlxboot`, `rescue` and `barrier`.** Behind
 `RLXFW_SPI_INST_PROVISION` (0 in the shipped build, 1 in a RAM-only provisioning build), so the
@@ -470,20 +472,20 @@ which has them. The cost: updating `rlxboot` is a bench act.
 `rlxfw_spi_inst_chk_cfg(img, len)`: `len == 4,096` exactly (`CFG_SLOT_SIZE`, `src/lib/cfg.h:52`),
 magic `RLXC` at 0, format 1 and header length 24 at 4 and 6, `seq` at 8 in
 1..`0xFFFFFFFE` (`src/lib/cfg.h:30-43`) — the constants restated, as `container.h`'s are
-(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:504-522`), and compared with
+(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:670-688`), and compared with
 `src/lib/cfg.h` by the host test. No CRC in the kernel: the loader of the record checks it
 (`src/lib/cfg.c:308-338`), and the kind check exists to stop a container landing in a store region
 or a record in a slot (`chk_rlxu` already refuses anything not `RLXU`, so a record:
-`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:528-529`). New reason `HDR_SEQ`.
-`chk_payload` (`:590-600`) gains the kind.
+`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:694-695`). New reason `HDR_SEQ`.
+`chk_payload` (`:786-798`) gains the kind.
 
 ### 2.3 `erase cfg0` / `erase cfg1`
 
 `erase` today is barrier-only
-(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:368-370`, `NOT_ERASABLE`). It is
+(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:523-526`, `NOT_ERASABLE`). It is
 allowed on `K_CFG` too, with the usual arm equal to the region. It is the deterministic way to
 make a slot invalid on the die (§ 3.6; § 6.3 W8, W9); `n_writes` +16 (`plan_init`: 65,536 / 4,096
-SEs, no programs, `:665-666`).
+SEs, no programs, `:863-864`).
 
 ### 2.4 The counter verb `ctr <N>`
 
@@ -501,10 +503,10 @@ bytes in address order; a zero after the first one is *malformed*, and then the 
 `ctr <N>`: `N` is 1–4 decimal digits, the first not `0` (so `ctr 0` is `SYNTAX` and `ctr 4097`
 reaches the range check), after exactly one space, nothing trailing; no address anywhere (the
 bitmap's place is the compile-time `RLXFW_SPI_INST_STATE`,
-`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:50`). 讀 the `/proc` handler hands
+`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:54`). 讀 the `/proc` handler hands
 a line to the install parser by prefix (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3018`)
 and the parser reads the first token whole
-(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:330-345`), which is how
+(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:481-500`), which is how
 `eraseprobe` is told from `erase` today; `ctr` and `ctrloop` take the same path, so `ctrloop`
 never reaches `ctr`'s grammar (§ 2.8, group B). Under `rtl819x_spi_lock`, in this order:
 
@@ -535,7 +537,7 @@ never reaches `ctr`'s grammar (§ 2.8, group B). Under `rtl819x_spi_lock`, in th
 `RLXFW-SC-END <reason> cur=<c> new=<n> read=<r> pp=<k> ms=<t>` after. `/proc/rtl819x-spi` gains
 `ctr_ran ctr_cur ctr_new ctr_read ctr_pp ctr_reason ctr_attempts ctr_refused ctr_failed`; the page
 budget (`RLXFW_SPI_INST_PROC_MAX`, 1,152,
-`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:907`) is re-measured by the host
+`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:1284`) is re-measured by the host
 test, as now.
 
 **No arm, and the verb still ends disarmed.** Like every write verb it disarms on exit
@@ -629,8 +631,8 @@ cut, and how often a re-programmed page reads back right (§ 9 item 4) — not t
 
 ### 2.8 Host test cases to add to `tools/test-spi-install.c` (each refusing and permitting)
 
-In the file's groups (`tools/test-spi-install.c:146`, `:212`, `:346`, `:413`, `:458`, `:556`,
-`:836`, `:862`, `:980`, `:1076`: A, B, C, E, F/G, H/I, J, L, K, M), every reason produced by a case
+In the file's groups (`tools/test-spi-install.c:164`, `:262`, `:431`, `:498`, `:543`, `:643`,
+`:926`, `:952`, `:1070`, `:1188`: A, B, C, E, F/G, H/I, J, L, K, M), every reason produced by a case
 and every case under `--mutate`:
 
 | group | permits | refuses |
@@ -643,7 +645,7 @@ and every case under `--mutate`:
 | I cuts | a cut after `k` ops and inside op `k+1` (bit stays 1, becomes 0, reads either): every read decodes to `c+k` or `c+k+1`, never below `c`, well-formed | a stray clear at a position `>= n` during the advance: decodes to `n+1`, malformed — the one case § 2.4.4's upper bound excludes, asserted as excluded rather than left out |
 | J read-back | `ctr`'s compare passes on a faithful part | a stuck-at-1 bit → `CTR_CMP` |
 | K `/proc` | the widest `ctr_*` + `inst_*` block fits the page budget | — |
-| M second source | `rlxfw_handoff_parse` accepts (magic, `A`, 1, check) and (magic, `B`, `0xFFFFFFFE`, check); kernel and `rlxboot` check words equal over a sweep; the kernel's counter decode equals `rlxu_counter_from_bitmap` on all 4,097 well-formed bitmaps, every single-bit flip of 64 of them and 10,000 random ones (linking `container.c`, as `-DWITH_CONTAINER_H` already includes its header, `tools/test-spi-install.c:44-47`); `cfg0`/`cfg1` equal `cfg.h`'s flash constants (§ 3.7); `RLXC`, format, header length and slot size equal `cfg.h`'s | handoff with magic ±1, check ±1, slot `C` and 0, version 0 and `0xFFFFFFFF`, each its reason |
+| M second source | `rlxfw_handoff_parse` accepts (magic, `A`, 1, check) and (magic, `B`, `0xFFFFFFFE`, check); kernel and `rlxboot` check words equal over a sweep; the kernel's counter decode equals `rlxu_counter_from_bitmap` on all 4,097 well-formed bitmaps, every single-bit flip of 64 of them and 10,000 random ones (linking `container.c`, as `-DWITH_CONTAINER_H` already includes its header, `tools/test-spi-install.c:53-56`); `cfg0`/`cfg1` equal `cfg.h`'s flash constants (§ 3.7); `RLXC`, format, header length and slot size equal `cfg.h`'s | handoff with magic ±1, check ±1, slot `C` and 0, version 0 and `0xFFFFFFFF`, each its reason |
 | L `ctrloop` plan | per pass one `SE` at `0x3E0000`, 4,096 one-byte ops inside `[0x3E0000, 0x3E0200)`, nothing outside `probe`, a final clean `SE` | — |
 
 `tools/test-spi-install-glue.c` (the extracted glue against a simulated part) gains: `ctr` with a
@@ -773,9 +775,9 @@ refused write) does not arise, and `/proc` keeps the reason of the call this cod
 ### 3.3 `n_writes` per store write
 
 讀 `rlxfw_spi_inst_plan_init`
-(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:649-668`): `ne = 65,536 / 4,096 =
+(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:847-866`): `ne = 65,536 / 4,096 =
 16` erases (the grain is 4,096, 量 `FW-244`), `np = ⌈4,096 / 256⌉ = 16` programs — **32 per store
-write**, the header page last (`:675-709`), the whole 64 KiB read back
+write**, the header page last (`:873-907`), the whole 64 KiB read back
 (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2756-2774`). `erase cfgN`: 16. 推 a store
 write lasts about 0.4–0.5 s: 量 `FW-246`, a 64 KiB region with 89 ops took 480–510 ms; this has 32.
 
@@ -804,7 +806,7 @@ at `:727`), 8 KiB. On flash that is two PIO reads: 推 ≤ 8 ms each request, an
 `UPDATE_DATA` requests per upload (§ 4) → ≤ 4.5 s. **Optional, after a measurement**: cache the
 parsed record keyed on the two 24-byte headers, re-reading a slot only when its header bytes
 changed. Sound for this store's own writes — an install erases the slot first (header → `0xFF`),
-then writes the header last (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:675-709`)
+then writes the header last (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:873-907`)
 with a new `seq` and CRCs — and it keeps `FW-184`'s promise.
 
 ### 3.6 Making a slot invalid on the die, and `cfgstore show`
@@ -825,7 +827,7 @@ with a new `seq` and CRCs — and it keeps `FW-184`'s promise.
 `0x3C0000`/`0x3D0000` live in the kernel's table and in `cfg.h`. The host test includes both
 (`tools/test-spi-install.c` with `-DWITH_CFG_H`) and fails on a difference, the pattern by which
 `rtl819x-spi-install.h` restates `container.h`
-(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:504-513`). A drift that escaped it
+(`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:670-679`). A drift that escaped it
 fails closed on the die: the arm `cfg.c` types would not equal the region (`ARM_WINDOW`).
 
 ### 3.8 Without a shell (ruled 2026-10-23 for the shipped image)
@@ -900,7 +902,7 @@ supported:
   destination letter.
 - **`UPDATE_DATA`** `u32 offset` + bytes: same session; `offset == received` and
   `received + n <= total`, else `INVAL sequence` and the staging is **poisoned** (the kernel's
-  `D12` rule, `kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:434-441`) until a new
+  `D12` rule, `kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:600-607`) until a new
   `BEGIN`.
 - **`UPDATE_END`** `u32 total`: `received == total`, not poisoned, then § 4.4.
 
@@ -1011,7 +1013,7 @@ neither; the host suite asserts that every refusal leaves the stub `/proc` direc
 3. `arm <base> <base+0x120000> 0x120000`; `install slot<X> sha=<sha256 of the staging>`.
 4. Read `/proc/rtl819x-spi`: `inst_reason OK`, `inst_cmp_ok 1`, `inst_cmp_diff 0`, `n_writes`
    moved by `288 + ⌈len/256⌉`
-   (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:665-666`; 量 `FW-246`: 4,621
+   (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h:863-864`; 量 `FW-246`: 4,621
    for 1,109,152 B).
    Log one console line: `brokerd: UPDATE slot <X> written: <inst_reason> cmp_diff <d> n_writes +<k> ms <t>`.
 5. `img reset`, `sync()`, `sleep(1)`, `reboot(RB_AUTOBOOT)` — 讀 a watchdog bite:
