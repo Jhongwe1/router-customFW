@@ -50,6 +50,7 @@ was measured on it, and what is still open. Each note owns its findings;
 
 - [`rlxboot.md`](rlxboot.md) — `rlxboot`, a second-stage loader that verifies a signed container
 - [`update-chain.md`](update-chain.md) — the signed update chain, the host side
+- [`self-update.md`](self-update.md) — self-update and anti-rollback from the running firmware, the design (`P6r-10`, `P6r-11`)
 - [`slots45-draft.md`](slots45-draft.md) — slots 4 and 5, the Linux half of a seating
 - [`boot-time.md`](boot-time.md) — boot time, its instrument and its clock
 - [`console-link.md`](console-link.md) — the console link and how fast it goes
