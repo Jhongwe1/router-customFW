@@ -71,6 +71,7 @@
 #include "container.h"
 #include "slots.h"
 #include "sha256b.h"
+#include "handoff.h"            /* P6r-10: what a slot boot leaves in a0..a3 */
 
 #ifndef RLXBOOT_BUILD
 #error "RLXBOOT_BUILD must be the 8-hex source digest; the Makefile computes it"
@@ -124,8 +125,8 @@
  * costs one power cycle per case.  The default is 1 and the reason is arithmetic:
  * seven reject cases at one power cycle each is seven power cycles on a project
  * with one device and no spare.  Either way NO UNVERIFIED IMAGE IS ENTERED --
- * `rlxboot_jump` is called from exactly one place and only after
- * `rlxu_verify` has returned RLXU_OK.
+ * `rlxboot_jump` and `rlxboot_jump_handoff` are called from exactly one
+ * place, `boot_verified`, and only after `rlxu_verify` has returned RLXU_OK.
  *
  * BOOT=ram ONLY.  The slots build always halts (D4: "HALT (spin), no reset
  * loop"): a reset there would come straight back through the stock loader's
@@ -229,11 +230,21 @@ static void report(const struct rlxu *r, int stage, int reason)
 /* The one path into a payload, shared by both builds.  `r` is a verdict of
  * RLXU_OK and `body` is the first payload byte OF THE BYTES THAT VERDICT WAS
  * ABOUT: the staged container (BOOT=ram) or the winning slot's own buffer
- * (BOOT=slots) -- never flash, and never a second copy. */
-static void boot_verified(const struct rlxu *r, const unsigned char *body)
+ * (BOOT=slots) -- never flash, and never a second copy.
+ *
+ * `slot` is the winner's name, 'A' or 'B', in the slots build and 0 in the
+ * RAM build (P6r-10, notes/self-update.md § 1.2).  A slot boot hands the
+ * payload magic, slot, version and a check word in a0..a3 through
+ * `rlxboot_jump_handoff`, and says so on the console first; slot 0 keeps
+ * `rlxboot_jump`, which zeroes all four.  The handoff is compiled into the
+ * slots build only, so the RAM image holds neither the magic nor the line --
+ * the payload gate's census reads both images for it. */
+static void boot_verified(const struct rlxu *r, const unsigned char *body,
+                          unsigned long slot)
 	__attribute__((noreturn));
 
-static void boot_verified(const struct rlxu *r, const unsigned char *body)
+static void boot_verified(const struct rlxu *r, const unsigned char *body,
+                          unsigned long slot)
 {
 	/* Verified.  Only now does one byte move. */
 	rlx_memcpy((void *)r->load_addr, (const void *)body, r->payload_len);
@@ -249,6 +260,18 @@ static void boot_verified(const struct rlxu *r, const unsigned char *body)
 	rlx_puts(" entry=");
 	rlx_puthex32((u32)r->entry_addr);
 	nl();
+#if RLXBOOT_SLOTS
+	/* What is handed over, before the drain so the capture holds it: the
+	 * slot as the console names it and the version in decimal, the two
+	 * values the kernel's `/proc/rlxfw-boot` must then read back. */
+	if (slot != 0) {
+		rlx_puts("RLXBOOT-HANDOFF slot=");
+		rlx_putc((int)slot);
+		rlx_puts(" ver=");
+		putdec((u32)r->version);
+		nl();
+	}
+#endif
 
 	/* Drain the UART before the jump.  The payload may reprogram the 16550
 	 * or reset the board; a line still in the FIFO is a line the capture
@@ -262,6 +285,13 @@ static void boot_verified(const struct rlxu *r, const unsigned char *body)
 			;
 	}
 
+#if RLXBOOT_SLOTS
+	if (slot != 0)
+		rlxboot_jump_handoff(r->entry_addr, slot, r->version,
+		                     RLXB_HANDOFF_CHECK(slot, r->version));
+#else
+	(void)slot;             /* BOOT=ram hands nothing over: always 0 */
+#endif
 	rlxboot_jump(r->entry_addr);
 }
 
@@ -296,6 +326,12 @@ static void print_from(void)
 	rlx_puthex32(*(volatile const u32 *)RLXB_LDR_FROM);
 	nl();
 }
+
+/* P6r-10: the slot a boot hands over is the winner's console name, passed as
+ * it is (`win->name`, below), so the name `RLXBOOT-SLOT` prints and the value
+ * the kernel compares are one value, or this does not compile. */
+typedef char rlxb_handoff_is_the_name[
+	('A' == RLXB_HANDOFF_SLOT_A && 'B' == RLXB_HANDOFF_SLOT_B) ? 1 : -1];
 #endif
 
 /* ----------------------------------------------------------------- main --- */
@@ -399,7 +435,8 @@ void rlxprobe_main(void)
 		for (;;)
 			;
 	}
-	boot_verified(&win->r, rlxb_boot_body(win));
+	boot_verified(&win->r, rlxb_boot_body(win),
+	              (unsigned long)(unsigned char)win->name);
 #else
 	if (rlxu_verify((const unsigned char *)RLXB_CONTAINER,
 	                RLXB_CONTAINER_LIMIT - RLXB_CONTAINER,
@@ -416,6 +453,6 @@ void rlxprobe_main(void)
 			;
 #endif
 	}
-	boot_verified(&r, (const unsigned char *)(RLXB_CONTAINER + RLXU_BODY_OFF));
+	boot_verified(&r, (const unsigned char *)(RLXB_CONTAINER + RLXU_BODY_OFF), 0);
 #endif
 }

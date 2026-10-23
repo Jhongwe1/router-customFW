@@ -334,17 +334,17 @@ if [ -n "$INITRAMFS" ]; then
 fi
 
 # ----------------------------------------- --expect-present ROW-ID, R8b FW-228
-# R8b's armed image is mainline with config/rlxfw-kernel.delta's
-# CONFIG_MTD_RTL819X_WRITE flipped to y on a branch.  rtl819x_spi_write_page is
-# then in System.map, config/rlxfw-marks.tsv's MK5 (`absent:`) goes RED in
-# verify -- correctly -- and run_gates makes that exit 6.  rlxfw-marks.py's
-# `--expect-present ROW` inverts ONE named conditional row for ONE run (its W17
-# table).  This script only FORWARDS the flag, verbatim, when it is given, and
-# never derives it from the .config: reading the delta here would make this
-# file a second reader of a value tools/kconfig-delta.py owns, and an armed
-# build that forgot the flag must stay RED.  The exemption is printed below, on
-# the verify verdict line and on the last line, and appended to the manifest;
-# with no flag not one of those changes by a byte.
+# Written for R8b's armed image, where CONFIG_MTD_RTL819X_WRITE=y put
+# rtl819x_spi_write_page in System.map and config/rlxfw-marks.tsv's MK5, then
+# a conditional row witnessed `absent:`, went RED in verify -- correctly.
+# rlxfw-marks.py's `--expect-present ROW` inverts ONE named conditional row
+# for ONE run (its W17 table).  🔄 2026-10-23: MK5 is `obj-y` with `sym:` by
+# the owner's ruling (notes/self-update.md § 2.9), so the committed declaration
+# has no row to name and the probe below refuses every id; test-kbuild-cflags
+# drives the flag through RLXFW_REPO.  This script only FORWARDS it, verbatim,
+# and never derives it from the .config -- a second reader of a value
+# tools/kconfig-delta.py owns -- so a build that forgot it stays RED.  It is
+# printed below and kept in the manifest; with no flag none of that changes.
 #
 # 🔴 THE ROW IDS ARE CHECKED HERE, ABOVE THE STAGE, AND BY rlxfw-marks ITSELF.
 # Checked only by the post-build verify, a typo costs a 480 MB stage and 592
@@ -360,7 +360,7 @@ EP_ARGV=()
 for ep in "${EXPECT_PRESENT[@]}"; do
     case "$ep" in
         "") echo "$CELL: --expect-present was given no ROW-ID. It takes one id from" >&2
-            echo "  config/rlxfw-marks.tsv's first column -- MK5 for R8b's armed image." >&2
+            echo "  the declaration's first column, a conditional row's (since 2026-10-23 the committed one has none)." >&2
             exit 3 ;;
         -*) echo "$CELL: --expect-present '$ep': that is an option, not a ROW-ID --" >&2
             echo "  the flag took the next argument as its value." >&2
@@ -558,16 +558,16 @@ TEMPLATE="$top/boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW"
 # ------------------------------------------------- declared host-compat patches
 # The build that was on disk on 2026-08-28 carried an UNDECLARED change to
 # `kernel/timeconst.pl`.  Reproducing it needed a patch nothing in the repo
-# named.  Every source change to the vendor tree now lives in
-# config/host-compat/, is applied here, and a patch that does not apply stops
-# the build rather than being skipped -- a partially patched tree builds, and
-# what it builds is not what the patch list describes.
+# named.  Every source change to the vendor tree lives in config/host-compat/,
+# is applied here, and a patch that does not apply stops the build rather than
+# being skipped -- a partially patched tree builds, and what it builds is not
+# what the patch list describes.  --fuzz=0: --silent would hide a fuzzed hunk.
 PATCHDIR="$REPO/config/host-compat"
 if [ "$KEEP" != 1 ]; then
     napplied=0
     for pf in "$PATCHDIR"/*.patch; do
         [ -e "$pf" ] || continue
-        if ! (cd "$top/linux-2.6.30" && patch -p1 --forward --silent < "$pf"); then
+        if ! (cd "$top/linux-2.6.30" && patch -p1 --forward --fuzz=0 --silent < "$pf"); then
             echo "$CELL: host-compat patch FAILED: $pf" >&2
             exit 3
         fi
@@ -788,9 +788,12 @@ run() {          # run() <logsuffix> <cmd...>
 #   verdict              green, recipient or not-green -- overall_verdict, the
 #                        one rule that also decides the exit status and whether
 #                        the `manifest ->` line is printed
+#   fwarg_check, fwarg_check_result    (2026-10-23, P6r-10) fwarg_check's
+#                        green | red | refused and its reason, after `verdict`
+#                        so every earlier line keeps its place
 #   marks_verify_expect_present  the row ids --expect-present named, space
 #                        separated.  🔴 WRITTEN ONLY WHEN THE FLAG WAS GIVEN, last,
-#                        so a run without it writes the same thirty lines as
+#                        so a run without it writes the same thirty-two lines as
 #                        before; `marks_verify green` beside it means that row
 #                        was confirmed PRESENT, the opposite of its absent:.
 #   recipient            `unit-specific checks not run: <UNIT_REFS>`.  🔴 WRITTEN
@@ -856,6 +859,8 @@ write_manifest() {          # write_manifest <vmlinux path>
         printf 'marks_verify_absent\t%s\n'  "${MVERIFY_ABSENT:--}"
         printf 'initramfs_manifest_sha256\t%s\n' "$irm"
         printf 'verdict\t%s\n'              "$(overall_verdict)"
+        printf 'fwarg_check\t%s\n'          "${FWARG_VERDICT:--}"
+        printf 'fwarg_check_result\t%s\n'   "${FWARG_RESULT:--}"
         [ -z "${EXPECT_PRESENT[*]-}" ] || \
             printf 'marks_verify_expect_present\t%s\n' "${EXPECT_PRESENT[*]}"
         [ "${RECIPIENT:-0}" = 0 ] || printf 'recipient\t%s\n' "$RECIPIENT_NOTE"
@@ -876,6 +881,11 @@ write_manifest() {          # write_manifest <vmlinux path>
 # A --recipient build whose gates are both green is not green either: it exits
 # 7 and prints a RECIPIENT BUILD line where `manifest ->` would be (the
 # --recipient block above the dry-run exit says why).
+#
+# 2026-10-23 (P6r-10): fwarg_check, called from run_gates beside verify, is a
+# third condition of the same rule and of the same record -- its verdict is in
+# the manifest, a red or refused one exits 6 and prints NOT FOR UPLOAD.  It is
+# not a declaration gate: nothing declares the two symbols it refuses.
 #
 # 🔴 FAIL, NOT RECORD-ONLY, and the reason is the state CFG-3 was opened
 # for.  Nothing reads these verdicts yet: looprun's S2 reads the exit status
@@ -927,10 +937,11 @@ gate_verdict() {
     fi
 }
 
-# run_gates -- sets KCHECK_* and MVERIFY_* for write_manifest.  Each gate's
-# whole output goes to <cell>.kconfig-check.log / <cell>.marks-verify.log.
-# An input that is missing is `refused` with the reason and the tool is not
-# run: a traceback is not a verdict.
+# run_gates -- sets KCHECK_* and MVERIFY_*, and through fwarg_check FWARG_*,
+# for write_manifest.  Each gate's whole output goes to
+# <cell>.kconfig-check.log / <cell>.marks-verify.log.  An input that is
+# missing is `refused` with the reason and the tool is not run: a traceback
+# is not a verdict.
 run_gates() {
     local kargs margs line pairs i ep ep_tag=""
     KCHECK_RC=-;  KCHECK_VERDICT=refused;  KCHECK_RESULT=-
@@ -975,13 +986,54 @@ run_gates() {
     [ -z "${EXPECT_PRESENT[*]-}" ] || ep_tag="[--expect-present ${EXPECT_PRESENT[*]}] "
     [ "${RECIPIENT:-0}" = 0 ] || ep_tag="${ep_tag}[RECIPIENT BUILD -- $RECIPIENT_NOTE] "
     echo "== $CELL: rlxfw-marks verify $ep_tag$MVERIFY_VERDICT (rc=$MVERIFY_RC): $MVERIFY_RESULT"
+    fwarg_check "$log.System.map"
+}
+
+# fwarg_check <System.map> -- sets FWARG_VERDICT and FWARG_RESULT.
+#
+# P6r-10, notes/self-update.md § 1.4.  A slot boot leaves the handoff --
+# magic, slot, version, check -- in a0..a3; head.S stores them in fw_arg0..3,
+# and arch/rlx/kernel/rlxfw-boot.c is their one reader.  讀 the drop's only
+# other readers, arch/rlx/fw/arc/init.c (which makes them prom_argc and
+# _prom_argv) and arch/rlx/fw/sni/sniprom.c, are under arch/rlx/fw/, which no
+# Makefile builds.  This keeps that reading true on every build: a map naming
+# prom_argc or _prom_argv means an object here reads the four registers as a
+# PROM argument vector and would misread a handoff, so the build is not green.
+# rlxfw-marks verify cannot hold it -- its pairing rule ties `absent:` to
+# conditional Kbuild rows -- so it sits beside verify, on the same map.
+#
+# Names are matched by field ($3), never as substrings, so prom_argc_foo is
+# not prom_argc.  The control is in the same map: fw_arg0..fw_arg3 must all be
+# there, or the file is not this kernel's map and an absence read on it says
+# nothing (`refused`).  What it does not see: a reader that keeps no symbol of
+# those two names -- it reads names, not code.
+fwarg_check() {
+    local map="$1" n hits
+    FWARG_VERDICT=refused; FWARG_RESULT=-
+    if [ ! -f "$map" ]; then
+        FWARG_RESULT="not run: there is no $map"
+    else
+        n="$(awk '$3 ~ /^fw_arg[0-3]$/ && !s[$3]++ { c++ } END { print c + 0 }' "$map")"
+        hits="$(awk '($3 == "prom_argc" || $3 == "_prom_argv") && !s[$3]++ {
+                         printf "%s%s", (c++ ? " " : ""), $3 }' "$map")"
+        if [ "$n" != 4 ]; then
+            FWARG_RESULT="not run: $map names $n of fw_arg0..fw_arg3, so it is not this kernel's map and an absence read on it says nothing"
+        elif [ -n "$hits" ]; then
+            FWARG_VERDICT=red
+            FWARG_RESULT="$map holds $hits: an object in this kernel reads fw_arg0..3 as a PROM argument vector, so a slot boot's handoff would be misread (notes/self-update.md, 1.4)"
+        else
+            FWARG_VERDICT=green
+            FWARG_RESULT="fw_arg0..fw_arg3 in the map; prom_argc and _prom_argv are not"
+        fi
+    fi
+    echo "== $CELL: fw_arg check $FWARG_VERDICT: $FWARG_RESULT"
 }
 
 # overall_verdict -- the ONE rule.  The manifest's `verdict`, the exit status
 # and the `manifest ->` line all come from here, so they cannot disagree.
 overall_verdict() {
     if [ "${BUILD_RC:-}" = 0 ] && [ "${KCHECK_VERDICT:-}" = green ] \
-       && [ "${MVERIFY_VERDICT:-}" = green ]; then
+       && [ "${MVERIFY_VERDICT:-}" = green ] && [ "${FWARG_VERDICT:-}" = green ]; then
         # --recipient can only take green away, never give it: read last.
         if [ "${RECIPIENT:-0}" = 0 ]; then echo green; else echo recipient; fi
     else
@@ -1010,7 +1062,7 @@ finish_build() {
         return 7
     fi
     echo "== $CELL: NOT FOR UPLOAD -- build rc=${BUILD_RC:--}," \
-         "kconfig-delta check ${KCHECK_VERDICT:--}," \
+         "kconfig-delta check ${KCHECK_VERDICT:--}, fw_arg check ${FWARG_VERDICT:--}," \
          "rlxfw-marks verify ${MVERIFY_VERDICT:--}${ep:+ under --expect-present $ep};" \
          "${rn}the record is $m"
     [ "${KCHECK_VERDICT:-}" = green ] || [ ! -f "$log.kconfig-check.log" ] \

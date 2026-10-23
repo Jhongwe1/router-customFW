@@ -1,0 +1,167 @@
+Carry the boot handoff through `rtkload`: save a0..a3 at `__start`, load
+them back in `start_kernel`.
+
+`P6r-10`, 2026-10-23, 144th segment.  The design is `notes/self-update.md`
+§ 1.3; this patch is the decompressor's half of the register handoff
+`src/rlxboot/jump.S`'s `rlxboot_jump_handoff` starts and
+`kernel/linux-2.6.30/arch/rlx/kernel/rlxfw-boot.c` reads.  It is the first
+host-compat patch that changes code the CPU executes before the kernel.  The
+only other vendor line the handoff needs is the `config/rlxfw-marks.tsv` row
+that builds rlxfw's own `rlxfw-boot.c`: the kernel already stores a0..a3 in
+`fw_arg0..3` at `kernel_entry`.
+
+WHAT WAS TRUE BEFORE, 讀 in the drop at its pin (`SPEC.md` `FW-261`).
+`rlxboot` enters `rtkload` at 0x80500000, and `rtkload` as built loses all
+four registers: `start.S` moves the stack top into a0 before `j main`
+(`move a0, t0`), the C code that follows uses a0..a3 freely, and
+`start_kernel` is `move t0,a0; li a0,0; li a1,0; li a2,0; jr t0; nop`, so the
+kernel is entered with a0..a2 zero and a3 whatever `hfload.c` left.  `v1.0`'s
+`nfjrom`, disassembled at 0x80500000, holds those six instructions as written,
+and a seventh word after them: a second `nop`, the reorder-mode assembler's
+own fill of the `jr`'s delay slot.
+
+WHAT THIS CHANGES, three insertions and one replacement, nothing else:
+
+  * `rlxfw_rtk_handoff`: four words in `.data`, aligned to 16 so that they
+    are one D-cache line of their own (`cache.c`: 4 words a line), followed
+    by the 11-byte witness `RLXFW-RTKH1`.  `.data` and not `.bss`, because
+    the loop at `_bstart` clears `.bss` after the save.  `start.o` is first
+    in the link, so the array lands at `_fdata`, ahead of the compressed
+    kernel, above the decompressor's output (from 0x80000000, ending at or
+    below 0x80500000 or `build` refuses the image) and below its heap
+    (above `.bss`);
+  * at `__start`, before anything else runs: eight instructions that form
+    the array's KSEG1 alias and store a0..a3 there;
+  * `start_kernel` takes the kernel's entry out of a0 FIRST, loads a0..a3
+    back from the same KSEG1 alias and jumps: eleven instructions in place of
+    the six source lines.
+
+Both blocks are `.set noreorder` / `.set nomacro` with every delay slot
+written: the entry block has no branch and no load; in `start_kernel` each
+`lw` is followed by an instruction that does not read its target, and the
+`jr`'s slot is a `nop`.  Each block RESTORES `reorder` and `macro` after
+itself rather than pushing and popping: `start.S` holds no `.set` directive,
+so the vendor's own lines run in gas's default reorder/macro mode and rely on
+it (`beq t0, VERSION_D, ...` is a macro), and restoring the defaults leaves
+them as they were.  KSEG1 for both the store and the load, so no cache state
+decides what `start_kernel` reads: nothing in `rtkload` reads or writes the
+array through KSEG0, so its own write-back and invalidate before the jump
+have no line of it to act on.  The one assumption kept is `rlxboot`'s: that
+its write-back before its own jump leaves no dirty line of the payload copy,
+the array's initial zeros included, to land on the array later.
+
+The hunks are generated, not typed: `diff -u` of a copy of the pinned
+`start.S` (sha256 `58cb9a79...de46`) against the same copy with the three
+blocks inserted by a script that refuses any other file and any anchor that
+does not occur exactly once.  The context lines are the drop's own bytes,
+trailing blanks included, so applying the patch is the check that they are.
+
+量 2026-10-23, at the desk: regenerated in a fresh directory the hunks are
+byte-identical to `notes/self-update.md` § 1.3's; applied the way
+`tools/rlxfw-kbuild.sh` applies every patch here, which is
+`patch -p1 --forward --silent` from the staged `linux-2.6.30/`, to a copy of
+the drop's `rtkload/`, `start.S` becomes sha256 `3661a64a...74b4` with no
+offset and no fuzz, and a second apply is refused.  Built by the vendor's
+toolchain around `v1.0`'s `vmlinux`, the stub grows by 12 instructions (48
+bytes: 8 at the entry, and 11 in place of the 7 words above), the array lands
+at `_fdata`, and the `nfjrom` keeps `v1.0`'s 1,110,016 bytes.
+
+WHAT DECIDES WHETHER IT REACHED THE IMAGE.  Not the tree: until this patch
+`tools/rtkimage.py build` copied `rtkload/` from the pristine drop, so a
+patch here showed as applied in the cell and was absent from the `nfjrom`
+(`SPEC.md` `FW-262`).  `build` now copies the cell's `rtkload/` and refuses an
+image unless the linked `memload-full` has `rlxfw_rtk_handoff` (16 bytes, on
+a 16-byte boundary, in [`_fdata`, `__vmlinux_start`)), the entry `__start`
+is 0x80500000, the vendor's five-word zeroing sequence is absent from the
+first 16 KiB of `nfjrom` and `RLXFW-RTKH1` occurs in it exactly once -- each
+read the same way on the drop's own `memload-full` and `image/nfjrom`, which
+must read absent, 1 and 0, or it refuses to judge.  `rlxfw-marks verify`
+cannot see any of this: it reads the kernel's ELF and `System.map`, and
+`rtkload` is in neither.
+
+PREDICTION, written before any device boot: a slot boot of an image built
+from a cell staged with this patch and with the kernel's `rlxfw-boot.c`
+linked, by an `rlxboot` that prints `RLXBOOT-HANDOFF slot=X ver=N`, makes
+`/proc/rlxfw-boot` read `slot X ver N`.
+REFUTED BY `none` there after such a line, or by `rtkimage.py build`'s gate
+refusing an image built from such a cell.  An `rlxboot` that zeroes a0..a3
+(the rescue copy, the `BOOT=ram` build) makes it read `none` either way: the
+fail-closed case, not a refutation.
+
+WHAT THIS PATCH DOES NOT ESTABLISH.  That it runs on the die: no instruction
+of it has executed anywhere.  That the vendor assembler schedules it as the
+host's does: only the artefact the vendor toolchain makes counts, which is
+why the gate reads that.  And the cache argument above is an argument --
+neither the D side's write policy nor the write-back half of `CCTL 0x200` is
+measured on this die (`notes/self-update.md` § 1.5).
+
+--- a/rtkload/start.S
++++ b/rtkload/start.S
+@@ -18,9 +18,39 @@
+         
+ 	.extern __start_dram
+  
++/* rlxfw (config/host-compat/0011): the boot handoff, P6r-10.
++ * rlxboot (src/rlxboot/jump.S) enters here with a0..a3 = magic, slot,
++ * version, check.  They are saved at entry -- before `move a0, t0`
++ * below puts the stack top in a0 and before main() uses a0..a3 at all --
++ * and loaded back into a0..a3 by start_kernel, which used to zero
++ * a0..a2.  One 16-byte D-cache line of its own (cache.c: 4 words), in
++ * .data and not .bss, because the loop at _bstart below clears .bss.
++ * Written and read only through the KSEG1 alias, so no cache state
++ * decides what start_kernel reads. */
++	.data
++	.align	4
++	.globl	rlxfw_rtk_handoff
++	.type	rlxfw_rtk_handoff, @object
++	.size	rlxfw_rtk_handoff, 16
++rlxfw_rtk_handoff:
++	.word	0, 0, 0, 0
++	.ascii	"RLXFW-RTKH1"
++
+         .text
+         .globl __start              
+ __start:
++	.set	noreorder		/* rlxfw: no branch, no load: no slot */
++	.set	nomacro
++	lui	$8, %hi(rlxfw_rtk_handoff)
++	addiu	$8, $8, %lo(rlxfw_rtk_handoff)
++	lui	$9, 0x2000
++	or	$8, $8, $9		/* KSEG0 -> KSEG1: uncached */
++	sw	$4, 0($8)		/* a0: magic */
++	sw	$5, 4($8)		/* a1: slot */
++	sw	$6, 8($8)		/* a2: version */
++	sw	$7, 12($8)		/* a3: check */
++	.set	macro
++	.set	reorder
+ 		 
+ #ifdef CONFIG_DONOT_ADJUST_SYSCLK_MEMSP
+ 		nop
+@@ -155,12 +185,21 @@
+ 
+         .globl start_kernel
+ start_kernel:
+-        move t0, a0
+-        li a0, 0
+-        li a1, 0
+-        li a2, 0
+-		jr t0
+-       	nop 
++	.set	noreorder		/* rlxfw: every slot below is filled by hand */
++	.set	nomacro
++	addu	$8, $4, $0		/* t0 = the kernel entry, out of a0 FIRST */
++	lui	$9, %hi(rlxfw_rtk_handoff)
++	addiu	$9, $9, %lo(rlxfw_rtk_handoff)
++	lui	$10, 0x2000
++	or	$9, $9, $10		/* KSEG0 -> KSEG1: uncached */
++	lw	$4, 0($9)		/* next: lw, reads $9 not $4 */
++	lw	$5, 4($9)		/* next: lw, reads $9 not $5 */
++	lw	$6, 8($9)		/* next: lw, reads $9 not $6 */
++	lw	$7, 12($9)		/* next: jr, reads $8 not $7 */
++	jr	$8
++	nop				/* delay slot: nothing */
++	.set	macro
++	.set	reorder
+ 
+ 
+ hfclock_setting:

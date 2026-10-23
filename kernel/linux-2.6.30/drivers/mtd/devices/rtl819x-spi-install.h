@@ -30,7 +30,7 @@
 #error "include rtl819x-spi-wrpolicy.h before rtl819x-spi-install.h"
 #endif
 
-#define RLXFW_SPI_INST_VERSION	"rtl819x-spi-install 1.1"
+#define RLXFW_SPI_INST_VERSION	"rtl819x-spi-install 1.2"
 
 /* ------------------------------------------------------------------------
  * The region table.  D1 and D6.
@@ -1113,6 +1113,14 @@ static inline int rlxfw_spi_inst_ctr_bit(const u8 *bm, u32 b)
 	return (int)((bm[b >> 3] >> (7u - (b & 7u))) & 1u);
 }
 
+/* 1.2: the flash address of the byte holding bit b of the bitmap at base --
+ * the encoding above, as an address.  `ctr`'s programs (rtl819x-spi.c) and
+ * rlxfw_spi_inst_loop_op() both take their address from here. */
+static inline u32 rlxfw_spi_inst_ctr_addr(u32 base, u32 b)
+{
+	return base + (b >> 3);
+}
+
 /* The byte one page program writes to clear bit b: 0 from the byte's MSB down
  * to b, 1 after it.  A program only takes bits from 1 to 0 (JEDEC PP; the
  * part's datasheet is not in hand, FW-191), so it clears bit b, leaves every
@@ -1221,7 +1229,7 @@ static inline int rlxfw_spi_inst_loop_op(u32 passes, u32 i,
 	}
 	op->kind = RLXFW_SPI_INST_OP_PROG;
 	op->bit = j - 1u;
-	op->addr = RLXFW_SPI_INST_PROBE_BASE + (op->bit >> 3);
+	op->addr = rlxfw_spi_inst_ctr_addr(RLXFW_SPI_INST_PROBE_BASE, op->bit);
 	op->val = rlxfw_spi_inst_ctr_value(op->bit);
 	return op->kind;
 }
@@ -1280,8 +1288,17 @@ static inline void rlxfw_spi_inst_begin(struct rlxfw_spi_inst_st *s)
 /* The /proc block.  Every line is a counter, a verdict, a name, an offset
  * or an owner-typed number echoed back -- no flash byte, no digest.  The
  * staged image's digest is deliberately NOT printed: the device must not be
- * a place the typed digest can be copied from (D7). */
-#define RLXFW_SPI_INST_PROC_MAX		1152
+ * a place the typed digest can be copied from (D7).
+ *
+ * 1.2: THE WHOLE BLOCK, ITS `inst_truncated 0` LINE INCLUDED, AND MEASURED.
+ * rlxfw_spi_inst_emit() prints that line itself, so a caller's budget check
+ * against this number covers every byte the block can print.  The value is
+ * the host test's measurement at the widest value each field's TYPE can print
+ * -- every %u at ten digits, every %d at -2147483648, the longest names, the
+ * provisioning table's longest region name -- and the test asserts it EQUAL.
+ * (1.1 said 1,152 for the emit alone, measured with se_jiffies * tick_us
+ * wrapping to 1, so se_us and pp_us printed one digit; the line came on top.) */
+#define RLXFW_SPI_INST_PROC_MAX		1183
 
 /* A boolean field prints as 0 or 1 whatever the int holds, which is also what
  * bounds this block's widest output (the host test measures it). */
@@ -1392,6 +1409,9 @@ static inline int rlxfw_spi_inst_emit(char *p,
 		       (unsigned)pr->pp_jiffies, (unsigned)pr->cal_polls,
 		       (unsigned)pr->cal_ticks, (unsigned)pr->clean_step,
 		       (unsigned)pr->clean_ops);
+	/* 1.2: the block says it is whole; a caller with no room prints
+	 * `inst_truncated 1` in its place */
+	len += sprintf(p + len, "inst_truncated 0\n");
 	return len;
 }
 
@@ -1453,9 +1473,49 @@ struct rlxfw_spi_inst_ctr_st {
 	u32 cur, newv, read, pp, ms;	/* read: the value read back */
 	int loop_ran, loop_reason;
 	u32 loop_passes, loop_done, loop_ops, loop_ms;
+	/* 1.2: the last `ctrloop show`, so a card gates on /proc and never on
+	 * the console line (FW-47).  scr_shows counts the attempts since boot,
+	 * so "ran" is a change in it; scr_rc is the last attempt's errno; the
+	 * three values are that read's, and 0 whenever scr_rc is not. */
+	u32 scr_shows, scr_value;
+	int scr_rc, scr_malformed, scr_erased;
 };
 
-#define RLXFW_SPI_INST_CTR_PROC_MAX	512
+/* `ctrloop show`'s reading, recorded.  sec is the n-byte sector the loop
+ * erases, as read -- its first RLXFW_SPI_INST_CTR_BYTES the scratch bitmap,
+ * n at least that -- and rc the read's errno.  A failed attempt records rc and
+ * CLEARS the values, so no earlier reading can stand beside it; sec may be
+ * NULL then, and is read only when rc is 0. */
+static inline void rlxfw_spi_inst_scratch_note(struct rlxfw_spi_inst_ctr_st *c,
+					       int rc, const u8 *sec, u32 n)
+{
+	int mal = 0;
+
+	c->scr_shows++;
+	c->scr_rc = rc;
+	c->scr_value = 0u;
+	c->scr_malformed = c->scr_erased = 0;
+	if (rc != 0)
+		return;
+	c->scr_value = rlxfw_spi_inst_ctr_decode(sec, &mal);
+	c->scr_malformed = mal;
+	c->scr_erased = rlxfw_spi_inst_probe_chk_erased(sec, n) ==
+			RLXFW_SPI_INST_OK;
+}
+
+/* The counter's whole block, its `ctr_truncated 0` line included, MEASURED
+ * by the host test at the widest each field's type can print and asserted
+ * equal (1.2; 1.1's 512 was a ceiling over 360 bytes, set by hand). */
+#define RLXFW_SPI_INST_CTR_PROC_MAX	501
+
+/* /proc/rtl819x-spi-inst, the machine readers' node (rtl819x-spi.c): one
+ * `n_writes <N>` line, the install block, the counter's block, and nothing
+ * else.  N is an unsigned long: ten digits at most on this 32-bit core.  The
+ * driver asserts at compile time that the sum fits ONE read(2). */
+#define RLXFW_SPI_INST_NODE_NWRITES_MAX	20	/* "n_writes 4294967295\n" */
+#define RLXFW_SPI_INST_NODE_MAX		(RLXFW_SPI_INST_NODE_NWRITES_MAX + \
+					 RLXFW_SPI_INST_PROC_MAX + \
+					 RLXFW_SPI_INST_CTR_PROC_MAX)
 
 static inline int rlxfw_spi_inst_emit_ctr(char *p,
 				const struct rlxfw_spi_inst_ctr_st *c)
@@ -1483,6 +1543,14 @@ static inline int rlxfw_spi_inst_emit_ctr(char *p,
 	len += sprintf(p + len, "loop_done %u\n", (unsigned)c->loop_done);
 	len += sprintf(p + len, "loop_ops %u\n", (unsigned)c->loop_ops);
 	len += sprintf(p + len, "loop_ms %u\n", (unsigned)c->loop_ms);
+	len += sprintf(p + len, "ctrscratch_shows %u\n", (unsigned)c->scr_shows);
+	len += sprintf(p + len, "ctrscratch_rc %d\n", c->scr_rc);
+	len += sprintf(p + len, "ctrscratch_value %u\n", (unsigned)c->scr_value);
+	len += sprintf(p + len, "ctrscratch_malformed %d\n",
+		       RLXFW_SPI_INST_B(c->scr_malformed));
+	len += sprintf(p + len, "ctrscratch_erased %d\n",
+		       RLXFW_SPI_INST_B(c->scr_erased));
+	len += sprintf(p + len, "ctr_truncated 0\n");
 	return len;
 }
 

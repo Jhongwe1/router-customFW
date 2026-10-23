@@ -1502,11 +1502,11 @@ jobs:
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-rlxprobe.sh 2>&1 | tee ci-out/test-rlxprobe.out; exit "${PIPESTATUS[0]}"
 
-      # The eighteen B/M cases read the GPL drop's own nfjrom and stand down
-      # here; the fourteen that run exercise sum16, the cr6c header parser and
-      # the ELF symbol reader on fixtures this suite builds. S3a-c pin the
-      # exit contract, which is the part a runner can check and the bench
-      # usually does not.
+      # The nineteen cases that read the GPL drop's own artefacts stand down
+      # here; the seventy-nine that run exercise sum16, the cr6c header parser,
+      # the ELF symbol reader and the boot-handoff gate (F1-F3, G0-G7, G5-G5g)
+      # on fixtures this suite builds. S3a-c pin the exit contract, which is
+      # the part a runner can check and the bench usually does not.
       - name: test-rtkimage
         if: "${{ !cancelled() && steps.prep.outcome == 'success' }}"
         run: bash tools/test-rtkimage.sh 2>&1 | tee ci-out/test-rtkimage.out; exit "${PIPESTATUS[0]}"

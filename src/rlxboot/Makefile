@@ -105,8 +105,13 @@ CFLAGS = $(ARCH) -O2 -std=gnu99 -ffreestanding -fno-builtin \
          -DRLX_RESET=1 -DRLX_GEOM=0 -DRLX_ISC=0 -DRLX_CLEAR_BEV=0 \
          -DRLX_RET_ERET=0 -DRLX_RESULT_BASE=0u -DRLX_GEOM_BASE=0u \
          -DRLXBOOT_BUILD=0x$(BUILD_ID)u $(BOOT_DEF) $(KEY_DEF) $(CFLAGS_EXTRA)
+# $(BOOT_DEF) reaches the assembler too, and since P6r-10 it has to: jump.S
+# assembles `rlxboot_jump_handoff` -- the handoff magic -- only under
+# `#if RLXBOOT_SLOTS`, so that the RAM image holds no magic, and it refuses an
+# undefined RLXBOOT_SLOTS rather than read it as 0.  The payload gate's census
+# below reads both images for it.
 ASFLAGS = $(ARCH) -DRLX_RESET=1 -DRLX_GEOM=0 -DRLX_ISC=0 -DRLX_CLEAR_BEV=0 \
-          -Wa,--fatal-warnings $(CFLAGS_EXTRA)
+          $(BOOT_DEF) -Wa,--fatal-warnings $(CFLAGS_EXTRA)
 # --defsym BEFORE -T, and it is not cosmetic: this binutils (2.16-era, shipped
 # with gcc 3.4.6) reads the script when it sees -T and a --defsym that comes
 # later is not yet in scope, so the link failed with
@@ -171,9 +176,10 @@ endif
 
 MY_C      := main.c container.c sha256b.c flashread.c klib.c $(BOOT_C)
 MY_S      := jump.S
-# slots.h is in both builds: main.c includes it unconditionally.  The key
-# header is not listed here: it is KEY_SRC, above.
-MY_HDR    := rlxboot.h container.h sha256b.h rlxboot.lds slots.h
+# slots.h is in both builds: main.c includes it unconditionally, and so is
+# handoff.h (main.c and jump.S include it; P6r-10).  The key header is not
+# listed here: it is KEY_SRC, above.
+MY_HDR    := rlxboot.h container.h sha256b.h rlxboot.lds slots.h handoff.h
 LIB_C     := ed25519.c sha512.c
 LIB_HDR   := ed25519.h sha512.h
 
@@ -306,25 +312,54 @@ $(BIN): $(BD)/rlxboot.gate
 	     echo "  FAIL   the device image contains a signer"; exit 1; \
 	 fi
 	@echo "  ok     no signer and no key generator in the device image"
-	@# D21 and D28, from the artefact as well, each address checked in both
-	@# builds so each build is the other's control that the census can see it:
+	@# D21, D28 and P6r-10, from the artefact as well, each address checked in
+	@# both builds so each build is the other's control that the census can
+	@# see it:
 	@#   0x81700000  the RAM-staged counter: slots image 0 rows (no RAM source
 	@#               compiled in), RAM image at least 1
 	@#   0x8040DD3C  the loader's accepted-candidate word: slots image at least
 	@#               1 (RLXBOOT-FROM is read), RAM image 0 (its output is R8a's)
+	@#   0x524C5848  the boot handoff's magic (handoff.h), which flashscan.py
+	@#               rebuilds from jump.S's `lui` and its delay-slot `ori`:
+	@#               slots image at least 1, RAM image 0 (BOOT=ram hands
+	@#               nothing over; ASFLAGS carries $(BOOT_DEF) for this)
 	@$(OBJDUMP) -d $(ELF) | $(PYTHON) $(HERE)test/flashscan.py > $(BD)/census.txt
 	@c=$$(grep -c '0x81700000' $(BD)/census.txt); \
 	 f=$$(grep -c '0x8040DD3C' $(BD)/census.txt); \
-	 if [ "$(BOOT)" = slots ] && { [ "$$c" != 0 ] || [ "$$f" = 0 ]; }; then \
+	 h=$$(grep -c '0x524C5848' $(BD)/census.txt); \
+	 if [ "$(BOOT)" = slots ] && { [ "$$c" != 0 ] || [ "$$f" = 0 ] || [ "$$h" = 0 ]; }; then \
 	     echo "  FAIL   slots image: $$c rows name 0x81700000 (D21 wants 0),"\
-	          "$$f name 0x8040DD3C (D28 wants >= 1)"; exit 1; \
+	          "$$f name 0x8040DD3C (D28 wants >= 1),"\
+	          "$$h name 0x524C5848 (the handoff wants >= 1)"; exit 1; \
 	 fi; \
-	 if [ "$(BOOT)" = ram ] && { [ "$$c" = 0 ] || [ "$$f" != 0 ]; }; then \
+	 if [ "$(BOOT)" = ram ] && { [ "$$c" = 0 ] || [ "$$f" != 0 ] || [ "$$h" != 0 ]; }; then \
 	     echo "  FAIL   RAM image: $$c rows name 0x81700000 (want >= 1),"\
-	          "$$f name 0x8040DD3C (want 0: no FROM line in BOOT=ram)"; exit 1; \
+	          "$$f name 0x8040DD3C (want 0: no FROM line in BOOT=ram),"\
+	          "$$h name 0x524C5848 (want 0: BOOT=ram hands nothing over)"; exit 1; \
 	 fi; \
-	 echo "  ok     census rows naming 0x81700000: $$c, 0x8040DD3C: $$f"\
-	      "(BOOT=$(BOOT); slots must be 0 and >= 1, ram >= 1 and 0)"
+	 echo "  ok     census rows naming 0x81700000: $$c, 0x8040DD3C: $$f,"\
+	      "0x524C5848: $$h (BOOT=$(BOOT); slots must be 0, >= 1, >= 1;"\
+	      "ram >= 1, 0, 0)"
+	@# P6r-10's handoff entry as the vendor's assembler emitted it, read out of
+	@# the linked image (notes/self-update.md § 1.2): in the slots image the
+	@# four words at `rlxboot_jump_handoff` are exactly these -- t0 = entry
+	@# first, then the magic's two halves around the `jr`, the low half in its
+	@# delay slot -- and the RAM image has no such symbol.  Each build is the
+	@# other's control: the slots image shows the reader finds the symbol and
+	@# its words, so the RAM image's 0 is not a reader that reads nothing.
+	@w=$$($(OBJDUMP) -d $(ELF) | awk '/^[0-9a-f]+ <rlxboot_jump_handoff>:/ { n = 4; next } n > 0 && /^ *[0-9a-f]+:/ { printf "%s ", $$2; n-- }'); \
+	 s=$$($(NM) $(ELF) | grep -c ' rlxboot_jump_handoff$$'); \
+	 want='00804021 3c04524c 01000008 34845848 '; \
+	 if [ "$(BOOT)" = slots ] && { [ "$$s" != 1 ] || [ "$$w" != "$$want" ]; }; then \
+	     echo "  FAIL   slots image: $$s rlxboot_jump_handoff symbol(s), words"\
+	          "'$$w'; want 1 and '$$want'"; exit 1; \
+	 fi; \
+	 if [ "$(BOOT)" = ram ] && { [ "$$s" != 0 ] || [ -n "$$w" ]; }; then \
+	     echo "  FAIL   RAM image: $$s rlxboot_jump_handoff symbol(s), words"\
+	          "'$$w'; want none"; exit 1; \
+	 fi; \
+	 echo "  ok     rlxboot_jump_handoff: $$s symbol(s), words '$$w'"\
+	      "(BOOT=$(BOOT); slots must be 1 and '$$want', ram none)"
 
 payload: $(BIN) flashsafe
 	@$(MAKE) --no-print-directory show

@@ -51,6 +51,26 @@ tree, nor that none did.  Whether a tree is dirty NOW is what
 can -- a write undone since, or a touch that moved only an mtime, leaves
 nothing a check made today can see.
 
+🔴 `build` BUILDS THE CELL'S `rtkload/`, AND REFUSES ONE WITHOUT THE BOOT HANDOFF
+------------------------------------------------------------------------------
+讀 until 2026-10-23 (`P6r-10`) `build` copied `rtkload/` from the pristine
+drop, so a `config/host-compat/` patch to it showed as applied in the cell and
+was absent from the `nfjrom` (`SPEC.md` `FW-262`).  It now copies
+`<cell>/linux-2.6.30/rtkload`, which `rlxfw-kbuild.sh` stages with the rest of
+`linux-2.6.30/` and patches, and after make -- before any record -- reads the
+artefact for `config/host-compat/0011`'s boot handoff (`notes/self-update.md`
+§ 1.3): `memload-full`'s symbol table has `rlxfw_rtk_handoff`, 16 bytes,
+16-aligned, in [`_fdata`, `__vmlinux_start`); `__start` is 0x80500000; the
+drop's five-word zeroing `start_kernel` is not in the first 16 KiB of
+`nfjrom`; `RLXFW-RTKH1` is in it exactly once.  Each is read the same way on
+the drop's own `memload-full` and `image/nfjrom`, which must read absent, 1
+and 0 -- a missing or unexpected control is a refusal to judge, never a
+pass.  So this version refuses, and writes no record for, a stub without the
+handoff -- every image built before `0011`, `v1.0`'s included, whose bytes
+make still writes: `REPRODUCE.md`'s layer 1 runs the release archive's own
+copy of this tool (`L1-11`), which predates the gate, and `--compare-vendor`
+now differs from the drop's artefacts by construction.
+
 THE THREE THINGS THIS TOOL CANNOT TELL YOU
 ------------------------------------------
 1.  That the image will boot.  It reads format, not behaviour.  The only desk
@@ -76,20 +96,25 @@ Usage
 sha256 of the vmlinux the loader stub was built around and of the `nfjrom` it
 produced (TC-i, 2026-09-23).  A card pins the nfjrom; the build manifest
 records the vmlinux and the verdicts of the declaration gates; this record is
-the one link between them, and nothing else writes it.
+the one link between them, and nothing else writes it.  Format 2
+(2026-10-23) appends two rows, never reorders: `rtkload_source`, the
+directory the stub was built from, and `handoff_gate`, the gate's reading.
 
 Exit
     0  built / checked, and every control fired
     1  a comparison the caller asked for did not hold -- for `build`, also:
-       make failed (not B1's), wrote no nfjrom, changed its vmlinux, or the
-       image is over the ceiling or cvimg disagrees (ceiling_verdict, D25)
+       make failed (not B1's), wrote no nfjrom, changed its vmlinux, the
+       image is over the ceiling or cvimg disagrees (ceiling_verdict, D25),
+       or its stub does not carry the boot handoff (handoff_verdict)
     2  a control failed -- nothing is reported.  For `build`: the tripwire
        said TRIPPED or TOUCHED, found a tree already dirty, could not read a
        tree after make ran, or printed no verdict line or one at odds with
-       its exit status.  No record is written
-    3  usage / environment refusal -- for `build`, also: no tripwire, or the
-       tripwire refused before make ran (no git tree under
-       $FWRE_WORK/rebuild/src-vendor to watch, or git could not read one)
+       its exit status; or a control of the handoff gate is missing or does
+       not read what the drop's own artefacts read.  No record is written
+    3  usage / environment refusal -- for `build`, also: no tripwire, a cell
+       with no rtkload/, or the tripwire refused before make ran (no git
+       tree under $FWRE_WORK/rebuild/src-vendor to watch, or git could not
+       read one)
 """
 
 import hashlib
@@ -101,7 +126,7 @@ import struct
 import subprocess
 import sys
 
-VERSION = '1.0'
+VERSION = '1.1'
 LOAD_START_ADDR = 0x80500000
 CEILING = 5242880            # notes/kernel-build.md §3.4: 0x80500000 - 0x80000000
 
@@ -137,7 +162,7 @@ def sha(path_or_bytes):
 
 
 RECORD_NAME = 'rtkimage-record.tsv'
-RECORD_FORMAT = '1'
+RECORD_FORMAT = '2'
 
 # `build` runs the drop's own binaries, so it runs them the way
 # rlxfw-kbuild.sh does: under vendor-tripwire.sh, which snapshots every git
@@ -561,6 +586,164 @@ def ceiling_verdict(img, logtext):
 
 
 # --------------------------------------------------------------------------
+# the boot handoff, as a refusal -- P6r-10, 2026-10-23
+# --------------------------------------------------------------------------
+# config/host-compat/0011 makes rtkload save a0..a3 at __start into a 16-byte
+# array and load them back in start_kernel (notes/self-update.md § 1.3).  The
+# tree says the patch was applied; only the artefact says it was BUILT, and
+# `rlxfw-marks verify` reads the kernel's ELF and System.map, where rtkload is
+# not.  So `build` reads memload-full and nfjrom themselves, and the drop's
+# own pair is read the same way as the control, every run: it must read the
+# opposite on every condition that has one, or nothing is judged.
+HANDOFF_SYM = 'rlxfw_rtk_handoff'
+HANDOFF_BYTES = 16
+HANDOFF_WITNESS = b'RLXFW-RTKH1'
+# start_kernel as the drop builds it -- move t0,a0; li a0,0; li a1,0;
+# li a2,0; jr t0 -- which v1.0's nfjrom holds at 0x80500064.
+HANDOFF_ZERO_SEQ = bytes.fromhex('00804021' '24040000' '24050000' '24060000'
+                                 '01000008')
+HANDOFF_ZERO_WINDOW = 16 * 1024          # rtkload's own code, not the kernel's
+
+
+def handoff_reading(memload, nfjrom):
+    """What the gate reads from one (memload-full, nfjrom) pair -- the built
+    image's and the control's, by the same code.  Never raises.
+
+    -> dict: 'error' (None, or why the pair could not be read), 'sym'
+       ((value, size), or None when the table has no such symbol), '_fdata',
+       '__vmlinux_start' and '__start' (a value or None), 'zeroseq' (count in
+       the first 16 KiB of nfjrom) and 'witness' (count in all of it).
+    """
+    out = {'error': None, 'sym': None, '_fdata': None,
+           '__vmlinux_start': None, '__start': None,
+           'zeroseq': None, 'witness': None}
+    for p in (memload, nfjrom):
+        if not os.path.isfile(p):
+            out['error'] = 'there is no %s' % p
+            return out
+    try:
+        syms = elf_symbols(memload)
+    except (OSError, struct.error, ValueError, IndexError) as e:
+        out['error'] = '%s: its symbol table cannot be read (%s)' % (memload, e)
+        return out
+    if syms is None:
+        out['error'] = '%s is not a 32-bit big-endian ELF' % memload
+        return out
+    out['sym'] = syms.get(HANDOFF_SYM)
+    for k in ('_fdata', '__vmlinux_start', '__start'):
+        out[k] = syms[k][0] if k in syms else None
+    try:
+        with open(nfjrom, 'rb') as fh:
+            b = fh.read()
+    except OSError as e:
+        out['error'] = '%s cannot be read (%s)' % (nfjrom, e)
+        return out
+    out['zeroseq'] = b[:HANDOFF_ZERO_WINDOW].count(HANDOFF_ZERO_SEQ)
+    out['witness'] = b.count(HANDOFF_WITNESS)
+    return out
+
+
+def _hx(v):
+    """An address as the gate prints it; '-' for one the table did not hold,
+    so no reading can turn a refusal into a traceback."""
+    return '-' if v is None else '0x%08X' % v
+
+
+def handoff_verdict(memload, nfjrom):
+    """-> (code, lines, summary).  code 0: the image carries the handoff;
+    1: it does not, every failed condition named; 2: a control is missing or
+    does not read what the drop's own artefacts read, and nothing about the
+    image is judged.  `summary` is the one line the record keeps."""
+    lines = []
+    c = handoff_reading(CTL_MEMLOAD, CTL_NFJROM)
+    # The control's table must have been READ -- the three symbols every
+    # memload-full has -- before its "no rlxfw_rtk_handoff" means anything.
+    cwhy = []
+    if c['error']:
+        cwhy.append(c['error'])
+    else:
+        if c['_fdata'] is None or c['__vmlinux_start'] is None \
+                or c['__start'] is None:
+            cwhy.append("the drop's memload-full has no _fdata, "
+                        "__vmlinux_start or __start, so its table was not "
+                        "read as one")
+        if c['sym'] is not None:
+            cwhy.append("the drop's memload-full HAS %s" % HANDOFF_SYM)
+        if c['zeroseq'] != 1:
+            cwhy.append("the drop's image/nfjrom holds the zeroing sequence "
+                        "%d time(s) in its first 16 KiB, not 1" % c['zeroseq'])
+        if c['witness'] != 0:
+            cwhy.append("the drop's image/nfjrom holds %s %d time(s), not 0"
+                        % (HANDOFF_WITNESS.decode(), c['witness']))
+    if cwhy:
+        lines.append('control    %s, %s' % (CTL_MEMLOAD, CTL_NFJROM))
+        lines += ['  REFUSED: %s.' % w for w in cwhy]
+        lines.append('  The handoff gate refuses to judge: a control that is '
+                     'missing, or reads what')
+        lines.append("  the drop's own artefacts do not, cannot tell a "
+                     'broken reader from a changed image.')
+        return 2, lines, 'refused: a control did not read as expected'
+    lines.append("control    the drop's memload-full: no %s (its table read: "
+                 '__start %s, __vmlinux_start %s); image/nfjrom: '
+                 'zeroing sequence %s, %s %s'
+                 % (HANDOFF_SYM, _hx(c['__start']), _hx(c['__vmlinux_start']),
+                    c['zeroseq'], HANDOFF_WITNESS.decode(), c['witness']))
+
+    m = handoff_reading(memload, nfjrom)
+    why = []
+    if m['error']:
+        why.append(m['error'])
+    else:
+        sym, fd, vs = m['sym'], m['_fdata'], m['__vmlinux_start']
+        if sym is None:
+            why.append("memload-full's symbol table has no %s: this stub was "
+                       'built without config/host-compat/0011' % HANDOFF_SYM)
+        else:
+            val, size = sym
+            if size != HANDOFF_BYTES:
+                why.append('%s is %d bytes, not %d'
+                           % (HANDOFF_SYM, size, HANDOFF_BYTES))
+            if val % 16:
+                why.append('%s is at 0x%08X, not 16-aligned: not one D-cache '
+                           'line of its own' % (HANDOFF_SYM, val))
+            if fd is None or vs is None:
+                why.append("memload-full has no _fdata or no __vmlinux_start "
+                           'to place %s against' % HANDOFF_SYM)
+            elif not (fd <= val and val + size <= vs):
+                why.append('%s at 0x%08X+%d is not inside [_fdata 0x%08X, '
+                           '__vmlinux_start 0x%08X)'
+                           % (HANDOFF_SYM, val, size, fd, vs))
+        if m['__start'] != LOAD_START_ADDR:
+            why.append('__start is %s, not 0x%08X'
+                       % ('absent' if m['__start'] is None
+                          else _hx(m['__start']), LOAD_START_ADDR))
+        if m['zeroseq'] != 0:
+            why.append("nfjrom's first 16 KiB holds the drop's zeroing "
+                       'start_kernel %d time(s)' % m['zeroseq'])
+        if m['witness'] != 1:
+            why.append('nfjrom holds %s %d time(s), not exactly once'
+                       % (HANDOFF_WITNESS.decode(), m['witness']))
+    if not m['error'] and m['sym'] is not None:
+        lines.append('handoff    memload-full: %s %s, %d bytes; _fdata %s, '
+                     '__vmlinux_start %s; __start %s'
+                     % (HANDOFF_SYM, _hx(m['sym'][0]), m['sym'][1],
+                        _hx(m['_fdata']), _hx(m['__vmlinux_start']),
+                        _hx(m['__start'])))
+    if not m['error']:
+        lines.append('handoff    nfjrom: zeroing sequence %d in the first 16 '
+                     'KiB, %s %d' % (m['zeroseq'], HANDOFF_WITNESS.decode(),
+                                     m['witness']))
+    lines += ['  REFUSED: %s.' % w for w in why]
+    if why:
+        return 1, lines, 'refused: %s' % why[0]
+    return 0, lines, ('ok: %s %s+%d in [%s, %s), __start %s, zeroing '
+                      'sequence 0, %s 1; controls absent, 1, 0'
+                      % (HANDOFF_SYM, _hx(m['sym'][0]), m['sym'][1],
+                         _hx(m['_fdata']), _hx(m['__vmlinux_start']),
+                         _hx(m['__start']), HANDOFF_WITNESS.decode()))
+
+
+# --------------------------------------------------------------------------
 # build
 # --------------------------------------------------------------------------
 def cmd_build(args):
@@ -599,6 +782,16 @@ def cmd_build(args):
             'it (cache.c, hfload.c, misc.c, prom_printf.c, read_memory.c, '
             'start.S), so an unconfigured tree cannot build the loader stub'
             % kcell)
+    # FW-262: the stub is built from the CELL's rtkload/, the copy
+    # rlxfw-kbuild.sh stages with the rest of linux-2.6.30/ and patches with
+    # config/host-compat/ -- never from the pristine drop, where a patch to
+    # it could not reach the nfjrom.
+    rtk_src = os.path.join(kcell, 'rtkload')
+    if not os.path.isfile(os.path.join(rtk_src, 'Makefile')):
+        die('%s has no rtkload/Makefile -- the loader stub is built from the '
+            'cell\'s own rtkload/, which rlxfw-kbuild.sh stages and patches '
+            'with the rest of linux-2.6.30/ (SPEC.md FW-262); this is not '
+            'such a cell' % kcell)
 
     shutil.rmtree(run, ignore_errors=True)
     os.makedirs(kroot)
@@ -618,7 +811,10 @@ def cmd_build(args):
             % (args['vmlinux'], src_sha[:16], sha(vm_used)[:16]))
     shutil.copy2(args['kconfig'], os.path.join(kroot, '.config'))
     shutil.copy2(args['sdkconfig'], os.path.join(run, '.config'))
-    shutil.copytree(os.path.join(DROP, 'linux-2.6.30/rtkload'), rtk)
+    shutil.copytree(rtk_src, rtk)
+    st = os.path.join(rtk, 'start.S')
+    print('rtkload    %s  (start.S sha256 %s)'
+          % (rtk_src, sha(st)[:16] if os.path.isfile(st) else 'ABSENT'))
 
     rsdk = None
     for root, _, files in os.walk(os.path.join(cell, 'toolchain'),
@@ -739,6 +935,16 @@ def cmd_build(args):
         print('  No %s is written: an nfjrom that cannot boot is not one a '
               'card may pin.' % RECORD_NAME)
         return 1
+    # P6r-10: the boot handoff refuses here, before any record exists.
+    hcode, lines, hsummary = handoff_verdict(os.path.join(rtk, 'memload-full'),
+                                             nf)
+    print('')
+    print('\n'.join(lines))
+    if hcode:
+        print('  No %s is written: an nfjrom whose stub does not carry the '
+              'boot handoff -- or one' % RECORD_NAME)
+        print('  the gate could not judge -- is not one a card may pin.')
+        return hcode
     nf_sha = sha(nf)
     rec = write_record(os.path.join(run, RECORD_NAME), [
         ('rlxfw-rtkimage-record', RECORD_FORMAT),
@@ -759,6 +965,9 @@ def cmd_build(args):
         ('nfjrom', nf),
         ('nfjrom_bytes', os.path.getsize(nf)),
         ('nfjrom_sha256', nf_sha),
+        # Format 2: where the stub came from, and what the handoff gate read.
+        ('rtkload_source', rtk_src),
+        ('handoff_gate', hsummary),
     ])
     print('  record -> %s' % rec)
     print('           vmlinux %s  ->  nfjrom %s' % (src_sha, nf_sha))
@@ -809,6 +1018,15 @@ def cmd_build(args):
               'shipped file exactly --')
         print('                  so the tool can write it and the option '
               'logic does not ask for it.')
+        print('')
+        print('  Since 2026-10-23 that accounting describes a build this '
+              'version no longer makes:')
+        print('  config/host-compat/0011 changes the stub itself (start.S '
+              'saves and restores the')
+        print('  boot handoff), so memload-full, nfjrom and linux.bin DIFFER '
+              "from the drop's by")
+        print('  construction, and a stub without it is refused before this '
+              'comparison runs.')
     return 0
 
 

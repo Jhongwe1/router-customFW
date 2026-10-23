@@ -1,19 +1,19 @@
 /*
  * rtl819x-spi-write -- this driver's flash WRITE path: the policy, the
  * counters and the two MTD-shaped entry points.  Declared to kconfig as of
- * R8b item 4 and still OFF in every committed image.
+ * R8b item 4, and linked into every image since 2026-10-23 (MK5, obj-y).
  *
  * THIS FILE IS NOT REALTEK'S.  R5-5, 2026-09-07, forty-first segment (the
  * refusing stubs); rewritten R8b item 4, 2026-10-04, 122nd segment.
  *
- * NOTE: NOT ONE LINE OF IT HAS RUN ANYWHERE.  It is not in any committed
- * image, it has never been on this die, and the only thing exercised at the
- * desk is its refusals, on the host, through tools/test-spi-wrpolicy.sh.
+ * NOTE: WHAT IT HAS DONE ON THIS DIE IS THE ARMED IMAGE'S RECORD -- R8b ran
+ * it from RAM (notes/spi-mtd-driver.md § 14).  No image carrying it from the
+ * slots has run yet; its refusals run on the host, tools/test-spi-wrpolicy.sh.
  *
- * CONFIG_MTD_RTL819X_WRITE is declared by config/host-compat/0010 and held at
- * `n` by config/rlxfw-kernel.delta, and `rlxfw-marks verify`'s
- * `absent:rtl819x_spi_write_page` witness on MK5 is the instrument that says
- * this TU is in no image.  In an image built with it, the engine refuses
+ * CONFIG_MTD_RTL819X_WRITE is declared by config/host-compat/0010 and set to
+ * `y` by config/rlxfw-kernel.delta, and `rlxfw-marks verify`'s
+ * `sym:rtl819x_spi_write_page` witness on MK5 is the instrument that says
+ * this TU is in the image (the 2026-10-23 ruling).  In it, the engine refuses
  * unless ARMED -- `echo 'arm <lo> <hi> <budget>' > /proc/rtl819x-spi`, a
  * window and a byte budget that each accepted operation debits, disarmed at
  * 0 -- and the arm verb refuses a window overlapping the forbidden one.  The
@@ -45,13 +45,17 @@
 
 #include "rtl819x-spi-wrpolicy.h"
 
+#ifndef CONFIG_MTD_RTL819X_WRITE
+#error "rtl819x-spi-write.c needs CONFIG_MTD_RTL819X_WRITE=y: config/rlxfw-marks.tsv MK5 links this file into every image (obj-y), config/rlxfw-kernel.delta sets the symbol to y, and without it rtl819x-spi.c compiles no write engine for this file to call"
+#endif
+
 /* ------------------------------------------------------------------------
  * The engine, which lives in the other TU beside the controller guard.
  *
  * Declared here and not in a header: a header shared by the two would be a
  * third file with an opinion about this interface, and there are exactly two
- * callers and two definitions.  Both are compiled under the same CONFIG_ as
- * this file, so a configuration that has one has the other.
+ * callers and two definitions.  rtl819x-spi.c compiles both only under
+ * CONFIG_MTD_RTL819X_WRITE, which is why the #error above stops this file.
  * ------------------------------------------------------------------------ */
 
 extern int rtl819x_spi_pp_page(u32 addr, u32 len, const u8 *buf);
@@ -122,14 +126,14 @@ static int rtl819x_spi_wr_refuse(int reason)
 /* ------------------------------------------------------------------------
  * The two entry points rtl819x-spi.c's mtd_info routes to.
  *
- * The names are the two symbols config/rlxfw-marks.tsv's MK5 witnesses.  They
+ * The first name is the symbol config/rlxfw-marks.tsv's MK5 witnesses.  They
  * keep their names and their EXPORT_SYMBOLs for the reason the R5-5 comment
- * gave and which has not stopped being true: a symbol-absence proof over a
- * `static` function proves nothing, because absent and inlined read the same
- * in System.map, and MEASURED on the shipped image the compiler did inline most of
- * rtl819x-spi.c's own statics right out of it.  Making these two global forces
- * the linker to emit them.  A cleanup that removes an export with no importer
- * would silently turn MK5's witness into a check that cannot fail.
+ * gave, which holds in the other direction now: System.map cannot tell a
+ * `static` function that was inlined from one that is absent, and MEASURED on
+ * the shipped image the compiler did inline most of rtl819x-spi.c's own
+ * statics right out of it.  Making these two global forces the linker to emit
+ * them.  A cleanup that removes an export with no importer would turn MK5's
+ * `sym:` witness red on an image that does carry this TU.
  *
  * Their SIGNATURES changed this segment, from (u32, u32, const u8 *) and
  * (u32) to the MTD shapes.  MK5's witness is a NAME, so the row is unaffected.
@@ -349,8 +353,8 @@ EXPORT_SYMBOL(rtl819x_spi_wr_proc_max);
  * The initcall.  It installs NOTHING and arms NOTHING: the mtd_info's
  * function pointers are rtl819x-spi.c's to set, and an image that boots armed
  * would be the whole point of the arming thrown away.  All it does is say
- * that this TU is in the image, which is the state MK5's `absent:` witness
- * exists to deny.
+ * that this TU is in the image -- what MK5's `sym:` witness asserts from
+ * System.map since 2026-10-23, said on the console as well.
  */
 static int __init rtl819x_spi_write_init(void)
 {

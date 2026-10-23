@@ -2221,8 +2221,8 @@ static int rtl819x_spi_verb_arm(const char *arg)
  *  - The payload's own declaration must name this region: a container's
  *    signed flash_at and flash_form (WHOL); a cr6c's burnAddr, plus
  *    check_image()'s zero 16-bit sum.
- *  - NOTE: EVERY install/erase verb, whatever its outcome, a refusal included,
- *    ends DISARMED.  One arm, one attempt: a retry re-types both statements.
+ *  - NOTE: EVERY verb this path dispatches, whatever its outcome, a refusal
+ *    included, ends DISARMED.  One arm, one attempt: a retry re-types both.
  *
  * WHY THE WRITES DO NOT GO THROUGH rtl819x_spi_write_page/_erase_sector.
  * Their budget is debited per operation and the arm verb caps it at hi-lo,
@@ -2253,6 +2253,16 @@ static int rtl819x_spi_verb_arm(const char *arg)
  * jiffies and a poll count is the finest reading this path can take.  It then
  * re-erases the block with the step its own verdict proves, and verifies.
  *
+ * 1.1, P6r-10 AND P6r-11 (notes/self-update.md § 2).  The store's regions,
+ * cfg0 and cfg1, take this path unchanged (the K_CFG payload check; `erase`).
+ * Every install first passes the RUNNING-SLOT FENCE: never the slot rlxboot
+ * handed over on this boot (include/linux/rlxfw-handoff.h; a RAM boot hands
+ * over nothing and is not fenced).  `repeat=<k>` runs the whole plan k times
+ * under the one arm.  `ctr <N>` advances the anti-rollback bitmap with page
+ * programs ONLY -- one byte, one bit, ascending, tied to the version rlxboot
+ * booted -- and `ctrloop` runs the same routine on the probe block for the
+ * cut rounds.  Both are below rtl819x_spi_inst_run().
+ *
  * WHAT THIS DOES NOT ESTABLISH.  That any of it works on this die: no line
  * below has run anywhere.  That RTL819X_SPI_WIP_SPINS (INFERRED) outlasts an erase
  * of this part: if it does not, the install stops with ENGINE, n_wip_timeout
@@ -2264,6 +2274,7 @@ static int rtl819x_spi_verb_arm(const char *arg)
  */
 #include <linux/vmalloc.h>
 #include <linux/delay.h>
+#include <linux/rlxfw-handoff.h>
 #include "rtl819x-spi-wrpolicy.h"
 #include "rtl819x-spi-install.h"
 
@@ -2309,6 +2320,14 @@ static const int rtl819x_spi_inst_errno[RLXFW_SPI_INST_R_COUNT] = {
 	-EIO,		/* PROBE_MARK */
 	-EIO,		/* PROBE_ANOMALY -- measured, inconclusive */
 	-EIO,		/* PROBE_UNCLEAN */
+	-ENOEXEC,	/* HDR_SEQ */
+	-EINVAL,	/* REPEAT_ONLY_SLOT */
+	-EBUSY,		/* RUNNING_SLOT -- the slot this boot runs from */
+	-ERANGE,	/* CTR_ABOVE */
+	-EPERM,		/* CTR_HANDOFF -- not the version rlxboot booted */
+	-ERANGE,	/* CTR_BELOW */
+	-EILSEQ,	/* CTR_MALFORMED -- refused, nothing written */
+	-EIO,		/* CTR_CMP -- after a write */
 };
 
 static int rtl819x_spi_inst_err(int reason)
@@ -2330,6 +2349,21 @@ static void rtl819x_spi_inst_say_step(int ph, u32 blk, unsigned long t0)
 	rlxfw_spi_inst_fmt_step(b, ph, blk, jiffies_to_msecs(jiffies - t0),
 				rtl819x_spi_inst_st.r.pace_ms);
 	rlxfw_puts(b);
+}
+
+/* What rlxboot handed over on this boot (P6r-10,
+ * include/linux/rlxfw-handoff.h): 'A' or 'B' with *ver set, or 0 for none --
+ * any answer but 0 from the latch is none, so a failed or early read refuses
+ * the tie and fences nothing.  The latch is statics only: no sleep, no lock,
+ * callable under ours. */
+static int rtl819x_spi_handoff(u32 *ver)
+{
+	u32 slot = 0u;
+
+	*ver = 0u;
+	if (rlxfw_boot_handoff(&slot, ver) != 0)
+		return 0;
+	return (int)slot;
 }
 
 /* ------------------------------------------------------------------------
@@ -2611,7 +2645,7 @@ static int rtl819x_spi_inst_run(const char *line)
 	unsigned long t0 = jiffies;
 	u8 got[32];
 	u8 *chunk = NULL;
-	u32 i, nops, off;
+	u32 i, nops, off, rep, nrep, ho_ver;
 	int why, rc = 0, wrote = 0;
 
 	rlxfw_spi_inst_begin(s);
@@ -2626,6 +2660,13 @@ static int rtl819x_spi_inst_run(const char *line)
 	rg = &rlxfw_spi_inst_regions[rq.region];
 	r->base = rg->base;
 	r->size = rg->size;
+
+	/* P6r-10's fence (notes/self-update.md § 2.5): never the slot rlxboot
+	 * booted on this boot.  Before the arm is even read, so no arm reaches
+	 * past it. */
+	why = rlxfw_spi_inst_fence(rg, rtl819x_spi_handoff(&ho_ver));
+	if (why)
+		goto refuse;
 
 	/* D6: the two typed statements agree, or nothing happens.  D20: the
 	 * copy is zeroed first, so even a getter that failed without saying
@@ -2686,7 +2727,10 @@ static int rtl819x_spi_inst_run(const char *line)
 	if (why)
 		goto refuse;
 	nops = rlxfw_spi_inst_nops(&pl);
-	r->ops_planned = nops;
+	/* § 2.6: repeat=<k> (slots only, never paced -- the parser's) is the
+	 * WHOLE plan, read-back included, k times under this one arm */
+	nrep = rq.repeat ? rq.repeat : 1u;
+	r->ops_planned = nops * nrep;
 	chunk = kmalloc(RTL819X_SPI_CHUNK, GFP_KERNEL);
 	if (!chunk) {
 		why = RLXFW_SPI_INST_R_NOMEM;
@@ -2700,6 +2744,8 @@ static int rtl819x_spi_inst_run(const char *line)
 
 	rlxfw_spi_inst_fmt_go(say, r);
 	rlxfw_puts(say);
+	rep = 1u;
+again:
 	/* D5: erase all (first block first), program pages 1.., page 0 last. */
 	for (i = 0; i < nops; i++) {
 		if (rlxfw_spi_inst_op(&pl, i, &op) == RLXFW_SPI_INST_OP_ERASE) {
@@ -2776,6 +2822,17 @@ static int rtl819x_spi_inst_run(const char *line)
 		why = RLXFW_SPI_INST_R_CMP;
 		goto fail;
 	}
+	if (rep < nrep) {
+		/* the next repetition: its per-phase arms whole again, and its
+		 * first erase takes away the header this one committed */
+		rep++;
+		sprintf(say, "RLXFW-SI-REP %u/%u\n", (unsigned)rep,
+			(unsigned)nrep);
+		rlxfw_puts(say);
+		arm_e.budget = arm_p.budget = rg->size;
+		r->committed = 0;
+		goto again;
+	}
 	r->cmp_ok = 1;
 	r->phase = 'D';
 	s->done++;
@@ -2797,14 +2854,311 @@ out:
 	return r->rc;
 }
 
-/* `install ...` and `erase ...`.  The whole line goes to the parser, so a
- * malformed one is still an attempt -- and still disarms. */
-static int rtl819x_spi_verb_inst(const char *line)
+/* ------------------------------------------------------------------------
+ * P6r-11: the counter, `ctr <N>`, and its scratch loop, `ctrloop`
+ * (notes/self-update.md §§ 2.4, 2.7).  Called with rtl819x_spi_lock held,
+ * through the dispatcher install uses, so they end disarmed like it.
+ *
+ * `ctr` takes NO arm and never reads the write TU's.  Each of its programs is
+ * checked by rlxfw_spi_wr_chk_prog() against a PER-OP arm, a local equal to
+ * the 512-byte bitmap, so the forbidden-window rule runs on every byte and
+ * nothing it is checked against outlives the op.  Its plan is page programs
+ * ONLY -- one byte, one bit cleared, ascending, from rlxfw_spi_inst_ctr_next()
+ * and _ctr_value() -- and it never reaches rlxfw_spi_inst_op(), whose plans
+ * begin with erases.
+ *
+ * CAUTION: A ONE-BYTE PROGRAM IS rtl819x_spi_pp_page()'S TAIL PATH ALONE, no
+ * full word before it.  READ, it is the register sequence the vendor's
+ * ComSrlCmd_ComWrite issues for uiLen 1 (spi_common.c, in the tree that
+ * builds: InputCommand's closing SFCSR_CS_L(3), then the short phase); no
+ * such program has been issued on this die.
+ * ------------------------------------------------------------------------ */
+static struct rlxfw_spi_inst_ctr_st rtl819x_spi_ctr_st;
+
+/* § 2.4 step 6's routine, which ctrloop runs too: ONE page program of ONE
+ * byte, `val` at `addr`, once the policy has accepted it against a per-op
+ * arm equal to the bitmap at `lo`.  *err is the primitive's errno. */
+static int rtl819x_spi_ctr_pp(u32 lo, u32 addr, u8 val, int *err)
 {
+	struct rlxfw_spi_wr_arm a;
+
+	a.armed = 1;
+	a.lo = lo;
+	a.hi = lo + RLXFW_SPI_INST_CTR_BYTES;
+	a.budget = RLXFW_SPI_INST_CTR_BYTES;
+	if (rlxfw_spi_wr_chk_prog(&a, addr, 1u))
+		return RLXFW_SPI_INST_R_POLICY;
+	*err = rtl819x_spi_pp_page(addr, 1u, &val);
+	if (*err)
+		return RLXFW_SPI_INST_R_ENGINE;
+	rtl819x_spi_note_write(0);	/* n_writes: one per bit cleared */
+	return RLXFW_SPI_INST_OK;
+}
+
+/* `ctr <N>`, § 2.4.2's seven steps.  Everything before the RLXFW-SC-GO line
+ * is a REFUSAL, nothing sent; everything after it is a FAILURE. */
+static int rtl819x_spi_ctr_run(const struct rlxfw_spi_inst_req *rq, int why)
+{
+	struct rlxfw_spi_inst_ctr_st *c = &rtl819x_spi_ctr_st;
+	char say[RLXFW_SPI_INST_SAY_MAX];
+	unsigned long t0 = jiffies;
+	u8 *bm = NULL, *rb = NULL;
+	u32 ho_ver, nops, b;
+	int ho_ok, mal, rc = 0;
+
+	c->attempts++;
+	c->ran = 1;
+	c->malformed = 0;
+	c->cur = c->read = c->pp = 0u;
+	c->newv = rq->ctr_n;
+	/* 1, 2: parsed and in range -- the parser's SYNTAX and CTR_ABOVE */
+	if (why)
+		goto refuse;
+	/* 3: the tie (§ 2.4.5), the version rlxboot booted on THIS boot */
+	ho_ok = rtl819x_spi_handoff(&ho_ver) != 0;
+	why = rlxfw_spi_inst_ctr_tie(rq->ctr_n, ho_ok, ho_ver);
+	if (why)
+		goto refuse;
+	/* 4: the bitmap by PIO, with room beside it for step 7's read-back */
+	bm = kmalloc(2u * RLXFW_SPI_INST_CTR_BYTES, GFP_KERNEL);
+	if (!bm) {
+		why = RLXFW_SPI_INST_R_NOMEM;
+		goto refuse;
+	}
+	rb = bm + RLXFW_SPI_INST_CTR_BYTES;
+	rc = rtl819x_spi_read_pio(RLXFW_SPI_INST_STATE,
+				  RLXFW_SPI_INST_CTR_BYTES, bm);
+	if (rc) {
+		why = RLXFW_SPI_INST_R_ENGINE;
+		goto refuse;
+	}
+	/* 5: the refusals on the bitmap as read; equal and well-formed is
+	 * SAME, done with nothing sent */
+	why = rlxfw_spi_inst_ctr_check(bm, rq->ctr_n, &c->cur, &mal, &nops);
+	c->malformed = mal;
+	if (why)
+		goto refuse;
+	if (nops == 0u) {
+		c->read = c->cur;
+		c->done++;
+		goto out;
+	}
+	/* 6: page programs only, the bits the plan walks, ascending */
+	rlxfw_spi_inst_fmt_ctr_go(say, c->cur, c->newv);
+	rlxfw_puts(say);
+	for (b = rlxfw_spi_inst_ctr_next(bm, rq->ctr_n, 0u); b < rq->ctr_n;
+	     b = rlxfw_spi_inst_ctr_next(bm, rq->ctr_n, b + 1u)) {
+		why = rtl819x_spi_ctr_pp(RLXFW_SPI_INST_STATE,
+				rlxfw_spi_inst_ctr_addr(RLXFW_SPI_INST_STATE, b),
+				rlxfw_spi_inst_ctr_value(b), &rc);
+		if (why)
+			goto fail;
+		c->pp++;
+		cond_resched();
+	}
+	/* 7: read back: N, well-formed, or CTR_CMP -- a failure, after writes */
+	rc = rtl819x_spi_read_pio(RLXFW_SPI_INST_STATE,
+				  RLXFW_SPI_INST_CTR_BYTES, rb);
+	if (rc) {
+		why = RLXFW_SPI_INST_R_ENGINE;
+		goto fail;
+	}
+	c->read = rlxfw_spi_inst_ctr_decode(rb, &mal);
+	why = rlxfw_spi_inst_ctr_verify(rb, rq->ctr_n);
+	if (why)
+		goto fail;
+	c->done++;
+	goto out;
+refuse:
+	c->refused++;
+	goto out;
+fail:
+	c->failed++;
+out:
+	kfree(bm);
+	c->reason = why;
+	c->ms = jiffies_to_msecs(jiffies - t0);
+	rlxfw_spi_inst_fmt_ctr_end(say, c);
+	rlxfw_puts(say);
+	return (why == RLXFW_SPI_INST_R_ENGINE && rc) ? rc :
+	       rtl819x_spi_inst_err(why);
+}
+
+/* `ctrloop show`: READ-ONLY, no arm.  The scratch bitmap's value and two
+ * flags, never a byte -- recorded for /proc (ctrscratch_*, what a card reads:
+ * FW-47) and echoed on the console; `erased` says whether the whole 4 KiB
+ * sector the loop erases reads 0xFF. */
+static int rtl819x_spi_loop_show(void)
+{
+	struct rlxfw_spi_inst_ctr_st *c = &rtl819x_spi_ctr_st;
+	char say[RLXFW_SPI_INST_SAY_MAX];
+	u8 *buf;
 	int rc;
 
+	buf = kmalloc(RTL819X_SPI_CHUNK, GFP_KERNEL);
+	if (!buf) {
+		rc = rtl819x_spi_inst_err(RLXFW_SPI_INST_R_NOMEM);
+		rlxfw_spi_inst_scratch_note(c, rc, NULL, 0u);
+		return rc;
+	}
+	rc = rtl819x_spi_read_pio(RLXFW_SPI_INST_PROBE_BASE, RTL819X_SPI_CHUNK,
+				  buf);
+	rlxfw_spi_inst_scratch_note(c, rc, buf, RTL819X_SPI_CHUNK);
+	if (!rc) {
+		rlxfw_spi_inst_fmt_scratch(say, c->scr_value, c->scr_malformed,
+					   c->scr_erased);
+		rlxfw_puts(say);
+	}
+	kfree(buf);
+	return rc;
+}
+
+/* `ctrloop <p>`, § 2.7, under an arm equal to the probe block: per pass one SE
+ * of the 4 KiB sector at the probe base, read back erased, then 4,096 one-bit
+ * programs with ctr's routine, read back full; after the last pass one SE
+ * more, and the whole block read back erased, so `eraseprobe` finds it clean.
+ * Every op is rlxfw_spi_inst_loop_op()'s: p x 4,097 + 1 of them. */
+static int rtl819x_spi_loop_run(const struct rlxfw_spi_inst_req *rq, int why)
+{
+	struct rlxfw_spi_inst_ctr_st *c = &rtl819x_spi_ctr_st;
+	const struct rlxfw_spi_inst_region *rg;
+	struct rlxfw_spi_wr_arm arm, arm_e;
+	struct rlxfw_spi_inst_ctrop op;
+	char say[RLXFW_SPI_INST_SAY_MAX];
+	unsigned long t0 = jiffies;
+	u8 *buf = NULL;
+	u32 i, nops;
+	int ff, rc = 0;
+
+	if (rq->verb == RLXFW_SPI_INST_V_CTRSHOW)
+		return rtl819x_spi_loop_show();
+	c->loop_ran = 1;
+	c->loop_passes = rq->loops;
+	c->loop_done = c->loop_ops = 0u;
+	if (why)
+		goto out;
+	rg = &rlxfw_spi_inst_regions[rq->region];
+	/* the arm eraseprobe takes, read the way install reads it (D6, D20) */
+	arm.armed = 0;
+	arm.lo = arm.hi = arm.budget = 0u;
+	if (rtl819x_spi_wr_get_arm(&arm))
+		why = RLXFW_SPI_INST_R_ARM_READ;
+	else
+		why = rlxfw_spi_inst_chk_arm(&arm, rg);
+	if (why)
+		goto out;
+	buf = kmalloc(RTL819X_SPI_CHUNK, GFP_KERNEL);
+	if (!buf) {
+		why = RLXFW_SPI_INST_R_NOMEM;
+		goto out;
+	}
+	nops = rlxfw_spi_inst_loop_nops(rq->loops);
+	for (i = 0; i < nops; i++) {
+		rlxfw_spi_inst_loop_op(rq->loops, i, &op);
+		if (op.kind == RLXFW_SPI_INST_OP_ERASE) {
+			/* a per-op arm equal to the one sector it clears */
+			arm_e.armed = 1;
+			arm_e.lo = op.addr;
+			arm_e.hi = op.addr + RLXFW_SPI_WR_ERASE_GRAIN;
+			arm_e.budget = RLXFW_SPI_WR_ERASE_GRAIN;
+			if (rlxfw_spi_wr_chk_erase(&arm_e, op.addr,
+					RLXFW_SPI_WR_ERASE_GRAIN,
+					RLXFW_SPI_WR_ERASE_GRAIN,
+					(u32)rtl819x_spi_mtd.erasesize)) {
+				why = RLXFW_SPI_INST_R_POLICY;
+				goto out;
+			}
+			rlxfw_spi_inst_fmt_loop(say, op.pass, 'e', 0u,
+					jiffies_to_msecs(jiffies - t0));
+			rlxfw_puts(say);
+			rc = rtl819x_spi_se_block(op.addr);
+			if (rc) {
+				why = RLXFW_SPI_INST_R_ENGINE;
+				goto out;
+			}
+			rtl819x_spi_note_write(1);
+			/* nothing is programmed over a bitmap the SE left */
+			rc = rtl819x_spi_read_pio(op.addr,
+					RLXFW_SPI_INST_CTR_BYTES, buf);
+			if (rc) {
+				why = RLXFW_SPI_INST_R_ENGINE;
+				goto out;
+			}
+			if (rlxfw_spi_inst_probe_chk_erased(buf,
+					RLXFW_SPI_INST_CTR_BYTES)) {
+				why = RLXFW_SPI_INST_R_PROBE_UNCLEAN;
+				goto out;
+			}
+			rlxfw_spi_inst_fmt_loop(say, op.pass, 'E', 0u,
+					jiffies_to_msecs(jiffies - t0));
+			rlxfw_puts(say);
+		} else if (op.kind == RLXFW_SPI_INST_OP_PROG) {
+			why = rtl819x_spi_ctr_pp(RLXFW_SPI_INST_PROBE_BASE,
+						 op.addr, op.val, &rc);
+			if (why)
+				goto out;
+			if ((op.bit + 1u) % RLXFW_SPI_INST_LOOP_EVERY == 0u) {
+				rlxfw_spi_inst_fmt_loop(say, op.pass, 'b',
+					op.bit + 1u,
+					jiffies_to_msecs(jiffies - t0));
+				rlxfw_puts(say);
+			}
+			if (op.bit + 1u == RLXFW_SPI_INST_CTR_BITS) {
+				/* the pass's read-back: full, well-formed */
+				rc = rtl819x_spi_read_pio(
+						RLXFW_SPI_INST_PROBE_BASE,
+						RLXFW_SPI_INST_CTR_BYTES, buf);
+				if (rc) {
+					why = RLXFW_SPI_INST_R_ENGINE;
+					goto out;
+				}
+				why = rlxfw_spi_inst_ctr_verify(buf,
+						RLXFW_SPI_INST_CTR_BITS);
+				if (why)
+					goto out;
+				c->loop_done++;
+			}
+		} else {
+			why = RLXFW_SPI_INST_R_POLICY;	/* plan ended early */
+			goto out;
+		}
+		c->loop_ops++;
+		cond_resched();
+	}
+	/* what eraseprobe needs: the whole probe block reads erased */
+	rc = rtl819x_spi_probe_read_ff(rg->base, rg->size, buf, &ff);
+	if (rc) {
+		why = RLXFW_SPI_INST_R_ENGINE;
+		goto out;
+	}
+	if (!ff)
+		why = RLXFW_SPI_INST_R_PROBE_UNCLEAN;
+out:
+	kfree(buf);
+	c->loop_reason = why;
+	c->loop_ms = jiffies_to_msecs(jiffies - t0);
+	return (why == RLXFW_SPI_INST_R_ENGINE && rc) ? rc :
+	       rtl819x_spi_inst_err(why);
+}
+
+/* `install ...`, `erase ...`, `eraseprobe` and, since 1.1, `ctr <N>`,
+ * `ctrloop <p>` and `ctrloop show`.  The whole line goes to the parser,
+ * which names the verb, so a malformed line is still an attempt -- and still
+ * disarms. */
+static int rtl819x_spi_verb_inst(const char *line)
+{
+	struct rlxfw_spi_inst_req rq;
+	int rc, why;
+
 	mutex_lock(&rtl819x_spi_lock);
-	rc = rtl819x_spi_inst_run(line);
+	why = rlxfw_spi_inst_parse(line, &rq);
+	if (rq.verb == RLXFW_SPI_INST_V_CTR)
+		rc = rtl819x_spi_ctr_run(&rq, why);
+	else if (rq.verb == RLXFW_SPI_INST_V_CTRLOOP ||
+		 rq.verb == RLXFW_SPI_INST_V_CTRSHOW)
+		rc = rtl819x_spi_loop_run(&rq, why);
+	else
+		rc = rtl819x_spi_inst_run(line);
 	/* ONE ARM, ONE ATTEMPT: refused, failed or done, the write path
 	 * leaves this verb disarmed. */
 	rtl819x_spi_wr_do_disarm();
@@ -2871,22 +3225,73 @@ out:
 	return rc;
 }
 
-/* The /proc block, behind its own budget check like the write TU's. */
+/* The install path's two /proc blocks, each behind its own budget check like
+ * the write TU's, each with its own flag, so a short answer says which block
+ * ran out of room.  Each MAX is the whole block, its `.._truncated 0` line
+ * included, as the host test measures it (rtl819x-spi-install.h 1.2).
+ *
+ * THE COUNTER'S BLOCK GOES FIRST, AND THE ARITHMETIC IS WHY.  The widest page
+ * read_proc's own comments allow before this call: 1,101 (its unguarded
+ * fields) + 340 (the sixteen guarded) + 128 (wr_linked .. n_mtd_erase_calls)
+ * + 714 (the write TU's widest) + 15 (wr_truncated) + 25 (n_wip_timeout) =
+ * 2,323.  Counter first: 2,323 + 501 = 2,824 <= 3,584, so it prints whole;
+ * the install block then needs 2,824 + 1,183 = 4,007 and says inst_truncated
+ * 1 there -- at the prefix measured on the armed image (1,304 bytes) both
+ * print, 2,988.  Install block first, the counter's needed the same 4,007:
+ * whole only for a budget in [4,007, 4,027], the top being 4,096 less the
+ * widest tail (two flag lines and read_proc's last line, 69), under a
+ * constant two other blocks share -- not taken.  Every path stays under
+ * 3,584 + 69 = 3,653 of the page's 4,096. */
 static int rtl819x_spi_inst_proc(char *page, int used)
 {
 	int len = 0;
 
-	if (used + RLXFW_SPI_INST_PROC_MAX <= RTL819X_SPI_PROC_BUDGET) {
-		len += rlxfw_spi_inst_emit(page, &rtl819x_spi_inst_st,
+	if (used + RLXFW_SPI_INST_CTR_PROC_MAX <= RTL819X_SPI_PROC_BUDGET)
+		len += rlxfw_spi_inst_emit_ctr(page, &rtl819x_spi_ctr_st);
+	else
+		len += sprintf(page + len, "ctr_truncated 1\n");
+	if (used + len + RLXFW_SPI_INST_PROC_MAX <= RTL819X_SPI_PROC_BUDGET)
+		len += rlxfw_spi_inst_emit(page + len, &rtl819x_spi_inst_st,
 					   &rtl819x_spi_img_st,
 					   &rtl819x_spi_probe_st,
 					   RTL819X_SPI_CMD_SE,
 					   RLXFW_SPI_WR_ERASE_GRAIN,
 					   jiffies_to_usecs(1));
-		len += sprintf(page + len, "inst_truncated 0\n");
-	} else {
+	else
 		len += sprintf(page + len, "inst_truncated 1\n");
-	}
+	return len;
+}
+
+/* /proc/rtl819x-spi-inst, mode 0400: the install path's state for MACHINE
+ * readers (spictl).  READ fs/proc/generic.c in the tree that builds: a
+ * read_proc that leaves *start NULL hands one read(2) at most PROC_BLOCK_SIZE
+ * = PAGE_SIZE - 1024 bytes (:37, :68), and the rest comes from a page the
+ * NEXT read regenerates -- so the main page, longer than that, can reach a
+ * reader as two different pages spliced.  This node is `n_writes <N>`, the
+ * install block and the counter's block, the same functions printing them as
+ * on the main page, nothing else and no truncation path; its widest fits one
+ * read, asserted here, so one read(2) is the whole node and the next returns
+ * 0 (FW-64), as long as no field changes width between the two calls.  No
+ * lock, like the driver's other read_proc handlers.  The main page is
+ * unchanged. */
+#define RTL819X_SPI_INST_PROC_NAME	"rtl819x-spi-inst"
+#define RTL819X_SPI_PROC_BLOCK		(PAGE_SIZE - 1024)	/* generic.c:37 */
+RLXFW_SPI_INST_ASSERT(node_one_read, (unsigned long)RLXFW_SPI_INST_NODE_MAX <=
+		      RTL819X_SPI_PROC_BLOCK);
+
+static int rtl819x_spi_inst_node_read_proc(char *page, char **start,
+					   off_t off, int count, int *eof,
+					   void *data)
+{
+	int len = 0;
+
+	len += sprintf(page + len, "n_writes %lu\n", rtl819x_spi_n_writes);
+	len += rlxfw_spi_inst_emit(page + len, &rtl819x_spi_inst_st,
+				   &rtl819x_spi_img_st, &rtl819x_spi_probe_st,
+				   RTL819X_SPI_CMD_SE, RLXFW_SPI_WR_ERASE_GRAIN,
+				   jiffies_to_usecs(1));
+	len += rlxfw_spi_inst_emit_ctr(page + len, &rtl819x_spi_ctr_st);
+	*eof = 1;
 	return len;
 }
 /* END OF R8b GAP A.  tools/test-spi-install.sh compiles the lines from the
@@ -3005,7 +3410,9 @@ static int rtl819x_spi_write_proc(struct file *file, const char __user *buffer,
 		ret = rtl819x_spi_verb_trywrite();
 #ifdef CONFIG_MTD_RTL819X_WRITE
 	/* arm and disarm take the lock since Gap A, so neither can land inside
-	 * an install, which holds it from its arm check to its disarm. */
+	 * an install, which holds it from its arm check to its disarm.  `ctr`
+	 * and `ctrloop` reach the install parser by prefix, as `eraseprobe`
+	 * does under `erase`: the parser reads the first token whole. */
 	else if (!strncmp(buf, "arm ", 4)) {
 		mutex_lock(&rtl819x_spi_lock);
 		ret = rtl819x_spi_verb_arm(buf + 4);
@@ -3015,7 +3422,8 @@ static int rtl819x_spi_write_proc(struct file *file, const char __user *buffer,
 		rtl819x_spi_wr_do_disarm();
 		mutex_unlock(&rtl819x_spi_lock);
 		ret = 0;
-	} else if (!strncmp(buf, "install", 7) || !strncmp(buf, "erase", 5))
+	} else if (!strncmp(buf, "install", 7) || !strncmp(buf, "erase", 5) ||
+		   !strncmp(buf, "ctr", 3))
 		ret = rtl819x_spi_verb_inst(buf);
 	else if (!strcmp(buf, "img reset"))
 		ret = rtl819x_spi_verb_img_reset();
@@ -3125,6 +3533,16 @@ static int __init rtl819x_spi_init(void)
 	}
 	pde->write_proc = rtl819x_spi_img_write_proc;
 	rlxfw_mark("S9");
+
+	/* The machine readers' node: 0400, read only, no verb; one read(2)
+	 * returns all of it (the assert above its handler). */
+	pde = create_proc_entry(RTL819X_SPI_INST_PROC_NAME, 0400, NULL);
+	if (!pde) {
+		rlxfw_mark("S10-NOINST");
+		return 0;
+	}
+	pde->read_proc = rtl819x_spi_inst_node_read_proc;
+	rlxfw_mark("S10");
 #endif
 	return 0;
 }

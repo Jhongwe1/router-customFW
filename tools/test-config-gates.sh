@@ -591,9 +591,10 @@ ck "G4b and TWELVE marks in total"        12 \
 # drivers/mtd/devices/, and its witness is the mtd_info's name.
 #
 # 🔴 AND THE PATTERN BELOW DELIBERATELY STILL READS ONLY `str|sym`, WHICH IS
-# WHY G4d EXISTS.  `MK5` carries the third witness kind, `absent:` -- the
+# WHY G4d EXISTS.  `MK5` carried the third witness kind, `absent:` -- the
 # inverse of `sym:`, asserting that a symbol is NOT in System.map, which is
-# how `R5-5`'s `D4` is proved.  Left here it would be **filtered out of every
+# how `R5-5`'s `D4` was proved until 2026-10-23 (the 🔄 below G4c's case).
+# Left here it would be **filtered out of every
 # assertion**, which is the exact state this case's own header calls "a block
 # nothing checks".  So it is counted separately rather than folded in: the two
 # kinds make opposite claims and one number covering both could not say which
@@ -634,10 +635,35 @@ echo "  observed  present-witness build rows: tool $g4c_tool, declaration ${g4c_
 ck "G4c present-witness rows: the tool agrees with the declaration" yes \
    "$([ -n "$g4c_decl" ] && [ "$g4c_tool" = "$g4c_decl" ] \
       && [ "${g4c_tool:-0}" -ge 8 ] && echo yes || echo no)"
-ck "G4d and ONE absent-witness build row"     1 \
-   "$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +absent: ')"
-ck "G4d and it reports the symbol as NOT found" 1 \
-   "$(printf '%s\n' "$o" | grep -cE 'absent: +rtl819x_spi_write_page +mine:0')"
+# 🔄 2026-10-23 (144th segment): `MK5` IS `obj-y` WITH `sym:rtl819x_spi_write_page`
+# by the owner's ruling (notes/self-update.md § 2.9), so the committed
+# declaration has NO `absent:` row, and the two G4d cases and G4e -- which read
+# `MK5`'s `absent:` line, `mine:0` on one map and `mine:1` on the other -- had
+# nothing left to read.  Each now asserts what is true, and none weaker:
+#   * G4d's count is DERIVED, the way G4c's is: "the tool and the declaration
+#     agree on how many `absent:` rows exist".  On today's table that reads
+#     0 = 0, which cannot fail, so G4f is its positive control: the same
+#     derivation over the real declaration with ONE fixture `absent:` row
+#     appended must read one more on both sides.  What the old constant also
+#     did -- go red when a row of that kind appeared or vanished -- is given up
+#     as G4c gave it up on 2026-09-20; `MK5` itself is pinned by the next two.
+#   * G4d's second case and G4e keep the fixture map's two arms on the same
+#     row and the same symbol, now under `sym:`: `mine:0` and RED on the map
+#     without it -- a build that dropped the TU -- and `mine:1` and green on
+#     the map with it.  A reader that stopped reading the map, or a `MK5` put
+#     back to `absent:`, turns them red.
+#   * G4f's two arms are the `absent:` kind end to end through `verify`'s CLI
+#     on a real-sized declaration: `mine:0` green, `mine:1` RED.  The kind is
+#     also driven by rlxfw-marks.py's own W10..W17m and, through the build
+#     driver's gate, by test-kbuild-cflags.sh X9..X12d -- both on fixtures.
+g4d_decl="$(awk -F'\t' '!/^#/ && NF>5 && $6 ~ /^absent:/' \
+            "$REPO/config/rlxfw-marks.tsv" | wc -l | tr -d ' ')"
+g4d_tool="$(printf '%s\n' "$o" | grep -cE '^  [A-Z][A-Z0-9]+ +absent: ')"
+echo "  observed  absent-witness build rows: tool $g4d_tool, declaration ${g4d_decl:-?}  (G4f is the control)"
+ck "G4d absent-witness rows: the tool agrees with the declaration" yes \
+   "$([ -n "$g4d_decl" ] && [ "$g4d_tool" = "$g4d_decl" ] && echo yes || echo no)"
+ck "G4d MK5's sym: reads mine:0, RED, on a map without the symbol" 1 \
+   "$(printf '%s\n' "$o" | grep -cE '^  MK5 +sym: +rtl819x_spi_write_page +mine:0 .*must be >=1 here')"
 # G4e -- the OTHER arm of G4d's fixture, and without it G4d is an assertion on
 # an instrument that has not been shown able to fail.  Same declaration, same
 # --image, one variable: a map that DOES carry the symbol.  A fixture that
@@ -646,8 +672,28 @@ ck "G4d and it reports the symbol as NOT found" 1 \
 o_present="$("$PY" "$RM" verify --decl "$REPO/config/rlxfw-marks.tsv" \
              --image "$REPO/config/rlxfw-marks.tsv" \
              --map "$T/g4-present.map" 2>&1)"
-ck "G4e the same row reads mine:1 when the map DOES carry it" 1 \
-   "$(printf '%s\n' "$o_present" | grep -cE 'absent: +rtl819x_spi_write_page +mine:1')"
+ck "G4e the same row reads mine:1, green, when the map DOES carry it" 1 \
+   "$(printf '%s\n' "$o_present" | grep -cE '^  MK5 +sym: +rtl819x_spi_write_page +mine:1 *$')"
+# G4f -- the real declaration plus ONE fixture `absent:` row, never committed.
+# Its anchor and object are invented (verify applies nothing) and its symbol is
+# MK5's, so on each map the two kinds read one symbol and must disagree.
+{ cat "$REPO/config/rlxfw-marks.tsv"
+  printf '\nG4F\tdrivers/g4f/Makefile\tafter\tobj-y += g4f-anchor.o\tobj-$(CONFIG_RLXFW_G4F) += g4f.o\tabsent:rtl819x_spi_write_page\ta fixture row, never committed: the control for G4d\n'
+} > "$T/g4-cond.tsv"
+o_cond="$("$PY" "$RM" verify --decl "$T/g4-cond.tsv" --image "$T/g4-cond.tsv" \
+          --map "$T/g4-absent.map" 2>&1)"
+o_cond_present="$("$PY" "$RM" verify --decl "$T/g4-cond.tsv" --image "$T/g4-cond.tsv" \
+                  --map "$T/g4-present.map" 2>&1)"
+g4f_decl="$(awk -F'\t' '!/^#/ && NF>5 && $6 ~ /^absent:/' "$T/g4-cond.tsv" | wc -l | tr -d ' ')"
+g4f_tool="$(printf '%s\n' "$o_cond" | grep -cE '^  [A-Z][A-Z0-9]+ +absent: ')"
+echo "  observed  with one fixture absent: row appended: tool $g4f_tool, declaration ${g4f_decl:-?}"
+ck "G4f POSITIVE CONTROL: one appended absent: row, counted on both sides" yes \
+   "$([ -n "$g4f_decl" ] && [ -n "$g4d_decl" ] && [ "$g4f_decl" -eq $((g4d_decl + 1)) ] \
+      && [ "$g4f_tool" = "$g4f_decl" ] && echo yes || echo no)"
+ck "G4f and that row reads mine:0, green, on the map without the symbol" 1 \
+   "$(printf '%s\n' "$o_cond" | grep -cE '^  G4F +absent: +rtl819x_spi_write_page +mine:0 *$')"
+ck "G4f and mine:1, RED, on the map that carries it" 1 \
+   "$(printf '%s\n' "$o_cond_present" | grep -cE '^  G4F +absent: +rtl819x_spi_write_page +mine:1 .*must be 0 here')"
 # 🔄 2026-09-07: the pattern tolerates the witness column's width.  It was
 # `'sym: rlxfw_puts'` with ONE space, and adding `absent:` widened that column
 # from 4 to 7 -- so a deliberate formatting change silently broke a checker

@@ -34,10 +34,16 @@
 # 🔄 2026-10-05 (R8b, FW-228): X1-X12d, `--expect-present ROW-ID` -- its
 # refusals above the stage, and the four cells of its truth table through the
 # gate, mainline and armed, with and without the flag.  Same: no drop needed.
+# 🔄 2026-10-23 (144th segment): MK5 is `obj-y` with `sym:` by the owner's
+# ruling, so the committed declaration has no row the flag can name.  X5b pins
+# that on it; X6-X8 drive the flag through RLXFW_REPO against the X9 fixture.
 # 🔄 2026-10-05 (GPL-2.0 § 3, P4b): Y1-Y7b and Z0-Z7, `--recipient` -- the
 # build a recipient of the corresponding source runs: the --absent rows the
 # driver's UNIT_REFS names are not read, nothing else is skipped, and the
 # verdict is `recipient` with exit 7, never green.  Same: no drop needed.
+# 🔄 2026-10-23 (P6r-10): F1-F7, fwarg_check through the same harness --
+# prom_argc and _prom_argv refused in System.map by field, fw_arg0..3 the
+# control.  Same: no drop needed.
 #
 # Usage:  tools/test-kbuild-cflags.sh
 set -o nounset
@@ -349,8 +355,8 @@ ck "C14 and with one, the digest comes from the driver's own .sha256 file" \
 # written when NO gate ran must not be able to read green.  Every verdict
 # field is `-`, and `verdict` says not-green rather than inheriting a default.
 ck "C15 no gate run -> the manifest's verdict is not-green, never green" \
-   "not-green/-/-" \
-   "$(field verdict)/$(field kconfig_check)/$(field marks_verify)"
+   "not-green/-/-/-" \
+   "$(field verdict)/$(field kconfig_check)/$(field marks_verify)/$(field fwarg_check)"
 ck "C16 the manifest says format 2" "2" \
    "$(awk -F'\t' '$1 == "rlxfw-build-manifest" { print $2 }' "$MTMP/c.manifest")"
 rm -rf "$MTMP"
@@ -509,10 +515,10 @@ echo "=== R1-R8: the two gates with the REAL tools, on synthetic inputs ==="
 # one-row marks declaration, an "image" holding the mark once, and a fake
 # $FWRE_WORK holding one reference.
 RT="$(mktemp -d)"
-for f in absent_refs gate_verdict run_gates overall_verdict write_manifest finish_build; do
+for f in absent_refs gate_verdict run_gates fwarg_check overall_verdict write_manifest finish_build; do
     sed -n "/^$f() {/,/^}\$/p" "$K" >> "$RT/fns.sh"
 done
-ck "R0 the six functions are extractable" "6" "$(grep -c '^}$' "$RT/fns.sh")"
+ck "R0 the seven functions are extractable" "7" "$(grep -c '^}$' "$RT/fns.sh")"
 printf '#\n# synthetic baseline\n#\nCONFIG_A=y\n# CONFIG_B is not set\n' > "$RT/base.config"
 BSHA="$(sha256sum "$RT/base.config" | cut -d' ' -f1)"
 { printf '# baseline-sha256: %s\n' "$BSHA"
@@ -524,7 +530,9 @@ printf 'CONFIG_A=y\nCONFIG_B=y\nCONFIG_X=y\n' > "$RT/built-undeclared"
 printf '# id\tfile\tposition\tanchor\tinsert\twitness\treason\nB00\tinit/main.c\tafter\tstart_kernel();\trlxfw_mark("B00");\t\tthe first mark\n' > "$RT/marks.tsv"
 printf 'head RLXFW-B00\n tail' > "$RT/marked.elf"
 printf 'head, and no mark\n'   > "$RT/unmarked.elf"
-printf '80000000 T _text\n'    > "$RT/System.map"
+# fw_arg0..3 are fwarg_check's control: a map without them is refused.
+FWA='803f0524 B fw_arg0\n803f0528 B fw_arg1\n803f052c B fw_arg2\n803f0530 B fw_arg3\n'
+printf "80000000 T _text\\n$FWA" > "$RT/System.map"
 mkdir -p "$RT/work/rebuild/ref"
 refdecl () {   # refdecl <file under $RT/work> <declaration out>
     printf 'vendor\t%s\t%s\t%s\ta synthetic vendor kernel\n' "$1" \
@@ -635,10 +643,47 @@ ck "R8 build step not 0 (rc 2), both gates green -> exit 2, no line" \
    "green/green/not-green/2/0" \
    "$(mf kconfig_check)/$(mf marks_verify)/$(mf verdict)/$(fin)/$(mrx)"
 
+# F1-F7 -- fwarg_check (P6r-10, notes/self-update.md § 1.4), through the same
+# harness: a map naming prom_argc or _prom_argv means some object reads the
+# boot handoff's registers as a PROM argument vector, and the build is not
+# green.  Each map is the fixture's (fw_arg0..3 present) with lines planted by
+# the hook; the two gates stay green, so the verdict is fwarg_check's alone.
+fwline () { grep '^== rcell: fw_arg check ' "$RT/fin.gates"; }
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0
+ck "F1 the fixture map: fw_arg check green, verdict green, exit 0" \
+   "green/green/0/1/1" \
+   "$(mf fwarg_check)/$(mf verdict)/$(fin)/$(mrx)/$(fwline | grep -c ' green: fw_arg0..fw_arg3 in the map; prom_argc and _prom_argv are not$')"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0 \
+      'printf "80123456 B prom_argc\n" >> "$log.System.map"'
+ck "F2 prom_argc planted: red, exit 6, no MANIFEST_RX, NOT FOR UPLOAD names it" \
+   "red/green/green/not-green/6/0/1/1" \
+   "$(mf fwarg_check)/$(mf kconfig_check)/$(mf marks_verify)/$(mf verdict)/$(fin)/$(mrx)/$(mf fwarg_check_result | grep -c 'holds prom_argc: an object in this kernel reads fw_arg0..3 as a PROM argument vector')/$(grep -c 'NOT FOR UPLOAD -- .*fw_arg check red, rlxfw-marks verify green;' "$RT/fin.out")"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0 \
+      'printf "80123460 D _prom_argv\n" >> "$log.System.map"'
+ck "F3 _prom_argv planted: red, exit 6, the result names it" "red/6/1" \
+   "$(mf fwarg_check)/$(fin)/$(mf fwarg_check_result | grep -c 'holds _prom_argv: ')"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0 \
+      'printf "80123460 D _prom_argv\n80123456 B prom_argc\n" >> "$log.System.map"'
+ck "F4 both planted: red, both named, in the map's order" "red/1" \
+   "$(mf fwarg_check)/$(mf fwarg_check_result | grep -c 'holds _prom_argv prom_argc: ')"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0 \
+      'printf "80123456 B prom_argc_foo\n80123457 B x_prom_argv\n80123458 B _prom_argvx\n80123459 b prom_argc.1234\n8012345a B __prom_argc\n" >> "$log.System.map"'
+ck "F5 longer and prefixed names are not the two: green, exit 0" "green/0" \
+   "$(mf fwarg_check)/$(fin)"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0 \
+      'grep -v " fw_arg2$" "$RT/System.map" > "$log.System.map"'
+ck "F6 the control: a map without fw_arg2 is refused, not read as clean" \
+   "refused/not-green/6/1" \
+   "$(mf fwarg_check)/$(mf verdict)/$(fin)/$(mf fwarg_check_result | grep -c 'names 3 of fw_arg0..fw_arg3, so it is not this kernel')"
+gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent.tsv" 0 \
+      'rm -f "$log.System.map"'
+ck "F7 no map at all: refused with the reason, exit 6" "refused/6/1" \
+   "$(mf fwarg_check)/$(fin)/$(mf fwarg_check_result | grep -c '^not run: there is no ')"
+
 echo
 echo "=== X1-X12d: --expect-present ROW-ID (R8b, FW-228) -- forwarded, never derived ==="
-# R8b's armed image flips config/rlxfw-kernel.delta's CONFIG_MTD_RTL819X_WRITE
-# to y, so rtl819x_spi_write_page is in its System.map and MK5's `absent:` goes
+# R8b's armed image flipped config/rlxfw-kernel.delta's CONFIG_MTD_RTL819X_WRITE
+# to y, so rtl819x_spi_write_page was in its System.map and MK5's `absent:` went
 # RED, correctly.  rlxfw-marks.py's `--expect-present ROW` inverts that one row
 # for one run (its own W17a-W17d); the driver forwards the flag verbatim when
 # it is given and never otherwise.  X1-X8b are the flag's refusals and their
@@ -649,8 +694,26 @@ echo "=== X1-X12d: --expect-present ROW-ID (R8b, FW-228) -- forwarded, never der
 # REAL rlxfw-marks.py, down to the exit status and the line looprun's
 # MANIFEST_RX reads.  The two REDS are the half that matters: a flag shown only
 # where it passes is a flag that cannot fail.
+# 🔄 2026-10-23: MK5 is `obj-y` with `sym:` by the owner's ruling
+# (notes/self-update.md § 2.9), so the COMMITTED declaration has no row the
+# flag can name.  X1-X5 still run against it and X5b pins the ruling there
+# (MK5 itself is refused now); X6-X8 -- which need a VALID id to test the
+# duplicate refusal, --target none and the positive control -- run the same
+# real driver through RLXFW_REPO against a fake repository whose declaration is
+# the X9 fixture, the A and Y blocks' shape.  No driver change was needed.
 xrun () { out="$(bash "$K" "$@" 2>&1)"; rc=$?; }
 xhas () { printf '%s\n' "$out" | grep -c -- "$1"; }
+# The fixture X6-X12d and Z6 share: a mark and an MK5-shaped conditional row,
+# the shape the committed MK5 had until 2026-10-23.
+{ printf '# id\tfile\tposition\tanchor\tinsert\twitness\treason\n'
+  printf 'B00\tinit/main.c\tafter\tstart_kernel();\trlxfw_mark("B00");\t\tthe first mark\n'
+  printf 'MK5\tdrivers/mtd/devices/Makefile\tafter\tobj-y += rtl819x-spi.o\tobj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o\tabsent:rtl819x_spi_write_page\tdeclared, conditional\n'
+} > "$RT/marks-cond.tsv"
+XR="$RT/xrepo"
+mkdir -p "$XR/config" "$XR/kernel"
+cp "$CF" "$XR/config/rlxfw-cflags"; cp "$SF" "$XR/config/rlxfw-build-stamp"
+cp "$RT/marks-cond.tsv" "$XR/config/rlxfw-marks.tsv"
+xfx () { out="$(RLXFW_REPO="$XR" bash "$K" "$@" 2>&1)"; rc=$?; }
 xrun gcf-x1 --variant quiet --dry-run --expect-present
 ck "X1 --expect-present with nothing after it -> 3, a reason" \
    "3/1/0" "$rc/$(xhas 'was given no ROW-ID')/$(xhas 'unbound variable')"
@@ -669,28 +732,29 @@ ck "X4 an unknown row id -> 3 in rlxfw-marks' words, before the dry-run" "3/1/1/
 xrun gcf-x5 --variant quiet --dry-run --expect-present MK4
 ck "X5 an unconditional row (MK4, obj-y) -> 3, it has nothing to invert" "3/1" \
    "$rc/$(xhas 'which is not a conditional Kbuild line')"
-xrun gcf-x6 --variant quiet --dry-run --expect-present MK5 --expect-present MK5
+# X5b -- the ruling, on the COMMITTED declaration: the id R8b's armed builds
+# passed is refused above the stage, in the tool's words, because MK5 is obj-y.
+xrun gcf-x5b --variant quiet --dry-run --expect-present MK5
+ck "X5b the committed MK5 (obj-y since 2026-10-23) -> 3, nothing to invert" "3/1/0" \
+   "$rc/$(xhas "MK5: that row's insert is 'obj-y += rtl819x-spi-write.o', which is not a conditional Kbuild line")/$(xhas 'nothing staged and nothing built')"
+xfx gcf-x6 --variant quiet --dry-run --expect-present MK5 --expect-present MK5
 ck "X6 the same row id twice -> 3, refused by the tool" "3/1" "$rc/$(xhas 'MK5 was given twice')"
-xrun gcf-x7 --variant quiet --dry-run --target none --expect-present MK5
+xfx gcf-x7 --variant quiet --dry-run --target none --expect-present MK5
 ck "X7 with --target none -> 3: no gate runs, so nothing to exempt" "3/1" \
    "$rc/$(xhas 'with --target none')"
 # X8 -- the positive control: a guard that refused everything would pass X1-X7.
 # X8b -- and without the flag the output does not mention it at all.
-xrun gcf-x8 --variant quiet --dry-run --expect-present MK5
+xfx gcf-x8 --variant quiet --dry-run --expect-present MK5
 ck "X8 --expect-present MK5 is accepted, printed, and the dry-run reached" "0/1/1" \
    "$rc/$(xhas '--expect-present MK5 <- argv, this run only')/$(xhas 'nothing staged and nothing built')"
 xrun gcf-x8b --variant quiet --dry-run
 ck "X8b no flag: not one line of the output mentions it" "0/0" "$rc/$(xhas 'expect-present')"
 
-# X9-X12d -- one declaration holding a mark and an MK5-shaped conditional row,
-# two maps that differ in that one symbol, and the exemption set the way the
+# X9-X12d -- the fixture above (a mark and an MK5-shaped conditional row), two
+# maps that differ in that one symbol, and the exemption set the way the
 # argument loop sets it, as EXPECT_PRESENT, through `gates`' hook.
-{ printf '# id\tfile\tposition\tanchor\tinsert\twitness\treason\n'
-  printf 'B00\tinit/main.c\tafter\tstart_kernel();\trlxfw_mark("B00");\t\tthe first mark\n'
-  printf 'MK5\tdrivers/mtd/devices/Makefile\tafter\tobj-y += rtl819x-spi.o\tobj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o\tabsent:rtl819x_spi_write_page\tdeclared, conditional\n'
-} > "$RT/marks-cond.tsv"
-printf '80000000 T _text\n80100000 T rtl819x_spi_read_page\n'  > "$RT/map-mainline"
-printf '80000000 T _text\n801a8a20 T rtl819x_spi_write_page\n' > "$RT/map-armed"
+printf "80000000 T _text\\n80100000 T rtl819x_spi_read_page\\n$FWA"  > "$RT/map-mainline"
+printf "80000000 T _text\\n801a8a20 T rtl819x_spi_write_page\\n$FWA" > "$RT/map-armed"
 cell () {   # cell <map> [row id] -- the exemption is in force iff a row id is given
     local hook='MARKS_DECL="$RT/marks-cond.tsv"; cp "$RT/'"$1"'" "$log.System.map"'
     [ -z "${2:-}" ] || hook="$hook; EXPECT_PRESENT=($2)"
@@ -704,7 +768,7 @@ cell map-mainline
 ck "X9 mainline, no flag: GREEN, exit 0, a line MANIFEST_RX reads" \
    "green/0/green/0/1" "$(mf marks_verify)/$(mf marks_verify_rc)/$(mf verdict)/$(fin)/$(mrx)"
 ck "X9b and no trace of the flag: tool argv, verdict line, last line, manifest" \
-   "0/0/0/30" "$(vlog | grep -c 'expect-present')/$(vline | grep -c 'expect-present')/$(grep -c 'expect-present' "$RT/fin.out")/$(wc -l < "$RT/c.manifest" | tr -d ' ')"
+   "0/0/0/32" "$(vlog | grep -c 'expect-present')/$(vline | grep -c 'expect-present')/$(grep -c 'expect-present' "$RT/fin.out")/$(wc -l < "$RT/c.manifest" | tr -d ' ')"
 cell map-mainline MK5
 ck "X10 mainline + --expect-present MK5: RED, exit 6, no MANIFEST_RX line" \
    "red/1/not-green/6/0" "$(mf marks_verify)/$(mf marks_verify_rc)/$(mf verdict)/$(fin)/$(mrx)"
@@ -721,8 +785,8 @@ ck "X12 armed + --expect-present MK5: GREEN, exit 0, a line MANIFEST_RX reads" \
    "green/0/green/0/1" "$(mf marks_verify)/$(mf marks_verify_rc)/$(mf verdict)/$(fin)/$(mrx)"
 ck "X12b the verdict line names it, and so does the line before the manifest" "1/1" \
    "$(vline | grep -c 'verify \[--expect-present MK5\] green (rc=0)')/$(sed -n 1p "$RT/fin.out" | grep -c 'green UNDER --expect-present MK5')"
-ck "X12c the manifest records it last, after the same thirty lines" \
-   "31/marks_verify_expect_present MK5" "$(wc -l < "$RT/c.manifest" | tr -d ' ')/$(lastrow)"
+ck "X12c the manifest records it last, after the same thirty-two lines" \
+   "33/marks_verify_expect_present MK5" "$(wc -l < "$RT/c.manifest" | tr -d ' ')/$(lastrow)"
 ck "X12d and verify's own RESULT says one row was confirmed PRESENT" 1 \
    "$(mf marks_verify_result | grep -c '1 confirmed PRESENT under --expect-present')"
 
@@ -854,7 +918,7 @@ any_recipient () { cat "$RT/fin.gates" "$RT/fin.out" "$RT/c.manifest" | grep -ci
 
 gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-u.tsv" 0
 ck "Z1 refs present, no flag: green, exit 0, MANIFEST_RX, both refs to verify" \
-   "green/0/1/2/0/30" \
+   "green/0/1/2/0/32" \
    "$(mf verdict)/$(fin)/$(mrx)/$(mf marks_verify_absent | tr ',' '\n' | grep -c .)/$(any_recipient)/$(wc -l < "$RT/c.manifest" | tr -d ' ')"
 gates "$RT/built-quiet" "$RT/marked.elf" quiet "$RT/absent-u.tsv" 0 "$UNIT_AWAY"
 mv "$RT/unit.away" "$RT/work/rebuild/desk/unit.bin"
@@ -866,7 +930,7 @@ mv "$RT/unit.away" "$RT/work/rebuild/desk/unit.bin"
 ck "Z3 unit ref missing + --recipient: verdict recipient, exit 7, no MANIFEST_RX" \
    "green/recipient/7/0" "$(mf marks_verify)/$(mf verdict)/$(fin)/$(mrx)"
 ck "Z3b the verify line, the last line and the manifest's last row carry it" \
-   "1/1/recipient $RECIPIENT_NOTE/31" \
+   "1/1/recipient $RECIPIENT_NOTE/33" \
    "$(grep -c "verify \[RECIPIENT BUILD -- $RECIPIENT_NOTE\] green (rc=0)" "$RT/fin.gates")/$(grep -c "^== rcell: RECIPIENT BUILD -- $RECIPIENT_NOTE; build rc=0, .*not for upload to this project's unit; the record is " "$RT/fin.out")/$(lastrow)/$(wc -l < "$RT/c.manifest" | tr -d ' ')"
 ck "Z3c verify got the other reference alone, and its RESULT counts one" \
    "vendor=$(sha256sum "$RT/work/rebuild/ref/vendor.bin" | cut -d' ' -f1)/1" \

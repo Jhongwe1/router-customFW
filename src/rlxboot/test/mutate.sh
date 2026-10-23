@@ -46,6 +46,13 @@
 #       "ignores a valid-looking RCNT block" cases.
 #   M8  the RAM source compiled out of the RAM build too.  EXPECTED:
 #       t_container's "BOOT=ram honours a staged RCNT block".
+#
+# And one on `handoff.h` (P6r-10, the boot handoff a slot boot leaves in
+# a0..a3):
+#
+#   M9  the check word loses its complement -- `~(magic ^ slot ^ version)`
+#       becomes `magic ^ slot ^ version`.  EXPECTED: t_slots' handoff cases,
+#       which read the winner's words with the kernel's own parser.
 
 set -e
 REPO=${1:?repo}
@@ -63,6 +70,11 @@ mkclone() {
 	cp "$REPO"/src/rlxboot/*.c "$REPO"/src/rlxboot/*.h "$BD/tree/src/rlxboot/"
 	cp "$REPO"/src/rlxboot/test/*.c "$REPO"/src/rlxboot/test/*.h \
 	   "$BD/tree/src/rlxboot/test/"
+	# t_slots.c includes the kernel's handoff parser by a path relative to
+	# itself, so the clone carries it where that path lands.
+	mkdir -p "$BD/tree/kernel/linux-2.6.30/include/linux"
+	cp "$REPO/kernel/linux-2.6.30/include/linux/rlxfw-handoff.h" \
+	   "$BD/tree/kernel/linux-2.6.30/include/linux/"
 }
 
 buildrun() {
@@ -214,4 +226,11 @@ mutate_slots M8 \
 	'nothing sees the RAM build lose its RAM source' \
 	flashread.c
 
-echo 'mutate: all eight mutations were applied and all eight were caught'
+echo '=== M9: the handoff check word loses its complement (P6r-10)'
+mutate_slots M9 \
+	's/\(\(~\(RLXB_HANDOFF_MAGIC/(((RLXB_HANDOFF_MAGIC/' \
+	'(((RLXB_HANDOFF_MAGIC' \
+	'nothing reads the check word a slot boot hands over' \
+	handoff.h
+
+echo 'mutate: all nine mutations were applied and all nine were caught'

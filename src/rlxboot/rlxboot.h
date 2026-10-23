@@ -125,5 +125,13 @@ int rlxb_counter_read(unsigned char *out, const volatile unsigned int *ram,
 /* Jump to `entry` with a0..a3 zeroed.  Does not return.  Every delay slot
  * filled by hand under `.set noreorder`. */
 void rlxboot_jump(unsigned long entry) __attribute__((noreturn));
+/* Jump to `entry` with a0..a3 = RLXB_HANDOFF_MAGIC, `slot`, `version`,
+ * `check` (handoff.h; notes/self-update.md § 1.2).  Does not return.
+ * Assembled in the BOOT=slots build only: declared for both, called from the
+ * slots build's boot path alone, so a BOOT=ram image that called it would
+ * not link. */
+void rlxboot_jump_handoff(unsigned long entry, unsigned long slot,
+                          unsigned long version, unsigned long check)
+	__attribute__((noreturn));
 
 #endif /* RLXBOOT_H */

@@ -33,10 +33,10 @@ are load-bearing: without the second, a mark is not a discriminator, and
 second `J 80500000` booted the vendor kernel and the banner looked like a pass.
 
 `--expect-present ROW` inverts ONE named conditional row's `absent:` for ONE
-run: `R8b` builds one image with CONFIG_MTD_RTL819X_WRITE=y and `MK5` then
-goes red, correctly.  Teaching the pairing rule below to read that value out
-of `config/rlxfw-kernel.delta` was rejected -- a second reader of what
-`tools/kconfig-delta.py` owns.  `W17c` keeps it honest: flag, no symbol, RED.
+run.  It was written for `R8b`'s armed `MK5`; teaching the pairing rule to
+read config/rlxfw-kernel.delta instead was rejected (`_exempt_rows`).  Since
+2026-10-23 `MK5` is `obj-y` with `sym:` (notes/self-update.md § 2.9), so the
+committed declaration has no row to name.  `W17c`: flag, no symbol, RED.
 
 Usage
     tools/rlxfw-marks.py apply    --decl F --tree DIR --src DIR
@@ -69,8 +69,8 @@ COLS = ("id", "file", "position", "anchor", "insert", "witness", "reason")
 # green under both.
 #
 # THREE FORMS.  The second exists because a measurement forced it; the third
-# exists because `R5-5`'s `D4` asks this file to declare a TU that is
-# deliberately NOT in the image:
+# because `R5-5`'s `D4` asked this file to declare a TU deliberately NOT in
+# the image (retired 2026-10-23; the kind stays, and no committed row uses it):
 #
 #   str:<literal>   the bytes must be in the image at least once, and in none
 #                   of the --absent artefacts.  The same test a mark gets.
@@ -80,10 +80,10 @@ COLS = ("id", "file", "position", "anchor", "insert", "witness", "reason")
 #                   Kbuild shape below.
 #
 # 🔴 WHY A THIRD KIND RATHER THAN A PATCH IN config/host-compat/.  `R5-5`'s
-# write path is a separate translation unit that the shipped image must not
-# contain, proved by symbol absence.  Its Kbuild line therefore has to be
-# `obj-$(CONFIG_MTD_RTL819X_WRITE) +=`, which `OBJ_RE` refuses, and it has no
-# `str:`/`sym:` witness to give because the object is not there to witness.
+# write path was a separate translation unit that the shipped image was not
+# to contain, proved by symbol absence.  Its Kbuild line therefore had to be
+# `obj-$(CONFIG_MTD_RTL819X_WRITE) +=`, which `OBJ_RE` refuses, and it had no
+# `str:`/`sym:` witness to give because the object was not there to witness.
 # The alternative -- putting that line in a host-compat patch -- would make
 # that patch a SECOND OWNER of "which of my files are linked", and this file
 # is the first.  House rule 1 decides it: the vocabulary widens by one shape
@@ -615,21 +615,21 @@ def _exempt_rows(rows, names, decl):
     """-> frozenset of row ids whose `absent:` assertion is INVERTED.
 
     WHY THE EXEMPTION IS A CALL-SITE FLAG AND NOT A RULE THAT READS A VALUE.
-    `MK5` declares `obj-$(CONFIG_MTD_RTL819X_WRITE) += rtl819x-spi-write.o`
-    and the pairing rule above requires `absent:` on it, because *conditional*
-    meant *not in the image*.  讀 `R8b` item 4: that symbol is no longer
-    undeclared -- `config/host-compat/0010` declares it `bool`/`default n` and
-    `config/rlxfw-kernel.delta` pins it `n` -- and `R8b` needs ONE image built
-    with it `y`, in which the symbol IS in System.map and this row goes red,
-    correctly.  The rejected remedy was to teach the pairing rule to read the
-    delta's value for the symbol: that makes this file a SECOND READER of a
-    value `tools/kconfig-delta.py` already owns, and it makes a row's verdict
-    depend on a file the row does not name.  This flag inverts ONE named row
-    for ONE run instead, so the exemption is in the run's own argv, is printed
-    by the run, and expires with it -- while the table keeps saying the TU is
-    not shipped.  The positive control for the armed build is unchanged and is
-    still a make-level override in a DISCARDED tree,
-    `make CONFIG_MTD_RTL819X_WRITE=y`, because `obj-$(...)` is plain Make.
+    A conditional row (`obj-$(CONFIG_X) += f.o`) must carry `absent:`, because
+    *conditional* meant *not in the image*.  `R8b` needed ONE image built with
+    such a row's symbol `y` -- `MK5`, then `obj-$(CONFIG_MTD_RTL819X_WRITE)`,
+    whose symbol `config/host-compat/0010` declares and the delta then pinned
+    `n` -- and in that image the row goes red, correctly.  The rejected remedy
+    was to teach the pairing rule to read the delta's value for the symbol:
+    that makes this file a SECOND READER of a value `tools/kconfig-delta.py`
+    already owns, and it makes a row's verdict depend on a file the row does
+    not name.  This flag inverts ONE named row for ONE run instead, so the
+    exemption is in the run's own argv, is printed by the run, and expires
+    with it -- while the table keeps saying the row's TU is not shipped.
+    🔄 2026-10-23: `MK5` is `obj-y` with `sym:rtl819x_spi_write_page` by the
+    owner's ruling (notes/self-update.md § 2.9), so config/rlxfw-marks.tsv has
+    no row this flag can name and every id given against it is refused here.
+    The flag is kept for a declaration that has one; `W17` runs on fixtures.
 
     ⚠️ WHAT IT IS NOT.  It is not `--skip`: an exempted row still needs
     `--map` (`W17j`) and still goes RED when the symbol is not there
@@ -746,9 +746,9 @@ def verify_marks(decl, image, absent, mapfile=None, expect_present=()):
     #
     # ⚠️ `absent:` is in the same sentence and for a stronger reason.  A
     # skipped `sym:` prints green over an unasked question; a skipped
-    # `absent:` prints green over the D4 CLAIM ITSELF -- "the write path is
-    # not in this image" -- which is exactly the assertion that must never be
-    # satisfied by not looking.
+    # `absent:` prints green over the row's CLAIM ITSELF -- "this object is
+    # not in this image", `R5-5` D4's until 2026-10-23 -- which is exactly
+    # the assertion that must never be satisfied by not looking.
     needs_map = [r for r in wits if r.wkind in ("sym", "absent")]
     if needs_map and not mapfile:
         die("%s declares %d sym:/absent: witness(es) and no --map was given. "
@@ -1124,9 +1124,9 @@ def self_test():
 
         # ------------------------------------------------------------------
         # W10..W14 -- the CONDITIONAL Kbuild row and its `absent:` witness.
-        # R5-5's D4 proves the flash WRITE path is not in the shipped image by
-        # symbol absence, and these are what stop that proof from being a
-        # check that cannot fail.
+        # R5-5's D4 proved the flash WRITE path absent from the shipped image
+        # this way until 2026-10-23, and these stop such a proof from being a
+        # check that cannot fail; no committed row uses the kind since.
         # ------------------------------------------------------------------
         condrow = ("MK9", "sub/Makefile", "after", "obj-y += x.o",
                    "obj-$(CONFIG_MTD_RTL819X_WRITE) += w.o",
@@ -1154,7 +1154,7 @@ def self_test():
            "in the map", w[0][3] is False, str(w[0][:3]))
 
         # W12 -- and skipping it is a refusal, for a stronger reason than
-        # W7c's: a skipped absent: prints green over the D4 claim itself.
+        # W7c's: a skipped absent: prints green over the row's claim itself.
         ok, why = refuses(verify_marks, d30, mine, [theirs])
         ck("W12 an absent: witness with no --map REFUSES rather than skipping",
            ok, why)
@@ -1191,11 +1191,11 @@ def self_test():
         # ------------------------------------------------------------------
         # W17 -- `--expect-present`, and THE FOUR CELLS OF ITS TRUTH TABLE.
         #
-        # `R8b` needs ONE image built with CONFIG_MTD_RTL819X_WRITE=y.  The
-        # symbol is in System.map then and `MK5`'s `absent:` goes RED, which
-        # is the rule working rather than failing.  The flag inverts that one
-        # row for that one run; `_exempt_rows` holds why the exemption is at
-        # the call site and not in the rule.
+        # `R8b` needed ONE image built with CONFIG_MTD_RTL819X_WRITE=y, in
+        # which `MK5`'s `absent:` (then) went RED -- the rule working rather
+        # than failing.  The flag inverts one row for one run; `_exempt_rows`
+        # holds why it is at the call site and why, since 2026-10-23, these
+        # cells run on fixtures only.
         #
         #   image     flag               expected
         #   armed     --                 RED     W17a

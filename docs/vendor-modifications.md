@@ -9,8 +9,8 @@ the vendor's code.
 | | |
 |---|---|
 | drop | `src-vendor/rtl819x-toolchain @ 5c9be5d9` 讀, from the `# baseline-drop:` header of `config/rlxfw-marks.tsv`, which `config/rlxfw-kernel.delta` agrees with |
-| declarations read | `config/rlxfw-marks.tsv` (28 row(s)), `config/host-compat/` (10 patch(es)), `config/busybox-patches/` (1 patch(es)), `config/rlxfw-kernel.delta` (148 row(s)) |
-| vendor files touched | **24** |
+| declarations read | `config/rlxfw-marks.tsv` (29 row(s)), `config/host-compat/` (11 patch(es)), `config/busybox-patches/` (1 patch(es)), `config/rlxfw-kernel.delta` (149 row(s)) |
+| vendor files touched | **25** |
 | anchors | 🔴 **NOT resolved: no `--tree` was given.** Every row below restates its declaration and nothing was read out of a vendor tree |
 | patch roots | `config/host-compat/` applies with `patch -p1` from `linux-2.6.30` 讀 `tools/rlxfw-kbuild.sh`; `config/busybox-patches/` from `users/busybox-1.13`, which is `rtl819x/users/busybox-1.13` in the other drop shape 讀 `tools/mkbusybox.sh` |
 | busybox drop | 推 the same drop; `tools/mkbusybox.sh` takes `--drop` and nothing in `config/busybox-patches/` declares one, so pass `--busybox-drop` when a build used another |
@@ -19,11 +19,11 @@ the vendor's code.
 | # | vendor file | kind | made by | anchor(s) | anchor state |
 |---:|---|---|---|---|---|
 | 1 | `boards/rtl8196e/bsp/setup.c` | insert | `IN3`, `B04`, `B05`, `B06`, `B07` | `#include "bspchip.h"`<br>`ioport_resource.start = 0x18000000;`<br>`bsp_serial_init();`<br>`_imem_dmem_init();`<br>`ret = bsp_swcore_init(version);` | declared (5) |
-| 2 | `boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW` | config-delta | `148 row(s)` | `sha256 44f781de` | declared (1) |
+| 2 | `boards/rtl8196e/config.linux-2.6.30.RTL8196E_88E_GW` | config-delta | `149 row(s)` | `sha256 44f781de` | declared (1) |
 | 3 | `linux-2.6.30/Kbuild` | patch | `0003-kbuild-filechk-generated-headers.patch` | `@@ -13,10 +13,8 @@`<br>`@@ -25,9 +23,9 @@`<br>`@@ -37,7 +35,7 @@`<br>`@@ -57,10 +55,8 @@`<br>`@@ -69,9 +65,9 @@`<br>`@@ -81,7 +77,7 @@` | declared (6) |
 | 4 | `linux-2.6.30/arch/rlx/Kconfig` | patch | `0005-arch-rlx-offer-gpiolib.patch`, `0007-vendor-eth-open-refusable.patch` | `@@ -13,6 +13,7 @@`<br>`@@ -18,6 +18,22 @@` | declared (2) |
 | 5 | `linux-2.6.30/arch/rlx/include/asm/mach-generic/gpio.h` | patch | `0006-arch-rlx-define-gpio-to-irq.patch` | `@@ -5,6 +5,7 @@`<br>`@@ -12,10 +13,23 @@` | declared (2) |
-| 6 | `linux-2.6.30/arch/rlx/kernel/Makefile` | insert | `MK`, `MK7` | `obj-$(CONFIG_EARLY_PRINTK) += early_printk.o`<br>`obj-y += rlx-time.o rlx-cevt.o` | declared (2) |
+| 6 | `linux-2.6.30/arch/rlx/kernel/Makefile` | insert | `MK`, `MK7`, `MK14` | `obj-$(CONFIG_EARLY_PRINTK) += early_printk.o`<br>`obj-y += rlx-time.o rlx-cevt.o`<br>`obj-y += rlxfw_mark.o` | declared (3) |
 | 7 | `linux-2.6.30/arch/rlx/kernel/setup.c` | insert | `IN2`, `B01`, `B02`, `B03`, `B08` | `#include <asm/setup.h>`<br>`cpu_probe();`<br>`cpu_probe();`<br>`bsp_init();`<br>`paging_init();` | declared (5) |
 | 8 | `linux-2.6.30/drivers/char/Makefile` | insert | `MK13` | `obj-y += mem.o random.o tty_io.o n_tty.o tty_ioctl.o tty_ldisc.o tty_buffer.o tty_port.o` | declared (1) |
 | 9 | `linux-2.6.30/drivers/char/random.c` | patch | `0009-random-rlxfw-input.patch` | `@@ -698,6 +698,49 @@` | declared (1) |
@@ -38,10 +38,11 @@ the vendor's code.
 | 18 | `linux-2.6.30/include/net/rtl/rtl_nic.h` | patch | `0008-rtl-nic-h-op-modes-outside-layered-driver.patch` | `@@ -224,11 +224,11 @@` | declared (1) |
 | 19 | `linux-2.6.30/init/main.c` | insert | `IN1`, `B00`, `B09`, `B10`, `ID0` | `#include <linux/kernel_stat.h>`<br>`page_address_init();`<br>`console_init();`<br>`if (ramdisk_execute_command) {`<br>`printk(KERN_NOTICE "%s", linux_banner);` | declared (5) |
 | 20 | `linux-2.6.30/kernel/timeconst.pl` | patch | `0001-timeconst-perl-5.22.patch` | `@@ -370,7 +370,7 @@` | declared (1) |
-| 21 | `linux-2.6.30/scripts/Kbuild.include` | patch | `0004-kbuild-make-cmd-pound.patch` | `@@ -4,6 +4,7 @@`<br>`@@ -181,7 +182,7 @@` | declared (2) |
-| 22 | `linux-2.6.30/usr/gen_init_cpio.c` | patch | `0002-gen-init-cpio-declared-mtime.patch` | `@@ -22,6 +22,8 @@`<br>`@@ -341,7 +343,7 @@` | declared (2) |
-| 23 | `users/busybox-1.13/networking/udhcp/dhcpd.h` root is also rtl819x/users/busybox-1.13 in the other drop shape | patch | `0001-udhcpd-drop-notify_file-system-hook.patch` | `@@ -55,7 +55,6 @@` | declared (1) |
-| 24 | `users/busybox-1.13/networking/udhcp/files.c` root is also rtl819x/users/busybox-1.13 in the other drop shape | patch | `0001-udhcpd-drop-notify_file-system-hook.patch` | `@@ -299,13 +299,12 @@`<br>`@@ -371,12 +370,6 @@` | declared (2) |
+| 21 | `linux-2.6.30/rtkload/start.S` | patch | `0011-rtkload-boot-handoff.patch` | `@@ -18,9 +18,39 @@`<br>`@@ -155,12 +185,21 @@` | declared (2) |
+| 22 | `linux-2.6.30/scripts/Kbuild.include` | patch | `0004-kbuild-make-cmd-pound.patch` | `@@ -4,6 +4,7 @@`<br>`@@ -181,7 +182,7 @@` | declared (2) |
+| 23 | `linux-2.6.30/usr/gen_init_cpio.c` | patch | `0002-gen-init-cpio-declared-mtime.patch` | `@@ -22,6 +22,8 @@`<br>`@@ -341,7 +343,7 @@` | declared (2) |
+| 24 | `users/busybox-1.13/networking/udhcp/dhcpd.h` root is also rtl819x/users/busybox-1.13 in the other drop shape | patch | `0001-udhcpd-drop-notify_file-system-hook.patch` | `@@ -55,7 +55,6 @@` | declared (1) |
+| 25 | `users/busybox-1.13/networking/udhcp/files.c` root is also rtl819x/users/busybox-1.13 in the other drop shape | patch | `0001-udhcpd-drop-notify_file-system-hook.patch` | `@@ -299,13 +299,12 @@`<br>`@@ -371,12 +370,6 @@` | declared (2) |
 
 ## What this record does not establish
 

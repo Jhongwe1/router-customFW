@@ -404,6 +404,60 @@ chk p_devimg   '^RLXBOOT-VERDICT B ok ver=8$'
 chk p_devimg   '^RLXBOOT-SLOT B$'
 chk p_devimg   '^RLXPAY-OB$'
 nono p_devimg  'RLXPAY-OK'
+
+echo
+echo "=== P6r-10: the boot handoff, as the booted payload found its registers"
+# qemupay.S copies a0..a3 to s0..s3 before anything else runs and prints them
+# as RLXPAY-REGS.  A slot boot must hand over the magic, the slot, the version
+# and the check word; BOOT=ram's rlxboot_jump must hand over four zeros.  It is
+# the same payload both ways, so each build is the other's control: a report
+# that printed one constant, or a slots build still entering through
+# rlxboot_jump, would read alike in both.  The check word is computed a second
+# way here -- shell arithmetic, not handoff.h's macro -- and each case's
+# version is the one its own VERDICT lines above name for the slot that won.
+hck() {     # hck <slot> <version>: ~(magic ^ slot ^ version), 32 bits
+	printf '%08x' $(( ~(0x524C5848 ^ $1 ^ $2) & 0xFFFFFFFF ))
+}
+ZREGS='RLXPAY-REGS a0=00000000 a1=00000000 a2=00000000 a3=00000000'
+hoslot() {  # hoslot <case> <A|B> <slot as a number> <version>
+	want=$(printf 'RLXPAY-REGS a0=524c5848 a1=%08x a2=%08x a3=%s' "$3" "$4" "$(hck "$3" "$4")")
+	chk "$1" "^RLXBOOT-HANDOFF slot=$2 ver=$4\$"
+	chk "$1" "^$want\$"
+	nono "$1" "$ZREGS"
+}
+chk accept     "^$ZREGS\$"
+nono accept    'RLXBOOT-HANDOFF'
+nono ctr_flash 'RLXBOOT-HANDOFF'
+hoslot s_a_only   A 0x41 7
+hoslot s_tie      A 0x41 7
+hoslot s_rcnt     A 0x41 7
+hoslot p_prod     A 0x41 7
+hoslot s_b_higher B 0x42 8
+hoslot s_from1    B 0x42 8
+hoslot s_from2    B 0x42 8
+hoslot p_devimg   B 0x42 8
+for name in s_none s_wrong; do
+	nono "$name" 'RLXBOOT-HANDOFF'
+	nono "$name" 'RLXPAY-REGS'
+done
+# The order: the HANDOFF line is the one right after RLXBOOT-BOOT, so it is
+# out before the drain and the jump.
+for name in s_a_only s_b_higher; do
+	nxt=$(tr -d '\r' < "$BD/$name.txt" | awk 'p { print; exit } /^RLXBOOT-BOOT / { p = 1 }')
+	case "$nxt" in
+	RLXBOOT-HANDOFF\ *) echo "  ok    $name: the line after RLXBOOT-BOOT is $nxt" ;;
+	*) echo "  FAIL  $name: the line after RLXBOOT-BOOT is '$nxt', not RLXBOOT-HANDOFF"; fail=1 ;;
+	esac
+done
+# The two slots hand over different words, and the report follows them.
+ra=$(tr -d '\r' < "$BD/s_a_only.txt" | grep '^RLXPAY-REGS ' || true)
+rb=$(tr -d '\r' < "$BD/s_b_higher.txt" | grep '^RLXPAY-REGS ' || true)
+if [ -n "$ra" ] && [ -n "$rb" ] && [ "$ra" != "$rb" ]; then
+	echo "  ok    slot A's and slot B's boots report different registers"
+else
+	echo "  FAIL  slot A's and slot B's boots report '$ra' and '$rb'"
+	fail=1
+fi
 # One banner per run: a halt that reset would print it again.
 for name in s_from1 s_from2 s_rcnt s_a_only s_b_higher s_tie s_none s_wrong p_prod p_devimg; do
 	nb=$(tr -d '\r' < "$BD/$name.txt" | grep -c '^RLXBOOT-V1 ' || true)

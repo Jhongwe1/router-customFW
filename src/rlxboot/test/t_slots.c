@@ -14,6 +14,11 @@
  *
  * WHAT IT CANNOT SEE: `main.c`'s halt and jump (the qemu payload run does those),
  * the flash window itself, the cache, and any timing.
+ *
+ * Since P6r-10 it also reads the boot handoff a winner is given -- the words
+ * `handoff.h` makes from a winner of this slot path -- with the kernel's own
+ * parser, `include/linux/rlxfw-handoff.h` under `kernel/`, included as it is.
+ * The registers `main.c`'s jump leaves are the qemu payload run's to read.
  */
 
 #include <stdio.h>
@@ -25,7 +30,14 @@
 #include "../slots.h"
 #include "../sha256b.h"
 #include "../devkey.h"
+#include "../handoff.h"
 #include "../../lib/ed25519.h"
+
+/* The kernel's half of the handoff: pure, no #include of its own, and its
+ * includer supplies u32.  Relative to this file, so the qemu and mutation
+ * runs, which compile it by path, find it too. */
+typedef unsigned int u32;
+#include "../../../kernel/linux-2.6.30/include/linux/rlxfw-handoff.h"
 
 #define CHIP    0x400000UL
 #define GUARDW  16                       /* guard words each side of a buffer */
@@ -731,6 +743,144 @@ static void test_choose_table(void)
 	ok("rlxb_choose: eight rows of the D4 table", bad == 0);
 }
 
+/* ------------------------------------------------------- the boot handoff */
+
+/* P6r-10 (notes/self-update.md §§ 1.2, 1.4, 1.6).  `main.c` boots a winner
+ * through `rlxboot_jump_handoff(entry, name, version,
+ * RLXB_HANDOFF_CHECK(name, version))`, and the assembler entry puts
+ * RLXB_HANDOFF_MAGIC in a0.  The one reader is the kernel's parser.  So: the
+ * words this tree's own macro makes from the winner of a real slot run, read
+ * by the kernel's own function -- the two halves of one interface, each
+ * compiled from the file its build compiles. */
+struct ho {
+	unsigned long a0, a1, a2, a3;
+};
+
+static struct ho ho_of(const struct rlxb_slot *w)
+{
+	struct ho h;
+	unsigned long slot = (unsigned long)(unsigned char)w->name;  /* main.c's cast */
+
+	h.a0 = RLXB_HANDOFF_MAGIC;
+	h.a1 = slot;
+	h.a2 = w->r.version;
+	h.a3 = RLXB_HANDOFF_CHECK(slot, w->r.version);
+	return h;
+}
+
+/* The parser's verdict, and whether it set (or left alone) the two outputs. */
+static int ho_parse(struct ho h, u32 *slot, u32 *ver)
+{
+	return rlxfw_handoff_parse((u32)h.a0, (u32)h.a1, (u32)h.a2, (u32)h.a3,
+	                           slot, ver);
+}
+
+/* A winner's handoff parses, and to the winner's own name and version. */
+static int ho_reads_back(const struct rlxb_slot *w, u32 want_slot)
+{
+	u32 slot = 0xEEEEEEEEu, ver = 0xEEEEEEEEu;
+
+	return w && ho_parse(ho_of(w), &slot, &ver) == RLXFW_HO_OK
+	       && slot == want_slot
+	       && slot == (u32)(unsigned char)w->name
+	       && ver == (u32)w->r.version;
+}
+
+static void test_handoff(void)
+{
+	struct rlxb_slot *w;
+	struct ho h, x;
+	u32 slot, ver;
+	int i, bad;
+
+	ok("handoff: rlxboot's magic and slot constants are the kernel's",
+	   RLXB_HANDOFF_MAGIC == RLXFW_HANDOFF_MAGIC
+	   && RLXB_HANDOFF_SLOT_A == RLXFW_HANDOFF_SLOT_A
+	   && RLXB_HANDOFF_SLOT_B == RLXFW_HANDOFF_SLOT_B);
+
+	reset(0);
+	put(&A, 7, 30000, 1);
+	w = run();
+	ok("handoff: slot A (version 7) wins, and its handoff parses to A, 7",
+	   w == &A && ho_reads_back(w, RLXFW_HANDOFF_SLOT_A));
+	ok("handoff: its check word is 0xADB3A7F1, worked by hand from "
+	   "~(0x524C5848 ^ 0x41 ^ 7)",
+	   w && ho_of(w).a3 == 0xADB3A7F1UL);
+
+	reset(0);
+	put(&A, 2, 30000, 1);
+	put(&B, 8, 30000, 2);
+	w = run();
+	ok("handoff: slot B (version 8) wins over A (2), and its handoff parses "
+	   "to B, 8", w == &B && ho_reads_back(w, RLXFW_HANDOFF_SLOT_B));
+	ok("handoff: its check word is 0xADB3A7FD, worked by hand from "
+	   "~(0x524C5848 ^ 0x42 ^ 8)",
+	   w && ho_of(w).a3 == 0xADB3A7FDUL);
+
+	/* The version range rlxboot verifies is the range the kernel accepts:
+	 * every version a slot can win with parses, and the two just outside
+	 * the range -- which rlxu_verify refuses -- are refused here too. */
+	reset(0);
+	put(&A, RLXU_VER_MIN, 4000, 1);
+	w = run();
+	ok("handoff: a winner at RLXU_VER_MIN (1) parses",
+	   w == &A && ho_reads_back(w, RLXFW_HANDOFF_SLOT_A));
+	reset(0);
+	put(&A, 1, 4000, 1);
+	put(&B, RLXU_VER_MAX, 4000, 2);
+	w = run();
+	ok("handoff: a winner at RLXU_VER_MAX (4294967294) parses",
+	   w == &B && ho_reads_back(w, RLXFW_HANDOFF_SLOT_B));
+	h.a0 = RLXB_HANDOFF_MAGIC;
+	h.a1 = RLXB_HANDOFF_SLOT_A;
+	h.a2 = RLXU_VER_MIN - 1UL;
+	h.a3 = RLXB_HANDOFF_CHECK(h.a1, h.a2);
+	x = h;
+	x.a2 = RLXU_VER_MAX + 1UL;
+	x.a3 = RLXB_HANDOFF_CHECK(x.a1, x.a2);
+	ok("handoff: versions 0 and 0xFFFFFFFF, check words valid, are refused "
+	   "as version",
+	   ho_parse(h, &slot, &ver) == RLXFW_HO_VERSION
+	   && ho_parse(x, &slot, &ver) == RLXFW_HO_VERSION);
+	ok("handoff: the check word is 32 bits wide on this host as well",
+	   (RLXB_HANDOFF_CHECK(RLXB_HANDOFF_SLOT_B, RLXU_VER_MAX)
+	    & ~0xFFFFFFFFUL) == 0);
+
+	/* The check word binds all three: one flipped bit anywhere in a1, a2 or
+	 * a3 is a check failure, and in a0 a magic failure -- 128 cases. */
+	reset(0);
+	put(&A, 2, 30000, 1);
+	put(&B, 8, 30000, 2);
+	w = run();
+	if (!w)
+		return;
+	h = ho_of(w);
+	bad = 0;
+	for (i = 0; i < 32; i++) {
+		unsigned long bit = 1UL << i;
+
+		x = h; x.a0 ^= bit;
+		bad += ho_parse(x, &slot, &ver) != RLXFW_HO_MAGIC;
+		x = h; x.a1 ^= bit;
+		bad += ho_parse(x, &slot, &ver) != RLXFW_HO_CHECK;
+		x = h; x.a2 ^= bit;
+		bad += ho_parse(x, &slot, &ver) != RLXFW_HO_CHECK;
+		x = h; x.a3 ^= bit;
+		bad += ho_parse(x, &slot, &ver) != RLXFW_HO_CHECK;
+	}
+	ok("handoff: each of 128 one-bit flips is refused, a0 as magic and a1, "
+	   "a2, a3 as check", bad == 0);
+
+	/* What every other boot path hands over: rlxboot_jump (BOOT=ram) and the
+	 * rescue copy zero all four.  Fail-closed, and nothing written. */
+	memset(&x, 0, sizeof x);
+	slot = 0xEEEEEEEEu;
+	ver = 0xEEEEEEEEu;
+	ok("handoff: four zeros are refused as magic and leave both outputs alone",
+	   ho_parse(x, &slot, &ver) == RLXFW_HO_MAGIC
+	   && slot == 0xEEEEEEEEu && ver == 0xEEEEEEEEu);
+}
+
 /* `t_slots show`: the console of three cases, as an operator would read it --
  * for a reader checking the line formats, not for a verdict. */
 static int show(void)
@@ -788,6 +938,7 @@ int main(int argc, char **argv)
 	test_bounds();
 	test_stage_order();
 	test_choose_table();
+	test_handoff();
 
 	printf("t_slots %d checks, %d failures\n", checks, failures);
 	return failures ? 1 : 0;

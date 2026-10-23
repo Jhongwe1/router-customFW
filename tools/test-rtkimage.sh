@@ -30,10 +30,23 @@
 #       mkinitramfs.over_ceiling() -- both sides of the boundary, cvimg's
 #       summary as a second source that must agree, the measured 7,494,144
 #       bytes -- and writes no record for one
+#   F1-F3  FW-262: `build` copies the CELL's rtkload/, never the drop's; a
+#       cell without one is refused (3) before anything is spawned; the
+#       record names the copy it built from
+#   G0-G7  P6r-10: the boot handoff gate -- a good image passes and the
+#       record keeps the reading; each condition refuses (1) on its own:
+#       the symbol absent, of the wrong size, misaligned, outside
+#       [_fdata, __vmlinux_start); __start moved; the zeroing start_kernel
+#       inside the first 16 KiB (both sides of that boundary); the witness
+#       absent or twice; a memload-full that is no ELF or is missing -- and
+#       every control that is missing or reads unexpectedly refuses to judge
+#       (2), never passes
+#   B4  the drop's own memload-full and image/nfjrom read as the gate's
+#       controls must: no symbol, the zeroing sequence once, no witness
 #
-# S1-S4, P1-P7, T/V/W/C/E and K run anywhere.  B1-B3 and M1-M2 need the GPL drop under
-# $FWRE_WORK/rebuild/src-vendor, which cannot be committed, and they SKIP
-# rather than pass without it.
+# S1-S4, P1-P7, T/V/W/C/E, K, F and G run anywhere.  B1-B4 and M1-M2 need the
+# GPL drop under $FWRE_WORK/rebuild/src-vendor, which cannot be committed, and
+# they SKIP rather than pass without it.
 set -o nounset
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -152,7 +165,7 @@ fi
 # equal a recomputation of the files it NAMES, and no record may exist for a
 # make the tripwire did not certify.
 "$PY" - "$TOOL" "$T" > "$T/p.out" 2>&1 <<'PYEOF'
-import contextlib, hashlib, importlib.util, io, os, sys, types
+import contextlib, hashlib, importlib.util, io, os, struct, sys, types
 spec = importlib.util.spec_from_file_location('r', sys.argv[1])
 r = importlib.util.module_from_spec(spec); spec.loader.exec_module(r)
 T = sys.argv[2]
@@ -169,18 +182,82 @@ def write(p, b):
     with open(p, 'wb') as fh:
         fh.write(b)
 
+def elf(syms):
+    """A 32-bit big-endian ELF whose .symtab holds [(name, value, size)]."""
+    shstr = b'\0.shstrtab\0.symtab\0.strtab\0'
+    strtab = b'\0'
+    symtab = b'\0' * 16
+    for n, v, z in syms:
+        symtab += struct.pack('>3IBBH', len(strtab), v, z, (1 << 4) | 1, 0, 1)
+        strtab += n.encode() + b'\0'
+    eh, se = 52, 40
+    o1 = eh; o2 = o1 + len(shstr); o3 = o2 + len(symtab); o4 = o3 + len(strtab)
+    osh = (o4 + 3) & ~3
+    sh = [(0,)*10,
+          (1, 3, 0, 0, o1, len(shstr), 0, 0, 1, 0),
+          (11, 2, 0, 0, o2, len(symtab), 3, 1, 4, 16),
+          (19, 3, 0, 0, o3, len(strtab), 0, 0, 1, 0)]
+    b = bytearray(b'\x7fELF\x01\x02\x01' + b'\0' * 9)
+    b += struct.pack('>HHIIIIIHHHHHH', 2, 8, 1, 0, 0, osh, 0, eh, 0, 0, se,
+                     len(sh), 1)
+    b += shstr + symtab + strtab
+    b += b'\0' * (osh - len(b))
+    for s in sh:
+        b += struct.pack('>10I', *s)
+    return bytes(b)
+
+# The fake cell: the stub's directory is the CELL's (FW-262), with a marker
+# the drop's copy does not have, so F1 can tell which one `build` copied.
 cell = os.path.join(T, 'pcell'); kcell = os.path.join(cell, 'linux-2.6.30')
 write(os.path.join(kcell, 'include/linux/autoconf.h'), b'/* fake */\n')
 write(os.path.join(kcell, '.config'), b'CONFIG_FAKE=y\n')
 write(os.path.join(cell, '.config'), b'CONFIG_SDK_FAKE=y\n')
 write(os.path.join(cell, 'toolchain/bin/rsdk-linux-gcc'), b'')
+write(os.path.join(kcell, 'rtkload/Makefile'), b'# fake, the cell\'s\n')
+write(os.path.join(kcell, 'rtkload/FROM-CELL'), b'cell\n')
 r.DROP = os.path.join(T, 'pdrop')
-write(os.path.join(r.DROP, 'linux-2.6.30/rtkload/Makefile'), b'# fake\n')
+write(os.path.join(r.DROP, 'linux-2.6.30/rtkload/Makefile'), b'# fake, the drop\'s\n')
+write(os.path.join(r.DROP, 'linux-2.6.30/rtkload/FROM-DROP'), b'drop\n')
 vm = os.path.join(T, 'pvmlinux')
 write(vm, b'\x7fELF a fake vmlinux ' + bytes(range(256)))
 
+# P6r-10's gate.  What a stub built with config/host-compat/0011 links to
+# (GOOD), and the drop's own pair as its controls: the symbols every
+# memload-full has and no handoff, and the zeroing start_kernel once at
+# 0x64, where v1.0's nfjrom holds it.
+WIT, ZSEQ = r.HANDOFF_WITNESS, r.HANDOFF_ZERO_SEQ
+GOOD = [('__start', 0x80500000, 0), ('_fdata', 0x80502880, 0),
+        ('rlxfw_rtk_handoff', 0x80502880, 16),
+        ('__vmlinux_start', 0x80502C00, 0), ('__vmlinux_end', 0x805D07E4, 0)]
+CTLSYMS = [('__start', 0x80500000, 0), ('_fdata', 0x80502870, 0),
+           ('__vmlinux_start', 0x80502C00, 0), ('__vmlinux_end', 0x805D07E4, 0)]
+def but(syms, name, value=None, size=None, drop=False):
+    """GOOD with one symbol changed, or left out."""
+    o = []
+    for n, v, z in syms:
+        if n == name:
+            if drop:
+                continue
+            v = v if value is None else value
+            z = z if size is None else size
+        o.append((n, v, z))
+    return o
+r.CTL_MEMLOAD = os.path.join(T, 'pctl', 'memload-full')
+r.CTL_NFJROM = os.path.join(T, 'pctl', 'nfjrom')
+CTL_ML = elf(CTLSYMS)
+CTL_NF = b'\0' * 0x64 + ZSEQ + b'\0' * 1000
+def controls(ml=CTL_ML, nf=CTL_NF):
+    """Write the control pair; None leaves that file out."""
+    for p, b in ((r.CTL_MEMLOAD, ml), (r.CTL_NFJROM, nf)):
+        if os.path.exists(p):
+            os.remove(p)
+        if b is not None:
+            write(p, b)
+controls()
+
 def fake_tripwire(make=True, make_rc=0, nfjrom=True, touch_input=False,
-                  tail=b'', pre=b'', line=None, rc=None, img=None, noimg=False):
+                  tail=b'', pre=b'', line=None, rc=None, img=None, noimg=False,
+                  ml=None, nfj=None):
     """`bash vendor-tripwire.sh --quiet -- make -C <rtk>`, faked.
 
     line=None prints the CLEAN line for `make_rc` and rc=None takes the exit
@@ -190,7 +267,9 @@ def fake_tripwire(make=True, make_rc=0, nfjrom=True, touch_input=False,
     there is one and taken whole when there is not, so a cmd_build that
     spawned make directly would still build -- and W alone would catch it.
     img=N makes vmlinux_img N bytes (the K cases' decompressed image) and
-    noimg=True leaves it out.
+    noimg=True leaves it out.  memload-full is an ELF of GOOD's symbols, or
+    of the list `ml`, or `ml` itself when it is bytes, or absent when it is
+    False; nfjrom is the reversed vmlinux and the witness once, or nfj(vm).
     """
     if line is None:
         line = 'VENDOR-TRIPWIRE: CLEAN  cmd-rc=%d  6 tree(s) watched' % make_rc
@@ -202,14 +281,19 @@ def fake_tripwire(make=True, make_rc=0, nfjrom=True, touch_input=False,
         cmd = argv[argv.index('--') + 1:] if '--' in argv else list(argv)
         rtk = cmd[cmd.index('-C') + 1]
         if make:
-            for f in ('vmlinux-stripped', 'vmlinux_img', 'memload-full', 'linux.bin'):
+            for f in ('vmlinux-stripped', 'vmlinux_img', 'linux.bin'):
                 if f == 'vmlinux_img' and noimg:
                     continue
                 write(os.path.join(rtk, f), b'\0' * img
                       if f == 'vmlinux_img' and img is not None else f.encode())
+            if ml is not False:
+                write(os.path.join(rtk, 'memload-full'),
+                      ml if isinstance(ml, bytes) else elf(GOOD if ml is None else ml))
             if nfjrom:
                 with open(os.path.join(rtk, '..', 'vmlinux'), 'rb') as fh:
-                    write(os.path.join(rtk, 'nfjrom'), b'NFJROM' + fh.read()[::-1])
+                    v = fh.read()
+                write(os.path.join(rtk, 'nfjrom'),
+                      b'NFJROM' + v[::-1] + WIT if nfj is None else nfj(v))
             if touch_input:
                 with open(os.path.join(rtk, '..', 'vmlinux'), 'ab') as fh:
                     fh.write(b'!')
@@ -250,7 +334,7 @@ rec = dict(rows)
 out.append(('P1a build writes a record', '0 True', '%s %s' % (rc, os.path.isfile(rp))))
 out.append(('P1h and it says the make was watched, CLEAN, cmd-rc=0', CLEAN0,
             rec.get('tripwire_verdict', '-')))
-out.append(('P1b its first row is the format', "('rlxfw-rtkimage-record', '1')",
+out.append(('P1b its first row is the format', "('rlxfw-rtkimage-record', '2')",
             repr(rows[0]) if rows else '-'))
 out.append(('P1c vmlinux_sha256 == sha256 of the vmlinux it names', 'True',
             str(bool(rec) and rec['vmlinux_sha256'] == sha(rec['vmlinux']))))
@@ -390,6 +474,96 @@ out.append(('K7  rtkimage.CEILING is mkinitramfs.CEILING', 'True',
             str(r.CEILING == mk.CEILING)))
 out.append(('K8  the measured D25 image, 7,494,144 bytes + cvimg\'s error -> 1', '1 False True',
             refused('k8', 'over the ceiling by 2251264 bytes', img=7494144, tail=E1)))
+
+# F -- FW-262, 2026-10-23: the stub is built from the CELL's rtkload/, which
+# rlxfw-kbuild.sh stages and patches; the drop's copy would carry no patch.
+rc, txt, rp = build('f1')
+k = os.path.join(T, 'pwork', 'f1', 'kroot', 'rtkload')
+out.append(('F1  build copies the cell\'s rtkload/, not the drop\'s', 'True False',
+            '%s %s' % (os.path.isfile(os.path.join(k, 'FROM-CELL')),
+                       os.path.isfile(os.path.join(k, 'FROM-DROP')))))
+rec = dict(record(rp)) if os.path.isfile(rp) else {}
+out.append(('F3  and the record names that copy', os.path.join(kcell, 'rtkload'),
+            rec.get('rtkload_source', '-')))
+os.rename(os.path.join(kcell, 'rtkload'), os.path.join(kcell, 'rtkload.away'))
+rc, txt, rp = build('f2')
+os.rename(os.path.join(kcell, 'rtkload.away'), os.path.join(kcell, 'rtkload'))
+out.append(('F2  a cell with no rtkload/ -> 3, nothing spawned, no work dir', 'exit 3 0 False True',
+            '%s %d %s %s' % (rc, len(seen),
+                             os.path.exists(os.path.join(T, 'pwork', 'f2')),
+                             'no rtkload/Makefile' in txt)))
+
+# G -- P6r-10, 2026-10-23: the boot handoff gate.  Each refusal is ONE
+# condition broken on an otherwise good image, so the word it must say is
+# that condition's and no other's; every refusal leaves no record.
+rc, txt, rp = build('g0')
+rec = dict(record(rp)) if os.path.isfile(rp) else {}
+out.append(('G0  a good image passes the gate, and the record keeps its reading',
+            '0 True True', '%s %s %s' % (rc, os.path.isfile(rp),
+                                        rec.get('handoff_gate', '').startswith('ok: '))))
+out.append(('G0b and the run prints both readings, the image\'s and the drop\'s',
+            'True True', '%s %s' % ('handoff    nfjrom: zeroing sequence 0' in txt,
+                                    "control    the drop's memload-full: no" in txt)))
+out.append(('G1  memload-full without rlxfw_rtk_handoff -> 1, no record', '1 False True',
+            refused('g1', 'has no rlxfw_rtk_handoff',
+                    ml=but(GOOD, 'rlxfw_rtk_handoff', drop=True))))
+out.append(('G1b the symbol 8 bytes, not 16 -> 1', '1 False True',
+            refused('g1b', 'is 8 bytes, not 16', ml=but(GOOD, 'rlxfw_rtk_handoff', size=8))))
+out.append(('G1c the symbol 8-aligned, not 16 -> 1', '1 False True',
+            refused('g1c', 'not 16-aligned',
+                    ml=but(GOOD, 'rlxfw_rtk_handoff', value=0x80502888))))
+out.append(('G1d the symbol at __vmlinux_start, not below it -> 1', '1 False True',
+            refused('g1d', 'is not inside',
+                    ml=but(GOOD, 'rlxfw_rtk_handoff', value=0x80502C00))))
+out.append(('G1e the symbol below _fdata -> 1', '1 False True',
+            refused('g1e', 'is not inside',
+                    ml=but(GOOD, 'rlxfw_rtk_handoff', value=0x80502870))))
+out.append(('G2  __start moved off 0x80500000 -> 1', '1 False True',
+            refused('g2', '__start is 0x80500004', ml=but(GOOD, '__start', value=0x80500004))))
+out.append(('G3  the zeroing start_kernel at 0x64 of nfjrom -> 1', '1 False True',
+            refused('g3', 'zeroing start_kernel 1 time(s)',
+                    nfj=lambda v: b'\0' * 0x64 + ZSEQ + v + WIT)))
+out.append(('G3b the same sequence ending at 16 KiB is inside the window -> 1', '1 False True',
+            refused('g3b', 'zeroing start_kernel 1 time(s)',
+                    nfj=lambda v: b'\0' * (0x4000 - len(ZSEQ)) + ZSEQ + v + WIT)))
+rc, txt, rp = build('g3c', nfj=lambda v: b'\0' * 0x4000 + ZSEQ + v + WIT)
+out.append(('G3c and starting at 16 KiB it is outside it: passes', '0 True',
+            '%s %s' % (rc, os.path.isfile(rp))))
+out.append(('G4  nfjrom without RLXFW-RTKH1 -> 1', '1 False True',
+            refused('g4', 'RLXFW-RTKH1 0 time(s), not exactly once',
+                    nfj=lambda v: b'NFJROM' + v)))
+out.append(('G4b RLXFW-RTKH1 twice -> 1', '1 False True',
+            refused('g4b', 'RLXFW-RTKH1 2 time(s), not exactly once',
+                    nfj=lambda v: b'NFJROM' + WIT + v + WIT)))
+out.append(('G6  a memload-full that is no ELF -> 1, a reason and no traceback', '1 False True',
+            refused('g6', 'is not a 32-bit big-endian ELF', ml=b'memload-full')))
+out.append(('G7  make wrote no memload-full -> 1', '1 False True',
+            refused('g7', 'there is no', ml=False)))
+# G5 -- the controls.  Each is broken on its own under an image G0 passed: a
+# gate that judged without them, or judged anything they read unexpectedly,
+# would pass these; it must refuse to judge (2) instead.
+for lbl, why, ctl in (
+        ('G5  the drop\'s memload-full missing -> 2', 'there is no', dict(ml=None)),
+        ('G5b the drop\'s image/nfjrom missing -> 2', 'there is no', dict(nf=None)),
+        ('G5c the drop\'s memload-full HAS the symbol -> 2', 'HAS rlxfw_rtk_handoff',
+         dict(ml=elf(CTLSYMS + [('rlxfw_rtk_handoff', 0x80502870, 16)]))),
+        ('G5d the drop\'s memload-full read as no table -> 2', 'was not read as one',
+         dict(ml=elf([('unrelated', 0x80500000, 0)]))),
+        ('G5e the drop\'s nfjrom without the zeroing sequence -> 2', 'not 1',
+         dict(nf=b'\0' * 2000)),
+        ('G5f the drop\'s nfjrom WITH the witness -> 2', 'RLXFW-RTKH1 1 time(s), not 0',
+         dict(nf=CTL_NF + WIT)),
+        ('G5g the drop\'s memload-full that is no ELF -> 2', 'is not a 32-bit big-endian ELF',
+         dict(ml=b'not an elf'))):
+    controls(**ctl)
+    rc, txt, rp = build('g5')
+    controls()
+    out.append((lbl, '2 False True True',
+                '%s %s %s %s' % (rc, os.path.exists(rp) or os.path.exists(rp + '.tmp'),
+                                 why in txt, 'refuses to judge' in txt)))
+rc, txt, rp = build('g5z')
+out.append(('G5z and with the controls restored the same image passes again', '0 True',
+            '%s %s' % (rc, os.path.isfile(rp))))
 for lbl, exp, got in out:
     print('%s\t%s\t%s' % (lbl, exp, got))
 PYEOF
@@ -458,15 +632,29 @@ if [ -f "$NF" ] && [ -f "$ML" ] && [ -f "$IMG" ]; then
     "$PY" "$T/m2.py" check --nfjrom "$NF" --memload "$ML" > "$T/m2.out" 2>&1
     ck   "M2  sum16 forced to 0: refuses" 2 "$?"
     ckin "M2b and it is R2" "FAIL  R2" "$T/m2.out"
+
+    # B4 -- the handoff gate's controls, read by the gate's own reader on the
+    # drop's real pair: what G0-G5 stand in for with fixtures.
+    "$PY" - "$TOOL" > "$T/b4.out" 2>&1 <<'PYEOF'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('r', sys.argv[1])
+r = importlib.util.module_from_spec(spec); spec.loader.exec_module(r)
+c = r.handoff_reading(r.CTL_MEMLOAD, r.CTL_NFJROM)
+print('%s %s %s %s %s' % (c['error'], c['sym'],
+      '-' if c['__start'] is None else '0x%08X' % c['__start'],
+      c['zeroseq'], c['witness']))
+PYEOF
+    ck "B4  the drop's memload-full and nfjrom read as the controls must" \
+       "None None 0x80500000 1 0" "$(cat "$T/b4.out")"
 else
-    # ONE skip line standing for eighteen cases, and the label is the one
+    # ONE skip line standing for nineteen cases, and the label is the one
     # `tools/ci-expected.tsv` carries. The first version printed eighteen
     # separate lines with eighteen labels: the census reported every one of
     # them as an UNEXPECTED-SKIP and then a CENSUS-MISMATCH, which is that
     # gate working -- a skip LINE is not a skipped CASE, and the table owns
     # the arithmetic.
     sk "the GPL drop" \
-       "$DROP absent -- 18 cases (S3d, B1-B1h, B2, B3, B3b, M1-M1c, M2, M2b); the drop's nfjrom, memload-full and vmlinux_img are someone else's property and cannot be committed"
+       "$DROP absent -- 19 cases (S3d, B1-B1h, B2, B3, B3b, M1-M1c, M2, M2b, B4); the drop's nfjrom, memload-full and vmlinux_img are someone else's property and cannot be committed"
 fi
 
 echo

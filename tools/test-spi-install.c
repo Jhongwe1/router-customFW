@@ -1091,13 +1091,62 @@ static int longest_region1(void)
 	return best + 1;
 }
 
+/* The widest state of the install block.  v11 = 1 builds 1.1's construction,
+ * kept as the record of its defect: se_jiffies and pp_jiffies at 0xFFFFFFFF
+ * times a tick of 0xFFFFFFFF wrap to 1, so se_us and pp_us printed ONE digit,
+ * and se_bytes 65536 and cmp_first 0x7FFFFFFF are not the widest their %d
+ * prints.  v11 = 0, 1.2's: the widest each field's TYPE can print -- every %u
+ * at ten digits with no product that wraps (the caller passes tick 1), every
+ * %d at -2147483648, the longest names.  Returns the tick to pass to emit. */
+static u32 widest(struct rlxfw_spi_inst_st *s, struct rlxfw_spi_inst_img *im,
+		  struct rlxfw_spi_inst_probe *pr, int v11)
+{
+	s->attempts = s->done = s->refused = s->failed = 0xFFFFFFFFu;
+	s->r.ran = INT_MIN;
+	s->r.reason = longest_reason();
+	s->r.verb = RLXFW_SPI_INST_V_PROBE;		/* the longest verb */
+	s->r.region1 = longest_region1();
+	s->r.base = s->r.size = s->r.len = s->r.pace_ms = 0xFFFFFFFFu;
+	s->r.rc = s->r.policy = s->r.arm_ok = s->r.sha_checked = INT_MIN;
+	s->r.sha_ok = s->r.hdr_checked = s->r.hdr_ok = INT_MIN;
+	s->r.ops_planned = s->r.ops_done = s->r.n_se = s->r.n_pp = 0xFFFFFFFFu;
+	s->r.erased = s->r.programmed = 0xFFFFFFFFu;
+	s->r.committed = s->r.cmp_ran = s->r.cmp_ok = INT_MIN;
+	s->r.phase = 'V';
+	s->r.cmp_bytes = s->r.cmp_diff = 0xFFFFFFFFu;
+	s->r.cmp_first = v11 ? 0x7FFFFFFFu : 0x80000000u;	/* %d: INT_MIN */
+	s->r.ms = 0xFFFFFFFFu;
+	im->len = im->writes = im->resets = 0xFFFFFFFFu;
+	im->err = RLXFW_SPI_INST_IMG_POISONED;
+	pr->ran = INT_MIN;
+	pr->classified = 1;
+	pr->se_bytes = v11 ? 65536 : INT_MIN;
+	pr->m[0] = pr->m[1] = pr->m[2] = 'O';
+	pr->se_polls = pr->se_jiffies = pr->pp_polls = pr->pp_jiffies = 0xFFFFFFFFu;
+	pr->cal_polls = pr->cal_ticks = pr->clean_step = pr->clean_ops = 0xFFFFFFFFu;
+	pr->clean_known = 0;		/* "-1", wider than 0 or 1 */
+	return v11 ? 0xFFFFFFFFu : 1u;
+}
+
+/* The eraseprobe verdict line of an emitted page, for a printout */
+static int verdict_len(const char *page, const char **at)
+{
+	const char *l = strstr(page, "\neraseprobe se_bytes="), *e;
+
+	*at = l ? l + 1 : "";
+	e = l ? strchr(l + 1, '\n') : NULL;
+	return e ? (int)(e - (l + 1)) : 0;
+}
+
 static void t_emit(void)
 {
 	static char page[8192];
 	struct rlxfw_spi_inst_st s;
 	struct rlxfw_spi_inst_img im;
 	struct rlxfw_spi_inst_probe pr;
-	int n, w;
+	const char *vl;
+	u32 tick;
+	int n, w, vn;
 
 	memset(&s, 0, sizeof(s));
 	memset(&im, 0, sizeof(im));
@@ -1130,37 +1179,44 @@ static void t_emit(void)
 	    strstr(page, " m0000=E m1000=I m8000=I "));
 	memset(&pr, 0, sizeof(pr));
 
-	/* the widest state the fields can hold */
-	s.attempts = s.done = s.refused = s.failed = 0xFFFFFFFFu;
-	s.r.ran = INT_MIN;
-	s.r.reason = longest_reason();
-	s.r.verb = RLXFW_SPI_INST_V_PROBE;		/* the longest verb */
-	s.r.region1 = longest_region1();
-	s.r.base = s.r.size = s.r.len = s.r.pace_ms = 0xFFFFFFFFu;
-	s.r.rc = s.r.policy = s.r.arm_ok = s.r.sha_checked = INT_MIN;
-	s.r.sha_ok = s.r.hdr_checked = s.r.hdr_ok = INT_MIN;
-	s.r.ops_planned = s.r.ops_done = s.r.n_se = s.r.n_pp = 0xFFFFFFFFu;
-	s.r.erased = s.r.programmed = 0xFFFFFFFFu;
-	s.r.committed = s.r.cmp_ran = s.r.cmp_ok = INT_MIN;
-	s.r.phase = 'V';
-	s.r.cmp_bytes = s.r.cmp_diff = 0xFFFFFFFFu;
-	s.r.cmp_first = 0x7FFFFFFFu;
-	s.r.ms = 0xFFFFFFFFu;
-	im.len = im.writes = im.resets = 0xFFFFFFFFu;
-	im.err = RLXFW_SPI_INST_IMG_POISONED;
-	pr.ran = INT_MIN;
-	pr.classified = 1;
-	pr.se_bytes = 65536;		/* the widest value the table yields */
-	pr.m[0] = pr.m[1] = pr.m[2] = 'O';
-	pr.se_polls = pr.se_jiffies = pr.pp_polls = pr.pp_jiffies = 0xFFFFFFFFu;
-	pr.cal_polls = pr.cal_ticks = pr.clean_step = pr.clean_ops = 0xFFFFFFFFu;
-	pr.clean_known = 0;		/* "-1", wider than 0 or 1 */
+	/* 1.1's construction, BEFORE: the record of the defect */
+	tick = widest(&s, &im, &pr, 1);
 	n = rlxfw_spi_inst_emit(page, &s, &im, &pr, 0xFFFFFFFFu, 0xFFFFFFFFu,
-				0xFFFFFFFFu);
+				tick);
+	vn = verdict_len(page, &vl);
+	printf("  (1.1's widest state, %d bytes: %.*s)\n", n, vn, vl);
+	ckb("K 1.1's widest state, recorded: se_us=1 pp_us=1 -- 0xFFFFFFFF "
+	    "ticks x 0xFFFFFFFF us wrap to 1, so it was not the widest",
+	    vn > 0 && strstr(vl, " se_us=1 pp_us=1 ") != NULL);
+	/* 1.2's, AFTER: the widest each field's type can print */
+	tick = widest(&s, &im, &pr, 0);
+	n = rlxfw_spi_inst_emit(page, &s, &im, &pr, 0xFFFFFFFFu, 0xFFFFFFFFu,
+				tick);
+	vn = verdict_len(page, &vl);
+	printf("  (1.2's widest state, %d bytes: %.*s)\n", n, vn, vl);
+	ckb("K 1.2's widest state: se_us and pp_us at ten digits, se_bytes and "
+	    "inst_cmp_first at -2147483648 -- no product wraps",
+	    vn > 0 && strstr(vl, "eraseprobe se_bytes=-2147483648 ") == vl &&
+	    strstr(vl, " se_us=4294967295 pp_us=4294967295 ") != NULL &&
+	    strstr(page, "\ninst_cmp_first -2147483648\n") != NULL);
 	printf("  (emit worst case %d bytes, ceiling %d)\n", n,
 	       RLXFW_SPI_INST_PROC_MAX);
 	ckb("emit: the widest state fits RLXFW_SPI_INST_PROC_MAX",
 	    n > 0 && n <= RLXFW_SPI_INST_PROC_MAX);
+	ckb("K the block prints its own inst_truncated 0 line, last, so a "
+	    "budget check against RLXFW_SPI_INST_PROC_MAX counts it",
+	    n > 17 && !strcmp(page + n - 17, "inst_truncated 0\n"));
+#if PROV
+	ckb("K RLXFW_SPI_INST_PROC_MAX is the MEASURED widest block (this, the "
+	    "provisioning table, has the longest region name), not a guess",
+	    n == RLXFW_SPI_INST_PROC_MAX);
+#else
+	ckb("K the shipped table's widest block is within the provisioning "
+	    "table's measurement (the region name is the only width that differs)",
+	    n <= RLXFW_SPI_INST_PROC_MAX &&
+	    n >= RLXFW_SPI_INST_PROC_MAX - (int)strlen("barrier") +
+	    (int)strlen(REG(longest_region1() - 1)->name));
+#endif
 	w = rlxfw_spi_inst_fmt_step(page, 'E', 0xFFFFFFFFu, 0xFFFFFFFFu,
 				    0xFFFFFFFFu);
 	n = rlxfw_spi_inst_fmt_go(page, &s.r);
@@ -1688,6 +1744,70 @@ static void t_fence(void)
 	   REG(I_SLOTA), 'C'), OK);
 }
 
+/* L, 1.2: ctr_addr(), and `ctrloop show`'s reading as /proc records it */
+static void t_loop_12(u8 *sec)
+{
+	struct rlxfw_spi_inst_ctr_st c;
+	u32 b, n = 0x1000u;
+	int ok = 1;
+
+	for (b = 0; b < RLXFW_SPI_INST_CTR_BITS; b++) {
+		memset(sec, 0xFF, 512);
+		sec[b >> 3] &= (u8)~(0x80u >> (b & 7u));	/* bit b, written out */
+		if (rlxfw_spi_inst_ctr_addr(RLXFW_SPI_INST_STATE, b) !=
+		    RLXFW_SPI_INST_STATE + b / 8u ||
+		    rlxfw_spi_inst_ctr_addr(REG(I_PROBE)->base, b) !=
+		    REG(I_PROBE)->base + b / 8u ||
+		    rlxfw_spi_inst_ctr_bit(sec, b) != 0 ||
+		    sec[rlxfw_spi_inst_ctr_addr(0u, b)] == 0xFFu)
+			ok = 0;
+	}
+	ckb("L ctr_addr(base, b) is base + b/8 for all 4,096 bits, at both bitmaps, "
+	    "and that byte is the one holding bit b, MSB first",
+	    ok && rlxfw_spi_inst_ctr_addr(RLXFW_SPI_INST_STATE, 4095u) ==
+	    RLXFW_SPI_INST_STATE + RLXFW_SPI_INST_CTR_BYTES - 1u);
+
+	memset(&c, 0, sizeof(c));
+	memset(sec, 0xFF, n);
+	rlxfw_spi_inst_scratch_note(&c, 0, sec, n);
+	ckb("L show records an erased sector: shows 1, rc 0, value 0, "
+	    "malformed 0, erased 1",
+	    c.scr_shows == 1u && c.scr_rc == 0 && c.scr_value == 0u &&
+	    c.scr_malformed == 0 && c.scr_erased == 1);
+	for (b = 0; b < 1000u; b++)
+		sec[b >> 3] &= (u8)~(0x80u >> (b & 7u));
+	rlxfw_spi_inst_scratch_note(&c, 0, sec, n);
+	ckb("L show records 1,000 leading zeros: value 1000, well-formed, not "
+	    "erased, shows 2",
+	    c.scr_shows == 2u && c.scr_rc == 0 && c.scr_value == 1000u &&
+	    c.scr_malformed == 0 && c.scr_erased == 0);
+	memset(sec, 0xFF, n);
+	sec[0] = 0x5Fu;				/* zeros at bits 0 and 2 */
+	rlxfw_spi_inst_scratch_note(&c, 0, sec, n);
+	ckb("L show records zeros at 0 and 2: value 2 (the total), malformed 1",
+	    c.scr_value == 2u && c.scr_malformed == 1 && c.scr_erased == 0);
+	memset(sec, 0xFF, n);
+	sec[0x800] = 0x00u;		/* past the bitmap, inside the sector */
+	rlxfw_spi_inst_scratch_note(&c, 0, sec, n);
+	ckb("L show records a byte programmed past the bitmap: value 0, "
+	    "erased 0 -- `erased` is the whole sector",
+	    c.scr_value == 0u && c.scr_malformed == 0 && c.scr_erased == 0);
+	for (b = 0; b < 1000u; b++)
+		sec[b >> 3] &= (u8)~(0x80u >> (b & 7u));
+	rlxfw_spi_inst_scratch_note(&c, 0, sec, n);
+	rlxfw_spi_inst_scratch_note(&c, -5, sec, n);	/* any errno */
+	ckb("L a show whose read failed records its errno and CLEARS the values "
+	    "-- the last good reading (1000) does not stand beside it",
+	    c.scr_shows == 6u && c.scr_rc == -5 && c.scr_value == 0u &&
+	    c.scr_malformed == 0 && c.scr_erased == 0);
+	/* a mutant that reads sec on a failure dies here: what it got wrong
+	 * above is on stdout first */
+	fflush(stdout);
+	rlxfw_spi_inst_scratch_note(&c, -12, NULL, 0u);
+	ckb("L a show with no buffer at all: the errno, values 0, no read",
+	    c.scr_shows == 7u && c.scr_rc == -12 && c.scr_value == 0u);
+}
+
 /* L: `ctrloop`'s plan, and a model probe sector it runs on */
 static void t_loop(void)
 {
@@ -1724,6 +1844,7 @@ static void t_loop(void)
 			} else if (op.kind == RLXFW_SPI_INST_OP_PROG) {
 				if (op.addr >= REG(I_PROBE)->base +
 				    RLXFW_SPI_INST_CTR_BYTES ||
+				    op.addr != REG(I_PROBE)->base + op.bit / 8u ||
 				    op.val != rlxfw_spi_inst_ctr_value(op.bit) ||
 				    rlxfw_spi_wr_chk_prog(&a, op.addr, 1u) !=
 				    RLXFW_SPI_WR_OK)
@@ -1762,6 +1883,7 @@ static void t_loop(void)
 	   rlxfw_spi_inst_probe_chk_erased(sec, 512u), OK);
 	ckb("  ... decodes to 0, well-formed", rlxfw_spi_inst_ctr_decode(sec,
 	    &mal) == 0u && !mal);
+	t_loop_12(sec);
 }
 
 /* K: the counter's /proc block and console lines, at the widest state */
@@ -1776,16 +1898,34 @@ static void t_emit_ctr(void)
 	ckb("emit_ctr, nothing run: ctr_ran 0, ctr_reason OK, loop_ran 0",
 	    strstr(page, "ctr_ran 0\n") && strstr(page, "ctr_reason OK\n") &&
 	    strstr(page, "loop_ran 0\n") && strstr(page, "ctr_attempts 0\n"));
+	ckb("K emit_ctr, never shown: ctrscratch_shows 0, rc 0, value 0, "
+	    "malformed 0, erased 0, then ctr_truncated 0, last",
+	    strstr(page, "\nctrscratch_shows 0\nctrscratch_rc 0\n"
+		   "ctrscratch_value 0\nctrscratch_malformed 0\n"
+		   "ctrscratch_erased 0\nctr_truncated 0\n") != NULL &&
+	    n > 16 && !strcmp(page + n - 16, "ctr_truncated 0\n"));
+	c.scr_shows = 3u;
+	c.scr_rc = -110;
+	n = rlxfw_spi_inst_emit_ctr(page, &c);
+	ckb("K emit_ctr prints a failed show's errno as ctrscratch_rc, so a "
+	    "reader can refuse its values",
+	    strstr(page, "\nctrscratch_shows 3\nctrscratch_rc -110\n") != NULL);
 	c.attempts = c.done = c.refused = c.failed = 0xFFFFFFFFu;
 	c.ran = c.malformed = c.loop_ran = INT_MIN;
 	c.reason = c.loop_reason = longest_reason();
 	c.cur = c.newv = c.read = c.pp = c.ms = 0xFFFFFFFFu;
 	c.loop_passes = c.loop_done = c.loop_ops = c.loop_ms = 0xFFFFFFFFu;
+	c.scr_shows = c.scr_value = 0xFFFFFFFFu;	/* 1.2 */
+	c.scr_rc = c.scr_malformed = c.scr_erased = INT_MIN;
 	n = rlxfw_spi_inst_emit_ctr(page, &c);
 	printf("  (emit_ctr worst case %d bytes, ceiling %d)\n", n,
 	       RLXFW_SPI_INST_CTR_PROC_MAX);
 	ckb("emit_ctr: the widest state fits RLXFW_SPI_INST_CTR_PROC_MAX",
 	    n > 0 && n <= RLXFW_SPI_INST_CTR_PROC_MAX);
+	ckb("K RLXFW_SPI_INST_CTR_PROC_MAX is the MEASURED widest block, its "
+	    "ctr_truncated 0 line and the scratch fields included",
+	    n == RLXFW_SPI_INST_CTR_PROC_MAX &&
+	    strstr(page, "\nctrscratch_rc -2147483648\n") != NULL);
 	ckb("emit_ctr: no field shows a byte of the bitmap (no `bitmap`, no hex "
 	    "run)", strstr(page, "bitmap") == NULL);
 	w = rlxfw_spi_inst_fmt_ctr_go(page, 0xFFFFFFFFu, 0xFFFFFFFFu);
@@ -1814,6 +1954,272 @@ static void t_emit_ctr(void)
 	rlxfw_spi_inst_fmt_loop(page, 3u, 'b', 256u, 120u);
 	ckb("RLXFW-SL p=3 bit=256 ms=120",
 	    !strcmp(page, "RLXFW-SL p=3 bit=256 ms=120\n"));
+}
+
+/* ------------------------------- M: the boot handoff, second source */
+
+/*
+ * P6r-10; notes/self-update.md § 2.8 row M and § 1.4: the kernel's parse,
+ * include/linux/rlxfw-handoff.h, against rlxboot's constants and check word,
+ * src/rlxboot/handoff.h.  Both headers are included HERE, at the group that
+ * uses them, so that no line this file's citations name moves.  Both are
+ * found BY NAME on the runner's -I path, as the driver's and rlxboot's other
+ * headers are, so the runner's mutate() can put a mutated copy first.
+ *
+ * What a green group says: the parse refuses and permits as pinned, first
+ * failure first, and rlxboot's words are the ones it accepts, on x86-64.  It
+ * says nothing about the registers at kernel entry, rtkload's carry, or
+ * arch/rlx/kernel/rlxfw-boot.c, which no host build compiles.
+ */
+#include "rlxfw-handoff.h"	/* kernel/linux-2.6.30/include/linux/ */
+#include "handoff.h"		/* src/rlxboot/ */
+
+#define HO_NREASON	(RLXFW_HO_VERSION + 1)
+#define HO_TOUCHED	(-1)		/* a verdict whose outputs are wrong */
+#define HO_SENT		0xA5A5A5A5u	/* what *slot and *ver hold going in */
+
+static int hseen[HO_NREASON];
+
+static const char *ho_name(int r)
+{
+	switch (r) {
+	case RLXFW_HO_OK:
+		return "OK";
+	case RLXFW_HO_MAGIC:
+		return "MAGIC";
+	case RLXFW_HO_CHECK:
+		return "CHECK";
+	case RLXFW_HO_SLOT:
+		return "SLOT";
+	case RLXFW_HO_VERSION:
+		return "VERSION";
+	case HO_TOUCHED:
+		return "TOUCHED";
+	}
+	return "?";
+}
+
+/* The parse's verdict on one register set -- or HO_TOUCHED when a refusal
+ * wrote *slot or *ver, or an OK left them anything but a1 and a2. */
+static int ho_parse(u32 a0, u32 a1, u32 a2, u32 a3)
+{
+	u32 slot = HO_SENT, ver = HO_SENT;
+	int r = rlxfw_handoff_parse(a0, a1, a2, a3, &slot, &ver);
+
+	if (r >= 0 && r < HO_NREASON)
+		hseen[r]++;
+	if (r == RLXFW_HO_OK ? (slot != a1 || ver != a2)
+			     : (slot != HO_SENT || ver != HO_SENT))
+		return HO_TOUCHED;
+	return r;
+}
+
+/* ck()'s shape and its inversion under --mutate, over the parse's reasons:
+ * they are not the install path's, and seen[] counts only those. */
+static void ckho(const char *name, int got, int want)
+{
+	int idx = ncase++;
+
+	if (idx == mutate) {
+		want = (want == RLXFW_HO_OK) ? RLXFW_HO_MAGIC : RLXFW_HO_OK;
+		printf("MUTATED case %d: now expecting %s\n", idx, ho_name(want));
+	}
+	if (got != want) {
+		printf("  FAIL %4d %-52s got %s, want %s\n", idx, name,
+		       ho_name(got), ho_name(want));
+		nfail++;
+	} else {
+		printf("  ok   %4d %-52s %s\n", idx, name, ho_name(got));
+	}
+}
+
+/* The pinned definition, restated: the a3 the parse accepts for a0..a2. */
+static u32 ho_check(u32 a0, u32 a1, u32 a2)
+{
+	return ~(a0 ^ a1 ^ a2);
+}
+
+/* xorshift32: every value but 0, so the seeded versions cover the range. */
+static u32 ho_rand(u32 *s)
+{
+	u32 x = *s;
+
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	*s = x;
+	return x;
+}
+
+static void t_handoff(void)
+{
+	static const u32 fixed[] = { 1u, 2u, 0x7FFFFFFFu, 0x80000000u,
+				     0xFFFFFFFEu };
+	/* One field wrong, the check word right for its own a0..a2; fix0..2 is
+	 * the same set with that field corrected, which must then parse OK. */
+	static const struct {
+		const char *name;
+		u32 a0, a1, a2, a3d;	/* a3 = ho_check(a0, a1, a2) + a3d */
+		int want;
+		u32 fix0, fix1, fix2;
+	} one[] = {
+		{ "M handoff magic+1 (own check word) is MAGIC",
+		  RLXFW_HANDOFF_MAGIC + 1u, RLXFW_HANDOFF_SLOT_B, 6u, 0u,
+		  RLXFW_HO_MAGIC, RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 6u },
+		{ "M handoff magic-1 (own check word) is MAGIC",
+		  RLXFW_HANDOFF_MAGIC - 1u, RLXFW_HANDOFF_SLOT_B, 6u, 0u,
+		  RLXFW_HO_MAGIC, RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 6u },
+		{ "M handoff check word +1 is CHECK",
+		  RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 6u, 1u,
+		  RLXFW_HO_CHECK, RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 6u },
+		{ "M handoff check word -1 is CHECK",
+		  RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 6u, 0xFFFFFFFFu,
+		  RLXFW_HO_CHECK, RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 6u },
+		{ "M handoff slot 'C' (own check word) is SLOT",
+		  RLXFW_HANDOFF_MAGIC, 0x43u, 6u, 0u,
+		  RLXFW_HO_SLOT, RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 6u },
+		{ "M handoff slot 0 (own check word) is SLOT",
+		  RLXFW_HANDOFF_MAGIC, 0u, 6u, 0u,
+		  RLXFW_HO_SLOT, RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_A, 6u },
+		{ "M handoff version 0 (own check word) is VERSION",
+		  RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 0u, 0u,
+		  RLXFW_HO_VERSION, RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 1u },
+		{ "M handoff version 0xFFFFFFFF (own check word) is VERSION",
+		  RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 0xFFFFFFFFu, 0u,
+		  RLXFW_HO_VERSION, RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B,
+		  0xFFFFFFFEu },
+	};
+	/* Two or more wrong at once: the first check in the pinned order wins. */
+	static const struct {
+		const char *name;
+		u32 a0, a1, a2, a3;
+		int want;
+	} two[] = {
+		{ "M handoff magic and check wrong: MAGIC first",
+		  RLXFW_HANDOFF_MAGIC ^ 0x100u, RLXFW_HANDOFF_SLOT_B, 6u,
+		  ~(RLXFW_HANDOFF_MAGIC ^ RLXFW_HANDOFF_SLOT_B ^ 6u),
+		  RLXFW_HO_MAGIC },
+		{ "M handoff magic and slot wrong (own check): MAGIC first",
+		  RLXFW_HANDOFF_MAGIC + 1u, 0x43u, 6u,
+		  ~((RLXFW_HANDOFF_MAGIC + 1u) ^ 0x43u ^ 6u), RLXFW_HO_MAGIC },
+		{ "M handoff check and slot wrong: CHECK first",
+		  RLXFW_HANDOFF_MAGIC, 0x43u, 6u,
+		  ~(RLXFW_HANDOFF_MAGIC ^ 0x43u ^ 6u) ^ 1u, RLXFW_HO_CHECK },
+		{ "M handoff check and version wrong: CHECK first",
+		  RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 0u,
+		  ~(RLXFW_HANDOFF_MAGIC ^ RLXFW_HANDOFF_SLOT_B ^ 0u) + 1u,
+		  RLXFW_HO_CHECK },
+		{ "M handoff slot and version wrong (own check): SLOT first",
+		  RLXFW_HANDOFF_MAGIC, 0x43u, 0u,
+		  ~(RLXFW_HANDOFF_MAGIC ^ 0x43u ^ 0u), RLXFW_HO_SLOT },
+		{ "M handoff all four wrong: MAGIC first",
+		  0x12345678u, 0u, 0xFFFFFFFFu, 0u, RLXFW_HO_MAGIC },
+	};
+	u32 s, v, kw, seed = 0x48A4D0FFu;
+	unsigned int i, j, n;
+	int acc, eq, rt, fixes, all;
+
+	memset(hseen, 0, sizeof(hseen));
+
+	/* The three constants are restated in the kernel; rlxboot's are the
+	 * other source.  Widened, so neither side's type can hide a difference. */
+	ckb("M handoff magic: the kernel's == rlxboot's",
+	    (unsigned long long)RLXFW_HANDOFF_MAGIC ==
+	    (unsigned long long)RLXB_HANDOFF_MAGIC);
+	ckb("M handoff slot A: the kernel's == rlxboot's",
+	    (unsigned long long)RLXFW_HANDOFF_SLOT_A ==
+	    (unsigned long long)RLXB_HANDOFF_SLOT_A);
+	ckb("M handoff slot B: the kernel's == rlxboot's",
+	    (unsigned long long)RLXFW_HANDOFF_SLOT_B ==
+	    (unsigned long long)RLXB_HANDOFF_SLOT_B);
+	ckb("M handoff magic spells \"RLXH\"; slots are 'A' and 'B'",
+	    RLXFW_HANDOFF_MAGIC == ((u32)'R' << 24 | (u32)'L' << 16 |
+				    (u32)'X' << 8 | (u32)'H') &&
+	    RLXFW_HANDOFF_SLOT_A == (u32)'A' && RLXFW_HANDOFF_SLOT_B == (u32)'B');
+
+	ckho("M handoff (magic, A, 1, check) is OK",
+	     ho_parse(RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_A, 1u,
+		      ho_check(RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_A, 1u)),
+	     RLXFW_HO_OK);
+	ckho("M handoff (magic, B, 0xFFFFFFFE, check) is OK",
+	     ho_parse(RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B, 0xFFFFFFFEu,
+		      ho_check(RLXFW_HANDOFF_MAGIC, RLXFW_HANDOFF_SLOT_B,
+			       0xFFFFFFFEu)),
+	     RLXFW_HO_OK);
+
+	fixes = 1;
+	for (i = 0; i < sizeof(one) / sizeof(one[0]); i++) {
+		ckho(one[i].name, ho_parse(one[i].a0, one[i].a1, one[i].a2,
+		     ho_check(one[i].a0, one[i].a1, one[i].a2) + one[i].a3d),
+		     one[i].want);
+		if (ho_parse(one[i].fix0, one[i].fix1, one[i].fix2,
+			     ho_check(one[i].fix0, one[i].fix1, one[i].fix2)) !=
+		    RLXFW_HO_OK)
+			fixes = 0;
+	}
+	ckb("M each one-field refusal above is OK with that field corrected "
+	    "(so the field under test was the only failing check)", fixes);
+
+	for (i = 0; i < sizeof(two) / sizeof(two[0]); i++)
+		ckho(two[i].name, ho_parse(two[i].a0, two[i].a1, two[i].a2,
+					   two[i].a3), two[i].want);
+
+	/* The sweep: both slots; versions 1, 2, 0x7FFFFFFF, 0x80000000,
+	 * 0xFFFFFFFE, then 10,000 from a fixed seed.  xorshift32 never yields
+	 * 0 and 0xFFFFFFFF is redrawn: both are refusals, with cases above. */
+	acc = eq = rt = 1;
+	n = 0;
+	for (j = 0; j < 2u; j++) {
+		s = j ? RLXFW_HANDOFF_SLOT_B : RLXFW_HANDOFF_SLOT_A;
+		for (i = 0; i < 5u + 10000u; i++) {
+			if (i < 5u) {
+				v = fixed[i];
+			} else {
+				do {
+					v = ho_rand(&seed);
+				} while (v == 0xFFFFFFFFu);
+			}
+			/* the word the kernel accepts: OK, and one bit off
+			 * (a different bit each time) is CHECK */
+			kw = ho_check(RLXFW_HANDOFF_MAGIC, s, v);
+			if (ho_parse(RLXFW_HANDOFF_MAGIC, s, v, kw) !=
+			    RLXFW_HO_OK ||
+			    ho_parse(RLXFW_HANDOFF_MAGIC, s, v,
+				     kw ^ (1u << (i & 31u))) != RLXFW_HO_CHECK)
+				acc = 0;
+			/* rlxboot's word, compared at full width: no cast
+			 * may hide high bits the macro failed to clear */
+			if ((unsigned long)kw != RLXB_HANDOFF_CHECK(s, v))
+				eq = 0;
+			/* the round trip: every value from rlxboot's header */
+			if (ho_parse((u32)RLXB_HANDOFF_MAGIC,
+				     (u32)(j ? RLXB_HANDOFF_SLOT_B :
+					   RLXB_HANDOFF_SLOT_A), v,
+				     (u32)RLXB_HANDOFF_CHECK(j ?
+					   RLXB_HANDOFF_SLOT_B :
+					   RLXB_HANDOFF_SLOT_A, v)) !=
+			    RLXFW_HO_OK)
+				rt = 0;
+			n++;
+		}
+	}
+	ckb("M sweep (2 slots x 10,005 versions): the kernel accepts its "
+	    "word and refuses it one bit off, CHECK", acc && n == 20010u);
+	ckb("M sweep: the kernel's word == RLXB_HANDOFF_CHECK at full width",
+	    eq && n == 20010u);
+	ckb("M round trip: rlxboot's magic, slot, version and check word "
+	    "parse OK in the kernel, slot and version out unchanged",
+	    rt && n == 20010u);
+
+	all = 1;
+	for (i = 0; i < (unsigned int)HO_NREASON; i++)
+		if (!hseen[i]) {
+			printf("  (handoff reason %s never produced)\n",
+			       ho_name((int)i));
+			all = 0;
+		}
+	ckb("M every handoff verdict is produced (OK, MAGIC, CHECK, SLOT, "
+	    "VERSION)", all);
 }
 
 /* -------------------------------------------------------------- main */
@@ -1911,6 +2317,7 @@ int main(int argc, char **argv)
 	t_fence();
 	t_loop();
 	t_emit_ctr();
+	t_handoff();
 
 	/* every reason a pure function can produce is produced; the glue's
 	 * seven are exempt by name, and in the shipped build so are the

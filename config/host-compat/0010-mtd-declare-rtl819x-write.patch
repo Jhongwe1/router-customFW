@@ -2,9 +2,9 @@ Declare `CONFIG_MTD_RTL819X_WRITE` to kconfig, `default n`.
 
 `R8b` item 4's decision W1, 2026-10-04, 122nd segment.  This is the ONLY
 vendor-tree change the flash write path needs, and it changes no vendor
-behaviour at all: it adds one `bool` with `default n` and nothing in the drop
-reads the symbol except `drivers/mtd/devices/Makefile`'s row, which
-`config/rlxfw-marks.tsv` `MK5` owns.
+behaviour at all: it adds one `bool` with `default n`.  Since 2026-10-23
+nothing in the drop reads the symbol (`MK5` is `obj-y`); rlxfw's own files do:
+`rtl819x-spi.c`'s `#ifdef` halves, and `rtl819x-spi-write.c`'s `#error`.
 
 WHAT WAS TRUE BEFORE, AND IS BEING GIVEN UP ON PURPOSE.  `R5-5` (2026-09-07)
 put the write path in a separate translation unit behind
@@ -25,14 +25,14 @@ unrecorded make argument.
 
 WHAT REPLACES IT, so the refusal is not merely removed:
 
-  * the delta row's value is `n`, so the TU is in no committed image;
-  * `MK5`'s `absent:rtl819x_spi_write_page` witness still reads the artefact
-    and still goes red if the object appears;
-  * `kconfig-delta check` now has an opinion about this symbol at all, which
-    it did not before;
-  * and in an image where the symbol IS `y`, the write path refuses every
-    operation until armed by a typed verb, and refuses the loader and `H601`
-    windows whatever the arming state (`rtl819x-spi-wrpolicy.h`).
+  * `kconfig-delta check` has an opinion about this symbol at all, which it
+    did not before, and one delta row is the line that decides it;
+  * since 2026-10-23 that row reads `y` and `MK5` is `obj-y` with
+    `sym:rtl819x_spi_write_page`, by the owner's ruling (notes/self-update.md
+    § 2.9): the TU is in every image, and verify reds a build that drops it;
+  * and the write path refuses every operation until armed by a typed verb,
+    and refuses the loader and `H601` windows whatever the arming state
+    (`rtl819x-spi-wrpolicy.h`), under the run-time layers § 2.9 lists.
 
 量 2026-10-04, at the desk, on the tree that builds
 (`src-vendor/rtl819x-toolchain/linux-2.6.30`):
@@ -59,10 +59,10 @@ pinned, so `(NEW)` reads **0** and no answer -- empty, `n`, `y` or EOF --
 changes the result.  REFUTED BY any `(NEW)` line in the `oldconfig` log naming
 this symbol, or `kconfig-delta check` reporting it undeclared or drifted.
 
-WHAT THIS PATCH DOES NOT ESTABLISH.  That the write path works.  Not one line
-of it has run anywhere: the TU is in no committed image, has never been on
-this die, and the only thing exercised at the desk is its refusals, on the
-host, through `tools/test-spi-wrpolicy.sh`.
+WHAT THIS PATCH DOES NOT ESTABLISH.  That the write path works: it declares
+a symbol.  What the path has done on this die is the armed image's record
+(`notes/spi-mtd-driver.md` § 14), and what the shipped image's install path
+does is `notes/self-update.md`'s to establish.
 
 --- a/drivers/mtd/devices/Kconfig
 +++ b/drivers/mtd/devices/Kconfig
@@ -74,24 +74,24 @@ host, through `tools/test-spi-wrpolicy.sh`.
 +	bool "rlxfw: build rtl819x-spi's flash WRITE path"
 +	default n
 +	help
-+	  rlxfw's own SPI NOR driver, rtl819x-spi, is read-only: its
-+	  mtd->write and mtd->erase refuse with -EOPNOTSUPP and mtd->flags is
-+	  MTD_CAP_ROM.  Saying y here compiles rtl819x-spi-write.c -- the
-+	  page-program and sector-erase path -- and routes those two pointers
-+	  to it.
++	  rlxfw's own SPI NOR driver, rtl819x-spi.  Y compiles the write
++	  engine in rtl819x-spi.c, the half under this symbol: page program,
++	  sector erase and the slot install verbs, with mtd->write and
++	  mtd->erase routed to rtl819x-spi-write.c, which MK5 in
++	  config/rlxfw-marks.tsv links into every image whatever this says.
 +
 +	  The compiled path still refuses EVERY operation until it is armed
 +	  through /proc/rtl819x-spi, and refuses 0x000000-0x007FFF (this
 +	  board's bootloader and its per-unit MAC and radio calibration)
 +	  whatever the arming state.
 +
-+	  Saying y puts a working flash-write path into the image.  On a board
-+	  whose bootloader cannot be recovered if it is erased, that is not a
-+	  default anybody should inherit.  Say n unless you are deliberately
-+	  building an image to reflash this device with, and see
-+	  config/rlxfw-kernel.delta for the one line that decides it.
++	  rlxfw's images say y, pinned by config/rlxfw-kernel.delta.  N now
++	  stops the build: rtl819x-spi-write.c refuses to compile without
++	  the engine it calls.  What keeps a write from happening is the
++	  run-time refusal above and the layers notes/self-update.md
++	  section 2.9 lists, not this symbol.
 +
-+	  If unsure, say N.
++	  Not a question for oldconfig: that delta row decides it.
 +
  endmenu
  
