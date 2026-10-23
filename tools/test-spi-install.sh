@@ -2,11 +2,17 @@
 # test-spi-install -- R8b Gap A's install path, on the host, then prove the
 # suites can fail.
 #
-# Two suites, one runner:
+# Two suites, three builds, one runner:
 #   test-spi-install.c       the DECISIONS: rtl819x-spi-install.h compiled
 #                            unchanged (region table, verbs, arm agreement,
 #                            staging, payload headers, the write ORDER, D11's
-#                            erased range at both candidate sizes, the cuts)
+#                            erased range at both candidate sizes, the cuts;
+#                            1.1: the store's regions, the counter, its loop,
+#                            repeat= and the fence), built TWICE -- `pure`
+#                            with the provisioning table
+#                            (-DCONFIG_MTD_RTL819X_PROVISION) and `pure0`
+#                            with the SHIPPED table, which names nothing
+#                            below slot A
 #   test-spi-install-glue.c  the GLUE: the block between rtl819x-spi.c's
 #                            `R8b GAP A` banner and its `END OF R8b GAP A`
 #                            line, extracted from the driver and run against
@@ -156,7 +162,7 @@ lo, hi = v[("BARRIER", "BASE")], v[("BARRIER", "BASE")] + v[("BARRIER", "SIZE")]
 if (min(mkcr6c.MUST_NOT_BOOT) != lo or
         max(mkcr6c.MUST_NOT_BOOT) + mkcr6c.REGION_BYTES != hi):
     bad.append("the barrier is not exactly mkcr6c.MUST_NOT_BOOT's blocks")
-for s in ("SLOTA", "SLOTB", "PROBE"):
+for s in ("SLOTA", "SLOTB", "CFG0", "CFG1", "PROBE"):
     b0, b1 = v[(s, "BASE")], v[(s, "BASE")] + v[(s, "SIZE")]
     if any(b0 <= c < b1 for c in mkcr6c.scan_candidates()):
         bad.append("%s holds a loader scan candidate" % s)
@@ -186,32 +192,67 @@ else
     cat "$out/fx.log"
 fi
 
+# P6r-10: the store's slot images, from the store's own producer -- src/cfgstore
+# built for the host -- so K_CFG is tested against what the store writes, as the
+# containers are against mkfw2.  seq 1 lands in slot 0 (both empty), seq 2 in
+# slot 1 (the slot not selected).
+echo "--- the store's slot images, from src/cfgstore's host build"
+if ! make -s -C "$repo/src/cfgstore" host O="$out/cs" > "$out/cs.log" 2>&1; then
+    sed 's/^/    /' "$out/cs.log"
+    echo "test-spi-install: src/cfgstore's host build failed; no producer for the store's fixtures" >&2
+    exit 3
+fi
+cs="$out/cs/host/cfgstore"
+if ! "$cs" --file "$out/fx/store.bin" init --force > "$out/cs-init.log" 2>&1 ||
+   ! "$cs" --file "$out/fx/store.bin" set sys.hostname=tsi1 > "$out/cs-set.log" 2>&1; then
+    cat "$out/cs-init.log" "$out/cs-set.log"
+    echo "test-spi-install: cfgstore refused to write the fixture store" >&2
+    exit 3
+fi
+head -c 4096 "$out/fx/store.bin" > "$out/fx/cfg-seq1.bin"
+tail -c +4097 "$out/fx/store.bin" > "$out/fx/cfg-seq2.bin"
+echo "  store.bin $(wc -c < "$out/fx/store.bin") bytes -> cfg-seq1.bin $(wc -c < "$out/fx/cfg-seq1.bin"), cfg-seq2.bin $(wc -c < "$out/fx/cfg-seq2.bin")"
+
 echo "--- compile"
 W="-std=gnu89 -Wall -Wextra -Werror -Wdeclaration-after-statement -Wstrict-prototypes -O2"
-build_pure () {   # build_pure OUT [EXTRA-INCLUDE-DIR]
+# The counter's second source is rlxboot's own decode, linked, with what
+# container.c links against (run-host-tests.sh's set).
+for f in src/rlxboot/container.c src/rlxboot/sha256b.c src/lib/ed25519.c src/lib/sha512.c; do
+    o="$out/2s-$(basename "$f" .c).o"
+    "$CC" -std=gnu99 -O2 -Wno-sign-compare -c -o "$o" "$repo/$f" 2> "$o.err" ||
+        { cat "$o.err"; exit 3; }
+done
+build_pure () {   # build_pure OUT PROVISION(0|1) [EXTRA-INCLUDE-DIR]
+    local pdef=
+    [ "$2" = 1 ] && pdef=-DCONFIG_MTD_RTL819X_PROVISION
     # shellcheck disable=SC2086
-    $CC $W -DWITH_CONTAINER_H ${2:+-I "$2"} -I "$dev" -I "$repo/src/rlxboot" \
-        -o "$1" "$here/test-spi-install.c" 2> "$1.err"
+    $CC $W -DWITH_CONTAINER_H -DWITH_CFG_H -DWITH_CONTAINER_C $pdef \
+        ${3:+-I "$3"} -I "$dev" -I "$repo/src/rlxboot" -I "$repo/src/lib" \
+        -o "$1" "$here/test-spi-install.c" "$out"/2s-*.o 2> "$1.err"
 }
 "$CC" -std=gnu99 -O2 -c -o "$out/sha256.o" "$repo/src/lib/sha256.c" 2> "$out/sha.err" ||
     { cat "$out/sha.err"; exit 3; }
 build_glue () {   # build_glue OUT INCDIR-WITH-gapA.inc [EXTRA-INCLUDE-DIR]
     # shellcheck disable=SC2086
-    $CC $W -Wno-unused-parameter ${3:+-I "$3"} -I "$2" -I "$out/inc" -I "$dev" \
+    $CC $W -Wno-unused-parameter -DCONFIG_MTD_RTL819X_PROVISION \
+        ${3:+-I "$3"} -I "$2" -I "$out/inc" -I "$dev" \
         -I "$repo/src/lib" -o "$1" "$here/test-spi-install-glue.c" "$out/sha256.o" \
         2> "$1.err"
 }
-if ! build_pure "$out/pure"; then cat "$out/pure.err"; exit 3; fi
+if ! build_pure "$out/pure" 1; then cat "$out/pure.err"; exit 3; fi
+if ! build_pure "$out/pure0" 0; then cat "$out/pure0.err"; exit 3; fi
 if ! build_glue "$out/glue" "$out"; then cat "$out/glue.err"; exit 3; fi
-echo "  both built with: $W"
+echo "  all three built with: $W"
 
 echo "--- arm 1 of 3: the suites as declared (must PASS)"
 "$out/pure" --fixtures "$out/fx" > "$out/pure.out"; prc=$?
+"$out/pure0" --fixtures "$out/fx" > "$out/pure0.out"; p0rc=$?
 "$out/glue" --fixtures "$out/fx" > "$out/glue.out"; grc=$?
 grep -v '^  ok ' "$out/pure.out"
+grep -v '^  ok ' "$out/pure0.out"
 grep -v '^  ok ' "$out/glue.out"
-echo "  pure suite exit $prc, glue suite exit $grc"
-if [ "$prc" != 0 ] || [ "$grc" != 0 ]; then
+echo "  pure suite exit $prc, shipped-table pure suite exit $p0rc, glue suite exit $grc"
+if [ "$prc" != 0 ] || [ "$p0rc" != 0 ] || [ "$grc" != 0 ]; then
     echo "test-spi-install: an unmutated suite FAILED; the mutations below would prove nothing" >&2
     exit 1
 fi
@@ -221,6 +262,10 @@ idx () { sed -n "s/^  ok  *\([0-9][0-9]*\) $2.*/\1/p" "$1" | head -n 1; }
 for spec in "pure|install slotA sha=<64 lower>" \
             "pure|a PAYL-form container for slotA" \
             "pure|D11 control: a 64 KiB step" \
+            "pure|ctr 6" \
+            "pure|I a cut after k programs" \
+            "pure0|shipped: install rlxboot is not nameable" \
+            "pure0|M decode == rlxboot's rlxu_counter_from_bitmap" \
             "glue|grain 4096 pace 0: install slotA -> OK" \
             "glue|not armed -> UNARMED"; do
     s=${spec%%|*}; name=${spec#*|}
@@ -240,8 +285,9 @@ mutate () {   # mutate LABEL SUITE FILE SED-EXPR
     sed -e "$expr" "$file" > "$d/$(basename "$file")"
     n=$(diff "$file" "$d/$(basename "$file")" | grep -c '^>')
     if [ "$n" -lt 1 ]; then red "mutation $label changed nothing -- fix the runner"; return; fi
-    if [ "$suite" = pure ]; then
-        build_pure "$d/bin" "$d" || { red "mutation $label did not compile (not a kill)"; return; }
+    if [ "$suite" = pure ] || [ "$suite" = pure0 ]; then
+        build_pure "$d/bin" "$([ "$suite" = pure ] && echo 1 || echo 0)" "$d" ||
+            { red "mutation $label did not compile (not a kill)"; return; }
     else
         build_glue "$d/bin" "$d" || { red "mutation $label did not compile (not a kill)"; return; }
     fi
@@ -272,10 +318,23 @@ mutate H9-size-table   pure "$ihdr" 's/^\t\treturn 4096;$/\t\treturn 32768;/'
 mutate H10-anomaly-raw pure "$ihdr" 's/^\t\treturn 0x1000u;$/\t\treturn 0u;/'
 mutate H11-verdict     pure "$ihdr" 's/if (clean != 1)/if (clean == 0)/'
 mutate H12-cr6c-magic  pure "$ihdr" 's/^#define RLXFW_SPI_INST_CR6C_MAGIC\t0x63733663u/#define RLXFW_SPI_INST_CR6C_MAGIC\t0x63723663u/'
+# 1.1, P6r-10 and P6r-11
+mutate H13-ctr-two-bits pure "$ihdr" 's/return (u8)(0xFFu >> ((b & 7u) + 1u));/return (u8)(0xFFu >> ((b \& 7u) + 2u));/'
+mutate H14-ctr-lead-only pure "$ihdr" 's/return bad ? total : lead;/return lead;/'
+mutate H15-ctr-no-below pure "$ihdr" 's/if (n < \*cur)/if (0)/'
+mutate H16-ctr-weak-tie pure "$ihdr" 's/if (!ho_ok || ho_ver != n)/if (!ho_ok \&\& ho_ver != n)/'
+mutate H17-no-fence    pure "$ihdr" 's/return RLXFW_SPI_INST_R_RUNNING_SLOT;/return RLXFW_SPI_INST_OK;/'
+mutate H18-cfg-seq0    pure "$ihdr" 's/if (seq == 0u || seq > RLXFW_SPI_INST_CFG_SEQ_MAX)/if (seq > RLXFW_SPI_INST_CFG_SEQ_MAX)/'
+mutate H19-repeat-any  pure "$ihdr" 's/return RLXFW_SPI_INST_R_REPEAT_ONLY_SLOT;/(void)0;/'
+mutate H20-shipped-floor pure0 "$ihdr" 's/{ "slotA",   RLXFW_SPI_INST_SLOTA_BASE,/{ "slotA",   RLXFW_SPI_INST_RLXBOOT_BASE,/'
+mutate H21-cfg-not-erasable pure "$ihdr" 's/rg->kind != RLXFW_SPI_INST_K_CFG)/1)/'
+mutate H22-loop-ops    pure "$ihdr" 's/^#define RLXFW_SPI_INST_LOOP_OPS\t(RLXFW_SPI_INST_CTR_BITS + 1u)/#define RLXFW_SPI_INST_LOOP_OPS\t(RLXFW_SPI_INST_CTR_BITS + 2u)/'
+mutate H23-no-ctrloop  pure "$ihdr" 's/if (rlxfw_spi_inst_tokeq(s, n, "ctrloop"))/if (0)/'
+mutate H24-ctr-prefix  pure "$ihdr" 's/if (rlxfw_spi_inst_tokeq(s, n, "ctr"))/if (rlxfw_spi_inst_prefix(s, n, "ctr"))/'
 
 if [ "$rc" -ne 0 ]; then
     echo "test-spi-install: FAILED (see FAIL lines above)" >&2
     exit 1
 fi
-echo "test-spi-install: ok ($(grep -c '^  ok ' "$out/pure.out") pure + $(grep -c '^  ok ' "$out/glue.out") glue cases green; every flip and mutation red)"
+echo "test-spi-install: ok ($(grep -c '^  ok ' "$out/pure.out") pure + $(grep -c '^  ok ' "$out/pure0.out") shipped-table pure + $(grep -c '^  ok ' "$out/glue.out") glue cases green; every flip and mutation red)"
 exit 0

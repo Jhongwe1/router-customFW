@@ -16,7 +16,11 @@
  * register, a lock, an allocation, a digest engine.  A green host test says
  * the decisions are right on the host; it says nothing about the silicon.
  *
- * The spec this implements is R8b's D1, D2, D5, D6, D7, D9, D10, D11, D12.
+ * The spec this implements is R8b's D1, D2, D5, D6, D7, D9, D10, D11, D12,
+ * and P6r-10/P6r-11's additions (1.1): the config store's two regions, the
+ * shipped table without the loader's neighbours, the anti-rollback counter,
+ * its scratch loop, `repeat=` and the running-slot fence
+ * (notes/self-update.md § 2).
  */
 
 #ifndef RTL819X_SPI_INSTALL_H
@@ -26,7 +30,7 @@
 #error "include rtl819x-spi-wrpolicy.h before rtl819x-spi-install.h"
 #endif
 
-#define RLXFW_SPI_INST_VERSION	"rtl819x-spi-install 1.0"
+#define RLXFW_SPI_INST_VERSION	"rtl819x-spi-install 1.1"
 
 /* ------------------------------------------------------------------------
  * The region table.  D1 and D6.
@@ -48,6 +52,11 @@
 /* The state block (anti-rollback bitmap, A/B selector).  D3: R8b writes no
  * state, so no region may reach it. */
 #define RLXFW_SPI_INST_STATE	0x003F0000u
+/* P6r-11: the anti-rollback counter at the head of the state block, in
+ * rlxboot's encoding (notes/rlxboot.md § 4): 512 bytes, 4,096 bits, the value
+ * the leading run of zero bits.  `ctr` programs bits of it and nothing else. */
+#define RLXFW_SPI_INST_CTR_BYTES	512u
+#define RLXFW_SPI_INST_CTR_BITS		4096u
 
 #define RLXFW_SPI_INST_RLXBOOT_BASE	0x00010000u
 #define RLXFW_SPI_INST_RLXBOOT_SIZE	0x00010000u	/*    65,536 */
@@ -66,6 +75,18 @@
  * is above 64 KiB, which no candidate is (FW-187: 4,096 or 65,536). */
 #define RLXFW_SPI_INST_PROBE_BASE	0x003E0000u
 #define RLXFW_SPI_INST_PROBE_SIZE	0x00010000u	/*    65,536 */
+/* P6r-10: the config store's two slots, one 64 KiB block each, at the top of
+ * the free area and just below the probe block, so no erase at either
+ * candidate grain (FW-187) reaches both.  Inside the tail the 2026-08-16 dump
+ * read erased; a card pre-reads them before the first write all the same
+ * (FLS-26).  notes/self-update.md § 2.1. */
+#define RLXFW_SPI_INST_CFG0_BASE	0x003C0000u
+#define RLXFW_SPI_INST_CFG0_SIZE	0x00010000u	/*    65,536 */
+#define RLXFW_SPI_INST_CFG1_BASE	0x003D0000u
+#define RLXFW_SPI_INST_CFG1_SIZE	0x00010000u	/*    65,536 */
+/* The free area P6r-10's DoD names for the store, [CFG_LO, CFG_HI). */
+#define RLXFW_SPI_INST_CFG_LO		0x002B0000u
+#define RLXFW_SPI_INST_CFG_HI		0x003E0000u
 
 /* D12: the staging buffer's capacity is the largest region.  The host test
  * recomputes the maximum over the table and compares. */
@@ -106,6 +127,25 @@ RLXFW_SPI_INST_ASSERT(o5, RLXFW_SPI_INST_SLOTB_BASE +
 		      RLXFW_SPI_INST_SLOTB_SIZE <= RLXFW_SPI_INST_PROBE_BASE);
 RLXFW_SPI_INST_ASSERT(o5b, RLXFW_SPI_INST_PROBE_BASE +
 		      RLXFW_SPI_INST_PROBE_SIZE <= RLXFW_SPI_INST_STATE);
+/* P6r-10's store regions: one whole block each, after slot B, before the
+ * probe block, both inside the free area the DoD names. */
+RLXFW_SPI_INST_ASSERT(a_cfg0, RLXFW_SPI_INST_ALIGNED(
+		      RLXFW_SPI_INST_CFG0_BASE, RLXFW_SPI_INST_CFG0_SIZE));
+RLXFW_SPI_INST_ASSERT(a_cfg1, RLXFW_SPI_INST_ALIGNED(
+		      RLXFW_SPI_INST_CFG1_BASE, RLXFW_SPI_INST_CFG1_SIZE));
+RLXFW_SPI_INST_ASSERT(cfg_one_block,
+		      RLXFW_SPI_INST_CFG0_SIZE == RLXFW_SPI_INST_BLOCK &&
+		      RLXFW_SPI_INST_CFG1_SIZE == RLXFW_SPI_INST_BLOCK);
+RLXFW_SPI_INST_ASSERT(o_cfg0, RLXFW_SPI_INST_SLOTB_BASE +
+		      RLXFW_SPI_INST_SLOTB_SIZE <= RLXFW_SPI_INST_CFG0_BASE);
+RLXFW_SPI_INST_ASSERT(o_cfg1, RLXFW_SPI_INST_CFG0_BASE +
+		      RLXFW_SPI_INST_CFG0_SIZE <= RLXFW_SPI_INST_CFG1_BASE);
+RLXFW_SPI_INST_ASSERT(o_cfgp, RLXFW_SPI_INST_CFG1_BASE +
+		      RLXFW_SPI_INST_CFG1_SIZE <= RLXFW_SPI_INST_PROBE_BASE);
+RLXFW_SPI_INST_ASSERT(cfg_window,
+		      RLXFW_SPI_INST_CFG0_BASE >= RLXFW_SPI_INST_CFG_LO &&
+		      RLXFW_SPI_INST_CFG1_BASE + RLXFW_SPI_INST_CFG1_SIZE <=
+		      RLXFW_SPI_INST_CFG_HI);
 RLXFW_SPI_INST_ASSERT(o6, RLXFW_SPI_INST_STATE <= RLXFW_SPI_WR_CHIP);
 RLXFW_SPI_INST_ASSERT(cap, RLXFW_SPI_INST_IMG_CAP >= RLXFW_SPI_INST_SLOTB_SIZE &&
 		      RLXFW_SPI_INST_IMG_CAP >= RLXFW_SPI_INST_BARRIER_SIZE);
@@ -115,8 +155,22 @@ enum {
 	RLXFW_SPI_INST_K_CR6C = 1,	/* a cs6c image the stock loader boots */
 	RLXFW_SPI_INST_K_ERASE,		/* erase only -- D2's barrier */
 	RLXFW_SPI_INST_K_RLXU,		/* a signed format-2 RLXU container */
-	RLXFW_SPI_INST_K_PROBE		/* `eraseprobe` only -- D19 */
+	RLXFW_SPI_INST_K_PROBE,		/* `eraseprobe` only -- D19 */
+	RLXFW_SPI_INST_K_CFG		/* one config-store slot image, RLXC */
 };
+
+/* P6r-10: the SHIPPED table names nothing below slot A, so no running image
+ * can rewrite rlxboot, its rescue copy or the barrier through a verb; the
+ * lowest byte it can name is 0x070000.  A RAM-only provisioning build keeps
+ * them.  CONFIG_MTD_RTL819X_PROVISION is declared by no Kconfig today, so
+ * every kernel this tree builds gets the shipped table; a provisioning branch
+ * declares it, and updating rlxboot stays a bench act (notes/self-update.md
+ * § 2.1).  tools/test-spi-install.sh compiles both tables. */
+#ifdef CONFIG_MTD_RTL819X_PROVISION
+#define RLXFW_SPI_INST_PROVISION	1
+#else
+#define RLXFW_SPI_INST_PROVISION	0
+#endif
 
 struct rlxfw_spi_inst_region {
 	const char *name;
@@ -126,20 +180,26 @@ struct rlxfw_spi_inst_region {
 };
 
 static const struct rlxfw_spi_inst_region rlxfw_spi_inst_regions[] = {
+#if RLXFW_SPI_INST_PROVISION
 	{ "rlxboot", RLXFW_SPI_INST_RLXBOOT_BASE, RLXFW_SPI_INST_RLXBOOT_SIZE,
 	  RLXFW_SPI_INST_K_CR6C },
 	{ "rescue",  RLXFW_SPI_INST_RESCUE_BASE,  RLXFW_SPI_INST_RESCUE_SIZE,
 	  RLXFW_SPI_INST_K_CR6C },
 	{ "barrier", RLXFW_SPI_INST_BARRIER_BASE, RLXFW_SPI_INST_BARRIER_SIZE,
 	  RLXFW_SPI_INST_K_ERASE },
+#endif
 	{ "slotA",   RLXFW_SPI_INST_SLOTA_BASE,   RLXFW_SPI_INST_SLOTA_SIZE,
 	  RLXFW_SPI_INST_K_RLXU },
 	{ "slotB",   RLXFW_SPI_INST_SLOTB_BASE,   RLXFW_SPI_INST_SLOTB_SIZE,
 	  RLXFW_SPI_INST_K_RLXU },
+	{ "cfg0",    RLXFW_SPI_INST_CFG0_BASE,    RLXFW_SPI_INST_CFG0_SIZE,
+	  RLXFW_SPI_INST_K_CFG },
+	{ "cfg1",    RLXFW_SPI_INST_CFG1_BASE,    RLXFW_SPI_INST_CFG1_SIZE,
+	  RLXFW_SPI_INST_K_CFG },
 	{ "probe",   RLXFW_SPI_INST_PROBE_BASE,   RLXFW_SPI_INST_PROBE_SIZE,
 	  RLXFW_SPI_INST_K_PROBE },
 };
-#define RLXFW_SPI_INST_NREGIONS	6
+#define RLXFW_SPI_INST_NREGIONS	(5 + 3 * RLXFW_SPI_INST_PROVISION)
 RLXFW_SPI_INST_ASSERT(nregions, sizeof(rlxfw_spi_inst_regions) /
 		      sizeof(rlxfw_spi_inst_regions[0]) ==
 		      RLXFW_SPI_INST_NREGIONS);
@@ -179,6 +239,15 @@ enum {
 	RLXFW_SPI_INST_R_PROBE_MARK,	/* a marker page did not read back */
 	RLXFW_SPI_INST_R_PROBE_ANOMALY,	/* no candidate size fits the markers */
 	RLXFW_SPI_INST_R_PROBE_UNCLEAN,	/* the block could not be re-erased */
+	/* 1.1, P6r-10 and P6r-11 */
+	RLXFW_SPI_INST_R_HDR_SEQ,	/* RLXC: seq 0 or 0xFFFFFFFF */
+	RLXFW_SPI_INST_R_REPEAT_ONLY_SLOT, /* repeat= on a region not a slot */
+	RLXFW_SPI_INST_R_RUNNING_SLOT,	/* install: the slot rlxboot booted */
+	RLXFW_SPI_INST_R_CTR_ABOVE,	/* ctr: above the bitmap's 4,096 */
+	RLXFW_SPI_INST_R_CTR_HANDOFF,	/* ctr: no handoff, or another version */
+	RLXFW_SPI_INST_R_CTR_BELOW,	/* ctr: below the counter as it reads */
+	RLXFW_SPI_INST_R_CTR_MALFORMED,	/* ctr: a zero at or above the value */
+	RLXFW_SPI_INST_R_CTR_CMP,	/* ctr: the read-back is not the value */
 	RLXFW_SPI_INST_R_COUNT		/* the array size; not a reason */
 };
 
@@ -188,7 +257,9 @@ static const char *const rlxfw_spi_inst_rname[RLXFW_SPI_INST_R_COUNT] = {
 	"IMG_SIZE", "KAT", "HASH", "SHA", "HDR_MAGIC", "HDR_FORMAT",
 	"HDR_FLASH_AT", "HDR_FORM", "HDR_LEN", "HDR_SUM", "POLICY", "NOMEM",
 	"ENGINE", "CMP", "PROBE_ONLY", "PROBE_DIRTY", "PROBE_MARK",
-	"PROBE_ANOMALY", "PROBE_UNCLEAN"
+	"PROBE_ANOMALY", "PROBE_UNCLEAN", "HDR_SEQ", "REPEAT_ONLY_SLOT",
+	"RUNNING_SLOT", "CTR_ABOVE", "CTR_HANDOFF", "CTR_BELOW",
+	"CTR_MALFORMED", "CTR_CMP"
 };
 
 static inline const char *rlxfw_spi_inst_reason_name(int r)
@@ -279,9 +350,11 @@ static inline int rlxfw_spi_inst_dec(const char *s, u32 n, u32 *out)
 /* ------------------------------------------------------------------------
  * The verbs.  D6, D7, D10.
  *
- *   install <region> sha=<64 hex>[ pace=<ms>]
+ *   install <region> sha=<64 hex>[ pace=<ms>| repeat=<k>]
  *   erase <region>[ pace=<ms>]
  *   eraseprobe                     (D19: the probe block is implied)
+ *   ctr <N>                        (P6r-11: the state block is implied)
+ *   ctrloop <p> | ctrloop show     (P6r-11: the probe block is implied)
  *
  * Single spaces, nothing trailing, region names case-sensitive.  Strict on
  * purpose: a malformed line is a refusal, never a guess.  `pace` is 1..30000
@@ -296,15 +369,28 @@ static inline int rlxfw_spi_inst_dec(const char *s, u32 n, u32 *out)
  * answers to `eraseprobe` and nothing else, and `eraseprobe` takes no
  * argument at all, so no typing can aim the probe's single raw erase anywhere
  * but there.
+ *
+ * 1.1 (notes/self-update.md §§ 2.3-2.7).  `erase` also takes the store's
+ * regions.  `repeat=<k>`, one digit 2..8, slots only (REPEAT_ONLY_SLOT), never
+ * with `pace=`: the same staged bytes written k times under one arm, so a
+ * hand-timed cut lands inside one of them; `install slotB sha=<64> repeat=5` is
+ * 91 bytes.  `ctr <N>`: N is 1..4 decimal digits, the first not 0, so `ctr 0`
+ * is SYNTAX and `ctr 4097` reaches the range check (CTR_ABOVE); no address
+ * anywhere.  `ctrloop <p>`: p is 1..2 digits, 1..64.  Every verb is matched as
+ * a whole first token, so `ctrloop` never reaches `ctr`'s grammar.
  * ------------------------------------------------------------------------ */
 #define RLXFW_SPI_INST_LINE_MAX		128
 #define RLXFW_SPI_INST_PACE_MAX		30000u
+#define RLXFW_SPI_INST_LOOP_MAX		64u
 
 enum {
 	RLXFW_SPI_INST_V_NONE = 0,
 	RLXFW_SPI_INST_V_INSTALL,
 	RLXFW_SPI_INST_V_ERASE,
-	RLXFW_SPI_INST_V_PROBE
+	RLXFW_SPI_INST_V_PROBE,
+	RLXFW_SPI_INST_V_CTR,
+	RLXFW_SPI_INST_V_CTRLOOP,
+	RLXFW_SPI_INST_V_CTRSHOW
 };
 
 struct rlxfw_spi_inst_req {
@@ -312,7 +398,71 @@ struct rlxfw_spi_inst_req {
 	int region;		/* index into the table, -1 if none */
 	u8 sha[32];		/* the typed digest; install only */
 	u32 pace_ms;		/* 0 = unpaced */
+	u32 repeat;		/* install: 0 = once, else 2..8 */
+	u32 ctr_n;		/* ctr: the value to advance to */
+	u32 loops;		/* ctrloop: passes */
 };
+
+/* The index of the one region of a kind, or -1. */
+static inline int rlxfw_spi_inst_kind_index(int kind)
+{
+	int k, idx = -1;
+
+	for (k = 0; k < RLXFW_SPI_INST_NREGIONS; k++)
+		if (rlxfw_spi_inst_regions[k].kind == kind)
+			idx = k;
+	return idx;
+}
+
+/* ` <digits>` and nothing after it: 1..max digits, the first not '0'. */
+static inline int rlxfw_spi_inst_num_tail(const char *s, u32 max, u32 *out)
+{
+	u32 n;
+
+	if (*s != ' ')
+		return -1;
+	s++;
+	n = rlxfw_spi_inst_toklen(s);
+	if (n == 0u || n > max || s[0] == '0' || s[n] != '\0')
+		return -1;
+	return rlxfw_spi_inst_dec(s, n, out);
+}
+
+/* `ctr` and `ctrloop`, after their first token.  No region is typed. */
+static inline int rlxfw_spi_inst_parse_ctr(const char *s,
+					   struct rlxfw_spi_inst_req *rq)
+{
+	u32 v;
+
+	rq->verb = RLXFW_SPI_INST_V_CTR;
+	if (rlxfw_spi_inst_num_tail(s, 4u, &v) != 0)
+		return RLXFW_SPI_INST_R_SYNTAX;
+	if (v > RLXFW_SPI_INST_CTR_BITS)
+		return RLXFW_SPI_INST_R_CTR_ABOVE;
+	rq->ctr_n = v;
+	return RLXFW_SPI_INST_OK;
+}
+
+static inline int rlxfw_spi_inst_parse_ctrloop(const char *s,
+					       struct rlxfw_spi_inst_req *rq)
+{
+	u32 v;
+
+	rq->verb = RLXFW_SPI_INST_V_CTRLOOP;
+	rq->region = rlxfw_spi_inst_kind_index(RLXFW_SPI_INST_K_PROBE);
+	if (rq->region < 0)
+		return RLXFW_SPI_INST_R_REGION;
+	if (s[0] == ' ' && rlxfw_spi_inst_tokeq(s + 1,
+			rlxfw_spi_inst_toklen(s + 1), "show") && s[5] == '\0') {
+		rq->verb = RLXFW_SPI_INST_V_CTRSHOW;
+		return RLXFW_SPI_INST_OK;
+	}
+	if (rlxfw_spi_inst_num_tail(s, 2u, &v) != 0 || v == 0u ||
+	    v > RLXFW_SPI_INST_LOOP_MAX)
+		return RLXFW_SPI_INST_R_SYNTAX;
+	rq->loops = v;
+	return RLXFW_SPI_INST_OK;
+}
 
 static inline int rlxfw_spi_inst_parse(const char *s,
 				       struct rlxfw_spi_inst_req *rq)
@@ -324,10 +474,15 @@ static inline int rlxfw_spi_inst_parse(const char *s,
 	rq->verb = RLXFW_SPI_INST_V_NONE;
 	rq->region = -1;
 	rq->pace_ms = 0u;
+	rq->repeat = rq->ctr_n = rq->loops = 0u;
 	for (i = 0; i < 32u; i++)
 		rq->sha[i] = 0u;
 
 	n = rlxfw_spi_inst_toklen(s);
+	if (rlxfw_spi_inst_tokeq(s, n, "ctr"))
+		return rlxfw_spi_inst_parse_ctr(s + n, rq);
+	if (rlxfw_spi_inst_tokeq(s, n, "ctrloop"))
+		return rlxfw_spi_inst_parse_ctrloop(s + n, rq);
 	if (rlxfw_spi_inst_tokeq(s, n, "eraseprobe")) {
 		rq->verb = RLXFW_SPI_INST_V_PROBE;
 		if (s[n] != '\0')
@@ -366,7 +521,8 @@ static inline int rlxfw_spi_inst_parse(const char *s,
 	    rg->kind == RLXFW_SPI_INST_K_ERASE)
 		return RLXFW_SPI_INST_R_ERASE_ONLY;
 	if (rq->verb == RLXFW_SPI_INST_V_ERASE &&
-	    rg->kind != RLXFW_SPI_INST_K_ERASE)
+	    rg->kind != RLXFW_SPI_INST_K_ERASE &&
+	    rg->kind != RLXFW_SPI_INST_K_CFG)
 		return RLXFW_SPI_INST_R_NOT_ERASABLE;
 	s += n;
 
@@ -390,12 +546,22 @@ static inline int rlxfw_spi_inst_parse(const char *s,
 	if (*s == ' ') {
 		s++;
 		n = rlxfw_spi_inst_toklen(s);
-		if (rlxfw_spi_inst_prefix(s, n, "pace=") != 5u || n > 10u ||
-		    s[5] == '0' ||
-		    rlxfw_spi_inst_dec(s + 5, n - 5u, &v) != 0 ||
-		    v == 0u || v > RLXFW_SPI_INST_PACE_MAX)
-			return RLXFW_SPI_INST_R_SYNTAX;
-		rq->pace_ms = v;
+		if (rq->verb == RLXFW_SPI_INST_V_INSTALL &&
+		    rlxfw_spi_inst_prefix(s, n, "repeat=") == 7u) {
+			/* the one optional token, so never with pace= */
+			if (n != 8u || s[7] < '2' || s[7] > '8')
+				return RLXFW_SPI_INST_R_SYNTAX;
+			if (rg->kind != RLXFW_SPI_INST_K_RLXU)
+				return RLXFW_SPI_INST_R_REPEAT_ONLY_SLOT;
+			rq->repeat = (u32)(s[7] - '0');
+		} else {
+			if (rlxfw_spi_inst_prefix(s, n, "pace=") != 5u ||
+			    n > 10u || s[5] == '0' ||
+			    rlxfw_spi_inst_dec(s + 5, n - 5u, &v) != 0 ||
+			    v == 0u || v > RLXFW_SPI_INST_PACE_MAX)
+				return RLXFW_SPI_INST_R_SYNTAX;
+			rq->pace_ms = v;
+		}
 		s += n;
 	}
 	if (*s != '\0')
@@ -587,6 +753,36 @@ static inline int rlxfw_spi_inst_chk_cr6c(const u8 *img, u32 len, u32 base)
 	return RLXFW_SPI_INST_OK;
 }
 
+/* P6r-10: one config-store slot image -- src/lib/cfg.h's RLXC record, 4,096
+ * bytes exactly (CFG_SLOT_SIZE), the constants restated because that header is
+ * not in the kernel tree; the host test includes both and fails on a
+ * difference.  No CRC here: the loader of the record checks it
+ * (src/lib/cfg.c), and this check exists to stop a container landing in a
+ * store region or a record in a slot -- chk_rlxu already refuses anything not
+ * RLXU, so a record there is HDR_MAGIC. */
+#define RLXFW_SPI_INST_CFG_MAGIC	0x524C5843u	/* "RLXC" */
+#define RLXFW_SPI_INST_CFG_FORMAT	1u
+#define RLXFW_SPI_INST_CFG_HDR_LEN	24u
+#define RLXFW_SPI_INST_CFG_SLOT		4096u
+#define RLXFW_SPI_INST_CFG_SEQ_MAX	0xFFFFFFFEu
+
+static inline int rlxfw_spi_inst_chk_cfg(const u8 *img, u32 len)
+{
+	u32 seq;
+
+	if (len < 4u || rlxfw_spi_inst_be32(img) != RLXFW_SPI_INST_CFG_MAGIC)
+		return RLXFW_SPI_INST_R_HDR_MAGIC;
+	if (len != RLXFW_SPI_INST_CFG_SLOT)
+		return RLXFW_SPI_INST_R_HDR_LEN;
+	if (rlxfw_spi_inst_be16(img + 4) != RLXFW_SPI_INST_CFG_FORMAT ||
+	    rlxfw_spi_inst_be16(img + 6) != RLXFW_SPI_INST_CFG_HDR_LEN)
+		return RLXFW_SPI_INST_R_HDR_FORMAT;
+	seq = rlxfw_spi_inst_be32(img + 8);
+	if (seq == 0u || seq > RLXFW_SPI_INST_CFG_SEQ_MAX)
+		return RLXFW_SPI_INST_R_HDR_SEQ;
+	return RLXFW_SPI_INST_OK;
+}
+
 static inline int rlxfw_spi_inst_chk_payload(const u8 *img, u32 len,
 				const struct rlxfw_spi_inst_region *rg)
 {
@@ -594,6 +790,8 @@ static inline int rlxfw_spi_inst_chk_payload(const u8 *img, u32 len,
 		return rlxfw_spi_inst_chk_rlxu(img, len, rg->base);
 	if (rg->kind == RLXFW_SPI_INST_K_CR6C)
 		return rlxfw_spi_inst_chk_cr6c(img, len, rg->base);
+	if (rg->kind == RLXFW_SPI_INST_K_CFG)
+		return rlxfw_spi_inst_chk_cfg(img, len);
 	if (rg->kind == RLXFW_SPI_INST_K_PROBE)
 		return RLXFW_SPI_INST_R_PROBE_ONLY;
 	return RLXFW_SPI_INST_R_ERASE_ONLY;	/* the barrier takes no payload */
@@ -869,6 +1067,185 @@ static inline void rlxfw_spi_inst_probe_begin(struct rlxfw_spi_inst_probe *p)
 }
 
 /* ------------------------------------------------------------------------
+ * The counter.  P6r-11, notes/self-update.md § 2.4.
+ *
+ * `ctr <N>` advances the anti-rollback counter at RLXFW_SPI_INST_STATE to N by
+ * programming bits only -- the plan holds no erase op, by construction -- one
+ * bit per page program, ascending, each op one byte inside the bitmap.  The
+ * decode is rlxboot's (src/rlxboot/container.c rlxu_counter_from_bitmap): the
+ * value is the leading run of zero bits, MSB first within a byte, bytes in
+ * address order; a zero after the first one is MALFORMED and the value is then
+ * the TOTAL zero count, never below the run.  Restated because the kernel
+ * cannot include it; the host test links rlxboot's function and compares.
+ *
+ * The checks, in the verb's order (§ 2.4.2): the value parsed and in range
+ * (the parser); the tie -- the value must be the version rlxboot booted on this
+ * boot, so an image rlxboot did not start never advances it (§ 2.4.5); then,
+ * on the bitmap as read, a value below the counter is CTR_BELOW, a zero at or
+ * above the value is CTR_MALFORMED (a bit cannot be set back without an
+ * erase), and a value equal to a well-formed counter is done with no op.
+ * ------------------------------------------------------------------------ */
+static inline u32 rlxfw_spi_inst_ctr_decode(const u8 *bm, int *malformed)
+{
+	u32 i, lead = 0u, total = 0u;
+	int b, seen_one = 0, bad = 0;
+
+	for (i = 0; i < RLXFW_SPI_INST_CTR_BYTES; i++) {
+		for (b = 7; b >= 0; b--) {
+			if (((bm[i] >> b) & 1u) == 0u) {
+				total++;
+				if (!seen_one)
+					lead++;
+				else
+					bad = 1;
+			} else {
+				seen_one = 1;
+			}
+		}
+	}
+	*malformed = bad;
+	return bad ? total : lead;
+}
+
+/* Bit b of the bitmap: byte b/8, MSB first. */
+static inline int rlxfw_spi_inst_ctr_bit(const u8 *bm, u32 b)
+{
+	return (int)((bm[b >> 3] >> (7u - (b & 7u))) & 1u);
+}
+
+/* The byte one page program writes to clear bit b: 0 from the byte's MSB down
+ * to b, 1 after it.  A program only takes bits from 1 to 0 (JEDEC PP; the
+ * part's datasheet is not in hand, FW-191), so it clears bit b, leaves every
+ * later bit alone, and programs the byte's earlier bits again, which on a
+ * well-formed advance are already 0 -- a marginal one left by a cut included
+ * (§ 2.4.3).  W3's six bytes are 7F 3F 1F 0F 07 03. */
+static inline u8 rlxfw_spi_inst_ctr_value(u32 b)
+{
+	return (u8)(0xFFu >> ((b & 7u) + 1u));
+}
+
+/* The tie: ho_ok and ho_ver are what rlxboot handed over at the jump. */
+static inline int rlxfw_spi_inst_ctr_tie(u32 n, int ho_ok, u32 ho_ver)
+{
+	if (!ho_ok || ho_ver != n)
+		return RLXFW_SPI_INST_R_CTR_HANDOFF;
+	return RLXFW_SPI_INST_OK;
+}
+
+/* The refusals on the bitmap as read, and the programs the advance takes:
+ * one per bit below n that reads 1. */
+static inline int rlxfw_spi_inst_ctr_check(const u8 *bm, u32 n, u32 *cur,
+					   int *malformed, u32 *nops)
+{
+	u32 b;
+
+	*nops = 0u;
+	*cur = rlxfw_spi_inst_ctr_decode(bm, malformed);
+	if (n < *cur)
+		return RLXFW_SPI_INST_R_CTR_BELOW;
+	for (b = n; b < RLXFW_SPI_INST_CTR_BITS; b++)
+		if (!rlxfw_spi_inst_ctr_bit(bm, b))
+			return RLXFW_SPI_INST_R_CTR_MALFORMED;
+	for (b = 0; b < n; b++)
+		if (rlxfw_spi_inst_ctr_bit(bm, b))
+			(*nops)++;
+	return RLXFW_SPI_INST_OK;
+}
+
+/* The next bit to clear: the lowest b in [from, n) that reads 1 on the bitmap
+ * as read before the first program, or n when none is left.  The kernel loop
+ * and the host test walk the plan through this one function. */
+static inline u32 rlxfw_spi_inst_ctr_next(const u8 *bm, u32 n, u32 from)
+{
+	u32 b;
+
+	for (b = from; b < n; b++)
+		if (rlxfw_spi_inst_ctr_bit(bm, b))
+			return b;
+	return n;
+}
+
+/* After the programs: the bitmap read back must decode to n, well-formed.
+ * After a write this is a failure, not a refusal. */
+static inline int rlxfw_spi_inst_ctr_verify(const u8 *bm, u32 n)
+{
+	int bad;
+
+	if (rlxfw_spi_inst_ctr_decode(bm, &bad) != n || bad)
+		return RLXFW_SPI_INST_R_CTR_CMP;
+	return RLXFW_SPI_INST_OK;
+}
+
+/* ------------------------------------------------------------------------
+ * The counter's scratch loop.  P6r-11's cut rounds, § 2.7.
+ *
+ * `ctrloop <p>`, under an arm equal to the probe block: per pass one SE of the
+ * 4 KiB sector at the probe base, then 4,096 one-bit programs of a bitmap AT
+ * THE PROBE BASE with the counter's own value function, so a cut lands inside
+ * the routine that advances the real counter, on a block that is not the state
+ * block; after the last pass one SE more, so `eraseprobe` finds the block
+ * clean.  p x 4,097 + 1 ops.  What it measures and what it cannot: the routine
+ * under a cut, and repeated partial programming of one page, not the state
+ * block (P6r-11's own does-not-establish).
+ * ------------------------------------------------------------------------ */
+#define RLXFW_SPI_INST_LOOP_OPS	(RLXFW_SPI_INST_CTR_BITS + 1u)	/* SE + 4,096 */
+
+struct rlxfw_spi_inst_ctrop {
+	int kind;		/* RLXFW_SPI_INST_OP_ERASE, _PROG or _END */
+	u32 addr;		/* the SE's base, or the byte programmed */
+	u8 val;			/* what a program writes */
+	u32 pass, bit;		/* the pass; the bit a program clears */
+};
+
+static inline u32 rlxfw_spi_inst_loop_nops(u32 passes)
+{
+	return passes * RLXFW_SPI_INST_LOOP_OPS + 1u;
+}
+
+static inline int rlxfw_spi_inst_loop_op(u32 passes, u32 i,
+					 struct rlxfw_spi_inst_ctrop *op)
+{
+	u32 j;
+
+	op->kind = RLXFW_SPI_INST_OP_END;
+	op->addr = op->pass = op->bit = 0u;
+	op->val = 0xFFu;
+	if (i >= rlxfw_spi_inst_loop_nops(passes))
+		return op->kind;
+	op->pass = i / RLXFW_SPI_INST_LOOP_OPS;
+	j = i % RLXFW_SPI_INST_LOOP_OPS;
+	if (j == 0u) {		/* each pass's SE, and the one after them */
+		op->kind = RLXFW_SPI_INST_OP_ERASE;
+		op->addr = RLXFW_SPI_INST_PROBE_BASE;
+		return op->kind;
+	}
+	op->kind = RLXFW_SPI_INST_OP_PROG;
+	op->bit = j - 1u;
+	op->addr = RLXFW_SPI_INST_PROBE_BASE + (op->bit >> 3);
+	op->val = rlxfw_spi_inst_ctr_value(op->bit);
+	return op->kind;
+}
+
+/* ------------------------------------------------------------------------
+ * The running-slot fence.  P6r-10, § 2.5.
+ *
+ * An install never writes the slot rlxboot booted on this boot: ho_slot is the
+ * slot rlxboot handed over at the jump, 'A' or 'B', and 0 for none.  The update
+ * path never needs that slot, so the fence costs nothing; a RAM boot has no
+ * handoff, so the bench's own installs are unaffected.
+ * ------------------------------------------------------------------------ */
+static inline int rlxfw_spi_inst_fence(const struct rlxfw_spi_inst_region *rg,
+				       int ho_slot)
+{
+	if (rg->kind != RLXFW_SPI_INST_K_RLXU)
+		return RLXFW_SPI_INST_OK;
+	if ((ho_slot == 'A' && rg->base == RLXFW_SPI_INST_SLOTA_BASE) ||
+	    (ho_slot == 'B' && rg->base == RLXFW_SPI_INST_SLOTB_BASE))
+		return RLXFW_SPI_INST_R_RUNNING_SLOT;
+	return RLXFW_SPI_INST_OK;
+}
+
+/* ------------------------------------------------------------------------
  * The results.  Zero-initialised means "nothing has run", field by field,
  * so the kernel's static needs no init call: region is index+1, the two
  * verdicts have a separate `checked`, and cmp_first is printed as -1 while
@@ -1021,7 +1398,10 @@ static inline int rlxfw_spi_inst_emit(char *p,
 /* Console lines.  D10: per 64 KiB block, the block index and ms since the
  * attempt began; a paced run says so on every line.  `ph` is E (erase), P
  * (program), H (the header page, last), V (read-back). */
-#define RLXFW_SPI_INST_SAY_MAX		96
+/* 96 until 1.1; the counter's END line is 104 bytes at its widest (every
+ * field at its u32 maximum, the longest reason), so 128.  The host test
+ * measures every line format against it. */
+#define RLXFW_SPI_INST_SAY_MAX		128
 
 static inline int rlxfw_spi_inst_fmt_step(char *b, int ph, u32 blk, u32 ms,
 					  u32 pace)
@@ -1060,6 +1440,91 @@ static inline int rlxfw_spi_inst_fmt_end(char *b,
 	return sprintf(b, "RLXFW-SI-END %s rc=%d cmp=%d ms=%u pace=%u\n",
 		       rlxfw_spi_inst_reason_name(r->reason), r->rc, r->cmp_ok,
 		       (unsigned)r->ms, (unsigned)r->pace_ms);
+}
+
+/* ------------------------------------------------------------------------
+ * The counter's results and lines, P6r-11.  Zero-initialised means "never
+ * run"; a block of its own beside rlxfw_spi_inst_emit's, under its own budget,
+ * which the host test measures at the widest state.
+ * ------------------------------------------------------------------------ */
+struct rlxfw_spi_inst_ctr_st {
+	u32 attempts, done, refused, failed;
+	int ran, reason, malformed;	/* malformed: the bitmap as read */
+	u32 cur, newv, read, pp, ms;	/* read: the value read back */
+	int loop_ran, loop_reason;
+	u32 loop_passes, loop_done, loop_ops, loop_ms;
+};
+
+#define RLXFW_SPI_INST_CTR_PROC_MAX	512
+
+static inline int rlxfw_spi_inst_emit_ctr(char *p,
+				const struct rlxfw_spi_inst_ctr_st *c)
+{
+	int len = 0;
+
+	len += sprintf(p + len, "ctr_attempts %u\n", (unsigned)c->attempts);
+	len += sprintf(p + len, "ctr_done %u\n", (unsigned)c->done);
+	len += sprintf(p + len, "ctr_refused %u\n", (unsigned)c->refused);
+	len += sprintf(p + len, "ctr_failed %u\n", (unsigned)c->failed);
+	len += sprintf(p + len, "ctr_ran %d\n", RLXFW_SPI_INST_B(c->ran));
+	len += sprintf(p + len, "ctr_reason %s\n",
+		       rlxfw_spi_inst_reason_name(c->reason));
+	len += sprintf(p + len, "ctr_cur %u\n", (unsigned)c->cur);
+	len += sprintf(p + len, "ctr_malformed %d\n",
+		       RLXFW_SPI_INST_B(c->malformed));
+	len += sprintf(p + len, "ctr_new %u\n", (unsigned)c->newv);
+	len += sprintf(p + len, "ctr_read %u\n", (unsigned)c->read);
+	len += sprintf(p + len, "ctr_pp %u\n", (unsigned)c->pp);
+	len += sprintf(p + len, "ctr_ms %u\n", (unsigned)c->ms);
+	len += sprintf(p + len, "loop_ran %d\n", RLXFW_SPI_INST_B(c->loop_ran));
+	len += sprintf(p + len, "loop_reason %s\n",
+		       rlxfw_spi_inst_reason_name(c->loop_reason));
+	len += sprintf(p + len, "loop_passes %u\n", (unsigned)c->loop_passes);
+	len += sprintf(p + len, "loop_done %u\n", (unsigned)c->loop_done);
+	len += sprintf(p + len, "loop_ops %u\n", (unsigned)c->loop_ops);
+	len += sprintf(p + len, "loop_ms %u\n", (unsigned)c->loop_ms);
+	return len;
+}
+
+/* `ctr`'s console lines, before the first op and after the read-back. */
+static inline int rlxfw_spi_inst_fmt_ctr_go(char *b, u32 cur, u32 newv)
+{
+	return sprintf(b, "RLXFW-SC-GO cur=%u new=%u\n", (unsigned)cur,
+		       (unsigned)newv);
+}
+
+static inline int rlxfw_spi_inst_fmt_ctr_end(char *b,
+				const struct rlxfw_spi_inst_ctr_st *c)
+{
+	return sprintf(b, "RLXFW-SC-END %s cur=%u new=%u read=%u pp=%u ms=%u\n",
+		       rlxfw_spi_inst_reason_name(c->reason), (unsigned)c->cur,
+		       (unsigned)c->newv, (unsigned)c->read, (unsigned)c->pp,
+		       (unsigned)c->ms);
+}
+
+/* `ctrloop`'s progress, every 256 bits and around each pass's SE, so the
+ * phase a cut hit is the last line captured before it. */
+#define RLXFW_SPI_INST_LOOP_EVERY	256u
+
+static inline int rlxfw_spi_inst_fmt_loop(char *b, u32 pass, int what,
+					  u32 bit, u32 ms)
+{
+	if (what == 'e')
+		return sprintf(b, "RLXFW-SL p=%u erase\n", (unsigned)pass);
+	if (what == 'E')
+		return sprintf(b, "RLXFW-SL p=%u erased ms=%u\n", (unsigned)pass,
+			       (unsigned)ms);
+	return sprintf(b, "RLXFW-SL p=%u bit=%u ms=%u\n", (unsigned)pass,
+		       (unsigned)bit, (unsigned)ms);
+}
+
+/* `ctrloop show`: the scratch bitmap's value and two flags, never a byte. */
+static inline int rlxfw_spi_inst_fmt_scratch(char *b, u32 value,
+					     int malformed, int erased)
+{
+	return sprintf(b, "ctrscratch value=%u malformed=%d erased=%d\n",
+		       (unsigned)value, RLXFW_SPI_INST_B(malformed),
+		       RLXFW_SPI_INST_B(erased));
 }
 
 #endif /* RTL819X_SPI_INSTALL_H */

@@ -28,6 +28,15 @@
  *     runs the unmutated suite first and requires every mutation to go red,
  *     and it also mutates the HEADER's source and requires red.
  *  4. D11's union check has a negative control that must come out unequal.
+ *
+ * 1.1 (P6r-10, P6r-11; notes/self-update.md § 2.8).  The runner compiles this
+ * file twice: with -DCONFIG_MTD_RTL819X_PROVISION, the provisioning table, and
+ * without it, the SHIPPED table, which names nothing below slot A.  A reason
+ * only the provisioning table can produce is exempt BY NAME in the shipped
+ * build and checked both ways there too.  The store's payload cases run on slot
+ * images src/cfgstore's host build PRODUCED, and the counter's decode is
+ * compared with rlxboot's own, linked from src/rlxboot/container.c
+ * (-DWITH_CONTAINER_C), on every well-formed bitmap.
  */
 
 #include <stdio.h>
@@ -45,6 +54,9 @@ typedef unsigned char u8;
 #include "container.h"
 #include "rlxboot.h"	/* Gap B's slot layout: the reader of what this writes */
 #endif
+#ifdef WITH_CFG_H
+#include "cfg.h"	/* the store's record: the second source for K_CFG */
+#endif
 
 #define OK	RLXFW_SPI_INST_OK
 #define NREG	RLXFW_SPI_INST_NREGIONS
@@ -52,8 +64,14 @@ typedef unsigned char u8;
 #define PAGE	RLXFW_SPI_WR_PAGE
 #define BLOCK	RLXFW_SPI_INST_BLOCK
 #define CHIP	RLXFW_SPI_WR_CHIP
+#define PROV	RLXFW_SPI_INST_PROVISION
 
-enum { I_RLXBOOT, I_RESCUE, I_BARRIER, I_SLOTA, I_SLOTB, I_PROBE };
+#if PROV
+enum { I_RLXBOOT, I_RESCUE, I_BARRIER, I_SLOTA, I_SLOTB, I_CFG0, I_CFG1,
+       I_PROBE };
+#else
+enum { I_SLOTA, I_SLOTB, I_CFG0, I_CFG1, I_PROBE };
+#endif
 
 /* ------------------------------------------------------------------ cases */
 
@@ -176,6 +194,7 @@ static void t_table(void)
 	}
 	ckb("D12 the staging capacity is the largest region (1,179,648)",
 	    RLXFW_SPI_INST_IMG_CAP == maxsz && maxsz == 1179648u);
+#if PROV
 	ckb("D1 layout: rlxboot 010000/64K rescue 020000/64K",
 	    REG(I_RLXBOOT)->base == 0x010000u && REG(I_RLXBOOT)->size == 65536u
 	    && REG(I_RESCUE)->base == 0x020000u &&
@@ -184,18 +203,49 @@ static void t_table(void)
 	    REG(I_BARRIER)->base == 0x030000u &&
 	    REG(I_BARRIER)->size == 262144u &&
 	    REG(I_BARRIER)->kind == RLXFW_SPI_INST_K_ERASE);
-	ckb("D1 layout: slotA 070000/1,179,648 slotB 190000/1,179,648",
-	    REG(I_SLOTA)->base == 0x070000u && REG(I_SLOTA)->size == 1179648u
-	    && REG(I_SLOTB)->base == 0x190000u &&
-	    REG(I_SLOTB)->size == 1179648u);
 	ckb("slots hold RLXU, rlxboot/rescue hold a stock-loader image (cs6c)",
 	    REG(I_SLOTA)->kind == RLXFW_SPI_INST_K_RLXU &&
 	    REG(I_SLOTB)->kind == RLXFW_SPI_INST_K_RLXU &&
 	    REG(I_RLXBOOT)->kind == RLXFW_SPI_INST_K_CR6C &&
 	    REG(I_RESCUE)->kind == RLXFW_SPI_INST_K_CR6C);
+#else
+	/* P6r-10: the shipped table names nothing below slot A */
+	ckb("shipped table: slotA is the first region, its base the lowest "
+	    "nameable byte, 0x070000",
+	    REG(0)->base == 0x070000u && I_SLOTA == 0 && NREG == 5);
+	for (i = 0; i < NREG; i++)
+		if (REG(i)->base < 0x070000u ||
+		    REG(i)->kind == RLXFW_SPI_INST_K_CR6C ||
+		    REG(i)->kind == RLXFW_SPI_INST_K_ERASE)
+			ckb("shipped table: no region below slot A, no cs6c, "
+			    "no barrier", 0);
+	ckb("shipped table: slots hold RLXU",
+	    REG(I_SLOTA)->kind == RLXFW_SPI_INST_K_RLXU &&
+	    REG(I_SLOTB)->kind == RLXFW_SPI_INST_K_RLXU);
+#endif
+	ckb("D1 layout: slotA 070000/1,179,648 slotB 190000/1,179,648",
+	    REG(I_SLOTA)->base == 0x070000u && REG(I_SLOTA)->size == 1179648u
+	    && REG(I_SLOTB)->base == 0x190000u &&
+	    REG(I_SLOTB)->size == 1179648u);
+	ckb("P6r-10 store: cfg0 3C0000/64K cfg1 3D0000/64K, K_CFG, after slot "
+	    "B, before the probe",
+	    REG(I_CFG0)->base == 0x3C0000u && REG(I_CFG0)->size == 65536u &&
+	    REG(I_CFG1)->base == 0x3D0000u && REG(I_CFG1)->size == 65536u &&
+	    REG(I_CFG0)->kind == RLXFW_SPI_INST_K_CFG &&
+	    REG(I_CFG1)->kind == RLXFW_SPI_INST_K_CFG &&
+	    REG(I_CFG0)->base >= REG(I_SLOTB)->base + REG(I_SLOTB)->size &&
+	    REG(I_CFG1)->base + REG(I_CFG1)->size <= REG(I_PROBE)->base);
+	ckb("P6r-10 store: both regions inside [0x2B0000, 0x3E0000), the free "
+	    "area the DoD names",
+	    REG(I_CFG0)->base >= 0x2B0000u &&
+	    REG(I_CFG1)->base + REG(I_CFG1)->size <= 0x3E0000u);
+	ckb("P6r-10 store: no erase grain (4 KiB or 64 KiB, FW-187) reaches "
+	    "both regions: each is a whole 64 KiB block of its own",
+	    REG(I_CFG0)->base / BLOCK != REG(I_CFG1)->base / BLOCK &&
+	    REG(I_CFG0)->base % BLOCK == 0u && REG(I_CFG1)->base % BLOCK == 0u);
 	ckb("D19 probe: 3E0000/64K, after slot B, ends where the state block "
 	    "begins, probe-only",
-	    NREG == 6 && REG(I_PROBE)->base == 0x3E0000u &&
+	    NREG == 5 + 3 * PROV && REG(I_PROBE)->base == 0x3E0000u &&
 	    REG(I_PROBE)->size == 65536u &&
 	    REG(I_PROBE)->base >= REG(I_SLOTB)->base + REG(I_SLOTB)->size &&
 	    REG(I_PROBE)->base + REG(I_PROBE)->size == RLXFW_SPI_INST_STATE &&
@@ -239,6 +289,17 @@ static void t_parse(void)
 	ck("install slotB sha=<64 UPPER> pace=500", r, OK);
 	ckb("  ... names slotB, pace 500, same digest",
 	    rq.region == I_SLOTB && rq.pace_ms == 500u && rq.sha[10] == 0xAAu);
+	ck("erase cfg0 (P6r-10: the store's regions are erasable)",
+	   parse("erase cfg0", &rq), OK);
+	ckb("  ... names cfg0, verb erase, no digest",
+	    rq.region == I_CFG0 && rq.verb == RLXFW_SPI_INST_V_ERASE);
+	ck("erase cfg1 pace=1", parse("erase cfg1 pace=1", &rq), OK);
+	snprintf(b, sizeof(b), "erase cfg0 sha=%s", HEX_LO);
+	ck("erase cfg0 with a digest (no payload)", parse(b, &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	ck("erase cfg0 extra", parse("erase cfg0 extra", &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+#if PROV
 	snprintf(b, sizeof(b), "install rlxboot sha=%s pace=30000", HEX_LO);
 	ck("install rlxboot ... pace=30000 (the longest line)", parse(b, &rq),
 	   OK);
@@ -257,6 +318,23 @@ static void t_parse(void)
 	ckb("  ... erase barrier names the barrier, no digest",
 	    rq.region == I_BARRIER && rq.verb == RLXFW_SPI_INST_V_ERASE);
 	ck("erase barrier pace=1", parse("erase barrier pace=1", &rq), OK);
+#else
+	snprintf(b, sizeof(b), "install rlxboot sha=%s", HEX_LO);
+	ck("shipped: install rlxboot is not nameable", parse(b, &rq),
+	   RLXFW_SPI_INST_R_REGION);
+	snprintf(b, sizeof(b), "install rescue sha=%s", HEX_LO);
+	ck("shipped: install rescue is not nameable", parse(b, &rq),
+	   RLXFW_SPI_INST_R_REGION);
+	ck("shipped: erase barrier is not nameable",
+	   parse("erase barrier", &rq), RLXFW_SPI_INST_R_REGION);
+	ck("shipped: erase rlxboot is not nameable",
+	   parse("erase rlxboot", &rq), RLXFW_SPI_INST_R_REGION);
+	snprintf(b, sizeof(b), "install slotA sha=%s pace=30000", HEX_LO);
+	ck("shipped: install slotA ... pace=30000 (its longest line)",
+	   parse(b, &rq), OK);
+	ckb("  ... 93 bytes, under the 128-byte buffer",
+	    strlen(b) == 93u && strlen(b) + 1u < RLXFW_SPI_INST_LINE_MAX);
+#endif
 
 	ck("empty line", parse("", &rq), RLXFW_SPI_INST_R_SYNTAX);
 	ck("install (alone)", parse("install", &rq), RLXFW_SPI_INST_R_SYNTAX);
@@ -292,11 +370,13 @@ static void t_parse(void)
 	snprintf(b, sizeof(b), "Install slotA sha=%s", HEX_LO);
 	ck("Install, capitalised", parse(b, &rq), RLXFW_SPI_INST_R_SYNTAX);
 	ck("erase (alone)", parse("erase", &rq), RLXFW_SPI_INST_R_SYNTAX);
+#if PROV
 	snprintf(b, sizeof(b), "erase barrier sha=%s", HEX_LO);
 	ck("erase barrier with a digest (no payload)", parse(b, &rq),
 	   RLXFW_SPI_INST_R_SYNTAX);
 	ck("erase barrier extra", parse("erase barrier extra", &rq),
 	   RLXFW_SPI_INST_R_SYNTAX);
+#endif
 
 	/* D1/D6: no address is nameable, in any spelling. */
 	snprintf(b, sizeof(b), "install slota sha=%s", HEX_LO);
@@ -332,15 +412,20 @@ static void t_parse(void)
 	snprintf(b, sizeof(b), "install probe sha=%s", HEX_LO);
 	ck("install probe", parse(b, &rq), RLXFW_SPI_INST_R_PROBE_ONLY);
 
-	/* D2/D6: the barrier is erase-only and only the barrier is erased. */
-	snprintf(b, sizeof(b), "install barrier sha=%s", HEX_LO);
-	ck("install barrier", parse(b, &rq), RLXFW_SPI_INST_R_ERASE_ONLY);
+	/* D2/D6: the barrier is erase-only; only it and, since 1.1, the store's
+	 * regions are erased. */
 	ck("erase slotA", parse("erase slotA", &rq),
 	   RLXFW_SPI_INST_R_NOT_ERASABLE);
+	ck("erase slotB", parse("erase slotB", &rq),
+	   RLXFW_SPI_INST_R_NOT_ERASABLE);
+#if PROV
+	snprintf(b, sizeof(b), "install barrier sha=%s", HEX_LO);
+	ck("install barrier", parse(b, &rq), RLXFW_SPI_INST_R_ERASE_ONLY);
 	ck("erase rlxboot", parse("erase rlxboot", &rq),
 	   RLXFW_SPI_INST_R_NOT_ERASABLE);
 	ck("erase rescue", parse("erase rescue", &rq),
 	   RLXFW_SPI_INST_R_NOT_ERASABLE);
+#endif
 }
 
 /* ---------------------------------------------------------- C: arm match */
@@ -425,8 +510,8 @@ static void t_img(void)
 	im.len = cap;
 	ck("chk_img: slotA full", rlxfw_spi_inst_chk_img(&im, REG(I_SLOTA)),
 	   OK);
-	ck("chk_img: the same bytes for rlxboot", rlxfw_spi_inst_chk_img(&im,
-	   REG(I_RLXBOOT)), RLXFW_SPI_INST_R_IMG_SIZE);
+	ck("chk_img: the same bytes for cfg0 (64 KiB)", rlxfw_spi_inst_chk_img(&im,
+	   REG(I_CFG0)), RLXFW_SPI_INST_R_IMG_SIZE);
 	ckb("one byte past the capacity is refused and poisons",
 	    rlxfw_spi_inst_img_admit(&im, 1ul) == RLXFW_SPI_INST_IMG_OVERFLOW
 	    && im.err == RLXFW_SPI_INST_IMG_OVERFLOW && im.len == cap);
@@ -448,11 +533,11 @@ static void t_img(void)
 	    RLXFW_SPI_INST_IMG_OVERFLOW);
 	rlxfw_spi_inst_img_reset(&im);
 	im.len = 65536u;
-	ck("chk_img: rlxboot exactly full", rlxfw_spi_inst_chk_img(&im,
-	   REG(I_RLXBOOT)), OK);
+	ck("chk_img: cfg0 exactly full", rlxfw_spi_inst_chk_img(&im,
+	   REG(I_CFG0)), OK);
 	im.len = 65537u;
-	ck("chk_img: rlxboot one byte over", rlxfw_spi_inst_chk_img(&im,
-	   REG(I_RLXBOOT)), RLXFW_SPI_INST_R_IMG_SIZE);
+	ck("chk_img: cfg0 one byte over", rlxfw_spi_inst_chk_img(&im,
+	   REG(I_CFG0)), RLXFW_SPI_INST_R_IMG_SIZE);
 }
 
 /* --------------------------------------------------- F/G: the payloads */
@@ -517,10 +602,13 @@ static void t_payload(const char *dir)
 	ck("slotA container with format 1", pay(&A, A.n, I_SLOTA),
 	   RLXFW_SPI_INST_R_HDR_FORMAT);
 	A.p[5] ^= 3u;
-	ck("FW-168: a container where a cs6c must go (rescue)",
-	   pay(&A, A.n, I_RESCUE), RLXFW_SPI_INST_R_HDR_MAGIC);
 	ck("a cs6c where a container must go (slotA)", pay(&S, S.n, I_SLOTA),
 	   RLXFW_SPI_INST_R_HDR_MAGIC);
+	ck("payload check on the probe block", pay(&A, A.n, I_PROBE),
+	   RLXFW_SPI_INST_R_PROBE_ONLY);
+#if PROV
+	ck("FW-168: a container where a cs6c must go (rescue)",
+	   pay(&A, A.n, I_RESCUE), RLXFW_SPI_INST_R_HDR_MAGIC);
 
 	ck("producer's rlxboot.cs6c on rlxboot", pay(&R, R.n, I_RLXBOOT), OK);
 	ck("producer's rescue.cs6c on rescue (full 64 KiB)",
@@ -547,8 +635,7 @@ static void t_payload(const char *dir)
 	R.p[100] ^= 0x01u;
 	ck("payload check on the barrier", pay(&R, R.n, I_BARRIER),
 	   RLXFW_SPI_INST_R_ERASE_ONLY);
-	ck("payload check on the probe block", pay(&R, R.n, I_PROBE),
-	   RLXFW_SPI_INST_R_PROBE_ONLY);
+#endif
 	free(A.p); free(AF.p); free(B.p); free(AP.p); free(NF.p); free(R.p);
 	free(S.p); free(LR.p); free(LS.p);
 }
@@ -715,7 +802,10 @@ static void t_plan(u32 lenA)
 	u32 i, nops;
 	int k;
 
+#if PROV
 	t_plan_one(REG(I_BARRIER), 0u);
+#endif
+	t_plan_one(REG(I_CFG0), 0u);	/* `erase cfg0`: an erase-only plan */
 	for (k = 0; k < NREG; k++) {
 		const struct rlxfw_spi_inst_region *r = REG(k);
 		int j;
@@ -751,9 +841,9 @@ static void t_plan(u32 lenA)
 	ck("plan_init: grain above a block", rlxfw_spi_inst_plan_init(&pl,
 	   REG(I_SLOTA), 1u, 0x20000u), RLXFW_SPI_INST_R_POLICY);
 	ck("plan_init: more bytes than the region", rlxfw_spi_inst_plan_init(
-	   &pl, REG(I_RLXBOOT), 65537u, 0x1000u), RLXFW_SPI_INST_R_IMG_SIZE);
+	   &pl, REG(I_CFG0), 65537u, 0x1000u), RLXFW_SPI_INST_R_IMG_SIZE);
 	ckb("op past the end of the plan is END",
-	    rlxfw_spi_inst_plan_init(&pl, REG(I_RLXBOOT), 300u, 0x1000u) == OK
+	    rlxfw_spi_inst_plan_init(&pl, REG(I_CFG0), 300u, 0x1000u) == OK
 	    && rlxfw_spi_inst_op(&pl, rlxfw_spi_inst_nops(&pl), &op) ==
 	    RLXFW_SPI_INST_OP_END && rlxfw_spi_inst_nops(&pl) == 16u + 2u);
 }
@@ -979,6 +1069,28 @@ static void t_probe(void)
 
 /* ---------------------------------------------- K: what /proc can print */
 
+/* The widest state is computed from the tables, never named by hand: 1.1
+ * added a reason longer than the one this case used to call "the longest". */
+static int longest_reason(void)
+{
+	int i, best = 1;
+
+	for (i = 1; i < RLXFW_SPI_INST_R_COUNT; i++)
+		if (strlen(rn(i)) > strlen(rn(best)))
+			best = i;
+	return best;
+}
+
+static int longest_region1(void)
+{
+	int i, best = 0;
+
+	for (i = 0; i < NREG; i++)
+		if (strlen(REG(i)->name) > strlen(REG(best)->name))
+			best = i;
+	return best + 1;
+}
+
 static void t_emit(void)
 {
 	static char page[8192];
@@ -1021,9 +1133,9 @@ static void t_emit(void)
 	/* the widest state the fields can hold */
 	s.attempts = s.done = s.refused = s.failed = 0xFFFFFFFFu;
 	s.r.ran = INT_MIN;
-	s.r.reason = RLXFW_SPI_INST_R_PROBE_ANOMALY;	/* the longest name */
+	s.r.reason = longest_reason();
 	s.r.verb = RLXFW_SPI_INST_V_PROBE;		/* the longest verb */
-	s.r.region1 = I_RLXBOOT + 1;
+	s.r.region1 = longest_region1();
 	s.r.base = s.r.size = s.r.len = s.r.pace_ms = 0xFFFFFFFFu;
 	s.r.rc = s.r.policy = s.r.arm_ok = s.r.sha_checked = INT_MIN;
 	s.r.sha_ok = s.r.hdr_checked = s.r.hdr_ok = INT_MIN;
@@ -1054,7 +1166,7 @@ static void t_emit(void)
 	n = rlxfw_spi_inst_fmt_go(page, &s.r);
 	if (n > w)
 		w = n;
-	s.r.reason = RLXFW_SPI_INST_R_PROBE_ANOMALY;
+	s.r.reason = longest_reason();
 	n = rlxfw_spi_inst_fmt_end(page, &s.r);
 	if (n > w)
 		w = n;
@@ -1112,10 +1224,596 @@ static void t_container_h(void)
 	    RLXB_SLOT_SIZE == RLXFW_SPI_INST_SLOTB_SIZE);
 	ckb("rlxboot.h's counter block == the installer's state block",
 	    RLXB_CTR_FLASH == RLXFW_SPI_INST_STATE);
+	ckb("container.h's counter bitmap == the installer's (512 bytes)",
+	    RLXU_CTR_BYTES == RLXFW_SPI_INST_CTR_BYTES &&
+	    RLXFW_SPI_INST_CTR_BITS == 8u * RLXFW_SPI_INST_CTR_BYTES);
 #else
 	ckb("built WITHOUT container.h: the RLXU offsets have no second "
 	    "source in this run", 0);
 #endif
+#ifdef WITH_CFG_H
+	/* P6r-10: the store's record has two owners for the same reason --
+	 * src/lib/cfg.h writes it, the install header checks it -- so the
+	 * agreement is enforced here (notes/self-update.md § 3.7). */
+	ckb("cfg.h's slot size == the installer's K_CFG length (4,096)",
+	    CFG_SLOT_SIZE == RLXFW_SPI_INST_CFG_SLOT);
+	ckb("cfg.h's magic, format and header length == the installer's",
+	    CFG_MAGIC == RLXFW_SPI_INST_CFG_MAGIC &&
+	    CFG_FORMAT == RLXFW_SPI_INST_CFG_FORMAT &&
+	    CFG_HDR_LEN == RLXFW_SPI_INST_CFG_HDR_LEN);
+	ckb("cfg.h's seq range == the installer's (1 .. 0xFFFFFFFE)",
+	    CFG_SEQ_MIN == 1u && CFG_SEQ_MAX == RLXFW_SPI_INST_CFG_SEQ_MAX);
+	ckb("one store slot fits a store region, and the staging buffer",
+	    CFG_SLOT_SIZE <= RLXFW_SPI_INST_CFG0_SIZE &&
+	    CFG_SLOT_SIZE <= RLXFW_SPI_INST_IMG_CAP);
+#else
+	ckb("built WITHOUT cfg.h: the store record has no second source in "
+	    "this run", 0);
+#endif
+}
+
+/* ------------------------------------------- P6r-10: the store's payload */
+
+/* The producer's slot image, `cfgstore --file X init --force` then `set`,
+ * cut by the runner from the two-slot file: seq 1 in slot 0, seq 2 in slot 1. */
+static void t_cfg(const char *dir)
+{
+	struct blob C1 = load(dir, "cfg-seq1.bin");
+	struct blob C2 = load(dir, "cfg-seq2.bin");
+	struct blob A = load(dir, "slotA.rlxu");
+	struct rlxfw_spi_inst_req rq;
+	u8 *big;
+	char b[256];
+	u32 save;
+
+	ckb("the producer's two slot images are 4,096 bytes, seq 1 and seq 2",
+	    C1.n == 4096u && C2.n == 4096u &&
+	    rlxfw_spi_inst_be32(C1.p + 8) == 1u &&
+	    rlxfw_spi_inst_be32(C2.p + 8) == 2u);
+	ck("producer's seq-1 slot image on cfg0", pay(&C1, C1.n, I_CFG0), OK);
+	ck("producer's seq-2 slot image on cfg1", pay(&C2, C2.n, I_CFG1), OK);
+	ck("a slot image on the other store region too (no flash_at: the "
+	   "store picks its slot)", pay(&C1, C1.n, I_CFG1), OK);
+	ck("a slot image less one byte (4,095)", pay(&C1, 4095u, I_CFG0),
+	   RLXFW_SPI_INST_R_HDR_LEN);
+	big = calloc(4097u, 1);
+	memcpy(big, C1.p, 4096u);
+	big[4096] = 0xFFu;
+	ck("a slot image plus one byte (4,097)",
+	   rlxfw_spi_inst_chk_payload(big, 4097u, REG(I_CFG0)),
+	   RLXFW_SPI_INST_R_HDR_LEN);
+	free(big);
+	ck("a slot image, 3 bytes", pay(&C1, 3u, I_CFG0),
+	   RLXFW_SPI_INST_R_HDR_MAGIC);
+	C1.p[3] ^= 1u;
+	ck("a slot image with its magic one bit off", pay(&C1, C1.n, I_CFG0),
+	   RLXFW_SPI_INST_R_HDR_MAGIC);
+	C1.p[3] ^= 1u;
+	C1.p[5] ^= 3u;			/* format 1 -> 2 */
+	ck("a slot image of format 2", pay(&C1, C1.n, I_CFG0),
+	   RLXFW_SPI_INST_R_HDR_FORMAT);
+	C1.p[5] ^= 3u;
+	C1.p[7] ^= 1u;			/* header length 24 -> 25 */
+	ck("a slot image declaring a 25-byte header", pay(&C1, C1.n, I_CFG0),
+	   RLXFW_SPI_INST_R_HDR_FORMAT);
+	C1.p[7] ^= 1u;
+	save = rlxfw_spi_inst_be32(C1.p + 8);
+	memset(C1.p + 8, 0x00, 4);
+	ck("a slot image with seq 0", pay(&C1, C1.n, I_CFG0),
+	   RLXFW_SPI_INST_R_HDR_SEQ);
+	memset(C1.p + 8, 0xFF, 4);
+	ck("a slot image with seq 0xFFFFFFFF (the erased value)",
+	   pay(&C1, C1.n, I_CFG0), RLXFW_SPI_INST_R_HDR_SEQ);
+	C1.p[8] = 0xFFu; C1.p[9] = 0xFFu; C1.p[10] = 0xFFu; C1.p[11] = 0xFEu;
+	ck("a slot image with seq 0xFFFFFFFE, the last valid one",
+	   pay(&C1, C1.n, I_CFG0), OK);
+	C1.p[8] = (u8)(save >> 24); C1.p[9] = (u8)(save >> 16);
+	C1.p[10] = (u8)(save >> 8); C1.p[11] = (u8)save;
+	ck("a container into cfg0", pay(&A, A.n, I_CFG0),
+	   RLXFW_SPI_INST_R_HDR_MAGIC);
+	ck("a slot image into slotA", pay(&C1, C1.n, I_SLOTA),
+	   RLXFW_SPI_INST_R_HDR_MAGIC);
+	ck("a slot image into slotB", pay(&C2, C2.n, I_SLOTB),
+	   RLXFW_SPI_INST_R_HDR_MAGIC);
+	ck("a slot image into the probe block", pay(&C1, C1.n, I_PROBE),
+	   RLXFW_SPI_INST_R_PROBE_ONLY);
+
+	snprintf(b, sizeof(b), "install cfg0 sha=%s", HEX_LO);
+	ck("install cfg0 sha=<64>", parse(b, &rq), OK);
+	ckb("  ... names cfg0, verb install", rq.region == I_CFG0 &&
+	    rq.verb == RLXFW_SPI_INST_V_INSTALL);
+	snprintf(b, sizeof(b), "install cfg1 sha=%s pace=200", HEX_LO);
+	ck("install cfg1 sha=<64> pace=200", parse(b, &rq), OK);
+	snprintf(b, sizeof(b), "install cfg2 sha=%s", HEX_LO);
+	ck("install cfg2 (no such region)", parse(b, &rq),
+	   RLXFW_SPI_INST_R_REGION);
+	ck("erase cfg", parse("erase cfg", &rq), RLXFW_SPI_INST_R_REGION);
+	free(C1.p); free(C2.p); free(A.p);
+}
+
+/* ---------------------------------- P6r-11: `ctr`, `ctrloop`, `repeat=` */
+
+static void t_ctr_parse(void)
+{
+	struct rlxfw_spi_inst_req rq;
+	char b[256];
+
+	ck("ctr 6", parse("ctr 6", &rq), OK);
+	ckb("  ... verb ctr, value 6, no region", rq.verb ==
+	    RLXFW_SPI_INST_V_CTR && rq.ctr_n == 6u && rq.region == -1);
+	ck("ctr 1", parse("ctr 1", &rq), OK);
+	ck("ctr 4096, the bitmap's last value", parse("ctr 4096", &rq), OK);
+	ckb("  ... value 4096", rq.ctr_n == 4096u);
+	ck("ctr 4097, one above", parse("ctr 4097", &rq),
+	   RLXFW_SPI_INST_R_CTR_ABOVE);
+	ck("ctr 9999", parse("ctr 9999", &rq), RLXFW_SPI_INST_R_CTR_ABOVE);
+	ck("ctr 0 (the first digit may not be 0)", parse("ctr 0", &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr 06", parse("ctr 06", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr -1", parse("ctr -1", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr 0x10", parse("ctr 0x10", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr 6 + a trailing space", parse("ctr 6 ", &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr 6 7", parse("ctr 6 7", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr (alone)", parse("ctr", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr + space", parse("ctr ", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr 99999 (five digits)", parse("ctr 99999", &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr  6 (a double space)", parse("ctr  6", &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr6 (no space)", parse("ctr6", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("Ctr 6, capitalised", parse("Ctr 6", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctr 0x3f0000 (an address is never typed)",
+	   parse("ctr 0x3f0000", &rq), RLXFW_SPI_INST_R_SYNTAX);
+
+	ck("ctrloop 30", parse("ctrloop 30", &rq), OK);
+	ckb("  ... parsed as ctrloop, not as ctr: 30 passes on the probe block",
+	    rq.verb == RLXFW_SPI_INST_V_CTRLOOP && rq.loops == 30u &&
+	    rq.region == I_PROBE && rq.ctr_n == 0u);
+	ck("ctrloop 1", parse("ctrloop 1", &rq), OK);
+	ck("ctrloop 64", parse("ctrloop 64", &rq), OK);
+	ck("ctrloop show", parse("ctrloop show", &rq), OK);
+	ckb("  ... verb show, the probe block", rq.verb ==
+	    RLXFW_SPI_INST_V_CTRSHOW && rq.region == I_PROBE);
+	ck("ctrloop 0", parse("ctrloop 0", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctrloop 65", parse("ctrloop 65", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctrloop 030", parse("ctrloop 030", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctrloop (alone)", parse("ctrloop", &rq), RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctrloop show x", parse("ctrloop show x", &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctrloop shows", parse("ctrloop shows", &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctrl 30 (neither verb)", parse("ctrl 30", &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	ck("ctrloops 30", parse("ctrloops 30", &rq), RLXFW_SPI_INST_R_SYNTAX);
+
+	snprintf(b, sizeof(b), "install slotB sha=%s repeat=5", HEX_LO);
+	ck("install slotB sha=<64> repeat=5", parse(b, &rq), OK);
+	ckb("  ... repeat 5, unpaced, slotB; 91 bytes, one --send under 127",
+	    rq.repeat == 5u && rq.pace_ms == 0u && rq.region == I_SLOTB &&
+	    strlen(b) == 91u &&
+	    strlen("echo ") + strlen(b) + strlen(" > /proc/rtl819x-spi") < 127u);
+	snprintf(b, sizeof(b), "install slotA sha=%s repeat=2", HEX_LO);
+	ck("repeat=2", parse(b, &rq), OK);
+	snprintf(b, sizeof(b), "install slotA sha=%s repeat=8", HEX_LO);
+	ck("repeat=8", parse(b, &rq), OK);
+	snprintf(b, sizeof(b), "install slotA sha=%s repeat=1", HEX_LO);
+	ck("repeat=1 (once is not a repeat)", parse(b, &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	snprintf(b, sizeof(b), "install slotA sha=%s repeat=9", HEX_LO);
+	ck("repeat=9", parse(b, &rq), RLXFW_SPI_INST_R_SYNTAX);
+	snprintf(b, sizeof(b), "install slotA sha=%s repeat=05", HEX_LO);
+	ck("repeat=05", parse(b, &rq), RLXFW_SPI_INST_R_SYNTAX);
+	snprintf(b, sizeof(b), "install slotA sha=%s repeat=", HEX_LO);
+	ck("repeat= with no number", parse(b, &rq), RLXFW_SPI_INST_R_SYNTAX);
+	snprintf(b, sizeof(b), "install slotA sha=%s repeat=5 pace=100", HEX_LO);
+	ck("repeat=5 pace=100 (never both)", parse(b, &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	snprintf(b, sizeof(b), "install slotA sha=%s pace=100 repeat=5", HEX_LO);
+	ck("pace=100 repeat=5 (never both)", parse(b, &rq),
+	   RLXFW_SPI_INST_R_SYNTAX);
+	snprintf(b, sizeof(b), "install cfg0 sha=%s repeat=2", HEX_LO);
+	ck("install cfg0 ... repeat=2 (slots only)", parse(b, &rq),
+	   RLXFW_SPI_INST_R_REPEAT_ONLY_SLOT);
+	ck("erase cfg1 repeat=2 (install only)", parse("erase cfg1 repeat=2",
+	   &rq), RLXFW_SPI_INST_R_SYNTAX);
+
+	ck("tie: handed over version 6, ctr 6", rlxfw_spi_inst_ctr_tie(6u, 1,
+	   6u), OK);
+	ck("tie: no handoff (a RAM boot), ctr 6", rlxfw_spi_inst_ctr_tie(6u, 0,
+	   6u), RLXFW_SPI_INST_R_CTR_HANDOFF);
+	ck("tie: handed over 5, ctr 6", rlxfw_spi_inst_ctr_tie(6u, 1, 5u),
+	   RLXFW_SPI_INST_R_CTR_HANDOFF);
+	ck("tie: handed over 7, ctr 6", rlxfw_spi_inst_ctr_tie(6u, 1, 7u),
+	   RLXFW_SPI_INST_R_CTR_HANDOFF);
+	ck("tie: handed over 4096, ctr 4096 (no burn past the booted version)",
+	   rlxfw_spi_inst_ctr_tie(4096u, 1, 4096u), OK);
+}
+
+/* A bitmap whose zero bits are exactly [0, c). */
+static void bm_lead(u8 *bm, u32 c)
+{
+	u32 b;
+
+	memset(bm, 0xFF, RLXFW_SPI_INST_CTR_BYTES);
+	for (b = 0; b < c; b++)
+		bm[b >> 3] &= (u8)~(0x80u >> (b & 7u));
+}
+
+static u32 popcount_bm(const u8 *bm)
+{
+	u32 i, n = 0;
+	int k;
+
+	for (i = 0; i < RLXFW_SPI_INST_CTR_BYTES; i++)
+		for (k = 0; k < 8; k++)
+			n += (bm[i] >> k) & 1u;
+	return n;
+}
+
+/* Walk the plan for n on bm (as read), applying each op to `model` the way a
+ * page program does (AND).  Returns 1 when every op was one byte inside the
+ * bitmap, cleared exactly one more bit, and the bits came in ascending order;
+ * *ops counts them. */
+static int walk(const u8 *bm, u32 n, u8 *model, u32 *ops)
+{
+	u32 b = rlxfw_spi_inst_ctr_next(bm, n, 0u), prev = 0u, before;
+	int ok = 1, first = 1;
+
+	*ops = 0u;
+	memcpy(model, bm, RLXFW_SPI_INST_CTR_BYTES);
+	while (b < n) {
+		u32 addr = RLXFW_SPI_INST_STATE + (b >> 3);
+
+		if (addr < RLXFW_SPI_INST_STATE ||
+		    addr >= RLXFW_SPI_INST_STATE + RLXFW_SPI_INST_CTR_BYTES)
+			ok = 0;
+		if (!first && b <= prev)
+			ok = 0;
+		before = popcount_bm(model);
+		model[b >> 3] &= rlxfw_spi_inst_ctr_value(b);
+		if (popcount_bm(model) + 1u != before ||
+		    rlxfw_spi_inst_ctr_bit(model, b))
+			ok = 0;
+		prev = b;
+		first = 0;
+		(*ops)++;
+		b = rlxfw_spi_inst_ctr_next(bm, n, b + 1u);
+	}
+	return ok;
+}
+
+static void t_ctr_plan(void)
+{
+	static u8 bm[512], model[512];
+	u32 c, n, cur, nops, ops, top;
+	int mal, okall = 1, nall = 0, r;
+
+	/* every c, every n from c to c+8: the advance a boot makes */
+	for (c = 0; c <= RLXFW_SPI_INST_CTR_BITS; c++) {
+		top = c + 8u < RLXFW_SPI_INST_CTR_BITS ? c + 8u :
+		      RLXFW_SPI_INST_CTR_BITS;
+		for (n = c; n <= top; n++) {
+			bm_lead(bm, c);
+			r = rlxfw_spi_inst_ctr_check(bm, n, &cur, &mal, &nops);
+			if (r != OK || cur != c || mal || nops != n - c ||
+			    !walk(bm, n, model, &ops) || ops != n - c ||
+			    rlxfw_spi_inst_ctr_decode(model, &mal) != n || mal ||
+			    rlxfw_spi_inst_ctr_verify(model, n) != OK)
+				okall = 0;
+			nall++;
+		}
+	}
+	ckb("H every c in 0..4096, n in c..c+8: n-c programs, one byte each "
+	    "inside the bitmap, one more bit each, ascending; decodes to n",
+	    okall && nall > 4096 * 8);
+	bm_lead(bm, 6u);
+	ck("ctr_check: 6 on a counter at 6 -- SAME, nothing to send",
+	   rlxfw_spi_inst_ctr_check(bm, 6u, &cur, &mal, &nops), OK);
+	ckb("  ... 0 programs", nops == 0u && cur == 6u && !mal);
+	bm_lead(bm, 0u);
+	ck("ctr_check: 0 -> 6, the round's first advance",
+	   rlxfw_spi_inst_ctr_check(bm, 6u, &cur, &mal, &nops), OK);
+	walk(bm, 6u, model, &ops);
+	ckb("  ... six one-byte programs at 0x3F0000, 7F 3F 1F 0F 07 03",
+	    nops == 6u && ops == 6u && model[0] == 0x03u && model[1] == 0xFFu &&
+	    rlxfw_spi_inst_ctr_value(0) == 0x7Fu &&
+	    rlxfw_spi_inst_ctr_value(1) == 0x3Fu &&
+	    rlxfw_spi_inst_ctr_value(2) == 0x1Fu &&
+	    rlxfw_spi_inst_ctr_value(3) == 0x0Fu &&
+	    rlxfw_spi_inst_ctr_value(4) == 0x07u &&
+	    rlxfw_spi_inst_ctr_value(5) == 0x03u);
+	bm_lead(bm, 6u);
+	ck("ctr_check: 6 -> 7, one byte at 0x3F0000, value 01",
+	   rlxfw_spi_inst_ctr_check(bm, 7u, &cur, &mal, &nops), OK);
+	ckb("  ... one program, value 01", nops == 1u &&
+	    rlxfw_spi_inst_ctr_value(6) == 0x01u);
+	ck("ctr_check: 5 on a counter at 6", rlxfw_spi_inst_ctr_check(bm, 5u,
+	   &cur, &mal, &nops), RLXFW_SPI_INST_R_CTR_BELOW);
+	ck("ctr_check: 1 on a counter at 6", rlxfw_spi_inst_ctr_check(bm, 1u,
+	   &cur, &mal, &nops), RLXFW_SPI_INST_R_CTR_BELOW);
+	bm_lead(bm, 6u);
+	bm[100 >> 3] &= (u8)~(0x80u >> (100u & 7u));	/* a stray zero at 100 */
+	ck("ctr_check: malformed, a zero at 100, ctr 7", rlxfw_spi_inst_ctr_check(
+	   bm, 7u, &cur, &mal, &nops), RLXFW_SPI_INST_R_CTR_MALFORMED);
+	ckb("  ... it reads malformed, value the total (7)", mal && cur == 7u);
+	ck("ctr_check: the same, ctr 100 (the zero is AT the value)",
+	   rlxfw_spi_inst_ctr_check(bm, 100u, &cur, &mal, &nops),
+	   RLXFW_SPI_INST_R_CTR_MALFORMED);
+	ck("ctr_check: the same, ctr 101 (every zero below it: repaired)",
+	   rlxfw_spi_inst_ctr_check(bm, 101u, &cur, &mal, &nops), OK);
+	ckb("  ... 94 programs, and the result is well-formed at 101",
+	    nops == 94u && walk(bm, 101u, model, &ops) && ops == 94u &&
+	    rlxfw_spi_inst_ctr_decode(model, &mal) == 101u && !mal);
+	bm_lead(bm, 0u);
+	bm[0] = 0x5Fu;			/* zeros at 0 and 2: 0101 1111 */
+	ck("ctr_check: zeros at 0 and 2, ctr 2 (the zero at 2 is at the value)",
+	   rlxfw_spi_inst_ctr_check(bm, 2u, &cur, &mal, &nops),
+	   RLXFW_SPI_INST_R_CTR_MALFORMED);
+	ck("ctr_check: zeros at 0 and 2, ctr 3 (repaired: bit 1 only)",
+	   rlxfw_spi_inst_ctr_check(bm, 3u, &cur, &mal, &nops), OK);
+	ckb("  ... one program", nops == 1u && walk(bm, 3u, model, &ops) &&
+	    rlxfw_spi_inst_ctr_decode(model, &mal) == 3u && !mal);
+	bm_lead(bm, 4096u);
+	ck("ctr_check: a full bitmap, ctr 4096 -- SAME",
+	   rlxfw_spi_inst_ctr_check(bm, 4096u, &cur, &mal, &nops), OK);
+	ckb("  ... value 4096, 0 programs", cur == 4096u && nops == 0u);
+}
+
+/* I: a cut after k complete programs, and inside program k+1 (its bit left
+ * 1, or 0 -- a marginal cell reads one or the other); and the one case the
+ * upper bound excludes, a stray clear at or above n. */
+static void t_ctr_cuts(void)
+{
+	static u8 bm[512], model[512];
+	u32 c, n, k, b, cur, nops, v0, v1;
+	int mal0, mal1, okall = 1, nall = 0;
+
+	for (c = 0; c <= 64u; c++) {
+		for (n = c + 1u; n <= c + 8u; n++) {
+			for (k = 0; k < n - c; k++) {
+				bm_lead(bm, c);
+				rlxfw_spi_inst_ctr_check(bm, n, &cur, &mal0, &nops);
+				memcpy(model, bm, sizeof(model));
+				b = rlxfw_spi_inst_ctr_next(bm, n, 0u);
+				for (; b < c + k; b = rlxfw_spi_inst_ctr_next(bm, n,
+								      b + 1u))
+					model[b >> 3] &= rlxfw_spi_inst_ctr_value(b);
+				/* op k+1's bit, still 1 */
+				v0 = rlxfw_spi_inst_ctr_decode(model, &mal0);
+				/* op k+1's bit, 0 */
+				model[b >> 3] &= rlxfw_spi_inst_ctr_value(b);
+				v1 = rlxfw_spi_inst_ctr_decode(model, &mal1);
+				if (v0 != c + k || v1 != c + k + 1u || mal0 || mal1 ||
+				    v0 < c || v1 > n)
+					okall = 0;
+				nall++;
+			}
+		}
+	}
+	ckb("I a cut after k programs, or inside program k+1 either way: c+k or "
+	    "c+k+1, well-formed, never below c, never above n",
+	    okall && nall > 64 * 8);
+	bm_lead(bm, 6u);
+	walk(bm, 7u, model, &k);
+	model[(7u + 5u) >> 3] &= (u8)~(0x80u >> ((7u + 5u) & 7u));
+	v0 = rlxfw_spi_inst_ctr_decode(model, &mal0);
+	ckb("I a stray clear at n+5 after 6 -> 7: decodes to n+1 = 8, malformed "
+	    "-- the case 'never above the new' rests on excluding",
+	    v0 == 8u && mal0);
+	ck("J read-back: the stray clear is CTR_CMP", rlxfw_spi_inst_ctr_verify(
+	   model, 7u), RLXFW_SPI_INST_R_CTR_CMP);
+	bm_lead(bm, 6u);
+	walk(bm, 7u, model, &k);
+	ck("J read-back: 6 -> 7 done is OK", rlxfw_spi_inst_ctr_verify(model,
+	   7u), OK);
+	bm_lead(bm, 0u);
+	walk(bm, 6u, model, &k);
+	model[0] |= 0x04u;		/* bit 5 stuck at 1 */
+	ck("J read-back: 0 -> 6 with bit 5 stuck at 1 is CTR_CMP",
+	   rlxfw_spi_inst_ctr_verify(model, 6u), RLXFW_SPI_INST_R_CTR_CMP);
+}
+
+/* M: the kernel's decode against rlxboot's own, linked. */
+#ifdef WITH_CONTAINER_C
+static u32 lcg(u32 *s)
+{
+	*s = *s * 1103515245u + 12345u;
+	return *s >> 8;
+}
+#endif
+
+static void t_ctr_second_source(void)
+{
+#ifdef WITH_CONTAINER_C
+	static u8 bm[512];
+	u32 c, b, i, s = 0x5EEDu, v;
+	int m1, m2, ok = 1, n = 0;
+
+	for (c = 0; c <= RLXFW_SPI_INST_CTR_BITS; c++) {
+		bm_lead(bm, c);
+		v = rlxfw_spi_inst_ctr_decode(bm, &m1);
+		if (v != (u32)rlxu_counter_from_bitmap(bm, &m2) || m1 != m2 ||
+		    v != c)
+			ok = 0;
+		n++;
+	}
+	ckb("M decode == rlxboot's rlxu_counter_from_bitmap on all 4,097 "
+	    "well-formed bitmaps", ok && n == 4097);
+	ok = 1;
+	n = 0;
+	for (c = 0; c < 64u; c++)
+		for (b = 0; b < RLXFW_SPI_INST_CTR_BITS; b++) {
+			bm_lead(bm, c * 64u);
+			bm[b >> 3] ^= (u8)(0x80u >> (b & 7u));
+			v = rlxfw_spi_inst_ctr_decode(bm, &m1);
+			if (v != (u32)rlxu_counter_from_bitmap(bm, &m2) ||
+			    m1 != m2)
+				ok = 0;
+			n++;
+		}
+	ckb("M decode == rlxboot's on every single-bit flip of 64 of them",
+	    ok && n == 64 * 4096);
+	ok = 1;
+	for (i = 0; i < 10000u; i++) {
+		for (b = 0; b < RLXFW_SPI_INST_CTR_BYTES; b++)
+			bm[b] = (u8)lcg(&s);
+		v = rlxfw_spi_inst_ctr_decode(bm, &m1);
+		if (v != (u32)rlxu_counter_from_bitmap(bm, &m2) || m1 != m2)
+			ok = 0;
+	}
+	ckb("M decode == rlxboot's on 10,000 random bitmaps", ok);
+#else
+	ckb("built WITHOUT container.c: the counter decode has no second "
+	    "source in this run", 0);
+#endif
+}
+
+/* P6r-10: the running-slot fence */
+static void t_fence(void)
+{
+	ck("fence: install slotA while A runs", rlxfw_spi_inst_fence(
+	   REG(I_SLOTA), 'A'), RLXFW_SPI_INST_R_RUNNING_SLOT);
+	ck("fence: install slotB while B runs", rlxfw_spi_inst_fence(
+	   REG(I_SLOTB), 'B'), RLXFW_SPI_INST_R_RUNNING_SLOT);
+	ck("fence: install slotA while B runs (the update's case)",
+	   rlxfw_spi_inst_fence(REG(I_SLOTA), 'B'), OK);
+	ck("fence: install slotB while A runs", rlxfw_spi_inst_fence(
+	   REG(I_SLOTB), 'A'), OK);
+	ck("fence: install slotA with no handoff (a RAM boot: the bench)",
+	   rlxfw_spi_inst_fence(REG(I_SLOTA), 0), OK);
+	ck("fence: install cfg0 while A runs (not a slot)",
+	   rlxfw_spi_inst_fence(REG(I_CFG0), 'A'), OK);
+	ck("fence: a letter that is no slot, 'C'", rlxfw_spi_inst_fence(
+	   REG(I_SLOTA), 'C'), OK);
+}
+
+/* L: `ctrloop`'s plan, and a model probe sector it runs on */
+static void t_loop(void)
+{
+	static u8 sec[0x1000];
+	struct rlxfw_spi_inst_ctrop op;
+	struct rlxfw_spi_wr_arm a;
+	u32 p, i, nops, nE, nP, b;
+	int ok, inside, pol, mal;
+
+	a.armed = 1;
+	a.lo = REG(I_PROBE)->base;
+	a.hi = REG(I_PROBE)->base + REG(I_PROBE)->size;
+	a.budget = REG(I_PROBE)->size;
+	for (p = 1; p <= 2u; p++) {
+		nops = rlxfw_spi_inst_loop_nops(p);
+		ok = inside = pol = 1;
+		nE = nP = 0u;
+		memset(sec, 0x00, sizeof(sec));	/* the sector before: dirty */
+		for (i = 0; i < nops; i++) {
+			rlxfw_spi_inst_loop_op(p, i, &op);
+			if (op.addr < REG(I_PROBE)->base ||
+			    op.addr >= REG(I_PROBE)->base + REG(I_PROBE)->size)
+				inside = 0;
+			if (op.kind == RLXFW_SPI_INST_OP_ERASE) {
+				if (op.addr != REG(I_PROBE)->base ||
+				    rlxfw_spi_wr_chk_erase(&a, op.addr,
+						RLXFW_SPI_WR_ERASE_GRAIN,
+						RLXFW_SPI_WR_ERASE_GRAIN,
+						RLXFW_SPI_WR_ERASE_GRAIN) !=
+				    RLXFW_SPI_WR_OK)
+					pol = 0;
+				memset(sec, 0xFF, sizeof(sec));
+				nE++;
+			} else if (op.kind == RLXFW_SPI_INST_OP_PROG) {
+				if (op.addr >= REG(I_PROBE)->base +
+				    RLXFW_SPI_INST_CTR_BYTES ||
+				    op.val != rlxfw_spi_inst_ctr_value(op.bit) ||
+				    rlxfw_spi_wr_chk_prog(&a, op.addr, 1u) !=
+				    RLXFW_SPI_WR_OK)
+					pol = 0;
+				sec[op.addr - REG(I_PROBE)->base] &= op.val;
+				nP++;
+				/* at each pass's end, the scratch counter is full */
+				if (op.bit == RLXFW_SPI_INST_CTR_BITS - 1u &&
+				    (rlxfw_spi_inst_ctr_decode(sec, &mal) !=
+				     RLXFW_SPI_INST_CTR_BITS || mal))
+					ok = 0;
+			} else {
+				ok = 0;		/* END inside the plan */
+			}
+		}
+		rlxfw_spi_inst_loop_op(p, nops, &op);
+		ckb(p == 1 ? "L ctrloop 1: 4,098 ops, 2 SE + 4,096 one-byte "
+			     "programs, all inside the probe block's bitmap"
+			   : "L ctrloop 2: 8,195 ops, 3 SE + 8,192 programs",
+		    ok && inside && pol && nops == p * 4097u + 1u &&
+		    nE == p + 1u && nP == p * 4096u &&
+		    op.kind == RLXFW_SPI_INST_OP_END);
+		ok = 1;
+		for (b = 0; b < sizeof(sec); b++)
+			if (sec[b] != 0xFFu)
+				ok = 0;
+		ckb(p == 1 ? "L ctrloop 1 ends with the sector erased "
+			     "(eraseprobe finds it clean)"
+			   : "L ctrloop 2 ends with the sector erased", ok);
+	}
+	ckb("L ctrloop 64: 262,209 ops, the n_writes a card predicts",
+	    rlxfw_spi_inst_loop_nops(64u) == 64u * 4097u + 1u &&
+	    rlxfw_spi_inst_loop_nops(64u) == 262209u);
+	memset(sec, 0xFF, 512);
+	ck("ctrloop show on an erased sector: chk_erased",
+	   rlxfw_spi_inst_probe_chk_erased(sec, 512u), OK);
+	ckb("  ... decodes to 0, well-formed", rlxfw_spi_inst_ctr_decode(sec,
+	    &mal) == 0u && !mal);
+}
+
+/* K: the counter's /proc block and console lines, at the widest state */
+static void t_emit_ctr(void)
+{
+	static char page[4096];
+	struct rlxfw_spi_inst_ctr_st c;
+	int n, w;
+
+	memset(&c, 0, sizeof(c));
+	n = rlxfw_spi_inst_emit_ctr(page, &c);
+	ckb("emit_ctr, nothing run: ctr_ran 0, ctr_reason OK, loop_ran 0",
+	    strstr(page, "ctr_ran 0\n") && strstr(page, "ctr_reason OK\n") &&
+	    strstr(page, "loop_ran 0\n") && strstr(page, "ctr_attempts 0\n"));
+	c.attempts = c.done = c.refused = c.failed = 0xFFFFFFFFu;
+	c.ran = c.malformed = c.loop_ran = INT_MIN;
+	c.reason = c.loop_reason = longest_reason();
+	c.cur = c.newv = c.read = c.pp = c.ms = 0xFFFFFFFFu;
+	c.loop_passes = c.loop_done = c.loop_ops = c.loop_ms = 0xFFFFFFFFu;
+	n = rlxfw_spi_inst_emit_ctr(page, &c);
+	printf("  (emit_ctr worst case %d bytes, ceiling %d)\n", n,
+	       RLXFW_SPI_INST_CTR_PROC_MAX);
+	ckb("emit_ctr: the widest state fits RLXFW_SPI_INST_CTR_PROC_MAX",
+	    n > 0 && n <= RLXFW_SPI_INST_CTR_PROC_MAX);
+	ckb("emit_ctr: no field shows a byte of the bitmap (no `bitmap`, no hex "
+	    "run)", strstr(page, "bitmap") == NULL);
+	w = rlxfw_spi_inst_fmt_ctr_go(page, 0xFFFFFFFFu, 0xFFFFFFFFu);
+	n = rlxfw_spi_inst_fmt_ctr_end(page, &c);
+	if (n > w)
+		w = n;
+	n = rlxfw_spi_inst_fmt_loop(page, 0xFFFFFFFFu, 'b', 0xFFFFFFFFu,
+				    0xFFFFFFFFu);
+	if (n > w)
+		w = n;
+	n = rlxfw_spi_inst_fmt_loop(page, 0xFFFFFFFFu, 'E', 0u, 0xFFFFFFFFu);
+	if (n > w)
+		w = n;
+	n = rlxfw_spi_inst_fmt_scratch(page, 0xFFFFFFFFu, INT_MIN, INT_MIN);
+	if (n > w)
+		w = n;
+	printf("  (counter console line worst case %d bytes, buffer %d)\n", w,
+	       RLXFW_SPI_INST_SAY_MAX);
+	ckb("counter console lines fit RLXFW_SPI_INST_SAY_MAX",
+	    w < RLXFW_SPI_INST_SAY_MAX);
+	rlxfw_spi_inst_fmt_ctr_go(page, 0u, 6u);
+	ckb("RLXFW-SC-GO cur=0 new=6", !strcmp(page, "RLXFW-SC-GO cur=0 new=6\n"));
+	rlxfw_spi_inst_fmt_scratch(page, 4096u, 0, 0);
+	ckb("ctrscratch value=4096 malformed=0 erased=0",
+	    !strcmp(page, "ctrscratch value=4096 malformed=0 erased=0\n"));
+	rlxfw_spi_inst_fmt_loop(page, 3u, 'b', 256u, 120u);
+	ckb("RLXFW-SL p=3 bit=256 ms=120",
+	    !strcmp(page, "RLXFW-SL p=3 bit=256 ms=120\n"));
 }
 
 /* -------------------------------------------------------------- main */
@@ -1129,11 +1827,32 @@ static const int glue_only[] = {
 	RLXFW_SPI_INST_R_ARM_READ
 };
 
+/* Produced only through the provisioning table's regions: the barrier is the
+ * one K_ERASE region and cs6c the one summed header.  In the shipped build
+ * they are exempt by name, and checked both ways there as well: the shipped
+ * table producing one is red. */
+static const int prov_only[] = {
+	RLXFW_SPI_INST_R_ERASE_ONLY, RLXFW_SPI_INST_R_HDR_SUM
+};
+
+static int listed(const int *v, int n, int r)
+{
+	int j;
+
+	for (j = 0; j < n; j++)
+		if (v[j] == r)
+			return 1;
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	const char *dir = NULL;
-	struct blob A, R, S, AF;
-	int i, j, ex;
+	struct blob A, AF, C1;
+#if PROV
+	struct blob R, S;
+#endif
+	int i, ex, po;
 
 	for (i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--mutate") && i + 1 < argc)
@@ -1151,10 +1870,12 @@ int main(int argc, char **argv)
 			"tools/test-spi-install.sh builds them\n");
 		return 3;
 	}
-	printf("test-spi-install: %s; grain %08X, page %u, floor %08X, cap %u\n",
+	printf("test-spi-install: %s; grain %08X, page %u, floor %08X, cap %u, "
+	       "%s table (%d regions)\n",
 	       RLXFW_SPI_INST_VERSION, (unsigned)RLXFW_SPI_WR_ERASE_GRAIN,
 	       (unsigned)PAGE, (unsigned)RLXFW_SPI_INST_FLOOR,
-	       (unsigned)RLXFW_SPI_INST_IMG_CAP);
+	       (unsigned)RLXFW_SPI_INST_IMG_CAP,
+	       PROV ? "provisioning" : "SHIPPED", NREG);
 	memset(seen, 0, sizeof(seen));
 
 	t_table();
@@ -1165,33 +1886,51 @@ int main(int argc, char **argv)
 	t_payload(dir);
 	A = load(dir, "slotA.rlxu");
 	AF = load(dir, "slotA-full.rlxu");
-	R = load(dir, "rlxboot.cs6c");
-	S = load(dir, "rescue.cs6c");
+	C1 = load(dir, "cfg-seq1.bin");
 	t_plan(A.n);
 	t_cuts(&A, I_SLOTA, "slotA container");
 	t_cuts(&AF, I_SLOTA, "full-size slotA container");
+	t_cuts(&C1, I_CFG0, "cfg0 store slot image");
+#if PROV
+	R = load(dir, "rlxboot.cs6c");
+	S = load(dir, "rescue.cs6c");
 	t_cuts(&R, I_RLXBOOT, "rlxboot cs6c");
 	t_cuts(&S, I_RESCUE, "rescue cs6c");
-	free(A.p); free(AF.p); free(R.p); free(S.p);
+	free(R.p); free(S.p);
+#endif
+	free(A.p); free(AF.p); free(C1.p);
 	t_cmp();
 	t_probe();
 	t_emit();
 	t_container_h();
+	t_cfg(dir);
+	t_ctr_parse();
+	t_ctr_plan();
+	t_ctr_cuts();
+	t_ctr_second_source();
+	t_fence();
+	t_loop();
+	t_emit_ctr();
 
 	/* every reason a pure function can produce is produced; the glue's
-	 * five are exempt by name, and the exemption is checked both ways */
+	 * seven are exempt by name, and in the shipped build so are the
+	 * provisioning table's two; each exemption is checked both ways */
 	for (i = 1; i < RLXFW_SPI_INST_R_COUNT; i++) {
-		ex = 0;
-		for (j = 0; j < (int)(sizeof(glue_only) / sizeof(glue_only[0]));
-		     j++)
-			if (glue_only[j] == i)
-				ex = 1;
+		ex = listed(glue_only, (int)(sizeof(glue_only) /
+			    sizeof(glue_only[0])), i);
+		po = !PROV && listed(prov_only, (int)(sizeof(prov_only) /
+				     sizeof(prov_only[0])), i);
 		if (ex && seen[i]) {
 			printf("  FAIL      reason %s is exempt as glue-only but a "
 			       "pure case produced it: the exemption is stale\n",
 			       rn(i));
 			nfail++;
-		} else if (!ex && !seen[i]) {
+		} else if (po && seen[i]) {
+			printf("  FAIL      reason %s is exempt in the shipped "
+			       "build as provisioning-only, but the shipped table "
+			       "produced it\n", rn(i));
+			nfail++;
+		} else if (!ex && !po && !seen[i]) {
 			printf("  FAIL      reason %s is never produced: its "
 			       "counter could not move\n", rn(i));
 			nfail++;
