@@ -1578,3 +1578,13 @@ is the only part this board has ever been driven as. The decisive reading is an
 actual erase, which is a flash write, which belongs to `R8b` under the owner's
 dated yes — and until then the whole of `W3` is unexercised code. `ledgerscan`
 cannot see that distinction and is not asked to.
+
+### `P6r-10`'s handoff reading, 2026-10-23 (143rd segment)
+
+What the design of the boot handoff read in the vendor's kernel to say that
+non-zero a0–a3 at kernel entry change nothing (`notes/self-update.md` § 1.4,
+`SPEC.md` `FW-261`). Nothing from it is in any code.
+
+| path | depth | origin | what was taken |
+|---|---|---|---|
+| `arch/rlx/fw/sni/sniprom.c` | line | vendor | `:139-140`, `fw_arg0` and `fw_arg1` read by `prom_init()` — one of the two readers of the firmware arguments in `arch/rlx`, both under `arch/rlx/fw/`, which no Makefile builds (`arch/rlx/Makefile:116`); the citation is the evidence that the reader exists and is not linked |
