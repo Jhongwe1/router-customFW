@@ -51,6 +51,7 @@ The directory keeps its name: the build driver and the records cite it by path.
 | [`rlxfw-init.sh`](rlxfw-init.sh), [`rlxfw-init-quiet.sh`](rlxfw-init-quiet.sh) | rlxfw's shell `/init` (`R3`, with the LAN brought up by `P2-2`), and the same without its LAN block (`R6b-8`). The image's `/init` is now the compiled PID 1 in [`src/init/`](../src/init/), as `rlxfw-initramfs.tsv` declares |
 | [`image-commands.tsv`](image-commands.tsv), [`image-commands-armed.tsv`](image-commands-armed.tsv) | what the first-boot image and the armed provisioning image can invoke, derived by `tools/appletcensus.py`; `tools/cardcheck.py` refuses any other command on a bench card |
 | [`mfgtest.sh`](mfgtest.sh) | the device-side manufacturing checks (`P1`) |
+| [`rlxfw-release`](rlxfw-release) | the release label; nothing reads it, and it moves `RECIPE_ID`, so a release candidate prints an `RLXFW-ID0` of its own |
 
 ## The differential and the record
 

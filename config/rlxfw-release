@@ -1,0 +1,14 @@
+# rlxfw's release label.  One line; everything else is a comment.
+#
+# NOTHING READS THE VALUE.  It reaches the image only through RECIPE_ID, the
+# sha256 over every file under config/ and kernel/ (tools/rlxfw-kbuild.sh), so
+# two builds that differ in nothing but this line print different RLXFW-ID0
+# lines at boot.  RLXFW-ID0 names the kernel recipe, not the image
+# (docs/known-issues/v1.0.md): a userspace change alone does not move it, and
+# this file is how a release candidate gets an identity of its own.
+#
+# P6r-10's bench round needs exactly that: U, version 7, is installed through
+# httpd over V, version 6, and the boot after it is identified by RLXFW-ID0
+# against U's build (notes/self-update.md § 6.1).  V was built before this file
+# existed.  Change the label for each release candidate.
+v1.1-rc1
