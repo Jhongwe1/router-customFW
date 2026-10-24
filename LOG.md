@@ -1585,7 +1585,7 @@ study 草稿放進 `study/20261017-study.md`（gitignored；與暫存區的草�
 
 **簽章。** 私鑰是擁有者的（`%USERPROFILE%\rlxfw-keys\v1.seed`，不在 repo 也不在 WSL），S 與 T 都是擁有者照私人腳本簽的；我沒有碰種子。寫 `plan/s146/sign-VU.bat`（`sign-S.bat` 的形狀：五支碰種子的工具要等於 `a1dc141c` 的、種子與兩個 payload 在、輸出不存在、兩個 payload 的 sha256、種子推出的公鑰，五關都過才簽 V 與 U）。用公開的開發種子先演練：WSL 裡同兩行 `mkfw2 build` 都成、`verify` 對自己的 slot 接受、對另一個 slot 在 `flash_match` 拒絕、在生產金鑰下於簽章拒絕；同一支 `.bat` 換成開發種子的複本在 Windows 從頭跑完，兩顆容器的 sha256 與 WSL 的相同（`caf29e6a…`、`aaa6e495…`），再跑一次在第 2 關因輸出已存在而停。開發金鑰的 U（`aaa6e495…`）就是 R3 的容器。R4／R5 的翻位元工具 `mkflips.py` 在開發金鑰的 U 上演練：翻 payload 一位在第 4 步（`payload_digest`）拒絕，翻 header 的 payload 摘要欄一位在第 3 步（簽章）拒絕。
 
-**其他。** `P5e-6` 的工具組 `s139/video` 的 `SHA256SUMS` 8 列全部 OK，正是手冊 § 8 列的 8 個檔。上機日的順序、每一次寫入的 yes 要說什麼、預測的 `n_writes`（W2、W6 各 288 + 4,461 = 4,749），與要擁有者回答的五件事，寫在 `plan/s146/bench-day.md`。
+**其他。** `P5e-6` 的工具組 `s139/video` 的 `SHA256SUMS` 8 列全部 OK，正是手冊 § 8 列的 8 個檔。上機日的順序、每一次寫入的 yes 要說什麼、預測的 `n_writes`（W2、W6 各 288 + 4,461 = 4,749），與要擁有者回答的五件事，寫在 `plan/s146/bench-day.md`。文件 commit `0499bfe8` 之後，在 ext4 clone 跑 build workflow 的兩步：根 `make test` rc 0（16:44–16:52），`ci-census` rc 0，host-userspace 83/83、host-rlxboot 21/21；citecheck（commit 後）rc 0、0 suspended。
 
 **做錯的。** 上面那次 tripwire 拒絕。手做突變的腳本第一次把 `src/lib/*.c` 全編進去，`ed25519.c` 的 `-Wsign-compare` 在 `-Werror` 下停住，改成只編 `RLXLIB_NAMES`。從 PowerShell 把帶 `|` 與引號的命令交給 `wsl bash -c` 又壞了一次，改成檔案。`mkfw2 verify` 沒給 `--write-form` 時丟 `TypeError` 的 traceback 而不是拒絕並說理由 —— 那是工具的缺陷（`CLAUDE.md`：工具拒絕要說理由），這一段沒修：改 `tools/mkfw2.py` 會讓 `sign-VU.bat` 的第 1 關失敗。翻位元演練腳本印的 `rc=` 是 `basename` 的，判決以 `verify` 印的那一行為準。
 
