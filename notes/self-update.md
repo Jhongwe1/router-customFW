@@ -849,7 +849,7 @@ steps, for what took 14 together with `CONFIG_FILE_LOCKING`, which the table did
 `rtl819x-spi.o`'s `.text` grew 24,092 → 31,300 B (+7,208) for the glue alone, compiled with the
 armed cell's flags, against the 3–4 KB guessed for the glue and the handoff TU together; in
 `s144k1` its `.text*` sections total 31,716 B, and `rlxfw-boot.o`'s 292 B with 460 B of
-`.init.text`, freed after boot. The userspace rows are still guesses (§§ 3–5 are unbuilt). 🔄 2026-10-24, 量 with §§ 3–5 built (`s145k1` and `s145k0`, recipe `e7f77c95`, from `5b4566ab`'s tree, which also carries 1B v3's `/proc/rtl819x-spi-inst`): 1,115 steps for the bench shape and 1,117 for the shipped one (`BENCH_SHELL=0`), 17 and 19 above `s144k1`, **36 and 34 below the slot's 1,151**; the decompressed image 80.8 % and 81.3 % of the ceiling. The userspace rows above guessed 12.5–15.5 KB in the image; the two parts are not separated by any build.
+`.init.text`, freed after boot. The userspace rows are still guesses (§§ 3–5 are unbuilt). 🔄 2026-10-24, 量 with §§ 3–5 built (`s145k1` and `s145k0`, recipe `e7f77c95`, from `5b4566ab`'s tree, which also carries 1B v3's `/proc/rtl819x-spi-inst`): 1,115 steps for the bench shape and 1,117 for the shipped one (`BENCH_SHELL=0`), 17 and 19 above `s144k1`, **36 and 34 below the slot's 1,151**; the decompressed image 80.8 % and 81.3 % of the ceiling. The userspace rows above guessed 12.5–15.5 KB in the image; the two parts are not separated by any build. 🔄 2026-10-24 (146th), 量 the bench day's images (`FW-269`): V and U 1,115 steps, 36 left; the shell-less U 1,118, **33 left** (`cfgstore` +64 B for § 6.4's echo, `b925ecdb`); V-armed and the GPIO-tick image, RAM only, 1,116.
 `SPEC.md` `FW-267` holds the numbers, `FW-269` those of 2026-10-24.
 
 ## 3. The store on flash
@@ -1296,7 +1296,7 @@ row needs the owner's dated `owner-yes` naming what the column says.
 | K1–K3 | the cut rounds | § 6.5 | | | |
 | W8, W9 | `erase cfg1`, then `erase cfg0` | `cfg1`, `cfg0` | console, each under its arm | the erase of that region | +16 each |
 
-The `W`, `B`, `C`, `R` and `K` ids are this note's own; the card numbers its cells.
+The `W`, `B`, `C`, `R` and `K` ids are this note's own; the card numbers its cells. 🔄 2026-10-24 (146th): no card, by the owner's ruling — the bench day is tested as it runs, and each row's yes is given at the bench before the write, naming what the column says.
 
 🔄 2026-10-23, ruled (1B's item 8): no install has issued a one-byte `PP` on this die — the tail
 path of `pp_page` with no full word before it, which is every program `ctr` makes; 1B read the
@@ -1404,7 +1404,7 @@ operation).
 - That an update from the WAN side works (`P6r-9`).
 - That the headroom table is right: it is a guess to be refuted by the first build (§ 2.9).
   🔄 2026-10-23: refuted for the kernel side, which took 14 steps (§ 2.9); the userspace rows wait
-  for their build. 🔄 2026-10-24: 17 steps more for the bench shape, 19 for the shipped one; 36 and 34 left (§ 2.9, `FW-269`).
+  for their build. 🔄 2026-10-24: 17 steps more for the bench shape, 19 for the shipped one; 36 and 34 left (§ 2.9, `FW-269`); 33 for the shipped one since `b925ecdb`.
 
 ## 9. Open questions only a measurement settles
 
@@ -1421,6 +1421,6 @@ operation).
 6. `UPDATE_END`'s time with userspace SHA-256 and Ed25519 on the 4181 (R1–R5, W6).
 7. A store write's duration and `n_writes` +32 (W4).
 8. The image's actual growth against § 2.9 (the first build). 🔄 2026-10-23: the kernel's is 14
-   steps, 53 left (§ 2.9, `FW-267`); the userspace's is open. 🔄 2026-10-24: with it, 1,115 and 1,117 steps, 36 and 34 left (`FW-269`).
+   steps, 53 left (§ 2.9, `FW-267`); the userspace's is open. 🔄 2026-10-24: with it, 1,115 and 1,117 steps, 36 and 34 left (`FW-269`); 1,118 and 33 for the shipped one since `b925ecdb`.
 9. `MemFree` on V with `brokerd` holding a staging (W6).
 10. The time from the upload's first byte to `lan up` (W6/B4).
