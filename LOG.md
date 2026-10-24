@@ -1587,6 +1587,8 @@ study 草稿放進 `study/20261017-study.md`（gitignored；與暫存區的草�
 
 **其他。** `P5e-6` 的工具組 `s139/video` 的 `SHA256SUMS` 8 列全部 OK，正是手冊 § 8 列的 8 個檔。上機日的順序、每一次寫入的 yes 要說什麼、預測的 `n_writes`（W2、W6 各 288 + 4,461 = 4,749），與要擁有者回答的五件事，寫在 `plan/s146/bench-day.md`。文件 commit `0499bfe8` 之後，在 ext4 clone 跑 build workflow 的兩步：根 `make test` rc 0（16:44–16:52），`ci-census` rc 0，host-userspace 83/83、host-rlxboot 21/21；citecheck（commit 後）rc 0、0 suspended。
 
+**擁有者簽了（17:11）。** 擁有者跑 `plan/s146/sign-VU.bat`，兩顆容器的 mtime 17:11:06、17:11:07。17:12 量：V.rlxu 1,141,920 B、`9fd0bb8f…1e8d`，U.rlxu 1,141,920 B、`1e521f0f…4a6e`；兩顆從位元組 160 起的 payload 各等於 `s146v`／`s146u` 的 `nfjrom`；`mkfw2 verify` 在生產金鑰 `4a6eda72…` 下各在自己的 slot ACCEPTED（V：版本 6、recipe `e7f77c95`、`0x190000`；U：版本 7、`495094ab`、`0x070000`），另一個 slot 在第 2 步 `flash_match` 拒絕，開發金鑰在第 3 步簽章拒絕。R4 `U-payflip.rlxu`（`857a9f98…3434`）在第 4 步 `payload_digest` 拒絕，R5 `U-hdrflip.rlxu`（`29c7c77b…1b5a`）在第 3 步簽章拒絕（`$FWRE_WORK/rebuild/s146/flips/`）。接著擁有者說「推」。
+
 **做錯的。** 上面那次 tripwire 拒絕。手做突變的腳本第一次把 `src/lib/*.c` 全編進去，`ed25519.c` 的 `-Wsign-compare` 在 `-Werror` 下停住，改成只編 `RLXLIB_NAMES`。從 PowerShell 把帶 `|` 與引號的命令交給 `wsl bash -c` 又壞了一次，改成檔案。`mkfw2 verify` 沒給 `--write-form` 時丟 `TypeError` 的 traceback 而不是拒絕並說理由 —— 那是工具的缺陷（`CLAUDE.md`：工具拒絕要說理由），這一段沒修：改 `tools/mkfw2.py` 會讓 `sign-VU.bat` 的第 1 關失敗。翻位元演練腳本印的 `rc=` 是 `basename` 的，判決以 `verify` 印的那一行為準。
 
-**沒做完、留給下一段。** 擁有者跑 `sign-VU.bat`；簽好之後做 R4／R5；上機時寫主機端的上傳（`/api/login` 拿 `rlxs`／`rlxc` 兩個 cookie，`POST /api/firmware` 帶 `X-RLX-CSRF`）；上機日本身。`mkfw2 verify` 的 traceback。這一段沒寫 study 檔（擁有者免了流程）。兩個程式 commit（`b925ecdb`、`a1dc141c`）與這一段的文件 commit 未推，推要擁有者當下的 yes。
+**沒做完、留給下一段。** 上機時寫主機端的上傳（`/api/login` 拿 `rlxs`／`rlxc` 兩個 cookie，`POST /api/firmware` 帶 `X-RLX-CSRF`）；上機日本身。`mkfw2 verify` 的 traceback。這一段沒寫 study 檔（擁有者免了流程）。推的是 `b4aa9405` 之後的五個 commit，這一則所在的 commit 是最後一個；推送與兩個 workflow 的結果記在下一段。
