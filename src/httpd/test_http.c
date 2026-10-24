@@ -247,6 +247,101 @@ int main(void)
 		      (long)r.body_len, BODYLEN);
 	}
 
+	/* ------------------------------------- the one streaming route's bound
+	 * POST /api/firmware: Content-Length up to HTTP_UPLOAD_MAX, refused past
+	 * it at the header line, and the body never stored here. */
+	case_status("POST /api/firmware HTTP/1.1\r\nContent-Length: 1179649\r\n\r\n",
+		    413, "the upload route: 1,179,649 is 413");
+	case_status("POST /api/login HTTP/1.1\r\nContent-Length: 1179648\r\n\r\n",
+		    413, "the upload bound is that route's alone: login at it is 413");
+	case_status("POST /api/firmwarex HTTP/1.1\r\nContent-Length: 4097\r\n\r\n",
+		    413, "and a path that only begins like it is not the route");
+	case_status("POST /api/firmware HTTP/1.1\r\n\r\n", 411,
+		    "the upload route without Content-Length is 411");
+	case_status("POST /api/firmware HTTP/1.1\r\nTransfer-Encoding: chunked\r\n"
+		    "\r\n", 501, "the upload route with Transfer-Encoding is 501");
+	case_status("GET /api/firmware HTTP/1.1\r\nContent-Length: 5\r\n\r\nabcde",
+		    400, "a GET of it with a body is still 400");
+	{
+		static const char head[] =
+			"POST /api/firmware HTTP/1.1\r\nHost: x\r\n"
+			"Content-Length: 1179648\r\n\r\n";
+		struct http_parser ps;
+		size_t used = 0;
+		int rc;
+
+		memcpy(buf, head, sizeof(head) - 1);
+		memset(buf + sizeof(head) - 1, 'B', 100);
+		http_parse_init(&ps, &r);
+		rc = http_feed(&ps, (const uint8_t *)buf, sizeof(head) - 1 + 100,
+			       &used);
+		t_okf(rc == HTTP_FEED_STREAM, "1,179,648 is accepted: the stream code",
+		      rc, HTTP_FEED_STREAM);
+		t_okf(used == sizeof(head) - 1, "and it stops at the blank line",
+		      (long)used, (long)(sizeof(head) - 1));
+		t_ok(r.stream == 1 && r.clen == 1179648u && r.body_len == 0,
+		     "with the route flagged and not one body byte stored", NULL);
+		rc = http_feed(&ps, (const uint8_t *)buf + used, 100, &used);
+		t_okf(rc == HTTP_FEED_STREAM && used == 0,
+		      "fed again, it consumes nothing and says the same", rc,
+		      HTTP_FEED_STREAM);
+
+		/* refused AT the line: before the blank line exists */
+		http_parse_init(&ps, &r);
+		rc = http_feed(&ps, (const uint8_t *)
+			       "POST /api/firmware HTTP/1.1\r\n"
+			       "Content-Length: 1179649\r\n", 54, &used);
+		t_okf(rc == -413, "1,179,649 is refused at its own header line",
+		      rc, -413);
+		http_parse_init(&ps, &r);
+		rc = http_feed(&ps, (const uint8_t *)
+			       "POST /api/firmware HTTP/1.1\r\n"
+			       "Content-Length: 1179648\r\n", 54, &used);
+		t_okf(rc == 0, "control: 1,179,648 at that line wants more", rc, 0);
+	}
+	{
+		struct http_req g;
+
+		t_okf(parse_str("POST /api/%66irmware HTTP/1.1\r\n"
+				"Content-Length: 9\r\n\r\n", &g) == HTTP_FEED_STREAM
+		      && g.stream == 1,
+		      "the decoded path is the route, as route_dispatch matches it",
+		      0, HTTP_FEED_STREAM);
+		t_okf(parse_str("POST /api/firmware?x=1 HTTP/1.1\r\n"
+				"Content-Length: 9\r\n\r\n", &g) == HTTP_FEED_STREAM,
+		      "and a query does not change it", 0, HTTP_FEED_STREAM);
+		t_okf(parse_str("GET /api/firmware HTTP/1.1\r\n\r\n", &g) == 1 &&
+		      g.stream == 0, "GET of it is an ordinary request", 0, 1);
+		t_okf(parse_str("POST /api/config HTTP/1.1\r\n"
+				"Content-Length: 2\r\n\r\n{}", &g) == 1 &&
+		      g.stream == 0, "control: another POST is buffered as before",
+		      0, 1);
+	}
+	{
+		/* No proper prefix of the upload head is reported complete or
+		 * streaming: only the whole blank line ends it. */
+		static const char head[] =
+			"POST /api/firmware HTTP/1.1\r\nHost: x\r\n"
+			"Cookie: rlxs=0123456789abcdef0123456789abcdef\r\n"
+			"Content-Length: 1110176\r\n\r\n";
+		int early = 0, odd = 0;
+
+		for (cut = 0; cut < sizeof(head) - 1; cut++) {
+			struct http_parser ps;
+			size_t used = 0;
+			int rc;
+
+			http_parse_init(&ps, &r);
+			rc = http_feed(&ps, (const uint8_t *)head, cut, &used);
+			if (rc == 1 || rc == HTTP_FEED_STREAM)
+				early++;
+			if (rc != 0)
+				odd++;
+		}
+		t_okf(early == 0 && odd == 0,
+		      "no proper prefix of the upload head is complete", early, 0);
+	}
+
 	/* ----------------------------------------- 2. truncation at every length */
 	for (cut = 0; cut < REQLEN; cut++) {
 		struct http_parser ps;
@@ -510,5 +605,5 @@ int main(void)
 	t_ok(!http_is_hex32("0123456789abcdef0123456789abcdeg"), "hex32 non-hex",
 	     NULL);
 
-	return t_done(100);
+	return t_done(122);
 }

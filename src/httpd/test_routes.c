@@ -14,10 +14,12 @@
 
 #include "routes.h"
 #include "testlib.h"
+#include "upload.h"
 
 #include "cfg.h"
 #include "schema.h"
 #include "client.h"
+#include "test_upd.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +43,11 @@ static struct {
 int bk_call(const char *sock_path, const struct bk_req *rq, struct bk_resp *rs)
 {
 	(void)sock_path;
+	/* The three update ops go to the stand-in that speaks their format
+	 * (test_upd.h); `fake` below never sees them. */
+	if (rq->op == OP_UPDATE_BEGIN || rq->op == OP_UPDATE_DATA ||
+	    rq->op == OP_UPDATE_END)
+		return upd_call(rq, rs);
 	fake.calls++;
 	fake.last_op = rq->op;
 	memcpy(fake.last_session, rq->session, 16);
@@ -61,6 +68,7 @@ static void fake_reset(void)
 {
 	memset(&fake, 0, sizeof(fake));
 	fake.status = BK_OK;
+	upd_reset();
 }
 
 /* A LOGIN response: session[16] + csrf[16] + ttl u32. */
@@ -149,6 +157,15 @@ static int run(const char *method, const char *path, const char *sess,
 	}
 
 	rc = http_parse_all((const uint8_t *)req, n, &rq);
+	if (rc == HTTP_FEED_STREAM) {
+		/* srv_conn()'s branch for the streaming route, with no socket:
+		 * the body is all in the bytes past the head. */
+		size_t bl = (body != NULL) ? strlen(body) : 0;
+
+		(void)upload_run(-1, &rq, (const uint8_t *)req + (n - bl), bl,
+				 env, rs);
+		return rs->status;
+	}
 	if (rc != 1) {
 		route_rsp_init(rs);
 		rs->status = -rc;
@@ -196,6 +213,7 @@ int main(void)
 	env_yes.client_ip = 0x0a010164u;
 	env_yes.kdf_grant = grant_yes;
 	env_yes.kdf_release = NULL;
+	env_yes.alarm_fn = upd_alarm;
 	env_no = env_yes;
 	env_no.kdf_grant = grant_no;
 
@@ -304,7 +322,9 @@ int main(void)
 			"{}",
 			"{}"
 		};
-		static const int want_ok[] = { 200, 200, 200, 200, 200, 501 };
+		/* /api/firmware's right-CSRF cell streams its two bytes through
+		 * BEGIN, one DATA and END to the stand-in, which says OK. */
+		static const int want_ok[] = { 200, 200, 200, 200, 200, 200 };
 		unsigned i;
 		char nm[64];
 
@@ -680,6 +700,164 @@ int main(void)
 	t_okf(run("GET", "/api/status", SESS, NULL, NULL, NULL, &rs, &env_yes)
 	      == 200, "a truncated TLV stream is survived", rs.status, 200);
 
+	/* ------------------------------------------- POST /api/firmware, streamed
+	 * The matrix above runs its five cells through upload_run(); these say
+	 * what the refusing cells did NOT do, and what the permitting one did. */
+	fake_reset();
+	t_okf(run("POST", "/api/firmware", NULL, CSRF, CSRF, "{}", &rs, &env_yes)
+	      == 401, "F1 no session: 401", rs.status, 401);
+	t_ok(fake.calls == 0 && upd.calls == 0, "F1 and no broker call of any op",
+	     NULL);
+	fake_reset();
+	t_okf(run("POST", "/api/firmware", SESS, OTHR, CSRF, "{}", &rs, &env_yes)
+	      == 403, "F2 a CSRF mismatch: 403", rs.status, 403);
+	t_ok(fake.calls == 0 && upd.calls == 0, "F2 and no broker call", NULL);
+	fake_reset();
+	upd_expect(SESS, CSRF, env_yes.client_ip);
+	t_okf(run("POST", "/api/firmware", SESS, CSRF, CSRF, "{}", &rs, &env_yes)
+	      == 200, "F3 control: right tokens, 200", rs.status, 200);
+	t_ok(strcmp(upd.log, "BADaATE") == 0 && fake.calls == 0,
+	     "F3 BEGIN, one DATA, END, and nothing through the other fake",
+	     upd.log);
+	t_ok(rs.nostore == 1, "F3 and the answer is no-store", NULL);
+
+	/* Each refusal status, mapped as every route maps it (route_map_status):
+	 * with a reason in the update form, without one in that status's own. */
+	{
+		static const struct {
+			uint8_t st;
+			int code;
+			const char *bare;
+		} m[] = {
+			{ BK_AUTH,  401, "{\"ok\":false,\"error\":\"auth\"}" },
+			{ BK_PERM,  403, "{\"ok\":false,\"error\":\"perm\"}" },
+			{ BK_INVAL, 400, "{\"ok\":false,\"error\":\"inval\",\"key\":0}" },
+			{ BK_BUSY,  503, "{\"ok\":false,\"error\":\"busy\"}" },
+			{ BK_IO,    500, "{\"ok\":false,\"error\":\"io\"}" }
+		};
+		static const char upd_body[] =
+			"{\"ok\":false,\"error\":\"update\",\"reason\":\"digest\"}";
+		unsigned i;
+		char nm[96];
+
+		for (i = 0; i < sizeof(m) / sizeof(m[0]); i++) {
+			fake_reset();
+			upd.end_st = m[i].st;
+			upd.end_why = "digest";
+			(void)run("POST", "/api/firmware", SESS, CSRF, CSRF, "{}",
+				  &rs, &env_yes);
+			(void)snprintf(nm, sizeof(nm),
+				       "F4 END refused %u with a reason: %d", m[i].st,
+				       m[i].code);
+			t_ok(rs.status == m[i].code && rs.blen == strlen(upd_body) &&
+			     memcmp(rs.body, upd_body, rs.blen) == 0, nm, rs.body);
+			fake_reset();
+			upd.end_st = m[i].st;
+			(void)run("POST", "/api/firmware", SESS, CSRF, CSRF, "{}",
+				  &rs, &env_yes);
+			(void)snprintf(nm, sizeof(nm),
+				       "F4 END refused %u without one: %d, its own body",
+				       m[i].st, m[i].code);
+			t_ok(rs.status == m[i].code && rs.blen == strlen(m[i].bare) &&
+			     memcmp(rs.body, m[i].bare, rs.blen) == 0, nm, rs.body);
+		}
+	}
+	fake_reset();
+	upd.dest = 'A';
+	(void)run("POST", "/api/firmware", SESS, CSRF, CSRF, "{}", &rs, &env_yes);
+	t_ok(rs.status == 200 &&
+	     rs.blen == strlen("{\"ok\":true,\"slot\":\"A\",\"version\":7}") &&
+	     memcmp(rs.body, "{\"ok\":true,\"slot\":\"A\",\"version\":7}",
+		    rs.blen) == 0, "F5 END OK renders exactly", rs.body);
+
+	/* The buffered path never serves the streaming route, and the gate
+	 * refuses a request the parser and the table disagree about. */
+	{
+		struct http_req hq;
+
+		memset(&hq, 0, sizeof(hq));
+		hq.method = HM_POST;
+		(void)strcpy(hq.path, HTTP_UPLOAD_PATH);
+		hq.pathlen = (uint16_t)strlen(hq.path);
+		(void)strcpy(hq.sess, SESS);
+		(void)strcpy(hq.hcsrf, CSRF);
+		(void)strcpy(hq.ccsrf, CSRF);
+		hq.has_clen = 1;
+		hq.clen = 2;
+		hq.body_len = 2;
+		memcpy(hq.body, "{}", 3);
+		fake_reset();
+		(void)route_dispatch(&hq, &rs, &env_yes);
+		t_okf(rs.status == 500 && strstr(rs.body, "\"stream\"") != NULL &&
+		      upd.calls == 0 && fake.calls == 0,
+		      "F6 a buffered request for the upload route is 500 stream",
+		      rs.status, 500);
+		fake_reset();
+		(void)upload_run(-1, &hq, (const uint8_t *)"{}", 2, &env_yes, &rs);
+		t_okf(rs.status == 500 && upd.calls == 0,
+		      "F6 and upload_run() refuses one the parser did not flag",
+		      rs.status, 500);
+		hq.stream = 1;
+		(void)strcpy(hq.path, "/api/reboot");
+		fake_reset();
+		(void)upload_run(-1, &hq, (const uint8_t *)"{}", 2, &env_yes, &rs);
+		t_okf(rs.status == 500 && upd.calls == 0 && fake.calls == 0,
+		      "F6 and one flagged for a route that does not stream",
+		      rs.status, 500);
+		hq.stream = 1;
+		(void)strcpy(hq.path, HTTP_UPLOAD_PATH);
+		fake_reset();
+		(void)upload_run(-1, &hq, (const uint8_t *)"{}", 2, &env_yes, &rs);
+		t_okf(rs.status == 200 && upd.nend == 1,
+		      "F6 control: flagged and the upload route, it streams",
+		      rs.status, 200);
+	}
+
+	/* STATUS's BKS_UPDATE_LAST, rendered as one field. */
+	{
+		static const struct {
+			const char *v;
+			int shown;
+			const char *name;
+		} m[] = {
+			{ "ok A 7", 1, "S1 update_last \"ok A 7\" renders" },
+			{ "digest", 1, "S1 and a reason renders" },
+			{ "123456789012345678901234567890123456789012345678", 1,
+			  "S1 48 bytes renders" },
+			{ "1234567890123456789012345678901234567890123456789", 0,
+			  "S1 49 bytes is skipped, not fatal" },
+			{ "ok\001A", 0, "S1 a control byte is skipped, not fatal" }
+		};
+		unsigned i;
+
+		for (i = 0; i < sizeof(m) / sizeof(m[0]); i++) {
+			uint8_t *b = fake.body;
+			size_t l = strlen(m[i].v);
+			uint32_t o = 0;
+			char want[96];
+
+			fake_reset();
+			b = fake.body;
+			b[o++] = 0x80; b[o++] = 0x01; b[o++] = 0; b[o++] = 4;
+			b[o++] = 0; b[o++] = 0; b[o++] = 0x03; b[o++] = 0x00;
+			b[o++] = (uint8_t)(BKS_UPDATE_LAST >> 8);
+			b[o++] = (uint8_t)(BKS_UPDATE_LAST & 0xff);
+			b[o++] = 0;
+			b[o++] = (uint8_t)l;
+			memcpy(b + o, m[i].v, l);
+			o += (uint32_t)l;
+			fake.body_len = o;
+			(void)run("GET", "/api/status", SESS, NULL, NULL, NULL, &rs,
+				  &env_yes);
+			(void)snprintf(want, sizeof(want), "\"update_last\":\"%s\"",
+				       m[i].v);
+			t_ok(rs.status == 200 &&
+			     strstr(rs.body, "\"uptime_s\":768") != NULL &&
+			     (strstr(rs.body, m[i].shown ? want : "update_last")
+			      != NULL) == m[i].shown, m[i].name, rs.body);
+		}
+	}
+
 	/* constant-time compare: both directions */
 	t_ok(route_ct_eq32(CSRF, CSRF) == 1, "ct_eq32 equal", NULL);
 	t_ok(route_ct_eq32(CSRF, OTHR) == 0, "ct_eq32 different", NULL);
@@ -717,5 +895,5 @@ int main(void)
 		     "admin.pwhash is WEB_HIDDEN in the table", NULL);
 	}
 
-	return t_done(120);
+	return t_done(160);
 }

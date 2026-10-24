@@ -48,6 +48,11 @@ void bk_init(struct broker *bk)
 	bk->ping_timeout_s = BK_PING_TIMEOUT;
 	bk->use_fake_clock = 0;
 	bk->fake_now = 0;
+	/* The update path's two (update.c).  The staging starts empty -- the
+	 * memset above -- so a struct that held one must be emptied with
+	 * bk_upd_discard() before it is initialised again. */
+	bk->boot_path     = BK_BOOT_PATH;
+	bk->upd_reboot    = bk_upd_reboot_real;
 	(void)cfg_defaults(&bk->cfg);
 }
 

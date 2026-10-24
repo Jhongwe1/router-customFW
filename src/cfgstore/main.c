@@ -11,7 +11,7 @@
  * why `dump` exists and why every refusal names the key it is about.
  *
  * There is no shell anywhere in it: no system(), no popen(), no exec at all.
- * It reads and writes one file through src/lib/cfg.c and prints.
+ * It reads and writes the store through src/lib/cfg.c, and prints.
  *
  * ---------------------------------------------------------------------------
  * EXIT CODES (SPEC-R7, this assignment)
@@ -49,7 +49,7 @@
 #include "kdf.h"
 #include "schema.h"
 
-#define CFGSTORE_DEFAULT_PATH "/var/lib/cfg.bin"
+#define CFGSTORE_DEFAULT_PATH CFG_FLASH_DEV	/* flash; --file PATH: a file */
 #define CFGSTORE_MAXARG       64	/* assignments or names in one command */
 #define CFGSTORE_NAME_MAX     40	/* > the longest schema name + slack */
 #define CFGSTORE_PW_MAX       64	/* SPEC-R7 § 6: LOGIN password 1..64 */
@@ -455,8 +455,9 @@ static int cmd_dump(int argc, char **argv)
 {
 	struct cfg c;
 	struct cfg_store_info info;
-	uint8_t slot[CFG_SLOT_SIZE];
-	FILE *f;
+	uint8_t slot[CFG_NSLOTS][CFG_SLOT_SIZE];
+	size_t got[CFG_NSLOTS];
+	uint32_t where[CFG_NSLOTS];
 	int s, rc;
 
 	if (argc != 1 || strcmp(argv[0], "--hex") != 0) {
@@ -467,49 +468,48 @@ static int cmd_dump(int argc, char **argv)
 	rc = load_or_die(&c, &info, 0, "dump");
 	if (rc != EX_OK)
 		return rc;
-
-	f = fopen(g_path, "rb");
-	if (f == NULL) {
-		fprintf(stderr, "cfgstore: dump: %s: %s\n", g_path,
-			strerror(errno));
-		return EX_IO;
+	/* Through the backend, both slots before any output (cfg_slot_raw). */
+	for (s = 0; s < CFG_NSLOTS; s++) {
+		errno = 0;
+		if (cfg_slot_raw(g_path, s, slot[s], &got[s], &where[s]) != 0) {
+			fprintf(stderr, "cfgstore: dump: %s: %s\n", g_path,
+				strerror(errno != 0 ? errno : EIO));
+			return EX_IO;
+		}
 	}
 	printf("store %s  bytes %lu  selected %s\n", g_path,
 	       (unsigned long)info.file_bytes, source_name(info.selected));
 
 	for (s = 0; s < CFG_NSLOTS; s++) {
-		size_t got = fread(slot, 1, sizeof slot, f);
 		size_t show;
 
 		printf("\nslot %d  offset %lu  read %lu  verdict %s  seq %lu\n",
-		       s, (unsigned long)((size_t)s * CFG_SLOT_SIZE),
-		       (unsigned long)got, cfg_strerror(info.rc[s]),
-		       (unsigned long)info.seq[s]);
-		if (got == 0)
-			continue;
+		       s, (unsigned long)where[s], (unsigned long)got[s],
+		       cfg_strerror(info.rc[s]), (unsigned long)info.seq[s]);
+		if (got[s] == 0)
+			continue;	/* also an erased flash slot: absent */
 
 		/* The record's own extent when the header can be believed,
 		 * otherwise a fixed window: printing 4 KiB of 0xFF fill down a
 		 * 38400 baud console is not diagnosis. */
 		show = 0;
-		if (got >= (size_t)CFG_HDR_LEN) {
-			uint32_t paylen = ((uint32_t)slot[12] << 24) |
-					  ((uint32_t)slot[13] << 16) |
-					  ((uint32_t)slot[14] << 8) |
-					  (uint32_t)slot[15];
+		if (got[s] >= (size_t)CFG_HDR_LEN) {
+			uint32_t paylen = ((uint32_t)slot[s][12] << 24) |
+					  ((uint32_t)slot[s][13] << 16) |
+					  ((uint32_t)slot[s][14] << 8) |
+					  (uint32_t)slot[s][15];
 
 			if (info.rc[s] == 0 &&
 			    paylen <= (uint32_t)(CFG_SLOT_SIZE - CFG_HDR_LEN))
 				show = (size_t)CFG_HDR_LEN + (size_t)paylen;
 		}
-		if (show == 0 || show > got) {
-			show = (got < 64u) ? got : 64u;
+		if (show == 0 || show > got[s]) {
+			show = (got[s] < 64u) ? got[s] : 64u;
 			printf("  (header not believable; first %lu bytes)\n",
 			       (unsigned long)show);
 		}
-		hexdump(slot, show, (size_t)s * CFG_SLOT_SIZE);
+		hexdump(slot[s], show, (size_t)where[s]);
 	}
-	fclose(f);
 	return EX_OK;
 }
 

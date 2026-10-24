@@ -15,7 +15,7 @@
 #include "schema.h"
 
 /* SPEC-R7 § 3 paths. */
-#define PATH_CFG "/var/lib/cfg.bin"
+#define PATH_CFG CFG_FLASH_DEV	/* cfg.h, included where it is used */
 #define PATH_UDHCPD_CONF "/var/udhcpd.conf"
 #define PATH_UDHCPD_LEASES "/var/udhcpd.leases"
 #define PATH_BUSYBOX "/bin/busybox"
@@ -66,6 +66,31 @@
 #ifndef RLXFW_SWITCH_BRINGUP
 #define RLXFW_SWITCH_BRINGUP 1
 #endif
+
+/* ------------------------------------------------------ the one-shot children */
+/*
+ * Two children PID 1 forks at most once per boot, each running a function of
+ * this image (no execve) and in no child table (notes/self-update.md §§ 5, 3.8):
+ *
+ * RLXFW_CTR_ADVANCE 1 = the counter advance (src/init/ctradv.c): after
+ * `rlxfw: lan up` and after the child table has started brokerd, it waits for
+ * brokerd to answer STATUS, reads /proc/rlxfw-boot and, on a slot boot, writes
+ * ONE `ctr <version>` under the flash lock.  0 = none, so P6r-10's stop-loss
+ * can ship persistence without the counter write:
+ *
+ *   make -C src/init target O=… TC=… TRIP=… CTR_ADVANCE=0
+ *
+ * A RLXFW_SWITCH_BRINGUP=0 build prints no `lan up`, so it has no helper.
+ *
+ * The first-password step (src/init/firstpw.c) exists only in a build WITHOUT
+ * the bench shell: it reads from the console, which the shell owns when there
+ * is one, and the bench image keeps `cfgstore passwd` at the shell.
+ */
+#ifndef RLXFW_CTR_ADVANCE
+#define RLXFW_CTR_ADVANCE 1
+#endif
+#define RLXFW_CTR_HELPER (RLXFW_CTR_ADVANCE && RLXFW_SWITCH_BRINGUP)
+#define RLXFW_FIRSTPW (!RLXFW_BENCH_SHELL)
 
 /* The rung-1 discriminator.  It must stay byte-identical: tools/bootbytes.py
  * compares it across every committed rlxfw boot and RUNSHEET.md B5/P6 checks

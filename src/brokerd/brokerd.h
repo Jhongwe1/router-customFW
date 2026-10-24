@@ -21,7 +21,7 @@
 #include "kdf.h"		/* KDF_LOG2N/R/P, the one owner of the parameters */
 
 #define BK_SOCK_PATH   "/srv/www/run/broker.sock"
-#define BK_CFG_PATH    "/var/lib/cfg.bin"
+#define BK_CFG_PATH    CFG_FLASH_DEV	/* cfg.h: the flash backend */
 #define BK_ENTROPY_PATH "/proc/sys/kernel/random/entropy_avail"
 #define BK_RANDOM_PATH "/dev/urandom"
 #define BK_PING_BIN    "/bin/busybox"
@@ -74,6 +74,34 @@ struct bk_rl {
 	long     seen;        /* bk_now() at the last touch, for eviction */
 };
 
+/* ---- the update path's one staging (update.c) -----------------------
+ * notes/self-update.md §§ 4.2-4.5.  ONE staging at a time, bound to the uid
+ * and the session token that began it.  POISONED keeps the binding and frees
+ * the bytes: a DATA can never clear it, only a new BEGIN from its owner does.
+ * VERIFIED is END's OK, waiting for the reply to leave the socket; nothing
+ * sweeps it, and only the connection that carries that reply decides whether
+ * the install runs (loop.c). */
+#define BK_BOOT_PATH    "/proc/rlxfw-boot"
+#define BK_UPD_IDLE_S   30      /* no DATA for this long: the staging is dropped */
+#define BK_UPD_LOCK_S   30      /* spictl_lock's wait before an install */
+
+enum { BK_UPD_NONE = 0, BK_UPD_STAGING, BK_UPD_POISONED, BK_UPD_VERIFIED };
+
+struct bk_upd {
+	int      state;                  /* BK_UPD_* */
+	uid_t    uid;                    /* who began it ... */
+	uint8_t  tok[PROTO_TOK_LEN];     /* ... with which session token */
+	uint8_t *buf;                    /* malloc(total); 0 unless STAGING/VERIFIED */
+	uint32_t total;                  /* BEGIN's u32 */
+	uint32_t received;               /* bytes accepted, in order */
+	long     last;                   /* bk_now() at BEGIN or the last DATA taken */
+	char     dest;                   /* 'A' or 'B': the slot not running */
+	uint32_t version;                /* END OK: the container's version */
+	/* STATUS's BKS_UPDATE_LAST: "ok <A|B> <version>" or the last refusal's
+	 * reason; "" until the first update op since boot.  Never cleared. */
+	char     last_result[BKS_UPDATE_LAST_MAX + 1];
+};
+
 /* What the last bk_cfg_reload() found, kept so that a change is logged once
  * and not once per request (`FW-184`). */
 #define BK_CFG_OK      0	/* a valid record, or no store yet */
@@ -94,6 +122,8 @@ struct broker {
 	uint32_t entropy_last;      /* what the last read said, for STATUS */
 	int      kdf_busy;          /* the global "1 scrypt in flight" latch */
 	int      pending_reboot;    /* main() acts on this AFTER the reply */
+	int      pending_update;    /* END said OK: the install runs AFTER the reply */
+	struct bk_upd upd;          /* update.c */
 
 	/* seams: production values from bk_init(), moved only by tests */
 	const char *entropy_path;
@@ -105,6 +135,10 @@ struct broker {
 	int  ping_timeout_s;
 	int  use_fake_clock;
 	long fake_now;
+	const char *boot_path;      /* /proc/rlxfw-boot, the handoff */
+	/* After an install: sync(), sleep(1), reboot(RB_AUTOBOOT).  Returns only
+	 * when reboot(2) did, with -errno.  bk_upd_reboot_real in production. */
+	int (*upd_reboot)(void);
 };
 
 void bk_init(struct broker *bk);
@@ -187,5 +221,65 @@ uint32_t bk_proc_load1x100(struct broker *bk);
 uint32_t bk_proc_memfree_kb(struct broker *bk);
 
 void bk_log(const char *fmt, ...);
+
+/* ---- the update ops (update.c) -------------------------------------- */
+/* Each fills rs and returns 0; the table in ops.c has already passed the
+ * caller (uid 100 with a live session and its CSRF token, or root). */
+int  bk_upd_begin(struct broker *bk, const struct proto_req *rq, uid_t uid,
+                  struct proto_resp *rs);
+int  bk_upd_data(struct broker *bk, const struct proto_req *rq, uid_t uid,
+                 struct proto_resp *rs);
+int  bk_upd_end(struct broker *bk, const struct proto_req *rq, uid_t uid,
+                struct proto_resp *rs);
+/* The staging dropped when 30 s passed with no DATA, or when the uid-100
+ * session that began it is gone (LOGOUT, PWSET, expiry, eviction).  Called
+ * by every update op and by the loop beside the connection deadlines; never
+ * touches a VERIFIED staging. */
+void bk_upd_sweep(struct broker *bk);
+/* Free the bytes and forget the binding; last_result is kept. */
+void bk_upd_discard(struct broker *bk);
+/* After END's OK reply.  delivered = 1 when every byte of it was written to
+ * the socket: the install of § 4.5 runs and, when it passed, bk->upd_reboot.
+ * delivered = 0 (the write failed, the slot was reaped, the reply could not be
+ * formed): logged, nothing staged, nothing written.  0 = installed (and the
+ * reboot returned, which only a test or an unprivileged run sees), -1 = not. */
+int  bk_upd_after_reply(struct broker *bk, int delivered);
+int  bk_upd_reboot_real(void);
+/* STATUS's BKS_UPDATE_LAST, or 0 bytes before the first update op. */
+size_t bk_upd_last(const struct broker *bk, const char **text);
+
+/* ---- the listener's loop (loop.c) ----------------------------------- */
+#define BK_MAXCONN 8
+#define BK_IDLE_S  5        /* no byte for this long -> closed */
+#define BK_LIFE_S  15       /* hard cap on a connection, whatever it does */
+#define BK_CHUNK   512
+
+struct bk_conn {
+	int   fd;
+	uid_t uid;
+	int   writing;
+	int   reboot_after_write;   /* THIS slot armed it (REBOOT) */
+	int   install_after_write;  /* THIS slot carries END's OK (update.c) */
+	long  born;
+	long  last;
+	struct proto_rx rx;
+	uint8_t out[PROTO_RESP_MAX];
+	size_t outlen;
+	size_t outoff;
+};
+
+struct bk_loop {
+	struct bk_conn c[BK_MAXCONN];
+};
+
+int  bk_bind_socket(const char *path, mode_t mode, gid_t gid);
+void bk_loop_init(struct bk_loop *L);
+/* A connected socket and the uid SO_PEERCRED gave it, into a free slot.
+ * 0, or -1 (and fd closed) when every slot is taken. */
+int  bk_loop_adopt(struct bk_loop *L, int fd, uid_t uid);
+/* One poll() pass: accept on lfd (none when lfd < 0), read, dispatch, write,
+ * the deadlines and bk_upd_sweep.  0, or -1 when poll() itself failed. */
+int  bk_loop_step(struct broker *bk, struct bk_loop *L, int lfd, int timeout_ms);
+void bk_loop_close_all(struct broker *bk, struct bk_loop *L);
 
 #endif /* RLXFW_BROKERD_H */

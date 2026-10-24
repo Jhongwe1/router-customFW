@@ -45,18 +45,45 @@ struct http_rsp {
 /* The parent's answer to "may I spend a KDF evaluation?".  1 = yes, 0 = no, and
  * on no *retry_s says when.  A NULL grant function means "always yes", which is
  * what the mutation control in the tests uses to show the limiter is load
- * bearing rather than decorative. */
+ * bearing rather than decorative.
+ *
+ * `alarm_fn` is alarm(2) for the streaming upload (upload.c), which re-arms the
+ * child's whole-connection bound after UPDATE_BEGIN and reads what is left of it
+ * before UPDATE_END.  NULL, as srv_loop() leaves it, IS alarm(2); the tests
+ * supply a recorder so no host test arms a real alarm in its own process. */
 struct route_env {
 	const char *sock;               /* broker socket path */
 	uint32_t    client_ip;
 	int       (*kdf_grant)(void *ctx, uint32_t *retry_s);
 	void      (*kdf_release)(void *ctx);
 	void       *ctx;
+	unsigned  (*alarm_fn)(unsigned secs);
 };
+
+struct bk_req;
+struct bk_resp;
 
 void route_rsp_init(struct http_rsp *rs);
 int  route_dispatch(const struct http_req *rq, struct http_rsp *rs,
 		    const struct route_env *env);
+
+/* The streaming route's gate, for upload.c: route_dispatch()'s own table lookup
+ * and its RF_SESS, RF_CSRF and empty-body checks, in its order, with the
+ * declared Content-Length standing for the body the parser never stored.
+ * 0 = the upload may begin; -1 = rs holds the refusal. */
+int  route_stream_gate(const struct http_req *rq, struct http_rsp *rs);
+
+/* The header of every broker request a route makes: op 0, client_ip, and the
+ * session and CSRF tokens decoded from the request.  0, or -1 with rs holding
+ * the 400.  Exposed so upload.c builds its calls exactly as call_broker does. */
+int  route_bk_req(const struct route_env *env, const struct http_req *rq,
+		  struct bk_req *q, struct http_rsp *rs);
+
+/* A broker refusal as the HTTP answer: the one status mapping every route uses.
+ * `body` is read only for the two statuses that carry one (LOCKED's seconds,
+ * INVAL's key id); NULL/0 reads as neither. */
+void route_map_status(struct http_rsp *rs, uint8_t status,
+		      const uint8_t *body, uint32_t blen);
 
 /* Serialise the status line and every header into out[0..cap).  Returns the
  * length, or -1 if it did not fit.  The security headers of SPEC-R7 section 7 are

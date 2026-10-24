@@ -166,4 +166,93 @@ int cfg_load_info(const char *path, struct cfg *out, struct cfg_store_info *info
  * the store writes, rather than a test's idea of them. */
 int cfg_slot_image(const struct cfg *c, uint32_t seq, uint8_t *img, size_t n);
 
+/* ---------------------------------------------------------------------------
+ * THE FLASH BACKEND (notes/self-update.md §§ 3.1-3.4; src/lib/cfgflash.c)
+ * ---------------------------------------------------------------------------
+ *
+ * cfg_load_info, cfg_store, cfg_store_fresh and cfg_slot_raw take the flash
+ * backend when `path` is the STRING CFG_FLASH_DEV, compared with strcmp and
+ * never by pointer: brokerd's -c and cfgstore's --file hand in argv strings,
+ * and a pointer test would send `cfgstore --file /dev/mtd2ro` to the file
+ * backend, which reads [0, 8192) of the chip -- the loader -- with no guard.
+ * Every other path is the file backend: the host suites and the torn-write
+ * sweep (notes/config-store.md § 5) run on it.  It reads and writes REGULAR
+ * files only, checked on the descriptor before any byte moves, so /dev/mtd0ro,
+ * //dev/mtd2ro or any other node spelled as a store is -CFGE_IO, named on
+ * fd 2 and by cfg_file_why() ("not a regular file"; "" when none refused).
+ *
+ * The flash backend has no "absent store": the device node is part of the
+ * image, so a slot it cannot read is -CFGE_IO, never "no store yet" -- a store
+ * that cannot be read must not be written over as if it were empty.  A slot
+ * whose CFG_SLOT_SIZE bytes are all 0xFF reads as absent (got = 0), slot by
+ * slot, so two erased regions are "no store yet" exactly as a missing file is.
+ *
+ * The offsets are the install table's cfg0 and cfg1
+ * (kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi-install.h, 1.1, two
+ * owners of two numbers, § 3.7); a slot is the first CFG_SLOT_SIZE bytes of
+ * its 64 KiB region and the rest of the region reads 0xFF.
+ */
+#define CFG_FLASH_DEV		"/dev/mtd2ro"
+#define CFG_FLASH_OFF0		0x3C0000u
+#define CFG_FLASH_OFF1		0x3D0000u
+#define CFG_FLASH_REGION	0x10000u
+#define CFG_FLASH_LOCK_S	30u	/* § 3.2 step 1: LOCK_NB retries, 30 s */
+#define CFG_FLASH_NWRITES	32u	/* § 3.3: 16 sector erases + 16 programs */
+
+/* 1 when `path` names the flash backend, else 0. */
+int cfg_is_flash(const char *path);
+
+/* Writes `rec`, with seq 1, into slot 0 -- ONLY when neither slot holds a
+ * valid record (each one absent or corrupt), and refuses otherwise.  It is
+ * the shell-less first-password step's write (§ 3.8): over a corrupt store,
+ * without basing anything on the corrupt bytes.  A fresh record must never
+ * shadow a valid one (seq 1 below the other slot's) nor replace it (written
+ * over it), so a valid record in EITHER slot is -CFGE_SEQ -- "the sequence has
+ * no place for seq 1" -- and nothing is written.  An unreadable store is
+ * -CFGE_IO: whether it holds a valid record is unknown, so nothing is written
+ * either.  On the flash backend the check and the write are under one hold of
+ * the flash lock, so no other writer's record can land between them.
+ * 0 sets rec->seq = 1 and rec->source = 1.  cfg_validate's refusals as
+ * cfg_store's. */
+int cfg_store_fresh(const char *path, struct cfg *rec);
+
+/* The raw bytes of slot s as the medium holds them, for `cfgstore dump`:
+ * *where is the offset on the medium (CFG_FLASH_OFF0/OFF1, or s *
+ * CFG_SLOT_SIZE in the file), *got the bytes read (0 for an erased flash slot
+ * or a slot past the end of the file).  0, -CFGE_IO (errno is the failing
+ * call's), or -CFGE_SPACE for a bad argument. */
+int cfg_slot_raw(const char *path, int s, uint8_t *buf, size_t *got,
+		 uint32_t *where);
+
+/* The file backend's last refusal of a path that is not a regular file, or
+ * "" (cleared by each file-backend open). */
+const char *cfg_file_why(void);
+
+/* src/lib/cfgflash.c.  The slot index is 0 or 1.
+ *
+ *   cfg_flash_read_slot   CFG_SLOT_SIZE bytes at CFG_FLASH_OFF0/OFF1 through
+ *                         spictl_flash_read; all 0xFF -> *got = 0, else
+ *                         CFG_SLOT_SIZE.  0 or -CFGE_IO.
+ *   cfg_flash_lock        the flash lock, CFG_FLASH_LOCK_S: the fd, or
+ *                         -CFGE_IO with the reason logged (flock's ENOSYS on
+ *                         a kernel without CONFIG_FILE_LOCKING is named).
+ *   cfg_flash_write_slot_locked
+ *                         § 3.2 steps 2-8 under a lock the caller holds:
+ *                         disarm; img reset; stage 4,096; img_len 4096 and
+ *                         img_err none, n_writes noted; arm the region; install
+ *                         cfgN sha=<sha256 of img>; inst_reason OK,
+ *                         inst_cmp_ok 1, inst_cmp_diff 0, n_writes moved by
+ *                         exactly CFG_FLASH_NWRITES; img reset.  Any deviation
+ *                         is -CFGE_IO, logged, and is followed by ONE verb only,
+ *                         the cleanup `img reset`: never an arm or an install.
+ *   cfg_flash_write_slot  the same, taking and releasing the lock itself.
+ *   cfg_flash_why         "" after a clean run, else "<step>: <detail>" of the
+ *                         last deviation, the text the log line carried. */
+int  cfg_flash_read_slot(int s, uint8_t *buf, size_t *got);
+int  cfg_flash_lock(void);
+void cfg_flash_unlock(int fd);
+int  cfg_flash_write_slot_locked(int s, const uint8_t *img);
+int  cfg_flash_write_slot(int s, const uint8_t *img);
+const char *cfg_flash_why(void);
+
 #endif /* RLXFW_CFG_H */

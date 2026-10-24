@@ -11,7 +11,10 @@
  *   4  the config store, read by linking cfg.c -- never by exec'ing cfgstore
  *   5  hostname, then the five /proc verbs, then the LAN by ioctl
  *   6  /var/udhcpd.conf, written from integers
- *   7  the child table, then the loop: reap, restart, poll
+ *   7  the child table, then the loop: reap, restart, poll -- and, once each,
+ *      the one-shot children init.h describes: the counter advance after
+ *      brokerd has started (ctradv.c), and in a BENCH_SHELL=0 build the
+ *      console first-password step while the store holds no hash (firstpw.c)
  *
  * ---------------------------------------------------------------------------
  * NO SHELL, AND WHAT THAT COSTS
@@ -21,6 +24,8 @@
  * file.  Six children exist and each one is `fork` plus `execve` with an argv
  * of string literals and a fixed three-entry environment; not one argv byte
  * comes from the config store, from a lease, or from the kernel command line.
+ * The one-shot children are `fork` and no `execve` at all: a function of this
+ * image, then `_exit`.
  * The five /proc writes that bring the switch core up are `write(2)` of a
  * compile-time literal to a compile-time path -- they are what the old script's
  * `echo … >` did, minus the interpreter.
@@ -46,6 +51,12 @@
 #include "supervise.h"
 #include "../lib/netutil.h"
 #include "cfg.h"
+#if RLXFW_CTR_HELPER
+#include "ctradv.h"
+#endif
+#if RLXFW_FIRSTPW
+#include "firstpw.h"
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
@@ -579,6 +590,12 @@ static void write_verbs(void)
 	}
 }
 
+#if RLXFW_CTR_HELPER
+/* Set once `rlxfw: lan up` is on the console: the counter advance exists only
+ * after it (notes/self-update.md § 5). */
+static int lan_said_up;
+#endif
+
 static void lan_up(uint32_t ip, uint32_t mask)
 {
 	struct nu_net net;
@@ -614,6 +631,9 @@ static void lan_up(uint32_t ip, uint32_t mask)
 					 ? 0
 					 : nu_mask_prefix(mask)));
 	lb_out(&l);
+#if RLXFW_CTR_HELPER
+	lan_said_up = 1;
+#endif
 }
 #endif /* RLXFW_SWITCH_BRINGUP */
 
@@ -825,6 +845,126 @@ static void build_table(struct sv_set *s, const struct cfg *c, int shell_on)
 		  1, shell_on, ": console shell DISABLED in this build");
 }
 
+#if RLXFW_CTR_HELPER || RLXFW_FIRSTPW
+/* ==========================================================================
+ * The one-shot children (init.h): the counter advance and the console
+ * first-password step.  Each is forked at most once, runs a function of this
+ * image -- no execve, so no program is added to the image -- and _exits with
+ * its result.  Neither is in the child table: sv_reap_all reaps a pid that
+ * sv_by_pid does not know and does nothing else with it (supervise.c;
+ * test_supervise.c t_orphan), so a one-shot that exits at once never reads as
+ * a service's fast failure and nothing restarts it (supervise.h).
+ * ========================================================================== */
+
+static pid_t oneshot(int (*body)(void), int console_in)
+{
+	pid_t pid = fork();
+	int fd;
+
+	if (pid != 0)
+		return pid;   /* parent, or -1 */
+
+	/* --- child ------------------------------------------------------- */
+	/* PID 1's handlers write into PID 1's self-pipe, so a child that kept
+	 * them would turn a stray SIGTERM into PID 1's reboot.  SIGPIPE stays
+	 * ignored, as PID 1 has it: a broker that hangs up early is an EPIPE
+	 * here, not a death before the verdict line is printed. */
+	(void)signal(SIGCHLD, SIG_DFL);
+	(void)signal(SIGTERM, SIG_DFL);
+	(void)signal(SIGINT, SIG_DFL);
+	(void)signal(SIGUSR1, SIG_DFL);
+	(void)signal(SIGHUP, SIG_DFL);
+	if (sigpipe_fd[0] >= 0)
+		(void)close(sigpipe_fd[0]);
+	if (sigpipe_fd[1] >= 0)
+		(void)close(sigpipe_fd[1]);
+	if (!console_in) {
+		/* Only the first-password step reads the console. */
+		fd = open("/dev/null", O_RDWR);
+		if (fd >= 0) {
+			(void)dup2(fd, 0);
+			if (fd > 2)
+				(void)close(fd);
+		}
+	}
+	_exit(body() & 0x7f);
+}
+
+static void oneshot_said(const char *what, pid_t pid)
+{
+	struct lbuf l;
+	int e = errno;
+
+	lb_reset(&l);
+	lb_s(&l, "rlxfw: init: ");
+	lb_s(&l, what);
+	if (pid > 0) {
+		lb_s(&l, " forked pid=");
+		lb_u(&l, (unsigned long)pid);
+	} else {
+		lb_s(&l, " NOT forked: fork() errno=");
+		lb_u(&l, (unsigned long)e);
+	}
+	lb_out(&l);
+}
+#endif /* RLXFW_CTR_HELPER || RLXFW_FIRSTPW */
+
+#if RLXFW_CTR_HELPER
+static int ctr_settled;
+
+static int ctr_body(void)
+{
+	struct ctr_env e;
+
+	ctr_env_dev(&e);
+	return ctr_advance(&e);
+}
+
+/* 1 once settled -- forked, or it never will be and that was said once --
+ * and 0 to ask again on the next pass of the loop. */
+static int ctr_maybe_fork(const struct sv_set *s)
+{
+	int due = ctr_fork_due(s, lan_said_up);
+
+	if (due == 0)
+		return 0;
+	if (due < 0) {
+		struct lbuf l;
+
+		lb_reset(&l);
+		lb_s(&l, ctr_fork_why(due));
+		lb_out(&l);
+		return 1;
+	}
+	oneshot_said("ctr helper", oneshot(ctr_body, 0));
+	return 1;
+}
+#endif /* RLXFW_CTR_HELPER */
+
+#if RLXFW_FIRSTPW
+static int fp_want;      /* fp_offer() of the store as step 4 loaded it */
+static int fp_settled;
+
+static int fp_body(void)
+{
+	struct fp_env e;
+
+	fp_env_dev(&e, 0, console_fd, PATH_CFG);
+	return fp_run(&e);
+}
+
+static int fp_maybe_fork(void)
+{
+	if (fp_want == FP_OFFER_UNREADABLE)
+		say("first-password step NOT offered: the config store could "
+		    "not be read, and a store that cannot be read is never "
+		    "written over");
+	else if (fp_want == FP_OFFER_YES)
+		oneshot_said("first-password step", oneshot(fp_body, 1));
+	return 1;
+}
+#endif /* RLXFW_FIRSTPW */
+
 /* ==========================================================================
  * main
  * ========================================================================== */
@@ -885,6 +1025,9 @@ int main(int argc, char **argv)
 		lb_u(&l, (unsigned long)cfg.seq);
 		lb_out(&l);
 	}
+#if RLXFW_FIRSTPW
+	fp_want = fp_offer(rc, &cfg);
+#endif
 
 	/* Step 5. */
 	set_hostname(&cfg);
@@ -973,6 +1116,14 @@ int main(int argc, char **argv)
 		}
 
 		(void)sv_start_due(&set, &sysops, now_ms());
+#if RLXFW_CTR_HELPER
+		if (!ctr_settled)
+			ctr_settled = ctr_maybe_fork(&set);
+#endif
+#if RLXFW_FIRSTPW
+		if (!fp_settled)
+			fp_settled = fp_maybe_fork();
+#endif
 
 		d = sv_next_due(&set, now_ms());
 		if (pfd.fd < 0) {

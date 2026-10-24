@@ -236,10 +236,12 @@ static void ok_empty(struct http_rsp *rs)
 /* ------------------------------------------------------ broker status mapping */
 
 /* One place, so no handler invents a mapping.  `body` is the broker's response
- * body, used only for the two statuses SPEC-R7 gives a body to. */
-static void map_broker(struct http_rsp *rs, const struct bk_resp *br)
+ * body, used only for the two statuses SPEC-R7 gives a body to.  upload.c maps
+ * the update ops' refusals through this too, with no body: theirs are TLVs. */
+void route_map_status(struct http_rsp *rs, uint8_t status,
+		      const uint8_t *body, uint32_t blen)
 {
-	switch (br->status) {
+	switch (status) {
 	case BK_BADREQ:
 		route_err(rs, 400, "badreq");
 		return;
@@ -251,7 +253,7 @@ static void map_broker(struct http_rsp *rs, const struct bk_resp *br)
 		return;
 	case BK_LOCKED: {
 		struct json_w w;
-		uint32_t s = (br->body_len >= 4) ? get32be(br->body) : 60u;
+		uint32_t s = (body != NULL && blen >= 4) ? get32be(body) : 60u;
 
 		if (s > 3600u)
 			s = 3600u;
@@ -268,7 +270,7 @@ static void map_broker(struct http_rsp *rs, const struct bk_resp *br)
 	}
 	case BK_INVAL: {
 		struct json_w w;
-		uint32_t id = (br->body_len >= 2) ? get16be(br->body) : 0u;
+		uint32_t id = (body != NULL && blen >= 2) ? get16be(body) : 0u;
 
 		/* The key id goes back as a NUMBER, not as its name and not as
 		 * the text the peer sent: the page maps ids from its own table.
@@ -309,6 +311,27 @@ static void map_broker(struct http_rsp *rs, const struct bk_resp *br)
 	}
 }
 
+static void map_broker(struct http_rsp *rs, const struct bk_resp *br)
+{
+	route_map_status(rs, br->status, br->body, br->body_len);
+}
+
+int route_bk_req(const struct route_env *env, const struct http_req *rq,
+		 struct bk_req *q, struct http_rsp *rs)
+{
+	memset(q, 0, sizeof(*q));
+	q->client_ip = env->client_ip;
+	if (rq->sess[0] != '\0' && unhex16(rq->sess, q->session) != 0) {
+		route_err(rs, 400, "session");
+		return -1;
+	}
+	if (rq->hcsrf[0] != '\0' && unhex16(rq->hcsrf, q->csrf) != 0) {
+		route_err(rs, 400, "csrf");
+		return -1;
+	}
+	return 0;
+}
+
 static int call_broker(const struct route_env *env, uint8_t op,
 		       const struct http_req *rq,
 		       const uint8_t *body, uint32_t blen,
@@ -317,19 +340,11 @@ static int call_broker(const struct route_env *env, uint8_t op,
 	struct bk_req q;
 	int rc;
 
-	memset(&q, 0, sizeof(q));
+	if (route_bk_req(env, rq, &q, rs) != 0)
+		return -1;
 	q.op = op;
-	q.client_ip = env->client_ip;
 	q.body = body;
 	q.body_len = blen;
-	if (rq->sess[0] != '\0' && unhex16(rq->sess, q.session) != 0) {
-		route_err(rs, 400, "session");
-		return -1;
-	}
-	if (rq->hcsrf[0] != '\0' && unhex16(rq->hcsrf, q.csrf) != 0) {
-		route_err(rs, 400, "csrf");
-		return -1;
-	}
 
 	rc = bk_call(env->sock, &q, br);
 	if (rc != 0) {
@@ -435,6 +450,19 @@ static void h_index(const struct http_req *rq, struct http_rsp *rs,
 	(void)send_file(rs, "index.html", "text/html; charset=utf-8");
 }
 
+/* 1 when v[0..l) is printable ASCII, 0x20..0x7e: what json_w_strn() can write
+ * without failing the whole document. */
+static int printable(const uint8_t *v, uint16_t l)
+{
+	uint16_t i;
+
+	for (i = 0; i < l; i++) {
+		if (v[i] < 0x20 || v[i] > 0x7e)
+			return 0;
+	}
+	return 1;
+}
+
 /* GET /api/status.  Renders the TLVs of SPEC-R7 op 0x04.  Without a session the
  * broker returns only 0x8001, 0x8006 and 0x8008, and this renders whatever came
  * back rather than assuming which. */
@@ -492,6 +520,13 @@ static void h_status(const struct http_req *rq, struct http_rsp *rs,
 		case 0x8008:
 			if (l == 1)
 				json_w_bool(&w, "auth_ready", v[0] != 0);
+			break;
+		case BKS_UPDATE_LAST:
+			/* "<reason>" or "ok <A|B> <version>", as brokerd wrote
+			 * it.  Out of bounds or unprintable, it is skipped like
+			 * any malformed TLV, not fatal to the document. */
+			if (l <= BKS_UPDATE_LAST_MAX && printable(v, l))
+				json_w_strn(&w, "update_last", (const char *)v, l);
 			break;
 		default:
 			break;
@@ -1015,17 +1050,19 @@ static void h_reboot(const struct http_req *rq, struct http_rsp *rs,
 	ok_empty(rs);
 }
 
-/* POST /api/firmware.  SPEC-R7 reserves ops 0x20..0x22 for R8 and says NOTSUP in
- * R7, so httpd answers 501 without a broker round trip -- but only after the same
- * session and CSRF checks as any other state-changing route, so the route does
- * not become an unauthenticated probe for whether a firmware path exists. */
+/* POST /api/firmware is served by upload.c, never from here: the parser stops at
+ * its blank line (HTTP_FEED_STREAM) and srv_conn() hands the socket to
+ * upload_run(), which runs this table's gate for the route through
+ * route_stream_gate().  So this handler is reached only by a buffered request for
+ * the streaming route -- which no path in this program builds -- and it says so
+ * rather than acting on a body it was never meant to hold. */
 static void h_firmware(const struct http_req *rq, struct http_rsp *rs,
 		       const struct route_env *env)
 {
 	(void)rq;
 	(void)env;
 	rs->nostore = 1;
-	route_err(rs, 501, "notsup");
+	route_err(rs, 500, "stream");
 }
 
 /* ----------------------------------------------------------- the route table */
@@ -1036,6 +1073,7 @@ static void h_firmware(const struct http_req *rq, struct http_rsp *rs,
 #define RF_CSRF  0x08   /* state changing: X-RLX-CSRF must match the rlxc cookie */
 #define RF_API   0x10   /* Cache-Control: no-store, and errors are JSON */
 #define RF_PFX   0x20   /* match by prefix, not exact */
+#define RF_STREAM 0x40  /* the body is upload.c's, never in http_req */
 
 struct route {
 	const char *path;
@@ -1056,20 +1094,26 @@ static const struct route routes[] = {
 	{ "/api/password",  RF_POST, RF_API | RF_SESS | RF_CSRF,   h_password },
 	{ "/api/ping",      RF_POST, RF_API | RF_SESS | RF_CSRF,   h_ping },
 	{ "/api/reboot",    RF_POST, RF_API | RF_SESS | RF_CSRF,   h_reboot },
-	{ "/api/firmware",  RF_POST, RF_API | RF_SESS | RF_CSRF,   h_firmware }
+	{ HTTP_UPLOAD_PATH, RF_POST, RF_API | RF_SESS | RF_CSRF | RF_STREAM,
+	  h_firmware }
 };
 
 #define NROUTES (sizeof(routes) / sizeof(routes[0]))
 
-int route_dispatch(const struct http_req *rq, struct http_rsp *rs,
-		   const struct route_env *env)
+/* The lookup and every check a route's handler runs behind, in this order: the
+ * path, the method, RF_SESS, RF_CSRF, and for an API POST a non-empty body.
+ * `blen` is that body's length -- rq->body_len for a buffered request, and the
+ * declared rq->clen for the streaming one, whose body the parser never stored.
+ * 0 and *out = the route; -1 and rs holds the refusal.  route_dispatch() and
+ * route_stream_gate() both call this, so the streaming route is gated by the
+ * same lines as every other one and not by a copy of them. */
+static int route_gate(const struct http_req *rq, struct http_rsp *rs,
+		      uint32_t blen, const struct route **out)
 {
 	unsigned i;
 	int path_found = 0;
 	const struct route *r = NULL;
 	uint8_t want = (rq->method == HM_GET) ? RF_GET : RF_POST;
-
-	route_rsp_init(rs);
 
 	for (i = 0; i < NROUTES; i++) {
 		int match;
@@ -1095,7 +1139,7 @@ int route_dispatch(const struct http_req *rq, struct http_rsp *rs,
 		} else {
 			route_err(rs, 404, "notfound");
 		}
-		return 0;
+		return -1;
 	}
 
 	if (r->flags & RF_API)
@@ -1105,7 +1149,7 @@ int route_dispatch(const struct http_req *rq, struct http_rsp *rs,
 		if (rq->sess[0] == '\0') {
 			route_err(rs, 401, "nosession");
 			rs->nostore = 1;
-			return 0;
+			return -1;
 		}
 	}
 	if (r->flags & RF_CSRF) {
@@ -1115,19 +1159,48 @@ int route_dispatch(const struct http_req *rq, struct http_rsp *rs,
 		    !route_ct_eq32(rq->hcsrf, rq->ccsrf)) {
 			route_err(rs, 403, "csrf");
 			rs->nostore = 1;
-			return 0;
+			return -1;
 		}
 	}
 	if ((r->methods & RF_POST) && rq->method == HM_POST &&
-	    (r->flags & RF_API) && rq->body_len == 0) {
+	    (r->flags & RF_API) && blen == 0) {
 		route_err(rs, 400, "nobody");
 		rs->nostore = 1;
-		return 0;
+		return -1;
 	}
+	*out = r;
+	return 0;
+}
+
+int route_dispatch(const struct http_req *rq, struct http_rsp *rs,
+		   const struct route_env *env)
+{
+	const struct route *r = NULL;
+
+	route_rsp_init(rs);
+	if (route_gate(rq, rs, rq->body_len, &r) != 0)
+		return 0;
 
 	r->fn(rq, rs, env);
 	if (r->flags & RF_API)
 		rs->nostore = 1;
+	return 0;
+}
+
+int route_stream_gate(const struct http_req *rq, struct http_rsp *rs)
+{
+	const struct route *r = NULL;
+
+	route_rsp_init(rs);
+	if (route_gate(rq, rs, rq->clen, &r) != 0)
+		return -1;
+	if ((r->flags & RF_STREAM) == 0 || !rq->stream) {
+		/* The parser said "stream" and the table did not, or the
+		 * reverse: this program's bug, refused before any broker call. */
+		route_err(rs, 500, "stream");
+		rs->nostore = 1;
+		return -1;
+	}
 	return 0;
 }
 

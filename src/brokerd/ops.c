@@ -46,9 +46,9 @@ static const struct bk_op_rule rules[] = {
 	{ OP_LOGIN,        "LOGIN",        1, 1, 0, 0, 0, 0 },
 	{ OP_LOGOUT,       "LOGOUT",       1, 1, 0, 1, 1, 0 },
 	{ OP_PWSET,        "PWSET",        1, 1, 0, 1, 1, 0 },
-	{ OP_UPDATE_BEGIN, "UPDATE_BEGIN", 0, 1, 0, 1, 1, 0 },
-	{ OP_UPDATE_DATA,  "UPDATE_DATA",  0, 1, 0, 1, 1, 0 },
-	{ OP_UPDATE_END,   "UPDATE_END",   0, 1, 0, 1, 1, 0 }
+	{ OP_UPDATE_BEGIN, "UPDATE_BEGIN", 1, 1, 0, 1, 1, 0 },
+	{ OP_UPDATE_DATA,  "UPDATE_DATA",  1, 1, 0, 1, 1, 0 },
+	{ OP_UPDATE_END,   "UPDATE_END",   1, 1, 0, 1, 1, 0 }
 };
 #define NRULES ((int)(sizeof(rules) / sizeof(rules[0])))
 
@@ -247,6 +247,18 @@ static int op_status(struct broker *bk, int full, struct proto_resp *rs)
 		                         BKS_ENTROPY, bk->entropy_last);
 	bad |= proto_tlv_put_u8(rs->body, sizeof(rs->body), &off,
 	                        BKS_AUTHRDY, (uint8_t)(bk->auth_ready ? 1 : 0));
+	/* The last update's result (update.c), in the full set only and only
+	 * once there is one: before the first update op since boot, the set is
+	 * exactly what it was. */
+	if (full) {
+		const char *ul;
+		size_t ull = bk_upd_last(bk, &ul);
+
+		if (ull > 0)
+			bad |= proto_tlv_put(rs->body, sizeof(rs->body), &off,
+			                     BKS_UPDATE_LAST, (const uint8_t *)ul,
+			                     (uint16_t)ull);
+	}
 	if (bad != 0) {
 		rs_status(rs, ST_IO);
 		return 0;
@@ -794,6 +806,14 @@ int bk_dispatch(struct broker *bk, const struct proto_req *rq, uid_t peer_uid,
 		return 0;
 	case OP_PWSET:
 		return op_pwset(bk, rq, peer_uid, rs);
+	/* notes/self-update.md § 4.2: the table above let only uid 100 with a
+	 * live session and its CSRF token (or root) this far. */
+	case OP_UPDATE_BEGIN:
+		return bk_upd_begin(bk, rq, peer_uid, rs);
+	case OP_UPDATE_DATA:
+		return bk_upd_data(bk, rq, peer_uid, rs);
+	case OP_UPDATE_END:
+		return bk_upd_end(bk, rq, peer_uid, rs);
 	default:
 		rs_status(rs, ST_NOTSUP);
 		return 0;

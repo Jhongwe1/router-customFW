@@ -542,7 +542,7 @@ the cause it named and it was not the whole cause.
 ### 7.3 `INC-2`: confining the define, and the product it must not move
 
 The staged tree has **exactly one** consumer of the macro —
-`init/main.c:576`, the `ID0` row of `config/rlxfw-marks.tsv` — so the define
+`linux-2.6.30/init/main.c:576`, the `ID0` row of `config/rlxfw-marks.tsv` — so the define
 does not need to be global. `--id-scope main` passes it as `CFLAGS_main.o`.
 `global` stays the default, because it is what every measurement so far was
 taken under.

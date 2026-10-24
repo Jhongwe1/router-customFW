@@ -37,6 +37,19 @@
 #define HTTP_BODY_TIMEOUT_S 10
 #define HTTP_CONN_MAX       8
 
+/* The one route whose body is streamed rather than buffered (upload.h):
+ * `POST HTTP_UPLOAD_PATH`.  Its Content-Length is bounded by HTTP_UPLOAD_MAX
+ * instead of HTTP_BODY_MAX, at the header line like every other bound, and its
+ * body is never stored in struct http_req.  HTTP_UPLOAD_MAX is one slot,
+ * src/rlxboot/rlxboot.h's RLXB_SLOT_SIZE (0x120000); it is restated here because
+ * this header is also compiled where rlxboot.h is not (the fuzz harness, the
+ * flat target staging), and test_serve.c refuses to compile if the two differ.
+ * HTTP_UPLOAD_ALARM_S replaces the child's whole-connection alarm once
+ * UPDATE_BEGIN has said OK, and only then. */
+#define HTTP_UPLOAD_PATH    "/api/firmware"
+#define HTTP_UPLOAD_MAX     1179648u
+#define HTTP_UPLOAD_ALARM_S 180
+
 enum http_method { HM_NONE = 0, HM_GET, HM_POST };
 
 struct http_req {
@@ -46,6 +59,7 @@ struct http_req {
 	char     path[HTTP_PATH_MAX];     /* percent-decoded and validated */
 	uint8_t  has_clen;
 	uint8_t  chunked;                 /* Transfer-Encoding present -> 501 */
+	uint8_t  stream;                  /* POST HTTP_UPLOAD_PATH: body not here */
 	uint32_t clen;
 	char     sess[HTTP_TOK_MAX];      /* cookie rlxs, "" when absent */
 	char     ccsrf[HTTP_TOK_MAX];     /* cookie rlxc, "" when absent */
@@ -55,7 +69,8 @@ struct http_req {
 	uint8_t  body[HTTP_BODY_MAX + 1];
 };
 
-enum http_state { HS_REQLINE = 0, HS_HEADERS, HS_BODY, HS_DONE, HS_ERR };
+enum http_state { HS_REQLINE = 0, HS_HEADERS, HS_BODY, HS_DONE, HS_ERR,
+		  HS_STREAM };
 
 struct http_parser {
 	uint8_t  state;
@@ -77,12 +92,17 @@ struct http_parser {
 /* Feeding.  http_feed returns:
  *    0  more bytes are needed
  *    1  the request is complete
+ *    2  HTTP_FEED_STREAM: the head of `POST HTTP_UPLOAD_PATH` is complete and
+ *       its body is the caller's.  *used stops just past the blank line, so
+ *       p[*used..n) are the body's first bytes; none of them was consumed
  *   <0  refused; -(*) is the HTTP status to send, and nothing is echoed
  * *used is always set to the number of bytes consumed from p. */
+#define HTTP_FEED_STREAM 2
 void http_parse_init(struct http_parser *ps, struct http_req *r);
 int  http_feed(struct http_parser *ps, const uint8_t *p, size_t n, size_t *used);
 
-/* One-shot, for the tests and the fuzz harness. */
+/* One-shot, for the tests and the fuzz harness.  The streaming route's head
+ * returns HTTP_FEED_STREAM, whatever follows it. */
 int  http_parse_all(const uint8_t *p, size_t n, struct http_req *r);
 
 /* Percent-decode and validate a request target into out[0..cap).  Returns the

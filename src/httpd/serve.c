@@ -42,6 +42,7 @@
 #include "http.h"
 #include "rl.h"
 #include "routes.h"
+#include "upload.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -343,6 +344,19 @@ int srv_conn(int fd, const struct route_env *env)
 			if (-rc == 405)
 				rs.allow_get_post = 1;
 			return send_rsp(fd, &rs);
+		}
+		if (rc == HTTP_FEED_STREAM) {
+			/* POST /api/firmware: the body is upload.c's, with the
+			 * body's per-recv timeout; buf[used..r) is its start. */
+			set_rcv_timeout(fd, HTTP_BODY_TIMEOUT_S);
+			status = upload_run(fd, &rq, buf + used, (size_t)r - used,
+					    env, &rs);
+			if (status >= 0)
+				status = send_rsp(fd, &rs);
+			memset(buf, 0, sizeof(buf));
+			memset(&rq, 0, sizeof(rq));
+			memset(&rs, 0, sizeof(rs));
+			return status;
 		}
 		if (rc == 1) {
 			done = 1;
@@ -693,7 +707,9 @@ int srv_loop(int lfd, const char *sock_path)
 				 * one byte every four seconds would never time
 				 * out.  This is the bound on the whole
 				 * connection, and SIGALRM's default action ends
-				 * the process. */
+				 * the process.  upload.c re-arms it to
+				 * HTTP_UPLOAD_ALARM_S once UPDATE_BEGIN said OK,
+				 * and at no other point. */
 				(void)alarm(HTTP_HDR_TIMEOUT_S +
 					    HTTP_BODY_TIMEOUT_S + 5);
 				memset(&sa, 0, sizeof(sa));

@@ -521,13 +521,52 @@ static int write_at(int fd, off_t off, const uint8_t *buf, size_t n)
 /* Load                                                                      */
 /* ------------------------------------------------------------------------- */
 
+/* By string, never by pointer: cfg.h says why. */
+int cfg_is_flash(const char *path)
+{
+	return (path != NULL && strcmp(path, CFG_FLASH_DEV) == 0) ? 1 : 0;
+}
+
+/* The file backend reads and writes REGULAR files only.  Every other spelling
+ * of a device -- /dev/mtd0ro, //dev/mtd2ro, /dev/./mtd2ro -- is not
+ * CFG_FLASH_DEV and lands here, and a character device here would be read
+ * from offset 0 with no guard (the loader); a FIFO would block the reader.
+ * So the descriptor is checked before a byte is read or written, the refusal
+ * is -CFGE_IO, and it is named on fd 2 and by cfg_file_why(). */
+static const char *cfg_file_reason = "";
+
+const char *cfg_file_why(void)
+{
+	return cfg_file_reason;
+}
+
+static int file_not_regular(int fd, const char *path)
+{
+	struct stat st;
+	char line[240];
+	ssize_t w;
+	int n;
+
+	if (fstat(fd, &st) == 0 && S_ISREG(st.st_mode))
+		return 0;
+	cfg_file_reason = "not a regular file";
+	n = snprintf(line, sizeof line, "rlxfw: cfg: %s: not a regular file;"
+		     " the file backend reads regular files only\n", path);
+	if (n > 0) {
+		w = write(2, line, ((size_t)n < sizeof line) ? (size_t)n
+							    : sizeof line - 1);
+		(void)w;
+	}
+	return 1;
+}
+
 int cfg_load_info(const char *path, struct cfg *out, struct cfg_store_info *info)
 {
 	struct cfg_store_info local;
 	struct cfg tmp;
 	uint8_t slot[CFG_SLOT_SIZE];
 	uint32_t best = 0;
-	int fd, s, rc, ret = 0;
+	int fd = -1, s, rc, ret = 0, flash;
 
 	if (info == NULL)
 		info = &local;
@@ -541,18 +580,33 @@ int cfg_load_info(const char *path, struct cfg *out, struct cfg_store_info *info
 	if (rc != 0)
 		return rc;
 
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		if (errno == ENOENT)
-			return 0;	/* no store yet: defaults, source 0 */
-		return -CFGE_IO;
+	/* The flash backend opens per slot and has no "absent store": a slot it
+	 * cannot read is -CFGE_IO below, and only an erased one reads as got 0. */
+	flash = cfg_is_flash(path);
+	if (!flash) {
+		cfg_file_reason = "";
+		/* O_NONBLOCK so that a FIFO cannot hold the open; it changes
+		 * nothing for the regular file that is all this accepts. */
+		fd = open(path, O_RDONLY | O_NONBLOCK);
+		if (fd < 0) {
+			if (errno == ENOENT)
+				return 0;	/* no store yet: defaults, source 0 */
+			return -CFGE_IO;
+		}
+		if (file_not_regular(fd, path)) {
+			close(fd);
+			return -CFGE_IO;	/* before any read */
+		}
 	}
 
 	for (s = 0; s < CFG_NSLOTS; s++) {
 		size_t got = 0;
 
-		rc = read_at(fd, (off_t)s * (off_t)CFG_SLOT_SIZE, slot,
-			     (size_t)CFG_SLOT_SIZE, &got);
+		if (flash)
+			rc = cfg_flash_read_slot(s, slot, &got);
+		else
+			rc = read_at(fd, (off_t)s * (off_t)CFG_SLOT_SIZE, slot,
+				     (size_t)CFG_SLOT_SIZE, &got);
 		if (rc != 0) {
 			ret = -CFGE_IO;
 			info->rc[s] = -CFGE_IO;
@@ -579,7 +633,8 @@ int cfg_load_info(const char *path, struct cfg *out, struct cfg_store_info *info
 		}
 	}
 
-	close(fd);
+	if (!flash)
+		close(fd);
 	if (info->selected == 0 && ret == 0) {
 		/* Fail-closed: defaults, source 0.  cfg_defaults already ran. */
 		(void)cfg_defaults(out);
@@ -596,54 +651,26 @@ int cfg_load(const char *path, struct cfg *out)
 /* Store                                                                     */
 /* ------------------------------------------------------------------------- */
 
-int cfg_store(const char *path, struct cfg *c)
+/* The file backend's write of one slot image, then the read-back.  This is
+ * cfg_store's file path as it was before the flash backend existed, moved
+ * here unchanged so that cfg_store_fresh writes the same way. */
+static int put_slot_file(const char *path, int target, const uint8_t *img,
+			 uint32_t newseq)
 {
-	uint8_t img[CFG_SLOT_SIZE];
 	uint8_t back[CFG_SLOT_SIZE];
 	struct cfg probe;
-	struct cfg_store_info info;
 	struct stat st;
-	uint32_t newseq, maxseq = 0;
-	int fd, s, target, rc, used;
+	int fd, rc;
 	size_t got = 0;
 
-	if (path == NULL || c == NULL)
-		return -CFGE_SPACE;
-
-	/* Refuse to write a record that could not be loaded back.  SPEC-R7 does
-	 * not require this; a store that accepts an invalid record would create
-	 * a file whose only effect is to make the next boot fall back. */
-	rc = cfg_validate(c);
-	if (rc != 0)
-		return rc;
-
-	/* Where the current record is, read from the file rather than from
-	 * c->source: c may be minutes old. */
-	{
-		struct cfg unused;
-
-		rc = cfg_load_info(path, &unused, &info);
-		if (rc != 0)
-			return rc;
-	}
-	for (s = 0; s < CFG_NSLOTS; s++) {
-		if (info.rc[s] == 0 && info.seq[s] > maxseq)
-			maxseq = info.seq[s];
-	}
-	if (maxseq >= CFG_SEQ_MAX)
-		return -CFGE_SEQ;		/* the sequence space is spent */
-	newseq = maxseq + 1;
-
-	/* The slot NOT holding the current record; both invalid -> slot 0. */
-	target = (info.selected == 1) ? 1 : 0;
-
-	used = cfg_slot_image(c, newseq, img, sizeof img);
-	if (used < 0)
-		return used;
-
-	fd = open(path, O_RDWR | O_CREAT, 0600);
+	cfg_file_reason = "";
+	fd = open(path, O_RDWR | O_CREAT | O_NONBLOCK, 0600);
 	if (fd < 0)
 		return -CFGE_IO;
+	if (file_not_regular(fd, path)) {
+		close(fd);
+		return -CFGE_IO;	/* before any write */
+	}
 
 	/* A file that does not yet hold two slots is extended first.  The bytes
 	 * ftruncate adds are zero, and a zeroed slot is invalid (seq 0), so the
@@ -661,7 +688,8 @@ int cfg_store(const char *path, struct cfg *c)
 		}
 	}
 
-	rc = write_at(fd, (off_t)target * (off_t)CFG_SLOT_SIZE, img, sizeof img);
+	rc = write_at(fd, (off_t)target * (off_t)CFG_SLOT_SIZE, img,
+		      (size_t)CFG_SLOT_SIZE);
 	if (rc != 0) {
 		close(fd);
 		return rc;
@@ -680,7 +708,7 @@ int cfg_store(const char *path, struct cfg *c)
 		close(fd);
 		return -CFGE_IO;
 	}
-	if (memcmp(img, back, sizeof img) != 0) {
+	if (memcmp(img, back, sizeof back) != 0) {
 		close(fd);
 		return -CFGE_IO;
 	}
@@ -691,10 +719,147 @@ int cfg_store(const char *path, struct cfg *c)
 	}
 	if (close(fd) != 0)
 		return -CFGE_IO;
-
-	c->seq = newseq;
-	c->source = target + 1;
 	return 0;
+}
+
+/* The flash backend's: cfgflash.c's eight steps under the lock the caller
+ * holds, then the same read-back, through /dev/mtd2ro (§ 3.2 step 8). */
+static int put_slot_flash(int target, const uint8_t *img, uint32_t newseq)
+{
+	uint8_t back[CFG_SLOT_SIZE];
+	struct cfg probe;
+	size_t got = 0;
+	int rc;
+
+	rc = cfg_flash_write_slot_locked(target, img);
+	if (rc != 0)
+		return rc;
+	rc = cfg_flash_read_slot(target, back, &got);
+	if (rc != 0 || got != (size_t)CFG_SLOT_SIZE)
+		return -CFGE_IO;
+	if (memcmp(img, back, sizeof back) != 0)
+		return -CFGE_IO;
+	if (cfg_parse_record(back, sizeof back, &probe) != 0 ||
+	    probe.seq != newseq)
+		return -CFGE_IO;
+	return 0;
+}
+
+/* cfg_store and cfg_store_fresh are one body: `fresh` adds the refusal of a
+ * store that holds a valid record, and with none valid the rules below
+ * already give seq 1 and slot 0. */
+static int store_rec(const char *path, struct cfg *c, int fresh)
+{
+	uint8_t img[CFG_SLOT_SIZE];
+	struct cfg_store_info info;
+	uint32_t newseq, maxseq = 0;
+	int s, target, rc, used, flash, lk = -1;
+
+	if (path == NULL || c == NULL)
+		return -CFGE_SPACE;
+
+	/* Refuse to write a record that could not be loaded back.  SPEC-R7 does
+	 * not require this; a store that accepts an invalid record would create
+	 * a file whose only effect is to make the next boot fall back. */
+	rc = cfg_validate(c);
+	if (rc != 0)
+		return rc;
+
+	/* On flash, ONE hold of the lock covers read, decide and write: two
+	 * writers that read the same two slots would otherwise pick the same
+	 * target and seq, and the second would replace the first unseen -- and
+	 * a record landing between cfg_store_fresh's check and its write is
+	 * exactly the one it must not replace. */
+	flash = cfg_is_flash(path);
+	if (flash) {
+		lk = cfg_flash_lock();
+		if (lk < 0)
+			return -CFGE_IO;
+	}
+
+	/* Where the current record is, read from the store rather than from
+	 * c->source: c may be minutes old.  Unreadable is an error for both
+	 * entries: for `fresh`, a valid record may be there. */
+	{
+		struct cfg unused;
+
+		rc = cfg_load_info(path, &unused, &info);
+	}
+	if (rc != 0)
+		goto out;
+	if (fresh && info.selected != 0) {
+		rc = -CFGE_SEQ;		/* a valid record exists: no place for 1 */
+		goto out;
+	}
+	for (s = 0; s < CFG_NSLOTS; s++) {
+		if (info.rc[s] == 0 && info.seq[s] > maxseq)
+			maxseq = info.seq[s];
+	}
+	if (maxseq >= CFG_SEQ_MAX) {
+		rc = -CFGE_SEQ;		/* the sequence space is spent */
+		goto out;
+	}
+	newseq = maxseq + 1;
+
+	/* The slot NOT holding the current record; both invalid -> slot 0. */
+	target = (info.selected == 1) ? 1 : 0;
+
+	used = cfg_slot_image(c, newseq, img, sizeof img);
+	if (used < 0) {
+		rc = used;
+		goto out;
+	}
+	rc = flash ? put_slot_flash(target, img, newseq)
+		   : put_slot_file(path, target, img, newseq);
+	if (rc == 0) {
+		c->seq = newseq;
+		c->source = target + 1;
+	}
+out:
+	if (flash)
+		cfg_flash_unlock(lk);
+	return rc;
+}
+
+int cfg_store(const char *path, struct cfg *c)
+{
+	return store_rec(path, c, 0);
+}
+
+int cfg_store_fresh(const char *path, struct cfg *rec)
+{
+	return store_rec(path, rec, 1);
+}
+
+int cfg_slot_raw(const char *path, int s, uint8_t *buf, size_t *got,
+		 uint32_t *where)
+{
+	int fd, rc, e;
+
+	if (got != NULL)
+		*got = 0;
+	if (path == NULL || buf == NULL || got == NULL || where == NULL ||
+	    s < 0 || s >= CFG_NSLOTS)
+		return -CFGE_SPACE;
+	if (cfg_is_flash(path)) {
+		*where = (s == 0) ? CFG_FLASH_OFF0 : CFG_FLASH_OFF1;
+		return cfg_flash_read_slot(s, buf, got);
+	}
+	*where = (uint32_t)s * (uint32_t)CFG_SLOT_SIZE;
+	cfg_file_reason = "";
+	fd = open(path, O_RDONLY | O_NONBLOCK);
+	if (fd < 0)
+		return -CFGE_IO;	/* errno is the open's */
+	if (file_not_regular(fd, path)) {
+		(void)close(fd);
+		errno = EINVAL;		/* for dump's message: not EIO */
+		return -CFGE_IO;	/* before any read */
+	}
+	rc = read_at(fd, (off_t)*where, buf, (size_t)CFG_SLOT_SIZE, got);
+	e = errno;
+	(void)close(fd);
+	errno = e;
+	return rc;
 }
 
 /* ------------------------------------------------------------------------- */

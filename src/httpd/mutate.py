@@ -36,6 +36,25 @@ Defects, each named by the check it removes:
               here named, so the next reader does not spend fifteen minutes of
               fuzzing finding it out again.
 
+The streaming upload's controls (POST /api/firmware, upload.c and the parser's
+bound for it).  Each is planted in a copy and src/httpd/test_serve.c must go red;
+`make mutate` builds and runs the unmutated copy first and requires it green, so
+a red mutant is the mutation's and not the tree's:
+
+  upl_prebegin   a body byte forwarded before BEGIN's OK: BEGIN's refusal no
+                 longer stops the upload, so the pieces go out after it.
+  upl_bound      the 413 bound skipped: neither the header line nor the end of
+                 the headers refuses a Content-Length past HTTP_UPLOAD_MAX for
+                 the upload route, so BEGIN is called with 1,179,649.
+  upl_bound_line only the header line's bound skipped; the end-of-headers check
+                 still answers 413, so only the case that sends no blank line --
+                 "refused AT the header line" -- can see it.
+  upl_offset     an off-by-one in each DATA's offset.
+  upl_piece      the piece size 2,045: one past UPD_DATA_MAX, so a DATA body is
+                 2,049 bytes, one past what bk_call() sends (the buffer grows
+                 with it, so the mutant is wrong and not undefined).
+  upl_endafter   END sent after a DATA refusal.
+
 Usage:  mutate.py <defect> <file.c>
 Exit:   0 planted, 2 usage, 3 the anchor did not match (the control is broken).
 """
@@ -113,6 +132,68 @@ def m_linebound(s):
     return cut(s, """			if (ps->linelen >= cap) {""",
                """			if (ps->linelen > cap) {""",
                "the line-buffer bound")
+
+
+# ---- the streaming upload's controls: upload.c, and http.c's bound for it ----
+
+@defect("upl_prebegin")
+def m_upl_prebegin(s):
+    return cut(s, """	if (up_call(env, c, OP_UPDATE_BEGIN, 4, rs) != 0)
+		return rs->status;
+""", """	(void)up_call(env, c, OP_UPDATE_BEGIN, 4, rs);
+""", "BEGIN's verdict stopping the upload")
+
+
+def _bound_line(s):
+    return cut(s, """		if (v > (ps->r->stream ? HTTP_UPLOAD_MAX : HTTP_BODY_MAX))""",
+               """		if (!ps->r->stream && v > HTTP_BODY_MAX)""",
+               "the upload route's bound at the header line")
+
+
+@defect("upl_bound")
+def m_upl_bound(s):
+    s = _bound_line(s)
+    return cut(s, """			if (r->clen > HTTP_UPLOAD_MAX)
+				return -413;
+			ps->state = HS_STREAM;
+""", """			ps->state = HS_STREAM;
+""", "the upload route's bound at the end of the headers")
+
+
+@defect("upl_bound_line")
+def m_upl_bound_line(s):
+    return _bound_line(s)
+
+
+@defect("upl_offset")
+def m_upl_offset(s):
+    return cut(s, """		proto_put_be32(c->msg, off);""",
+               """		proto_put_be32(c->msg, off + 1);""",
+               "each DATA's offset")
+
+
+@defect("upl_piece")
+def m_upl_piece(s):
+    s = cut(s, """	uint8_t        msg[4 + UPD_DATA_MAX];""",
+            """	uint8_t        msg[4 + UPD_DATA_MAX + 1];""",
+            "the piece buffer")
+    return cut(s, """		if (want > UPD_DATA_MAX)
+			want = UPD_DATA_MAX;
+""", """		if (want > UPD_DATA_MAX + 1)
+			want = UPD_DATA_MAX + 1;
+""", "the piece size")
+
+
+@defect("upl_endafter")
+def m_upl_endafter(s):
+    return cut(s, """		if (up_call(env, c, OP_UPDATE_DATA, 4 + want, rs) != 0)
+			return rs->status;
+""", """		if (up_call(env, c, OP_UPDATE_DATA, 4 + want, rs) != 0) {
+			proto_put_be32(c->msg, total);
+			(void)up_call(env, c, OP_UPDATE_END, 4, rs);
+			return rs->status;
+		}
+""", "the stop after a DATA refusal")
 
 
 def main(argv):

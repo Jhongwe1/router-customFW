@@ -42,14 +42,15 @@ PROG  := cfgstore
 
 # The default goal, declared BEFORE the include: src/lib/Makefile defines no
 # targets for exactly this reason, and this line does not depend on that.
-.PHONY: all host test target check-one target-inner gate-target clean help
+.PHONY: all host test target check-one target-inner gate-target clean help \
+        mutants
 all: help
 
 include $(HERE)/../lib/Makefile
 
 # O is required for everything that builds.  Refuse with a reason, at parse
 # time, rather than creating /host/cfgstore at the filesystem root.
-NEEDS_O := host test target check-one target-inner gate-target
+NEEDS_O := host test target check-one target-inner gate-target mutants
 ifneq ($(filter $(NEEDS_O),$(MAKECMDGOALS)),)
   ifeq ($(strip $(O)),)
     $(error REFUSED: O=<absolute output directory> is required)
@@ -62,6 +63,7 @@ endif
 help:
 	@echo "make host   O=<abs dir>"
 	@echo "make test   O=<abs dir>                        # 4 configurations"
+	@echo "make mutants O=<abs dir>                       # the flash suites' controls"
 	@echo "make target O=<abs dir> TC=<rsdk root> TRIP=<vendor-tripwire.sh>"
 
 # ---------------------------------------------------------------------------
@@ -86,16 +88,26 @@ endif
 HOSTCFLAGS   := -std=gnu99 -Wall -Wextra -Werror -O1 -g $(SANFLAGS)
 HOSTCPPFLAGS := $(RLXLIB_CPPFLAGS) -I$(HERE)
 
-TESTNAMES := test_crc32 test_tlv test_schema test_cfg test_cli
+TESTNAMES := test_crc32 test_tlv test_schema test_cfg test_cli test_spictl \
+             test_flash
 TESTBINS  := $(addprefix $(HOSTOUT)/,$(TESTNAMES))
 HOSTLIBO  := $(addprefix $(HOSTOBJ)/,$(addsuffix .o,$(RLXLIB_NAMES)))
-HOSTDEPS  := $(RLXLIB_HDRS) $(HERE)/test_util.h
+HOSTDEPS  := $(RLXLIB_HDRS) $(HERE)/test_util.h $(HERE)/simkern.h
+
+# The flash backend's two suites link with -Wl,--wrap: test_spictl records
+# what src/lib/spictl.c calls; test_flash and cfgstore-sim (main.c, the same
+# objects) run against simkern.c's simulated rtl819x-spi, which compiles the
+# install header the kernel compiles.  simkern.o is in no target list.
+KDEV        := $(REPO)/kernel/linux-2.6.30/drivers/mtd/devices
+SPICTL_WRAP := -Wl,--wrap=open,--wrap=write,--wrap=flock,--wrap=nanosleep
+SIMK_WRAP   := -Wl,--wrap=open,--wrap=close,--wrap=write,--wrap=flock,--wrap=nanosleep,--wrap=lseek
+SIMK_DEPS   := $(KDEV)/rtl819x-spi-install.h $(KDEV)/rtl819x-spi-wrpolicy.h
 
 # Without this, make treats every pattern-rule object as intermediate and
 # deletes it after the link, so every invocation is a full rebuild.
 .SECONDARY:
 
-host: $(HOSTOUT)/$(PROG) $(TESTBINS)
+host: $(HOSTOUT)/$(PROG) $(HOSTOUT)/$(PROG)-sim $(TESTBINS)
 
 $(HOSTOBJ)/%.o: $(RLXLIB_DIR)/%.c $(HOSTDEPS)
 	@mkdir -p $(@D)
@@ -113,6 +125,23 @@ $(HOSTOUT)/test_%: $(HOSTOBJ)/test_%.o $(HOSTLIBO)
 	@mkdir -p $(@D)
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $< $(HOSTLIBO)
 
+$(HOSTOBJ)/simkern.o: $(HERE)/simkern.c $(HOSTDEPS) $(SIMK_DEPS)
+	@mkdir -p $(@D)
+	$(HOSTCC) $(HOSTCFLAGS) $(HOSTCPPFLAGS) -I$(KDEV) -c $< -o $@
+
+$(HOSTOUT)/test_spictl: $(HOSTOBJ)/test_spictl.o $(HOSTLIBO)
+	@mkdir -p $(@D)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $< $(HOSTLIBO) $(SPICTL_WRAP)
+
+$(HOSTOUT)/test_flash: $(HOSTOBJ)/test_flash.o $(HOSTOBJ)/simkern.o $(HOSTLIBO)
+	@mkdir -p $(@D)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $< $(HOSTOBJ)/simkern.o $(HOSTLIBO) $(SIMK_WRAP)
+
+$(HOSTOUT)/$(PROG)-sim: $(HOSTLIBO) $(HOSTOBJ)/main.o $(HOSTOBJ)/simkern.o
+	@mkdir -p $(@D)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(HOSTLIBO) $(HOSTOBJ)/main.o \
+	    $(HOSTOBJ)/simkern.o $(SIMK_WRAP)
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -122,19 +151,21 @@ SANENV := ASAN_OPTIONS=detect_leaks=1:abort_on_error=0:exitcode=1 \
           UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
 
 # TESTS_MIN is the number of test programs, MEASURED 2026-10-17 (the five in
-# TESTNAMES) and typed rather than counted from the list it guards: a list that
+# TESTNAMES then) and 2026-10-23 (seven: test_spictl and test_flash, the flash
+# backend's), typed rather than counted from the list it guards: a list that
 # loses one REFUSES in every configuration instead of passing with fewer.  Each
 # run prints one `ok` or `FAIL` line indented by exactly two spaces, the shape
 # tools/ci-census.py counts in CI; a failing run still stops the configuration.
-TESTS_MIN := 5
+TESTS_MIN := 7
 CONF      := $(HOSTCC)$(if $(filter 1,$(SAN)),+san,)
 
 check-one: host
 	@echo "--- suite: CC=$(HOSTCC) SAN=$(SAN) out=$(HOSTOUT) ---"
 	@set -e; ran=0; for t in $(TESTNAMES); do \
 	   case $$t in \
-	     test_cfg) set -- $(HOSTOUT) ;; \
+	     test_cfg|test_spictl) set -- $(HOSTOUT) ;; \
 	     test_cli) set -- $(HOSTOUT)/$(PROG) $(HOSTOUT) ;; \
+	     test_flash) set -- $(HOSTOUT) $(HOSTOUT)/$(PROG)-sim ;; \
 	     *)        set -- ;; \
 	   esac; \
 	   echo "$(SANENV) $(HOSTOUT)/$$t $$*"; \
@@ -159,7 +190,59 @@ test:
 	    HOSTCC=gcc-13   SAN=1 HOSTOUT=$(O)/host/gcc13-san
 	@$(MAKE) --no-print-directory -C $(HERE) check-one O=$(O) \
 	    HOSTCC=clang-18 SAN=1 HOSTOUT=$(O)/host/clang18-san
-	@echo "test: 4 configurations x 5 suites, all green"
+	@echo "test: 4 configurations x 7 suites, all green"
+
+# ---------------------------------------------------------------------------
+# Mutation controls (`make mutants O=`, not part of `test`)
+# ---------------------------------------------------------------------------
+#
+# Each plants one named defect, through mutate.py, in a COPY of src/lib under
+# $O/mut/<name>, rebuilds test_spictl, test_flash and cfgstore-sim against the
+# copy with gcc-13, and must turn the flash suites RED.  The unmutated copy is
+# built and run the same way first; a red control refuses the run, and a
+# mutant that does not COMPILE refuses it too (-Werror: a build failure is not
+# a kill).
+MUTANTS := nwrites badstage nolock noguard nocleanup ptrdispatch noregular
+MUTCC   := gcc-13 -std=gnu99 -Wall -Wextra -Werror -O1 -g
+
+mutants:
+	@set -e; m=$(O)/mut; rm -rf $$m; mkdir -p $$m; \
+	 build() { d=$$1; libs=; \
+	   for n in $(RLXLIB_NAMES); do libs="$$libs $$d/lib/$$n.c"; done; \
+	   $(MUTCC) -I$$d/lib -I$(HERE) -o $$d/test_spictl \
+	     $(HERE)/test_spictl.c $$libs $(SPICTL_WRAP) && \
+	   $(MUTCC) -I$$d/lib -I$(HERE) -I$(KDEV) -o $$d/test_flash \
+	     $(HERE)/test_flash.c $(HERE)/simkern.c $$libs $(SIMK_WRAP) && \
+	   $(MUTCC) -I$$d/lib -I$(HERE) -I$(KDEV) -o $$d/$(PROG)-sim \
+	     $(HERE)/main.c $(HERE)/simkern.c $$libs $(SIMK_WRAP); }; \
+	 suites() { d=$$1; r=0; \
+	   $$d/test_spictl $$d > $$d/spictl.out 2>&1 || r=1; \
+	   $$d/test_flash $$d $$d/$(PROG)-sim > $$d/flash.out 2>&1 || r=$$((r+2)); \
+	   return $$r; }; \
+	 c=$$m/control; mkdir -p $$c/lib; cp $(RLXLIB_DIR)/*.c $(RLXLIB_DIR)/*.h $$c/lib/; \
+	 build $$c > $$c/cc.log 2>&1 || { cat $$c/cc.log; \
+	   echo "REFUSED: the unmutated copy does not build"; exit 1; }; \
+	 if suites $$c; then echo "control: the unmutated flash suites pass"; \
+	 else echo "REFUSED: the unmutated flash suites fail ($$c/*.out);" \
+	   "a mutation run on a red suite proves nothing"; exit 1; fi; \
+	 caught=0; missed=0; \
+	 for x in $(MUTANTS); do \
+	   d=$$m/$$x; mkdir -p $$d/lib; cp $(RLXLIB_DIR)/*.c $(RLXLIB_DIR)/*.h $$d/lib/; \
+	   $(PYTHON) $(HERE)/mutate.py $$x $$d/lib || { \
+	     echo "REFUSED: mutation $$x was not planted"; exit 1; }; \
+	   build $$d > $$d/cc.log 2>&1 || { cat $$d/cc.log; \
+	     echo "REFUSED: mutant $$x does not compile, so it cannot be a kill"; exit 1; }; \
+	   if suites $$d; then \
+	     echo "  $$x: *** NOT CAUGHT *** (both flash suites still pass)"; \
+	     missed=$$((missed+1)); \
+	   else \
+	     echo "  $$x: CAUGHT -- FAIL lines: test_spictl $$(grep -c '^FAIL' $$d/spictl.out || true)," \
+	          "test_flash $$(grep -c '^FAIL' $$d/flash.out || true)"; \
+	     caught=$$((caught+1)); \
+	   fi; \
+	 done; \
+	 echo "mutants: $$caught caught, $$missed not caught ($(words $(MUTANTS)) planted)"; \
+	 [ $$missed -eq 0 ] || { echo "REFUSED: a mutant survived"; exit 1; }
 
 # ---------------------------------------------------------------------------
 # Target build (big-endian MIPS, static, uClibc 0.9.30)

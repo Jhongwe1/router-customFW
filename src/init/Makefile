@@ -9,13 +9,18 @@
 #   make -C src/init host   O=<abs dir>
 #   make -C src/init test   O=<abs dir>                 gcc-13 AND clang-18, both
 #                                                       with -fsanitize=address,undefined
-#   make -C src/init mutants O=<abs dir>                the two mutation controls
+#   make -C src/init mutants O=<abs dir>                the mutation controls (M1, and
+#                                                       the one-shot children's eight)
 #   make -C src/init target O=<abs dir> TC=<toolchain root> TRIP=<vendor-tripwire.sh>
 #
 # `O=` is required everywhere: there is no in-tree build, because the tree may be
 # on DrvFs and because a stray object under src/ is a file the census counts.
 #
-# BENCH_SHELL=0 builds PID 1 without the console shell (see init.h).
+# BENCH_SHELL=0 builds PID 1 without the console shell and with the console
+# first-password step (see init.h).  CTR_ADVANCE=0 builds it without the
+# counter advance; SWITCH_BRINGUP=0 without the LAN bring-up, and so without
+# the counter advance too.  Each is 0 or 1.  A build with BENCH_SHELL=1 and no
+# counter advance links exactly the objects it linked before either existed.
 # LAN_IF / WAN_IF override the interface names.
 
 SHELL      := /bin/sh
@@ -30,8 +35,15 @@ endif
 
 PYTHON     ?= /usr/bin/python3
 BENCH_SHELL ?= 1
+CTR_ADVANCE ?= 1
+SWITCH_BRINGUP ?= 1
 LAN_IF     ?=
 WAN_IF     ?=
+
+$(foreach v,BENCH_SHELL CTR_ADVANCE SWITCH_BRINGUP,$(if $(filter-out 0 1,$($(v))),\
+  $(error REFUSED: $(v)=$($(v)); it is 0 or 1)))
+$(foreach v,BENCH_SHELL CTR_ADVANCE SWITCH_BRINGUP,$(if $(strip $($(v))),,\
+  $(error REFUSED: $(v) is empty; it is 0 or 1)))
 
 # --- the config loader ------------------------------------------------------
 # src/lib/cfg.c is the config store.  `R7-8` deleted src/init/stub/, which stood
@@ -52,11 +64,41 @@ OWN_SRC    := $(HERE)/main.c $(HERE)/mounts.c $(HERE)/supervise.c \
               $(SRCROOT)/lib/netutil.c
 # The real cfg.c needs the rest of the store's translation units; the stub was
 # self-contained, which is the one way the swap is not a Makefile one-liner.
-CFG_DEPS   := $(SRCROOT)/lib/schema.c $(SRCROOT)/lib/tlv.c $(SRCROOT)/lib/crc32.c
-SRCS       := $(OWN_SRC) $(CFG_C) $(CFG_DEPS)
-TEST_SRCS  := $(HERE)/test_supervise.c $(HERE)/test_mounts.c
+CFG_DEPS   := $(SRCROOT)/lib/schema.c $(SRCROOT)/lib/tlv.c $(SRCROOT)/lib/crc32.c $(SRCROOT)/lib/cfgflash.c $(SRCROOT)/lib/spictl.c $(SRCROOT)/lib/sha256.c
 
-DEFS       := -DRLXFW_BENCH_SHELL=$(BENCH_SHELL)
+# The one-shot children (init.h; notes/self-update.md §§ 5 and 3.8), each linked
+# only into a build that has it.  The counter advance talks to brokerd through
+# src/lib/client.c, which needs proto.c; the first-password step derives the
+# hash with src/lib/kdf.c (sha256.c is already in CFG_DEPS).
+CTR_ON     := $(and $(filter 1,$(CTR_ADVANCE)),$(filter 1,$(SWITCH_BRINGUP)))
+FP_ON      := $(filter 0,$(BENCH_SHELL))
+CTR_SRC    := $(HERE)/ctradv.c $(SRCROOT)/lib/client.c $(SRCROOT)/lib/proto.c
+FP_SRC     := $(HERE)/firstpw.c $(SRCROOT)/lib/kdf.c
+SRCS       := $(OWN_SRC) $(CFG_C) $(CFG_DEPS) $(if $(CTR_ON),$(CTR_SRC)) \
+              $(if $(FP_ON),$(FP_SRC))
+
+# The test programs, and what each links besides itself.  test_ctradv compiles
+# the install header the kernel compiles (its simulated `ctr`) and reads
+# brokerd.h for the one constant it holds equal; both wrap libc calls to record
+# them (see each file's header).
+TESTS      := test_supervise test_mounts test_ctradv test_firstpw
+TEST_SRCS  := $(addprefix $(HERE)/,$(addsuffix .c,$(TESTS)))
+KDEV       := $(REPO)/kernel/linux-2.6.30/drivers/mtd/devices
+T_SV       := $(HERE)/supervise.c $(HERE)/mounts.c $(SRCROOT)/lib/netutil.c
+TREST_test_supervise := $(T_SV)
+TREST_test_mounts    := $(T_SV)
+TREST_test_ctradv    := $(HERE)/supervise.c $(SRCROOT)/lib/spictl.c \
+                        $(SRCROOT)/lib/client.c $(SRCROOT)/lib/proto.c \
+                        -Wl,--wrap=open,--wrap=close,--wrap=write,--wrap=flock,--wrap=nanosleep
+TREST_test_firstpw   := $(CFG_C) $(CFG_DEPS) $(SRCROOT)/lib/kdf.c \
+                        -Wl,--wrap=tcsetattr
+TMOD_test_ctradv     := $(HERE)/ctradv.c
+TMOD_test_firstpw    := $(HERE)/firstpw.c
+TINC_test_ctradv     := -I$(KDEV) -I$(SRCROOT)/brokerd
+TINC_test_firstpw    := -I$(SRCROOT)/brokerd
+
+DEFS       := -DRLXFW_BENCH_SHELL=$(BENCH_SHELL) -DRLXFW_CTR_ADVANCE=$(CTR_ADVANCE) \
+              -DRLXFW_SWITCH_BRINGUP=$(SWITCH_BRINGUP)
 ifneq ($(strip $(LAN_IF)),)
 DEFS       += -DRLXFW_LAN_IF='"$(LAN_IF)"'
 endif
@@ -86,17 +128,29 @@ HOSTW      := -std=gnu99 -Wall -Wextra -Werror -Wundef -Wshadow -O1 -g
 SAN        := -fsanitize=address,undefined -fno-omit-frame-pointer
 HOSTCCS    ?= gcc-13 clang-18
 
+# One test program's compile-and-link line, inside the shell's loop over $$cc.
+# ONE line on purpose: a newline in an expansion inside a recipe makes a
+# separate shell, which would cut the loop in two.
+build_test = echo "--- $$cc: $(1) ---"; $$cc $(HOSTW) $(SAN) $(DEFS) $(INCS) $(TINC_$(1)) -o $$d/$(1) $(HERE)/$(1).c $(TMOD_$(1)) $(TREST_$(1));
+
+# main.c's one-shot glue is compiled out by switch, so the configured build
+# alone leaves its other shapes uncompiled.  Each BENCH_SHELL:CTR_ADVANCE:
+# SWITCH_BRINGUP shape is compiled here (-c only: the configured shape is the
+# one linked above).
+GLUE_SHAPES := 1:1:1 1:0:1 0:1:1 0:0:1 1:1:0 0:1:0
+
 host: which
 	@set -e; for cc in $(HOSTCCS); do \
 	  d=$(O)/host/$$cc; mkdir -p $$d; \
 	  echo "--- $$cc: $(PROG) ---"; \
 	  $$cc $(HOSTW) $(SAN) $(DEFS) $(INCS) -o $$d/$(PROG) $(SRCS); \
-	  for t in $(TEST_SRCS); do \
-	    b=$$(basename $$t .c); \
-	    echo "--- $$cc: $$b ---"; \
-	    $$cc $(HOSTW) $(SAN) $(DEFS) $(INCS) -o $$d/$$b $$t \
-	         $(HERE)/supervise.c $(HERE)/mounts.c $(SRCROOT)/lib/netutil.c; \
+	  $(foreach t,$(TESTS),$(call build_test,$(t))) \
+	  for s in $(GLUE_SHAPES); do \
+	    b=$${s%%:*}; r=$${s#*:}; a=$${r%%:*}; w=$${r#*:}; \
+	    $$cc $(HOSTW) $(SAN) -DRLXFW_BENCH_SHELL=$$b -DRLXFW_CTR_ADVANCE=$$a \
+	      -DRLXFW_SWITCH_BRINGUP=$$w $(INCS) -c -o $$d/main-glue.o $(HERE)/main.c; \
 	  done; \
+	  echo "--- $$cc: main.c compiles in all $(words $(GLUE_SHAPES)) switch shapes ---"; \
 	done
 	@echo "host build OK for: $(HOSTCCS)"
 
@@ -107,8 +161,9 @@ host: which
 # test_mounts) and typed here rather than counted from TEST_SRCS, the list it
 # guards: a list that loses a program REFUSES instead of passing with fewer, and
 # so does an empty HOSTCCS.  Each run prints one `ok` or `FAIL` line indented by
-# exactly two spaces, the shape tools/ci-census.py counts in CI.
-TESTS_MIN  := 2
+# exactly two spaces, the shape tools/ci-census.py counts in CI.  4 since the
+# one-shot children's two (test_ctradv, test_firstpw).
+TESTS_MIN  := 4
 
 test: host
 	@set -e; rc=0; ran=0; ncc=0; \
@@ -158,6 +213,45 @@ mutants: test
 	   grep -c '^FAIL' $$m/out.txt | sed 's/^/  failing checks: /'; \
 	   grep -m4 '^FAIL' $$m/out.txt | sed 's/^/  /'; \
 	fi
+	@$(MAKE) --no-print-directory -f $(HERE)/Makefile mutants-oneshot O=$(O)
+
+# ===========================================================================
+# THE ONE-SHOT CHILDREN'S MUTATION CONTROLS -- src/init/mutate.py plants each
+# in a COPY of ctradv.c or firstpw.c under $O/mut/<name>/, the suite's own test
+# is rebuilt against the copy with the suite's own flags (-Werror included: a
+# mutant that does not compile is NOT A KILL and stops the run), and it must
+# exit non-zero WITH at least one FAIL line -- a crash is not a check going red,
+# and neither is a hang: each run gets 300 s (`timeout`), and one cut off with
+# no FAIL line printed is NOT A KILL.  Run by `mutants`, after the unmutated
+# suite passed.
+# ===========================================================================
+MUT_CTR    := early onnone twice nolock
+MUT_FP     := overhash echo nowait noconfirm
+MUT_ENV    := ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+
+# mutant name, module (ctradv|firstpw), test program
+define mut_one
+md=$(O)/mut/$(1); rm -rf $$md; mkdir -p $$md; cp $(HERE)/$(2).c $$md/; \
+$(PYTHON) $(HERE)/mutate.py $(1) $$md/$(2).c || exit 1; \
+if ! gcc-13 $(HOSTW) $(SAN) $(DEFS) $(INCS) $(TINC_$(3)) -o $$md/$(3) $(HERE)/$(3).c $$md/$(2).c $(TREST_$(3)) > $$md/cc.txt 2>&1; then \
+  echo "NOT A KILL: $(1) does not compile"; sed -n '1,12p' $$md/cc.txt; exit 1; fi; \
+if ( cd $$md && $(MUT_ENV) timeout 300 ./$(3) > out.txt 2>&1 ); then \
+  echo "HOLE: $(1) and $(3) still PASSED"; sed -n '1,20p' $$md/out.txt; exit 1; fi; \
+f=$$(grep -c '^FAIL' $$md/out.txt || true); \
+if [ "$$f" -lt 1 ]; then \
+  echo "NOT A KILL: $(1) made $(3) exit non-zero with no FAIL line"; sed -n '1,20p' $$md/out.txt; exit 1; fi; \
+echo "$(1) OK: $(3) FAILS as it must ($$f failing checks)"; \
+grep -m3 '^FAIL' $$md/out.txt | sed 's/^/  /'; \
+n=$$((n+1));
+endef
+
+.PHONY: mutants-oneshot
+mutants-oneshot:
+	@set -e; n=0; \
+	$(foreach m,$(MUT_CTR),$(call mut_one,$(m),ctradv,test_ctradv)) \
+	$(foreach m,$(MUT_FP),$(call mut_one,$(m),firstpw,test_firstpw)) \
+	echo "one-shot mutants: $$n of $(words $(MUT_CTR) $(MUT_FP)) went red"; \
+	[ $$n -eq $(words $(MUT_CTR) $(MUT_FP)) ]
 
 # ===========================================================================
 # TARGET.  One tripwire snapshot for the whole toolchain phase: the vendor
@@ -176,6 +270,7 @@ else
 	   exit 1 ;; esac
 	@$(TRIP) -- $(MAKE) --no-print-directory -f $(HERE)/Makefile target-inner \
 	   O=$(O) TC=$(TC) TRIP=$(TRIP) BENCH_SHELL=$(BENCH_SHELL) \
+	   CTR_ADVANCE=$(CTR_ADVANCE) SWITCH_BRINGUP=$(SWITCH_BRINGUP) \
 	   LAN_IF=$(LAN_IF) WAN_IF=$(WAN_IF)
 endif
 endif
@@ -212,15 +307,25 @@ TSRCDIR    = $(TSTAGE)/$(PROG)
 # init.h's `#include "schema.h"` resolves in both.  gcc 3.4.6 reports a missing
 # include and then KEEPS GOING, so the first symptom of getting this wrong is a
 # list of undeclared identifiers, not the missing header.
+# The one-shot children's sources are staged whatever the switches say and
+# compiled only when the build has them (CTR_ON, FP_ON), so a build without
+# either compiles and links the objects it did before they existed; the object
+# directory is emptied first, because the link takes $(TOBJDIR)/*.o and an
+# object left by an earlier build with the other switches would otherwise be
+# linked into this one.
 PROG_STAGE = $(HERE)/main.c $(HERE)/mounts.c $(HERE)/supervise.c \
-             $(HERE)/init.h $(HERE)/mounts.h $(HERE)/supervise.h
+             $(HERE)/init.h $(HERE)/mounts.h $(HERE)/supervise.h \
+             $(HERE)/ctradv.c $(HERE)/ctradv.h $(HERE)/firstpw.c $(HERE)/firstpw.h
 LIB_STAGE  = $(SRCROOT)/lib/netutil.c $(SRCROOT)/lib/netutil.h \
-             $(SRCROOT)/lib/cfg.c $(SRCROOT)/lib/cfg.h \
-             $(SRCROOT)/lib/schema.c $(SRCROOT)/lib/schema.h \
-             $(SRCROOT)/lib/tlv.c $(SRCROOT)/lib/tlv.h \
-             $(SRCROOT)/lib/crc32.c $(SRCROOT)/lib/crc32.h
-PROG_C     = main.c mounts.c supervise.c
-LIB_C      = netutil.c cfg.c schema.c tlv.c crc32.c
+             $(SRCROOT)/lib/cfg.c $(SRCROOT)/lib/cfg.h $(SRCROOT)/lib/cfgflash.c \
+             $(SRCROOT)/lib/schema.c $(SRCROOT)/lib/schema.h $(SRCROOT)/lib/spictl.c $(SRCROOT)/lib/spictl.h \
+             $(SRCROOT)/lib/tlv.c $(SRCROOT)/lib/tlv.h $(SRCROOT)/lib/sha256.c $(SRCROOT)/lib/sha256.h \
+             $(SRCROOT)/lib/crc32.c $(SRCROOT)/lib/crc32.h \
+             $(SRCROOT)/lib/client.c $(SRCROOT)/lib/client.h $(SRCROOT)/lib/proto.c $(SRCROOT)/lib/proto.h \
+             $(SRCROOT)/lib/kdf.c $(SRCROOT)/lib/kdf.h
+PROG_C     = main.c mounts.c supervise.c $(if $(CTR_ON),ctradv.c) $(if $(FP_ON),firstpw.c)
+LIB_C      = netutil.c cfg.c cfgflash.c spictl.c sha256.c schema.c tlv.c crc32.c \
+             $(if $(CTR_ON),client.c proto.c) $(if $(FP_ON),kdf.c)
 TINCS      = -I. -I../lib
 
 target-inner: which
@@ -229,6 +334,7 @@ target-inner: which
 	   exit 1 ;; esac
 	@echo "no -march in TCFLAGS"
 	@mkdir -p $(TOBJDIR) $(TSRCDIR) $(TSTAGE)/lib $(O)/target
+	@rm -f $(TOBJDIR)/*.o
 	@# --- stage onto ext4 and prove every copy is the source -----------
 	@set -e; for f in $(PROG_STAGE); do \
 	  cp -f $$f $(TSRCDIR)/; \

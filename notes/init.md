@@ -26,7 +26,7 @@ A `#!/bin/sh` `/init` is a shell script in the shipped image.
 
 1. **stdio onto the console.**  `open("/dev/console", O_RDWR|O_NOCTTY)`, then
    `dup2` onto 0, 1, 2.  Done unconditionally, because the kernel's own attempt
-   only *warns* when it fails (`init/main.c:818`) and `# CONFIG_PRINTK is not
+   only *warns* when it fails (`init/main.c:838`) and `# CONFIG_PRINTK is not
    set` makes that warning print nothing — a PID 1 with no stdio reads exactly
    like a hang.  Falls back to `/dev/null`.
 2. **The rung-1 discriminator**, byte for byte:
@@ -37,7 +37,7 @@ A `#!/bin/sh` `/init` is a shell script in the shipped image.
 3. **Signals.**  A self-pipe, then `sigaction` for `SIGCHLD`, `SIGTERM`,
    `SIGINT`, `SIGUSR1`, `SIGHUP`; `SIGPIPE` ignored.  The handler writes one
    byte and nothing else.  PID 1 carries `SIGNAL_UNKILLABLE`
-   (`init/main.c:824`) and the kernel discards signals to it that have no
+   (`init/main.c:844`) and the kernel discards signals to it that have no
    handler, so an unhandled signal is safe and a handled one has to be installed
    before the first `fork`.
 4. **The mount table** (§ 3), then `mkdir` of `/var/lib` 0700, `/srv`,

@@ -73,6 +73,27 @@ enum {
 	ST_NOENTROPY = 10
 };
 
+/* The three update ops (notes/self-update.md § 4), one definition both sides
+ * include: httpd writes the requests and reads the replies, brokerd the reverse.
+ * Request bodies, big-endian:
+ *   OP_UPDATE_BEGIN  u32 total
+ *   OP_UPDATE_DATA   u32 offset, then at most UPD_DATA_MAX bytes
+ *   OP_UPDATE_END    u32 total
+ * Replies are TLVs written with proto_tlv_put*().  Refusals use ST_AUTH, ST_PERM,
+ * ST_INVAL, ST_BUSY and ST_IO, and carry UPD_T_REASON: a reason name of § 4.4 or
+ * § 4.6, or rlxu_verify()'s own as src/rlxboot/container.c spells it. */
+#define UPD_DATA_MAX    (PROTO_REQ_BODY_MAX - 4)  /* 2,044: what follows the offset */
+#define UPD_T_DEST      0x8101   /* u8 'A' or 'B'; BEGIN OK and END OK */
+#define UPD_T_VERSION   0x8102   /* u32; END OK */
+#define UPD_T_REASON    0x8103   /* ASCII, no NUL; every refusal of the three */
+#define UPD_T_RECEIVED  0x8104   /* u32, the bytes accepted so far; DATA OK */
+#define UPD_REASON_MAX  32       /* UPD_T_REASON's length bound */
+/* STATUS's TLV with the last update's result: ASCII "<reason>" or
+ * "ok <A|B> <version>".  The other STATUS ids, 0x8001..0x8008, are brokerd's own
+ * (src/brokerd/brokerd.h) and stay there. */
+#define BKS_UPDATE_LAST     0x8009
+#define BKS_UPDATE_LAST_MAX 48   /* its length bound */
+
 /* Codec errors.  All negative, all distinct, none overlapping a byte count. */
 #define PROTO_E_SHORT   (-1)   /* incomplete: need more bytes */
 #define PROTO_E_MAGIC   (-2)

@@ -37,7 +37,7 @@ shell (§ 3.8); no card publishes the working admin password (§ 6.4).
 1. **Naming each write.** The first text named every payload written by its digest. 讀 a record
    carrying a fresh salt cannot be named that way: `cfgstore passwd` draws the salt on the device
    (`src/cfgstore/main.c:619-620`, `pwhash_salt`) and `brokerd`'s `PWSET` does too
-   (`src/brokerd/ops.c:559`), so the 4,096 bytes such a write stages cannot be known before the
+   (`src/brokerd/ops.c:571`), so the 4,096 bytes such a write stages cannot be known before the
    write; and the install path never prints the staged digest, by design
    (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2217-2220`). Amended: a container or an
    `rlxboot` payload is named by its exact sha256 as before; a salted store record and the
@@ -878,8 +878,8 @@ file is today (`src/lib/cfg.c:544-548`), and one with one erased slot loads the 
 
 ### 3.2 Writing one slot
 
-`cfg_store` (`src/lib/cfg.c:599-698`) keeps its rules — validate, read both slots,
-`newseq = max + 1`, target the slot not selected (`:637-638`), build the 4,096-byte image from the
+`cfg_store` (`src/lib/cfg.c:824-827`, its body now `store_rec`, `:751-822`) keeps its rules — validate, read both slots,
+`newseq = max + 1`, target the slot not selected (`:804-805`), build the 4,096-byte image from the
 whole record (`cfg_slot_image`, `:454-469`), read back and parse — and replaces only
 `write_at`/`fsync` with `cfg_flash_write_slot(s, img)`:
 
@@ -908,7 +908,7 @@ whole record (`cfg_slot_image`, `:454-469`), read back and parse — and replace
 8. `img reset` (frees the staging buffer,
    `kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3171-3180`), release the lock; then
    `cfg_store`'s own read-back through `/dev/mtd2ro` and `cfg_parse_record`
-   (`src/lib/cfg.c:677-691`).
+   (`src/lib/cfg.c:705-719`).
 
 讀 one `write(2)` per verb, so `FW-247`'s triple handler call (busybox ash re-writing after a
 refused write) does not arise, and `/proc` keeps the reason of the call this code made.
@@ -936,13 +936,13 @@ write lasts about 0.4–0.5 s: 量 `FW-246`, a 64 KiB region with 89 ops took 48
   `admin.pwhash`'s bytes by design (`src/cfgstore/main.c:34-39`): no card may type it after a
   password is set (§ 6.4).
 - `brokerd`: `BK_CFG_PATH` (`src/brokerd/brokerd.h:24`) → `CFG_FLASH_DEV`. `init`: `PATH_CFG`
-  likewise (`src/init/main.c:873`, `:966`).
+  likewise (`src/init/main.c:1013`, `:966`).
 - `init` links `cfg.c` but never stores; if `cfg.c` calls `cfgflash.c`'s writer, `init` links
   `sha256.c` too (about 2 KB, in § 2.9's table).
 
 ### 3.5 `FW-184`'s per-request reload, on flash
 
-讀 `brokerd` reloads the whole store before every request (`src/brokerd/ops.c:634-686`, called
+讀 `brokerd` reloads the whole store before every request (`src/brokerd/ops.c:646-698`, called
 at `:727`), 8 KiB. On flash that is two PIO reads: 推 ≤ 8 ms each request, and about 550
 `UPDATE_DATA` requests per upload (§ 4) → ≤ 4.5 s. **Optional, after a measurement**: cache the
 parsed record keyed on the two 24-byte headers, re-reading a slot only when its header bytes
@@ -957,7 +957,7 @@ with a new `seq` and CRCs — and it keeps `FW-184`'s promise.
   store "no store yet": `load_or_die`'s strict path does not fire (`src/cfgstore/main.c:105`:
   `file_bytes > 0` is false), `show` prints `source default` with `admin.pwhash <unset>`
   (`src/cfgstore/main.c:207-236`), and `brokerd` answers every `LOGIN` `AUTH`
-  (`src/brokerd/ops.c:426-432`). Deterministic and nameable (§ 6.3).
+  (`src/brokerd/ops.c:438-444`). Deterministic and nameable (§ 6.3).
 - **Option B (not taken; it would be needed if "invalid" had to mean garbage):** `show` loads
   non-strictly and prints the store line, the two slot verdicts and the table, then exits 4 for a
   store that holds bytes but no record. No case of `test_cli.c` asserts `show` on a corrupt store
@@ -978,7 +978,7 @@ first-password step that runs only while the store holds no `admin.pwhash`; the 
 the shell. Nothing in §§ 3–5 needs a person at a root shell:
 
 - every store write in normal operation is `brokerd`'s (`SET`, `PWSET` through `httpd`) or the
-  first-password step's; `PWSET` with no stored hash stays root-only (`src/brokerd/ops.c:552-556`),
+  first-password step's; `PWSET` with no stored hash stays root-only (`src/brokerd/ops.c:564-568`),
   so the first password stays a console act;
 - ⚠️ **the first-password step must write over a corrupt store.** 讀 `cfgstore passwd` loads
   strictly and refuses a store with bytes and no valid record (`src/cfgstore/main.c:642`,
@@ -998,10 +998,10 @@ the shell. Nothing in §§ 3–5 needs a person at a root shell:
 ### 4.1 `httpd`: a bounded streaming upload
 
 讀 the limits it lives in: a 4,096-byte body cap checked at the header line and at the end of the
-headers (`src/httpd/http.c:393-404`, `:445-469`; `src/httpd/http.h:31`), a 10 s per-`recv` body
-timeout (`src/httpd/http.h:37`, `src/httpd/serve.c:351-355`), a 20 s alarm on the whole connection
-child (5 + 10 + 5, `src/httpd/serve.c:697-698`), fork per connection with at most 8 children
-(`src/httpd/serve.c:527-725`, `src/httpd/http.h:38`), and one broker request per connection with
+headers (`src/httpd/http.c:402-413`, `:445-469`; `src/httpd/http.h:31`), a 10 s per-`recv` body
+timeout (`src/httpd/http.h:37`, `src/httpd/serve.c:365-369`), a 20 s alarm on the whole connection
+child (5 + 10 + 5, `src/httpd/serve.c:713-714`), fork per connection with at most 8 children
+(`src/httpd/serve.c:541-742`, `src/httpd/http.h:38`), and one broker request per connection with
 a 2,048-byte body and a 15 s I/O deadline (`src/lib/proto.h:29`, `src/lib/client.c:20-21`,
 `:94-209`). The route exists and answers 501 after the session and CSRF checks
 (`src/httpd/routes.c:1018-1029`, `:1059`).
@@ -1011,13 +1011,13 @@ The design, inside that architecture:
 1. **The parser learns one streaming route.** When the request line is `POST /api/firmware`,
    `Content-Length` is bounded by `HTTP_UPLOAD_MAX` = 1,179,648 (the slot,
    `src/rlxboot/rlxboot.h:76`) instead of `HTTP_BODY_MAX`; `end_of_headers` returns a new code
-   instead of entering `HS_BODY`, and `srv_conn` (`src/httpd/serve.c:306-369`) hands the socket and
+   instead of entering `HS_BODY`, and `srv_conn` (`src/httpd/serve.c:307-370`) hands the socket and
    the bytes already read past the headers to `upload.c`. A larger `Content-Length` is `413` at the
    header line, before any body byte is kept: **refused whole**. `Transfer-Encoding` stays `501`
-   (`src/httpd/http.c:405-410`).
+   (`src/httpd/http.c:414-419`).
 2. **Authentication before the body.** `upload.c` runs `route_dispatch`'s `RF_SESS`/`RF_CSRF`
-   checks (`src/httpd/routes.c:1104-1120`), then `UPDATE_BEGIN` (body: the declared length) —
-   `brokerd` checks the session and the CSRF token there (`src/brokerd/ops.c:742-751`) and refuses
+   checks (`src/httpd/routes.c:1148-1164`), then `UPDATE_BEGIN` (body: the declared length) —
+   `brokerd` checks the session and the CSRF token there (`src/brokerd/ops.c:754-763`) and refuses
    before a byte of the body is forwarded. Only then is the body read.
 3. **The body, in broker-sized pieces.** Read up to 2,044 bytes at a time (2,048 less the
    offset); send each as `UPDATE_DATA` (body: a 4-byte offset, then the bytes); stop at the first
@@ -1048,7 +1048,7 @@ supported:
 - **`UPDATE_END`** `u32 total`: `received == total`, not poisoned, then § 4.4.
 
 One staging at a time, discarded after 30 s without a `DATA` (swept in the main loop beside the
-connection deadlines, `src/brokerd/main.c:434-443`). The buffer is `brokerd`'s heap, freed after
+connection deadlines, `src/brokerd/loop.c:409-419`). The buffer is `brokerd`'s heap, freed after
 `END`: 推
 about 2.4 MB at the peak of § 4.4 (staging + one slot read), against 量 `MemFree` 20,924–20,932 kB
 on an earlier image (`SPEC.md` `MEM-19`, `MEM-20` — before `R7`'s userspace, so 推 for `v1.0`). The
@@ -1130,8 +1130,8 @@ The production key is the same file `rlxboot` compiles in, `src/rlxboot/prodkey.
    `src/rlxboot/slots.c:228-229`, so an equal version written to B would never run). An addition
    to `rlxboot`'s checks, after them, refusing only;
 10. `OK`: reply `dest`, `version`, set `pending_update` — the install runs after the reply is on the
-    socket, as `REBOOT` does (`src/brokerd/ops.c:760-767`, `src/brokerd/main.c:382-396`,
-    `:413-429`).
+    socket, as `REBOOT` does (`src/brokerd/ops.c:772-779`, `src/brokerd/loop.c:266-289`,
+    `:308-325`).
 
 **Nothing is staged for flash before step 10.** Steps 1–9 read flash and `/proc`, and write
 neither; the host suite asserts that every refusal leaves the stub `/proc` directory with no
@@ -1158,7 +1158,7 @@ neither; the host suite asserts that every refusal leaves the stub `/proc` direc
    for 1,109,152 B).
    Log one console line: `brokerd: UPDATE slot <X> written: <inst_reason> cmp_diff <d> n_writes +<k> ms <t>`.
 5. `img reset`, `sync()`, `sleep(1)`, `reboot(RB_AUTOBOOT)` — 讀 a watchdog bite:
-   `kernel_restart` → `bsp_machine_restart` sets `WDTCNR = 0` and spins (`src/init/main.c:369-371`);
+   `kernel_restart` → `bsp_machine_restart` sets `WDTCNR = 0` and spins (`src/init/main.c:380-382`);
    量 the same syscall from `busybox reboot -f` resets this board (`FW-37`). 推 for `brokerd`'s own
    call, which no capture has.
 6. On any failure in 2–4: log it, release the lock, **do not reboot** — the running slot is
@@ -1189,7 +1189,7 @@ transfer. `UPDATE_END`: two slot reads (≤ 2.2 s at `FW-48`'s rate), three SHA-
 1.1 MB and three Ed25519 (`rlxboot` spends about 1.3 s a slot on this core with the window read,
 量 `FW-250`) — about 4–6 s, inside the 60 s of § 4.1 step 4. Install 10.3–11.2 s (量 `FW-246`).
 From `busybox reboot -f` to the mainline's prompt about 15.6 s (量 `FW-250`, `F05`), and
-`rlxfw: lan up` comes before the prompt (`src/init/main.c:610`, printed from `lan_up()` before the
+`rlxfw: lan up` comes before the prompt (`src/init/main.c:627`, printed from `lan_up()` before the
 child table starts). From the upload's first byte to `lan up`, about 35–45 s: the DoD reads it
 from the captures, between `brokerd: UPDATE_BEGIN` and `rlxfw: lan up`.
 
@@ -1210,8 +1210,8 @@ order, and **every refusal produces none of them**. `test_authz.c` walks the fli
 
 **Who.** A helper PID 1 forks once — not a new program (§ 2.9), not a supervised child (a one-shot
 child would read as a fast failure, `src/init/supervise.h:34-38`) — after `lan_up()` has printed
-`rlxfw: lan up` (`src/init/main.c:902-905`, `:582-617`, the line at `:610`) and the child table
-has started `brokerd` (`:809`, `:935`, `:975`). PID 1 reaps it like any orphan: 讀 `sv_reap_all`
+`rlxfw: lan up` (`src/init/main.c:1045-1048`, `:599-637`, the line at `:627`) and the child table
+has started `brokerd` (`:829`, `:1078`, `:1118`). PID 1 reaps it like any orphan: 讀 `sv_reap_all`
 ignores a pid not in the table (`src/init/supervise.c:215-218`). In a `RLXFW_SWITCH_BRINGUP=0`
 build there is no `lan up` and no helper.
 
@@ -1336,7 +1336,7 @@ find it (the search can see), the digest-only path must find 0. Host cells that 
 | id | write cut | how | why there, and why it is safe | verdict |
 |---|---|---|---|---|
 | K1 | an unpaced slot write, the kind an update makes | V-armed from RAM, V staged by `nc`, `install slotB sha=<V> repeat=5` (≈ 55 s); the owner pulls inside the window | no scratch region is slot-sized (§ 0.2 item 3); slot B is the non-running slot and V is below the floor (7), so B never wins whether torn or whole | `SLOT A` every time; `VERDICT B bad=magic`/`digest` (torn) or `bad=rollback` (complete) says which; the phase from the last `RLXFW-SI` line |
-| K2 | a store write | on U from flash: `i=0; while [ $i -lt 100 ]; do cfgstore set sys.hostname=h$i; i=$((i+1)); done` (≈ 70 s, 推) | the store's own criterion needs a cut inside a real store write; by design a write touches only the slot not selected (`src/lib/cfg.c:637-638`) | `cfgstore show`: `seq` = the last `written: … seq S` captured, or S+1; never `default`; the phase from the last `RLXFW-SI` line |
+| K2 | a store write | on U from flash: `i=0; while [ $i -lt 100 ]; do cfgstore set sys.hostname=h$i; i=$((i+1)); done` (≈ 70 s, 推) | the store's own criterion needs a cut inside a real store write; by design a write touches only the slot not selected (`src/lib/cfg.c:804-805`) | `cfgstore show`: `seq` = the last `written: … seq S` captured, or S+1; never `default`; the phase from the last `RLXFW-SI` line |
 | K3 | a counter advance | on U: `arm 0x3e0000 0x3f0000 0x10000`, `ctrloop 30` (≈ 60 s, 推) | a one-bit program lasts about 0.5 ms; the routine is § 2.4's | `ctrloop show` twice: `malformed=0` unless the last line was `erase`; `value` within the 256 bits after the last `bit=` line; the two reads differ by ≤ 1 |
 
 K2's 100 records each carry the hash W5 set, salt included (§ 0.2 item 1), so none of them can be
@@ -1374,7 +1374,7 @@ update ops only with a session token, as `T2`; it cannot open `/proc/rtl819x-spi
 (0644), `/proc/rtl819x-spi-img` (0200; both
 `kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:3498`, `:3529`), `/dev/mtd2ro` (0400) or
 `/run`'s lock (🔄 2026-10-23: nor read `/proc/rtl819x-spi-inst`, 0400, `:3539`), and inside its
-chroot it sees none of them (`src/httpd/serve.c:154-208`). uid 101 unchanged. **Root** gains a flash write
+chroot it sees none of them (`src/httpd/serve.c:155-209`). uid 101 unchanged. **Root** gains a flash write
 path one `echo` away: every region the shipped table names — with § 2.1's shrink, the slots, the
 store regions and the probe, not `rlxboot` or the rescue — and the counter only to the booted
 version (§ 2.4.5). ⚠️ Root keeps the vendor's route regardless: the image holds `mtd_spi_write`

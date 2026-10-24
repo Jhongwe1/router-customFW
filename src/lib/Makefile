@@ -35,9 +35,9 @@ RLXLIB_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 # (it used to refuse, because kdf.h was a declaration returning -ENOSYS), and
 # kdf.c needs sha256.c.  src/cfgstore/Makefile is this fragment's only includer,
 # so the cost is one extra object in one program.
-RLXLIB_NAMES  := crc32 tlv schema cfg sha256 kdf
+RLXLIB_NAMES  := crc32 tlv schema cfg sha256 kdf spictl cfgflash
 RLXLIB_SRCS   := $(addprefix $(RLXLIB_DIR)/,$(addsuffix .c,$(RLXLIB_NAMES)))
-RLXLIB_HDRS   := $(addprefix $(RLXLIB_DIR)/,crc32.h tlv.h schema.h cfg.h kdf.h                                             sha256.h)
+RLXLIB_HDRS   := $(addprefix $(RLXLIB_DIR)/,crc32.h tlv.h schema.h cfg.h kdf.h                                             sha256.h spictl.h)
 RLXLIB_CPPFLAGS := -I$(RLXLIB_DIR)
 
 # Sanity: a stale include path is a link error pages later, so say it here.

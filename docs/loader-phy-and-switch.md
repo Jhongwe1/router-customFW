@@ -1324,7 +1324,7 @@ rlxfw on A alone**; the rows say what this loader does.
 讀 A: the init is `eth_startup` (`0x804028B4`), called only by `goToDownMode` (`0x80408468`), which
 is called only at `0x804086E8` and `0x80408704`, both in the boot dispatcher `0x80408690` (Bb
 `init/utility.c:1939`–`:1975`, `doBooting`). 讀 the dispatcher's argument is the flash scan's result
-(`0x8040825C` → `0x80408084`; Bb `init/main.c:67`–`:73`). 讀 a non-zero result runs the ESC check
+(`0x8040825C` → `0x80408084`; Bb `init/main.c:78`–`:73`). 讀 a non-zero result runs the ESC check
 (`0x804086B0`): ESC on the console, or the reset button on GPIO A5 (`0x80408DE4`), prints
 `---Escape booting by user` and reaches `0x804086E8`; otherwise `0x804084B8` jumps to the image and
 the switch is never addressed. 讀 a zero result reaches `0x80408704` with no line printed.

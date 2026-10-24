@@ -18,6 +18,11 @@
  *   - A body without Content-Length is 411; a Content-Length on a GET is 400.
  * The sweep in test_http.c truncates a valid request at every length and
  * corrupts single bytes across it looking for a path around one of these.
+ *
+ * ONE ROUTE IS STREAMED: `POST /api/firmware` (HTTP_UPLOAD_PATH).  Its
+ * Content-Length is bounded by HTTP_UPLOAD_MAX at the header line, every other
+ * rule above holds for it unchanged, and at the blank line the parser stops and
+ * returns HTTP_FEED_STREAM without entering HS_BODY: the body is upload.c's.
  */
 
 #include "http.h"
@@ -288,6 +293,10 @@ static int parse_reqline(struct http_parser *ps)
 	if (rc < 0)
 		return rc;
 	ps->r->pathlen = (uint16_t)rc;
+	/* The decoded path, as route_dispatch() matches it, so the parser and
+	 * the route table cannot disagree about which request streams. */
+	if (ps->r->method == HM_POST && strcmp(ps->r->path, HTTP_UPLOAD_PATH) == 0)
+		ps->r->stream = 1;
 	return 0;
 }
 
@@ -398,7 +407,7 @@ static int parse_header(struct http_parser *ps)
 		ps->seen_clen = 1;
 		if (parse_u32_strict(s + vs, vlen, &v) != 0)
 			return -400;
-		if (v > HTTP_BODY_MAX)
+		if (v > (ps->r->stream ? HTTP_UPLOAD_MAX : HTTP_BODY_MAX))
 			return -413;
 		ps->r->has_clen = 1;
 		ps->r->clen = v;
@@ -451,6 +460,14 @@ static int end_of_headers(struct http_parser *ps)
 	if (r->method == HM_POST) {
 		if (!r->has_clen)
 			return -411;
+		if (r->stream) {
+			/* Bounded at the header line; asserted again here.  No
+			 * HS_BODY: not one body byte is stored by this parser. */
+			if (r->clen > HTTP_UPLOAD_MAX)
+				return -413;
+			ps->state = HS_STREAM;
+			return HTTP_FEED_STREAM;
+		}
 		if (r->clen > HTTP_BODY_MAX)
 			return -413;
 		if (r->clen == 0) {
@@ -477,6 +494,8 @@ int http_feed(struct http_parser *ps, const uint8_t *p, size_t n, size_t *used)
 		return -ps->status;
 	if (ps->state == HS_DONE)
 		return 1;
+	if (ps->state == HS_STREAM)
+		return HTTP_FEED_STREAM;
 
 	while (i < n) {
 		if (ps->state == HS_BODY) {
@@ -549,9 +568,9 @@ int http_feed(struct http_parser *ps, const uint8_t *p, size_t n, size_t *used)
 						*used = i;
 						return rc;
 					}
-					if (rc == 1) {
+					if (rc > 0) {
 						*used = i;
-						return 1;
+						return rc;
 					}
 					continue;
 				}

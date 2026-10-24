@@ -57,8 +57,12 @@ $(error REFUSED: $(LIB)/client.c is absent and src/httpd/stub/client.c is gone)
 endif
 SRC_CLIENT := $(LIB)/client.c $(LIB)/proto.c
 SRC_KDF    := $(LIB)/sha256.c $(LIB)/kdf.c
+# The streaming upload (POST /api/firmware).  serve.c calls it, so everything
+# that links serve.c links it; it reads the update ops' TLVs with proto.c's codec.
+SRC_UPLOAD := $(HERE)upload.c
 
-# Tests that bring their own bk_call (so they must not link the real one):
+# Tests that bring their own bk_call and bk_set_timeouts (so they must not link
+# the real client.c -- but they do link proto.c, the codec upload.c reads with):
 TESTS_FAKE := test_routes test_serve
 # Tests that link the real client but never call it:
 TESTS_PLAIN:= test_http test_json test_rl
@@ -86,14 +90,15 @@ all: host
 host:
 	@mkdir -p $(HOST_OUT)
 	$(HOSTCC) $(HCFLAGS) $(EXTRA) -o $(HOST_OUT)/httpd \
-	  $(HERE)main.c $(HERE)serve.c $(SRC_CORE) $(SRC_CLIENT)
+	  $(HERE)main.c $(HERE)serve.c $(SRC_UPLOAD) $(SRC_CORE) $(SRC_CLIENT)
 	@set -e; for b in $(TESTS_PLAIN); do \
 	   $(HOSTCC) $(HCFLAGS) $(EXTRA) -o $(HOST_OUT)/$$b \
 	     $(HERE)$$b.c $(SRC_CORE) $(SRC_CLIENT); \
 	 done
 	@set -e; for b in $(TESTS_FAKE); do \
 	   $(HOSTCC) $(HCFLAGS) $(EXTRA) -o $(HOST_OUT)/$$b \
-	     $(HERE)$$b.c $(HERE)serve.c $(SRC_CORE); \
+	     $(HERE)$$b.c $(HERE)serve.c $(SRC_UPLOAD) $(SRC_CORE) \
+	     $(LIB)/proto.c; \
 	 done
 	@if [ -f $(LIB)/kdf.c ] && [ -f $(HERE)test_kdf.c ]; then \
 	   $(HOSTCC) $(HCFLAGS) $(EXTRA) -o $(HOST_OUT)/test_kdf \
@@ -162,6 +167,13 @@ cov:
 # Each removes a check the suite says it enforces; each must make the suite go
 # RED, and the recipe FAILS if the suite stays green.  mutate.py refuses if its
 # anchor moved, so a control cannot rot into a no-op.
+#
+# The upload's controls (mutate.py names each) run test_serve, after an
+# unmutated copy built and run the same way has been required GREEN: a suite
+# red for its own reasons would make every mutant look killed.  A mutant that
+# does not compile stops the recipe (set -e); it is never counted as a kill.
+UPL_MUTANTS := upl_prebegin:upload.c upl_bound:http.c upl_bound_line:http.c \
+               upl_offset:upload.c upl_piece:upload.c upl_endafter:upload.c
 mutate:
 	@set -e; M=$(O)/mutate; rm -rf $$M; \
 	 for d in traversal hdrcap; do \
@@ -184,6 +196,38 @@ mutate:
 	   grep '^not ok' $$M/$$d/out | head -3 | sed 's/^/    /'; \
 	 done; \
 	 echo "both mutation controls went red; the suite's checks are load bearing"
+	@set -e; M=$(O)/mutate; \
+	 for e in none $(UPL_MUTANTS); do \
+	   d=$${e%%:*}; f=$${e#*:}; \
+	   mkdir -p $$M/$$d/httpd $$M/$$d/lib $$M/$$d/rlxboot; \
+	   cp -a $(HERE). $$M/$$d/httpd/; cp -a $(LIB)/. $$M/$$d/lib/; \
+	   cp -a $(REPO)/src/rlxboot/rlxboot.h $$M/$$d/rlxboot/; \
+	   echo "=== control: $$d ==="; \
+	   if [ $$d != none ]; then \
+	     $(PYTHON) $(HERE)mutate.py $$d $$M/$$d/httpd/$$f; fi; \
+	   $(HOSTCC) $(MCFLAGS) -I$$M/$$d/httpd -I$$M/$$d/lib -o $$M/$$d/t \
+	     $$M/$$d/httpd/test_serve.c $$M/$$d/httpd/serve.c \
+	     $$M/$$d/httpd/upload.c $$M/$$d/httpd/routes.c \
+	     $$M/$$d/httpd/rl.c $$M/$$d/httpd/http.c $$M/$$d/lib/json.c \
+	     $$M/$$d/lib/schema.c $$M/$$d/lib/tlv.c $$M/$$d/lib/proto.c; \
+	   if [ $$d = none ]; then \
+	     if ! $$M/$$d/t > $$M/$$d/out 2>&1; then \
+	       echo "REFUSED: the UNMUTATED copy is red, so no kill below would"; \
+	       echo "         mean anything."; tail -3 $$M/$$d/out; exit 1; fi; \
+	     echo "  green unmutated: $$(grep -c '^ok ' $$M/$$d/out) cases"; \
+	     continue; \
+	   fi; \
+	   if $$M/$$d/t > $$M/$$d/out 2>&1; then \
+	     echo "REFUSED: test_serve PASSED with $$d planted."; \
+	     echo "         It is therefore not testing what it claims to."; \
+	     tail -3 $$M/$$d/out; exit 1; \
+	   fi; \
+	   n=$$(grep -c '^not ok' $$M/$$d/out || true); \
+	   echo "  RED as required: $$n failing cases"; \
+	   grep '^not ok' $$M/$$d/out | head -3 | sed 's/^/    /'; \
+	 done; \
+	 echo "the $(words $(UPL_MUTANTS)) upload controls went red against a green" \
+	      "unmutated copy"
 
 # --------------------------------------------------------------- chrootcheck
 # ROOT= is the directory that will BE the chroot.  A gate condition of R7, so it
@@ -223,7 +267,7 @@ TLDFLAGS   := -static -Wl,--gc-sections
 TOUT       := $(O)/target
 TOBJ       := $(TOUT)/obj/httpd
 TSRC       := $(TOUT)/src
-TFILES     := main.c serve.c routes.c rl.c http.c
+TFILES     := main.c serve.c routes.c rl.c http.c upload.c
 # The library halves, staged flat into $(TSRC)/lib and compiled from there.
 LFILES     := json.c schema.c tlv.c client.c proto.c
 LHDRS      := json.h schema.h tlv.h client.h proto.h cfg.h sha256.h kdf.h
@@ -239,7 +283,7 @@ target:
 
 target-real:
 	@mkdir -p $(TOBJ) $(TSRC)/lib
-	@for f in $(TFILES) http.h routes.h rl.h serve.h; do \
+	@for f in $(TFILES) http.h routes.h rl.h serve.h upload.h; do \
 	   cp -f $(HERE)$$f $(TSRC)/$$f; \
 	 done
 	@for f in $(LFILES) $(LHDRS) sha256.c kdf.c; do \

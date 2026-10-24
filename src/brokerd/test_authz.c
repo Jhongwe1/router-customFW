@@ -51,6 +51,9 @@ static void fixture(struct broker *bk, const char *entropy_file)
 	bk->cfg_path = "/tmp/rlxbk-store-test_authz.bin";
 	bk->ping_bin = "/bin/echo";
 	bk->ping_timeout_s = 2;
+	/* The update ops' handoff (update.c): a slot boot, so the table and not
+	 * the handoff decides each cell.  write_file() puts it there. */
+	bk->boot_path = "/tmp/rlxbk_boot_authz";
 	(void)bk_entropy_ready(bk);
 	bk_test_set_pw(bk, TEST_PW);
 }
@@ -94,6 +97,16 @@ static void mk(struct proto_req *rq, uint8_t op)
 		memcpy(rq->body + 2, "newpass1", 8);
 		rq->body_len = 10;
 		break;
+	case OP_UPDATE_BEGIN:
+	case OP_UPDATE_END:
+		proto_put_be32(rq->body, 160);         /* the smallest total */
+		rq->body_len = 4;
+		break;
+	case OP_UPDATE_DATA:
+		proto_put_be32(rq->body, 0);
+		rq->body[4] = 0x5A;
+		rq->body_len = 5;
+		break;
 	default:
 		rq->body_len = 0;
 		break;
@@ -122,13 +135,36 @@ static int expect(const struct bk_op_rule *r, uid_t uid, int sess, int csrf_ok,
 	return 0;
 }
 
+/* The answer of a cell the table let through, for the update ops: in a fresh
+ * fixture BEGIN opens a staging (OK, with UPD_T_DEST), and DATA and END find
+ * none (INVAL `sequence`).  0 when it is right. */
+static int upd_cell_wrong(const struct proto_req *rq, const struct proto_resp *rs)
+{
+	size_t off = 0;
+	uint16_t t, l;
+	const uint8_t *v;
+	int dest = 0, why = 0;
+
+	while (proto_tlv_get(rs->body, rs->body_len, &off, &t, &v, &l) == 0) {
+		if (t == UPD_T_DEST && l == 1 && (v[0] == 'A' || v[0] == 'B'))
+			dest = 1;
+		if (t == UPD_T_REASON && l == 8 && memcmp(v, "sequence", 8) == 0)
+			why = 1;
+	}
+	if (rq->op == OP_UPDATE_BEGIN)
+		return !(rs->status == ST_OK && dest);
+	return !(rs->status == ST_INVAL && why);
+}
+
 static void walk(void)
 {
 	static const uid_t uids[] = { 0, 100, 101, 1000 };
 	struct broker bk;
 	int oi, ui, si, ci;
 
+	memset(&bk, 0, sizeof(bk));
 	write_file("/tmp/rlxbk_ent_full", "4096\n");
+	write_file("/tmp/rlxbk_boot_authz", "slot A ver 1\n");
 
 	for (oi = 0; oi < bk_op_count(); oi++) {
 		const struct bk_op_rule *r = bk_op_at(oi);
@@ -168,11 +204,24 @@ static void walk(void)
 						 * answer is the op's.  With the
 						 * fixture's known password, LOGIN
 						 * and PWSET are a wrong secret and
-						 * must be AUTH; every other op must
-						 * succeed. */
+						 * must be AUTH; DATA and END find no
+						 * staging and must be INVAL; every
+						 * other op must succeed. */
 						want = (r->op == OP_LOGIN ||
 						        r->op == OP_PWSET)
-						     ? ST_AUTH : ST_OK;
+						     ? ST_AUTH
+						     : (r->op == OP_UPDATE_DATA ||
+						        r->op == OP_UPDATE_END)
+						     ? ST_INVAL : ST_OK;
+						if (r->op == OP_UPDATE_BEGIN ||
+						    r->op == OP_UPDATE_DATA ||
+						    r->op == OP_UPDATE_END)
+							CHECK(!upd_cell_wrong(&rq, &rs),
+							      "%s uid=%lu sess=%d "
+							      "csrf_ok=%d: not the op's "
+							      "own answer", r->name,
+							      (unsigned long)uids[ui],
+							      si, ci == 0);
 					}
 					CHECK(rs.status == want,
 					      "%s uid=%lu sess=%d csrf_ok=%d: "
@@ -181,7 +230,14 @@ static void walk(void)
 					      si, ci == 0,
 					      (unsigned)rs.status, (unsigned)want,
 					      decided ? "table" : "op");
+					/* a refused cell must not have opened one */
+					if (decided)
+						CHECK(bk.upd.state == BK_UPD_NONE,
+						      "%s uid=%lu: a staging behind a "
+						      "refusal", r->name,
+						      (unsigned long)uids[ui]);
 					bk_sess_drop_all(&bk);
+					bk_upd_discard(&bk);
 				}
 			}
 		}
@@ -320,15 +376,50 @@ static void named_negatives(void)
 	CHECK(rs.body_len == 2 && proto_be16(rs.body) == 0x0020,
 	      "INVAL carries the key id");
 
-	/* UPDATE_* are NOTSUP for everyone, root included */
+	/* UPDATE_* (supported since P6r-10, update.c): uid 101 and an unknown
+	 * uid never; uid 100 only with a live session and its CSRF token; root
+	 * reaches the op.  The op's own answers are test_update.c's. */
+	write_file("/tmp/rlxbk_boot_authz", "slot A ver 1\n");
 	{
 		uint8_t o;
 
 		for (o = 0x20; o <= 0x22; o++) {
+			fixture(&bk, "/tmp/rlxbk_ent_full");
 			mk(&rq, o);
-			(void)bk_dispatch(&bk, &rq, BK_UID_ROOT, &rs);
-			CHECK(rs.status == ST_NOTSUP, "op %02x root: %u",
+			(void)bk_dispatch(&bk, &rq, BK_UID_DNSFWD, &rs);
+			CHECK(rs.status == ST_PERM, "op %02x uid 101: %u", o,
+			      (unsigned)rs.status);
+			(void)bk_dispatch(&bk, &rq, 1000, &rs);
+			CHECK(rs.status == ST_PERM, "op %02x uid 1000: %u", o,
+			      (unsigned)rs.status);
+			(void)bk_dispatch(&bk, &rq, BK_UID_HTTPD, &rs);
+			CHECK(rs.status == ST_AUTH, "op %02x httpd, no session: %u",
 			      o, (unsigned)rs.status);
+			s = bk_sess_new(&bk);
+			CHECK(s != 0, "session");
+			if (s != 0) {
+				memcpy(rq.session, s->tok, PROTO_TOK_LEN);
+				memcpy(rq.csrf, s->csrf, PROTO_TOK_LEN);
+				rq.csrf[7] = (uint8_t)(rq.csrf[7] ^ 0x10);
+				(void)bk_dispatch(&bk, &rq, BK_UID_HTTPD, &rs);
+				CHECK(rs.status == ST_PERM,
+				      "op %02x httpd, wrong CSRF: %u", o,
+				      (unsigned)rs.status);
+				CHECK(bk.upd.state == BK_UPD_NONE,
+				      "op %02x: a refusal opened a staging", o);
+				memcpy(rq.csrf, s->csrf, PROTO_TOK_LEN);
+				(void)bk_dispatch(&bk, &rq, BK_UID_HTTPD, &rs);
+				CHECK(o == OP_UPDATE_BEGIN ? rs.status == ST_OK
+				                           : rs.status == ST_INVAL,
+				      "op %02x httpd with both: %u (the op's)", o,
+				      (unsigned)rs.status);
+			}
+			bk_upd_discard(&bk);
+			(void)bk_dispatch(&bk, &rq, BK_UID_ROOT, &rs);
+			CHECK(rs.status != ST_NOTSUP && rs.status != ST_PERM &&
+			      rs.status != ST_AUTH, "op %02x root reaches the op: %u",
+			      o, (unsigned)rs.status);
+			bk_upd_discard(&bk);
 		}
 	}
 	/* an op that is not in the table at all */
