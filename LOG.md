@@ -1558,3 +1558,15 @@ study 草稿放進 `study/20261017-study.md`（gitignored；與暫存區的草�
 **做錯的。** 一支代理的 target build 在主線的 kernel 建置期間跑（21:46，兩邊 tripwire 都 CLEAN，但違反一次一個）——brief 只限制了 kernel 建置。整合套件第一次跑 httpd／cfgstore 的套件時少給 `O=`，三個 rc 2 是我的命令錯，補跑才綠。兩次撞到帳號用量額度（16:45、22:2x），代理被切斷。
 
 **沒做完、留給下一段。** 第三階段的使用者空間：3S（store 上 flash、`spictl`）、3H（`httpd` 串流上傳）已驗、在 ext4 整合樹 `integ4`（`58ab5959`），**未進 repo**；3B（`brokerd` 的 UPDATE）與 3C（`init` 的計數器與無 shell 的首次密碼）被額度切斷，半成品在各自的樹。`PROGRESS.md` § Now 這一段沒改寫。`cfgstore passwd` 關回顯（設計 § 6.4）未做。卡片未寫。交接：`plan/handoff-s145.md`。
+
+## 2026-10-24 — 第一百四十五段（02:25 開場，擁有者 11:0x 回覆範圍裁決後續做；桌面；零次電源動作，零次 flash 寫入，零次 `FLW`／`EW`／`EB`／非零 `AUTOBURN`／`FLR`）：`P6r-10`／`P6r-11` 第三階段進 repo、兩顆完整映像量大小、`P6r` 其餘的列收掉
+
+**做了什麼。** 擁有者這一段的指示：之前設的繁瑣流程這一段不管，重點是把 `P5e`、`P6r` 收起來；不開子代理，主線一次一件。交接用到的三份 patch 先核 sha256（3S v1 `46228855…`、3H `acc03da7…`、3S v2 `c31e2f43…`，都相符）。3C 與 3B 被額度切斷時其實已經跑完：3C 的根 `make test` rc 0、`init` 8 個測試程式、一次性突變 8/8 紅、四種 switch 形狀都建過；3B 的 `test_update` 316 個檢查、`test_e2e` 32、prodkey 12，update 路徑突變 9/9（`m6_early` 是事前登記的不殺），根 `make test` 過 —— 缺的只有 patch。主線讀過 `ctradv.c`、`firstpw.c`、`main.c` 的改動與寫 flash 的 `update.c` 全檔，做出 patch（3C `bfaa6e50…`、3B `af3cf4d1…`），在 ext4 的新 clone 上把 `integ4` 的差（`4fc2e1bc…`）、3C、3B 依序套到 `f0c499e1`，三份都沒有衝突。根 `make test` rc 0；ci-census host-userspace 83/83、host-rlxboot 21/21，`tools/ci-expected-build.tsv` 62 → 83。citecheck 的 C3（30 個不在 baseline 的 ROT）、C5（2 個超出檔尾）、C7（4 個新指到空行）清到 0：腳本機械改 21 個，手改 10 處（`brokerd` 的迴圈搬進 `loop.c`、`cfg_store` 的本體搬進 `store_rec`，順手改同一行上 citecheck 看不到的 `:N` 簡寫）；`SPEC.md` `TC-46` 與 `notes/incremental-build.md` 的 `init/main.c:576` 是 staged kernel 的檔，被 citecheck 用後綴解到 `src/init/main.c`，改寫成 `linux-2.6.30/init/main.c:576`。主 checkout 用 `git apply --index` 套上，index 的樹與 ext4 的樹同為 `b9e74112`，spec-check rc 0，commit `5b4566ab`。
+
+**裁決。** 擁有者 2026-10-24 選「一個上機日全做」：先拍 `P5e-6`，再做 `P6r-10`／`P6r-11` 整輪；其餘的列交給我。⊘ *Traded away*：`P6r-5`（與併入它的 `P6r-6`）、`P6r-8`、`P6r-9`、`P6r-12` 的 TLS，理由各寫在步驟表那一列。`P6r-12` 的主控台半由 `P6r-10` 的出貨映像交付（`BENCH_SHELL=0`，`notes/self-update.md` § 3.8），在上機日驗，DoD 在動工前寫好；`P6r-16` 兩級都搭上機日，第一級讀不到就整列 ⊘ *blocked on an instrument*。
+
+**量到的。** 兩顆完整映像（`s144/b/bld.sh` 不改，兩顆 recipe 都是 `e7f77c95`）：bench 形狀 `s145k1` 的 `nfjrom` 1,141,760 位元組＝1,115 個級距，出貨形狀 `s145k0` 1,143,808＝1,117，離 slot 上限 1,151 還有 36 與 34 個；比 `s144k1` 多 17 與 19（含 1B v3 的 `/proc/rtl819x-spi-inst`）；解壓後用掉上限的 80.8 %／81.3 %（`FW-269`）。
+
+**做錯的。** PowerShell 內嵌 `$d` 的迴圈被展開成空字串，同一個目錄印了八次；一次 `bash -c` 內嵌引號斷掉；`git commit -F -` 在 PowerShell 裡不從 here-string 讀 stdin，改用訊息檔。手改的重釘腳本第一次有兩個行號差一行，因為它先檢查全部錨點才寫，什麼都沒寫進去。
+
+**沒做完、留給下一段。** 上機日的桌面準備（重流程，碰 flash）：`cs6c`、V、U、V-armed、無 shell 的 U、每個 tick 翻一次 GPIO 的映像，一次建一顆；卡片（`notes/self-update.md` § 6.3 的 W1–W9、B1–B4、C1、R1–R6、§ 6.5 的 K1–K3，先 `ctrloop` 再 `ctr`，開機多 `RLXFW-HANDOFF`、`RLXFW-SW0` 兩行；最前面 `P5e-6`，再加 `P6r-12`、`P6r-16`）；`cfgstore passwd` 在 tty 上關回顯（§ 6.4）。這一段沒寫 study 檔（擁有者這一段免了流程）。5 個本地 commit 未推（`948ff614`、`e60ddf14`、`f0c499e1`、`5b4566ab` 與這一段的文件 commit），推要擁有者當下的 yes。
