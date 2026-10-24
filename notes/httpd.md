@@ -751,7 +751,7 @@ and it was a compile error rather than a silent behaviour change only by luck.
 讀 2026-09-30, the tree this lands in. Two things will not merge by themselves:
 
 1. **`src/lib/kdf.h` already exists** — an `-ENOSYS` stub with a `KDF_IMPLEMENTED`
-   feature macro, which `src/cfgstore/main.c:569` reads. `git apply` refuses to
+   feature macro, which `src/cfgstore/main.c:596` reads. `git apply` refuses to
    create a file that is already there, so the stub is **deleted first** and this
    patch applied second. To make that a delete-and-apply rather than a cross-file
    edit, this `kdf.h` keeps every name the stub defined — `KDF_IMPLEMENTED` (now

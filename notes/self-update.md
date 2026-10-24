@@ -36,7 +36,7 @@ shell (§ 3.8); no card publishes the working admin password (§ 6.4).
 
 1. **Naming each write.** The first text named every payload written by its digest. 讀 a record
    carrying a fresh salt cannot be named that way: `cfgstore passwd` draws the salt on the device
-   (`src/cfgstore/main.c:619-620`, `pwhash_salt`) and `brokerd`'s `PWSET` does too
+   (`src/cfgstore/main.c:660-661`, `pwhash_salt`) and `brokerd`'s `PWSET` does too
    (`src/brokerd/ops.c:571`), so the 4,096 bytes such a write stages cannot be known before the
    write; and the install path never prints the staged digest, by design
    (`kernel/linux-2.6.30/drivers/mtd/devices/rtl819x-spi.c:2217-2220`). Amended: a container or an
@@ -45,8 +45,8 @@ shell (§ 3.8); no card publishes the working admin password (§ 6.4).
    value) and the issuing image's sha256. An unsalted record — `cfgstore init --force`, and a `set`
    on a store holding no password hash — is deterministic and can still be named by digest
    (§ 6.3); 讀 a `set` on a store that holds `admin.pwhash` writes a record carrying that hash and
-   its salt, since `cmd_set` loads the whole record (`src/cfgstore/main.c:286`), changes one key
-   (`:333`) and stores the whole record again (`:339`; § 3.2).
+   its salt, since `cmd_set` loads the whole record (`src/cfgstore/main.c:288`), changes one key
+   (`:335`) and stores the whole record again (`:341`; § 3.2).
 2. **The counter after a cut.** The first text asked for the old value or the new one. That holds
    for an advance by one step and cannot hold for an advance by more than one under a cut,
    whatever the program order (§ 2.4.4); the round's first advance is 0 → 6. Amended: *"a value
@@ -63,9 +63,9 @@ shell (§ 3.8); no card publishes the working admin password (§ 6.4).
    write repeated on the slot `rlxboot` did not boot, the store write repeated on the store's own
    regions, the counter's program loop run on the erase probe's block (§ 6.5 says why each is
    safe).
-4. **"Both invalid".** 讀 `cfgstore show` loads strictly (`src/cfgstore/main.c:203`), and a store
+4. **"Both invalid".** 讀 `cfgstore show` loads strictly (`src/cfgstore/main.c:205`), and a store
    that holds bytes but no valid record exits 4 before printing anything
-   (`src/cfgstore/main.c:105-114`). Amended to *both erased*: an erased slot reads as absent
+   (`src/cfgstore/main.c:107-116`). Amended to *both erased*: an erased slot reads as absent
    (§ 3.1), so with both regions erased `show` prints `source default` (§ 3.6, option A).
 5. **The bootstrap.** T, `v1.0`'s image in slot A, has no update path (§ 6.1). Amended: the
    round's first slot write is made from the console of an image booted from RAM, and the update
@@ -931,9 +931,9 @@ write lasts about 0.4–0.5 s: 量 `FW-246`, a 64 KiB region with 89 ops took 48
   `notes/config-store.md` § 5).
 - `src/lib/cfgflash.c` (new): `cfg_flash_read_slot`, `cfg_flash_write_slot`, the lock; a guard
   that refuses any offset range overlapping `[0, 0x10000)` before the `open`.
-- `cfgstore`: default path `CFG_FLASH_DEV` (`src/cfgstore/main.c:52`); `dump --hex` reads through
-  the backend instead of `fopen` (`src/cfgstore/main.c:471-511`). ⚠️ `dump --hex` prints
-  `admin.pwhash`'s bytes by design (`src/cfgstore/main.c:34-39`): no card may type it after a
+- `cfgstore`: default path `CFG_FLASH_DEV` (`src/cfgstore/main.c:54`); `dump --hex` reads through
+  the backend instead of `fopen` (`src/cfgstore/main.c:473-513`). ⚠️ `dump --hex` prints
+  `admin.pwhash`'s bytes by design (`src/cfgstore/main.c:35-40`): no card may type it after a
   password is set (§ 6.4).
 - `brokerd`: `BK_CFG_PATH` (`src/brokerd/brokerd.h:24`) → `CFG_FLASH_DEV`. `init`: `PATH_CFG`
   likewise (`src/init/main.c:1013`, `:966`).
@@ -954,14 +954,14 @@ with a new `seq` and CRCs — and it keeps `FW-184`'s promise.
 
 - **Option A (chosen; the DoD reads *both erased*): erase.** `erase cfg1` makes slot 1 absent;
   `cfgstore show` then loads slot 0 (*one slot erased, the other loads*). Erasing both makes the
-  store "no store yet": `load_or_die`'s strict path does not fire (`src/cfgstore/main.c:105`:
+  store "no store yet": `load_or_die`'s strict path does not fire (`src/cfgstore/main.c:107`:
   `file_bytes > 0` is false), `show` prints `source default` with `admin.pwhash <unset>`
-  (`src/cfgstore/main.c:207-236`), and `brokerd` answers every `LOGIN` `AUTH`
+  (`src/cfgstore/main.c:209-238`), and `brokerd` answers every `LOGIN` `AUTH`
   (`src/brokerd/ops.c:438-444`). Deterministic and nameable (§ 6.3).
 - **Option B (not taken; it would be needed if "invalid" had to mean garbage):** `show` loads
   non-strictly and prints the store line, the two slot verdicts and the table, then exits 4 for a
   store that holds bytes but no record. No case of `test_cli.c` asserts `show` on a corrupt store
-  today (`src/cfgstore/test_cli.c:259-291` covers `get`, `set`, `dump`, `init`).
+  today (`src/cfgstore/test_cli.c:476-508` covers `get`, `set`, `dump`, `init`).
 
 ### 3.7 Two owners of two numbers
 
@@ -981,8 +981,8 @@ the shell. Nothing in §§ 3–5 needs a person at a root shell:
   first-password step's; `PWSET` with no stored hash stays root-only (`src/brokerd/ops.c:564-568`),
   so the first password stays a console act;
 - ⚠️ **the first-password step must write over a corrupt store.** 讀 `cfgstore passwd` loads
-  strictly and refuses a store with bytes and no valid record (`src/cfgstore/main.c:642`,
-  `:105-114`). On a
+  strictly and refuses a store with bytes and no valid record (`src/cfgstore/main.c:683`,
+  `:107-116`). On a
   shell-less image there is no `cfgstore init --force` to type, so a corrupt store would make the
   first password impossible. The step has to write a fresh record (defaults + hash) into slot 0
   without reading the corrupt one — fail-closed already held, since a corrupt store loads as
@@ -1307,9 +1307,9 @@ the table above is `B2`/`W3`: a one-byte-`PP` defect then shows on scratch, neve
 ### 6.4 The password a card sets (ruled 2026-10-23; the DoD as amended)
 
 讀 `tools/console-capture.py` writes every `--send` into the committed `.meta.json` as `sent` and
-`sent_hex` (`tools/console-capture.py:518-519`, `:761-762`), and `cfgstore passwd` leaves the
-tty's echo on — it only prints a prompt when `isatty` (`src/cfgstore/main.c:592-593`) — so the
-password would also be in the capture's text.
+`sent_hex` (`tools/console-capture.py:518-519`, `:761-762`). 🔄 2026-10-24: `cfgstore passwd` now
+turns a tty's echo off and reads the mode back before reading, refusing with 3 if echo stays on
+(`src/cfgstore/main.c:621-634`); `test_cli` shows it on a pty, permitting and refusing.
 
 **Chosen: a disposable password, declared on the card and its publication accepted by the owner
 in writing, which the same seating destroys.** The card's last writes are W8 and W9 (§ 6.3), which

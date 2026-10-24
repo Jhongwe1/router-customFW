@@ -7,16 +7,24 @@
  * census.  stdout and stderr go to a scratch file and are read back, so a case
  * can assert on what was printed as well as on the status.
  *
- * argv[1] the cfgstore binary, argv[2] a scratch directory.
+ * argv[1] the cfgstore binary, argv[2] a scratch directory, argv[3]
+ * cfgstore-tty (main.c with tcsetattr wrapped by ttyfault.c).
  */
 
+#define _GNU_SOURCE	/* posix_openpt, grantpt, unlockpt, ptsname */
+
+#include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "test_util.h"
@@ -25,6 +33,7 @@
 #define OUT_MAX   65536
 
 static char g_bin[PATH_MAX_];
+static char g_ttybin[PATH_MAX_];
 static char g_store[PATH_MAX_];
 static char g_out[PATH_MAX_];
 static char g_in[PATH_MAX_];
@@ -94,15 +103,223 @@ static void show_out(void)
 #define A1(v, a)		 { NULL, (char *)"--file", g_store, (char *)v, (char *)a, NULL }
 #define A2(v, a, b)		 { NULL, (char *)"--file", g_store, (char *)v, (char *)a, (char *)b, NULL }
 
+/* ------------------------------------------------------------------------- */
+/* The pty: what the console shows (notes/self-update.md § 6.4).  The child's  */
+/* stdin, stdout and stderr are the slave, so every byte the line discipline  */
+/* echoes and every byte the program prints is read from the master.          */
+/* ------------------------------------------------------------------------- */
+
+static int pty_open(int *master, int *slave)
+{
+	char *name;
+
+	*master = posix_openpt(O_RDWR | O_NOCTTY);
+	if (*master < 0)
+		return -1;
+	if (grantpt(*master) != 0 || unlockpt(*master) != 0)
+		return -1;
+	name = ptsname(*master);
+	if (name == NULL)
+		return -1;
+	*slave = open(name, O_RDWR | O_NOCTTY);
+	return *slave < 0 ? -1 : 0;
+}
+
+/* Read the master into buf (appending) until `want` appears, the timeout
+ * passes or the master reports an end.  1 when found. */
+static int pty_until(int master, char *buf, size_t cap, size_t *len,
+		     const char *want, int timeout_ms)
+{
+	struct pollfd p;
+
+	for (;;) {
+		ssize_t r;
+
+		buf[*len] = '\0';
+		if (want != NULL && strstr(buf, want) != NULL)
+			return 1;
+		p.fd = master;
+		p.events = POLLIN;
+		p.revents = 0;
+		if (poll(&p, 1, timeout_ms) <= 0)
+			return 0;
+		if (*len + 1 >= cap)
+			return 0;
+		r = read(master, buf + *len, cap - 1 - *len);
+		if (r <= 0)
+			return 0;
+		*len += (size_t)r;
+	}
+}
+
+/* waitpid with a deadline: a child still reading the console after a refusal
+ * is killed and reported, not waited for.  1 when it exited (st set). */
+static int wait_bounded(pid_t pid, int ms, int *st)
+{
+	struct timespec ts;
+	int waited = 0;
+
+	ts.tv_sec = 0;
+	ts.tv_nsec = 10L * 1000000L;
+	for (;;) {
+		pid_t r = waitpid(pid, st, WNOHANG);
+
+		if (r == pid)
+			return 1;
+		if (r < 0)
+			return 0;
+		if (waited >= ms) {
+			(void)kill(pid, SIGKILL);
+			(void)waitpid(pid, st, 0);
+			return 0;
+		}
+		(void)nanosleep(&ts, NULL);
+		waited += 10;
+	}
+}
+
+/* bin on the pty, CFGSTORE_TTYFAULT set to fault (or unset). */
+static pid_t spawn_tty(const char *bin, char **argv, int master, int slave,
+		       const char *fault)
+{
+	pid_t pid = fork();
+
+	if (pid != 0)
+		return pid;
+	(void)close(master);
+	if (fault != NULL)
+		(void)setenv("CFGSTORE_TTYFAULT", fault, 1);
+	else
+		(void)unsetenv("CFGSTORE_TTYFAULT");
+	if (dup2(slave, 0) < 0 || dup2(slave, 1) < 0 || dup2(slave, 2) < 0)
+		_exit(126);
+	argv[0] = (char *)bin;
+	execv(bin, argv);
+	_exit(127);
+}
+
+static size_t read_file(const char *path, char *buf, size_t cap)
+{
+	FILE *f = fopen(path, "rb");
+	size_t n;
+
+	if (f == NULL)
+		return 0;
+	n = fread(buf, 1, cap, f);
+	fclose(f);
+	return n;
+}
+
+static int echo_is_on(int fd)
+{
+	struct termios t;
+
+	return tcgetattr(fd, &t) == 0 && (t.c_lflag & (tcflag_t)ECHO) != 0;
+}
+
+static void t_passwd_tty(void)
+{
+	static char buf[OUT_MAX], before[3 * 4096], after[3 * 4096];
+	static const char *const fault[2] = { "fail", "keep" };
+	char *a[] = A0("passwd");
+	const char *bin[2];
+	size_t len = 0, nb, na;
+	int master = -1, slave = -1, st = -1, ok, k;
+	pid_t pid;
+	ssize_t w;
+
+	T_GROUP("passwd on a tty: echo off, read back");
+	if (pty_open(&master, &slave) != 0) {
+		CHECK(0, "a pty: errno %d", errno);
+		return;
+	}
+
+	/* The control: with echo on, a canary typed is seen on the master. */
+	CHECK(echo_is_on(slave), "the pty starts with echo on");
+	w = write(master, "canary-0451\n", 12);
+	(void)w;
+	CHECK(pty_until(master, buf, sizeof buf, &len, "canary-0451", 2000) == 1,
+	      "the control: a canary typed with echo on is seen on the master");
+	{
+		char sink[64];
+
+		w = read(slave, sink, sizeof sink);	/* consume the line */
+		(void)w;
+	}
+
+	/* Permitting, on the real binary and on cfgstore-tty with no fault:
+	 * the prompt, the password typed after it, and the password nowhere in
+	 * what the console showed.  The read comes before the entropy draw, so
+	 * the property holds whichever way the pool answers (0 or 3). */
+	bin[0] = g_bin;
+	bin[1] = g_ttybin;
+	for (k = 0; k < 2; k++) {
+		len = 0;
+		pid = spawn_tty(bin[k], a, master, slave, NULL);
+		CHECK(pid > 0, "fork: errno %d", errno);
+		ok = pid > 0 ? pty_until(master, buf, sizeof buf, &len,
+					 "new password: ", 5000) : 0;
+		CHECK(ok == 1, "%s: the prompt", bin[k]);
+		w = write(master, "hunter2-secret\n", 15);
+		(void)w;
+		ok = pid > 0 ? wait_bounded(pid, 30000, &st) : 0;
+		(void)pty_until(master, buf, sizeof buf, &len, NULL, 200);
+		CHECK(ok == 1 && WIFEXITED(st) &&
+		      (WEXITSTATUS(st) == 0 || WEXITSTATUS(st) == 3),
+		      "%s: passwd on a tty exits 0 or 3, got %d", bin[k],
+		      (ok == 1 && WIFEXITED(st)) ? WEXITSTATUS(st) : -1);
+		CHECK(strstr(buf, "admin.pwhash set") != NULL ||
+		      strstr(buf, "entropy_avail") != NULL,
+		      "%s: and it read the line and went on", bin[k]);
+		CHECK(strstr(buf, "hunter2") == NULL,
+		      "%s: the password is nowhere in what the console showed",
+		      bin[k]);
+		if (strstr(buf, "hunter2") != NULL)
+			printf("      the console showed:\n%s\n", buf);
+		CHECK(echo_is_on(slave), "%s: echo is back on afterwards", bin[k]);
+	}
+
+	/* Refusing: tcsetattr fails, or answers 0 and leaves echo on.  No
+	 * password is read -- a child that went on to read would sit on the
+	 * console until the deadline -- and the store's bytes do not move. */
+	for (k = 0; k < 2; k++) {
+		nb = read_file(g_store, before, sizeof before);
+		len = 0;
+		pid = spawn_tty(g_ttybin, a, master, slave, fault[k]);
+		CHECK(pid > 0, "fork: errno %d", errno);
+		ok = pid > 0 ? wait_bounded(pid, 5000, &st) : 0;
+		CHECK(ok == 1, "%s: the step exited within 5 s (not reading)",
+		      fault[k]);
+		CHECK(ok == 1 && WIFEXITED(st) && WEXITSTATUS(st) == 3,
+		      "%s: refused with 3, got %d", fault[k],
+		      (ok == 1 && WIFEXITED(st)) ? WEXITSTATUS(st) : -1);
+		(void)pty_until(master, buf, sizeof buf, &len, NULL, 200);
+		CHECK(strstr(buf, "the tty's echo could not be turned off") !=
+		      NULL, "%s: and said why", fault[k]);
+		CHECK(strstr(buf, "new password: ") == NULL,
+		      "%s: and asked for nothing", fault[k]);
+		na = read_file(g_store, after, sizeof after);
+		CHECK(nb > 0 && na == nb && memcmp(before, after, nb) == 0,
+		      "%s: the store's bytes are unchanged", fault[k]);
+		CHECK(echo_is_on(slave), "%s: echo is on afterwards", fault[k]);
+	}
+
+	(void)close(slave);
+	(void)close(master);
+}
+
 int main(int argc, char **argv)
 {
 	int rc;
 
-	if (argc < 3) {
-		fputs("usage: test_cli <cfgstore binary> <scratch dir>\n", stderr);
+	if (argc < 4) {
+		fputs("usage: test_cli <cfgstore binary> <scratch dir>"
+		      " <cfgstore-tty binary>\n", stderr);
 		return 2;
 	}
+	(void)signal(SIGPIPE, SIG_IGN);
 	snprintf(g_bin, sizeof g_bin, "%s", argv[1]);
+	snprintf(g_ttybin, sizeof g_ttybin, "%s", argv[3]);
 	snprintf(g_store, sizeof g_store, "%s/test_cli_store.bin", argv[2]);
 	snprintf(g_out, sizeof g_out, "%s/test_cli_out.txt", argv[2]);
 	snprintf(g_in, sizeof g_in, "%s/test_cli_in.txt", argv[2]);
@@ -351,6 +568,8 @@ int main(int argc, char **argv)
 		rc = run(d, NULL);
 		CHECK(rc == 0, "dump still works, got %d", rc);
 	}
+
+	t_passwd_tty();
 
 	T_GROUP("an unwritable store is 3, not 0");
 	{

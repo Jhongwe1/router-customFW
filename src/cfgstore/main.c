@@ -20,7 +20,8 @@
  *   0  ok
  *   1  usage: no such verb, a missing operand, an argument without `=`
  *   2  invalid value, and the message names the key
- *   3  I/O, and -- see `cmd_passwd` -- the KDF being absent
+ *   3  I/O, and -- see `cmd_passwd` -- the KDF being absent, or a tty whose
+ *      echo could not be turned off
  *   4  the store is there and neither slot is a valid record
  *
  * An unknown KEY NAME exits 2, not 1: the code that names a key is the one a
@@ -43,6 +44,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include "cfg.h"
@@ -545,11 +547,36 @@ static int read_line(char *buf, size_t cap, size_t *len)
 	return 0;
 }
 
+/* Echo off on a tty (notes/self-update.md § 6.4), the sequence of
+ * src/init/firstpw.c fp_echo_off: TCSAFLUSH drops what was typed before the
+ * prompt, and the mode is READ BACK before the first byte is read, because
+ * tcsetattr() returns 0 when any one of the requested changes took (POSIX).
+ * -1: echo could not be shown off, and the mode is as it was. */
+static int echo_off(int fd, struct termios *saved)
+{
+	struct termios t;
+
+	if (tcgetattr(fd, saved) != 0)
+		return -1;
+	t = *saved;
+	t.c_lflag &= ~(tcflag_t)(ECHO | ECHOE | ECHOK | ECHONL);
+	t.c_lflag |= (tcflag_t)ICANON;
+	if (tcsetattr(fd, TCSAFLUSH, &t) != 0)
+		goto undo;
+	if (tcgetattr(fd, &t) != 0 || (t.c_lflag & (tcflag_t)ECHO) != 0)
+		goto undo;
+	return 0;
+undo:
+	(void)tcsetattr(fd, TCSANOW, saved);
+	return -1;
+}
+
 static int cmd_passwd(int argc, char **argv)
 {
 	char pw[CFGSTORE_PW_MAX + 1];
+	struct termios saved;
 	size_t pwlen = 0;
-	int rc;
+	int rc, tty;
 
 	(void)argv;
 	if (argc != 0) {
@@ -588,10 +615,24 @@ static int cmd_passwd(int argc, char **argv)
 	 *
 	 * The password is read ONCE, from stdin, exactly as the code above was
 	 * written to do; there is no confirmation prompt, and `dump` is how an
-	 * operator checks that a hash landed. */
-	if (isatty(STDIN_FILENO))
+	 * operator checks that a hash landed.  On a tty, with echo off: a pipe
+	 * echoes nothing and is read as it is. */
+	memset(&saved, 0, sizeof saved);
+	tty = isatty(STDIN_FILENO);
+	if (tty) {
+		if (echo_off(STDIN_FILENO, &saved) != 0) {
+			fputs("cfgstore: passwd: REFUSED -- the tty's echo could not "
+			      "be turned off, so no password is read; nothing was "
+			      "written\n", stderr);
+			return EX_IO;
+		}
 		fputs("new password: ", stderr);
+	}
 	rc = read_line(pw, sizeof pw, &pwlen);
+	if (tty) {
+		(void)tcsetattr(STDIN_FILENO, TCSANOW, &saved);
+		fputs("\n", stderr);	/* the Enter was not echoed */
+	}
 	if (rc == -2) {
 		fprintf(stderr, "cfgstore: passwd: longer than %d bytes\n",
 			CFGSTORE_PW_MAX);

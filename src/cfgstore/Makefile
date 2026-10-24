@@ -107,7 +107,7 @@ SIMK_DEPS   := $(KDEV)/rtl819x-spi-install.h $(KDEV)/rtl819x-spi-wrpolicy.h
 # deletes it after the link, so every invocation is a full rebuild.
 .SECONDARY:
 
-host: $(HOSTOUT)/$(PROG) $(HOSTOUT)/$(PROG)-sim $(TESTBINS)
+host: $(HOSTOUT)/$(PROG) $(HOSTOUT)/$(PROG)-sim $(HOSTOUT)/$(PROG)-tty $(TESTBINS)
 
 $(HOSTOBJ)/%.o: $(RLXLIB_DIR)/%.c $(HOSTDEPS)
 	@mkdir -p $(@D)
@@ -142,6 +142,14 @@ $(HOSTOUT)/$(PROG)-sim: $(HOSTLIBO) $(HOSTOBJ)/main.o $(HOSTOBJ)/simkern.o
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(HOSTLIBO) $(HOSTOBJ)/main.o \
 	    $(HOSTOBJ)/simkern.o $(SIMK_WRAP)
 
+# cfgstore-tty: main.c with tcsetattr wrapped by ttyfault.c, which test_cli
+# runs on a pty to show `passwd`'s echo guard refusing.  ttyfault.o is in no
+# target list.
+$(HOSTOUT)/$(PROG)-tty: $(HOSTLIBO) $(HOSTOBJ)/main.o $(HOSTOBJ)/ttyfault.o
+	@mkdir -p $(@D)
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $(HOSTLIBO) $(HOSTOBJ)/main.o \
+	    $(HOSTOBJ)/ttyfault.o -Wl,--wrap=tcsetattr
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -164,7 +172,7 @@ check-one: host
 	@set -e; ran=0; for t in $(TESTNAMES); do \
 	   case $$t in \
 	     test_cfg|test_spictl) set -- $(HOSTOUT) ;; \
-	     test_cli) set -- $(HOSTOUT)/$(PROG) $(HOSTOUT) ;; \
+	     test_cli) set -- $(HOSTOUT)/$(PROG) $(HOSTOUT) $(HOSTOUT)/$(PROG)-tty ;; \
 	     test_flash) set -- $(HOSTOUT) $(HOSTOUT)/$(PROG)-sim ;; \
 	     *)        set -- ;; \
 	   esac; \
