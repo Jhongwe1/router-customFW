@@ -1,0 +1,7 @@
+cat /proc/uptime /proc/rlxfw-boot ; cat /proc/rtl819x-spi-inst | busybox grep -E ^n_writes\|^inst_attempts\|^img_len
+965.20 901.11
+slot B ver 6
+n_writes 0
+img_len 0
+inst_attempts 0
+# 

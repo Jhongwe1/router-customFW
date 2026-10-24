@@ -1,0 +1,5 @@
+start 2026-10-25 00:16:00
+login: HTTP 200
+csrf from rlxc: 32 characters
+upload U.rlxu 1141920 B sha256 1e521f0f...63a34a6e: curl_rc=0 HTTP 200  body {"ok":true,"slot":"A","version":7}  wall 10.38 s
+end 2026-10-25 00:16:11

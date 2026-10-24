@@ -1,0 +1,4 @@
+cat /proc/uptime /proc/rlxfw-boot
+15.56 9.95
+none
+# 

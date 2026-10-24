@@ -5781,3 +5781,14 @@ same arithmetic sees that. So neither the kernel nor the console stalled.
 **The lesson**: a file another operating system is writing is read through the writer. The size
 Windows showed for a file under `\\wsl.localhost` while WSL appended to it was not the file's
 size; the capture's own `.timing` was the instrument, and it was read only afterwards.
+
+### 30.7 Flood loss after a RAM boot (`FW-273`)
+
+量 2026-10-24/25, `ping -f -c 6000` from the host: no loss on four flash boots — V at about 305 s
+of uptime (`bench/2026-10-24/W5-06`), V about 25 s after a cold boot (`bench/2026-10-24/C1-03`)
+and soon after a warm one (`bench/2026-10-25/W6-02`), U at about 140 s (`W9-06`) — and 1,132 lost (18.87 %, 22.4 s)
+on V booted from RAM through the loader at about 15–38 s (`R6-03`), 515 (8.58 %, 12.9 s) on the
+shell-less U from RAM at about 34–48 s (`P12-03`). 推, two candidates, neither measured: the loader's
+own use of the NIC before the jump leaves state a RAM boot inherits, or the time since boot. Two
+RAM floods against four flash ones are an observation, not a rate; what settles it is one image
+booted both ways and flooded at matched uptimes.

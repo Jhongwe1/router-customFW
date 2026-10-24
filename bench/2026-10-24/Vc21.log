@@ -1,0 +1,30 @@
+  ==>   autoburn off   (the switch that decides whether an upload reaches flash)
+        'AUTOBURN: 0' -> Unknown command !
+  ok    the form this loader accepts is 'AUTOBURN 0'
+        AUTOBURN 0
+        AutoBurning=0
+        <RealTek>
+  ok    autoburn is off
+  ==>   LOADADDR 81800000   (where an upload lands, and where a read is served from)
+        'LOADADDR: 81800000' -> Unknown command !
+  ok    the form this loader accepts is 'LOADADDR 81800000'
+        LOADADDR 81800000
+        Set TFTP Load Addr 0x81800000
+        <RealTek>
+  ok    the loader reports its TFTP load address as 0x81800000
+  ==>   IPCONFIG 10.1.1.1
+        'IPCONFIG:10.1.1.1' -> Unknown command !
+  ok    the form this loader accepts is 'IPCONFIG 10.1.1.1'
+        IPCONFIG 10.1.1.1
+        Now your Target IP is 10.1.1.1
+        <RealTek>
+  ok    the loader reports 10.1.1.1
+
+  ==>   ping will NOT answer, and that is not a failure.
+        This loader implements TFTP and no ICMP at all, measured 2026-08-17.
+        What does show the link is live, none of it needing an upload:
+          * arp -n 10.1.1.1  resolves
+          * the host interface's rx_packets counter moves
+          * a TFTP read request comes back with DATA
+        Entering rescue mode is the whole of what P9-3 asks. Nothing is uploaded.
+  ok    transcript -> bench/2026-10-24/Vc21-rescue.json

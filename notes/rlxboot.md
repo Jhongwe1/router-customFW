@@ -683,7 +683,7 @@ forms `0x81700000` at all, with the RAM image as the control that the census can
 see it: 量, in the `s124/f` build logs, **0** census rows naming it in the slots
 image and **2** in the RAM image. `RLXBOOT-CTRSRC flash` is therefore a
 constant in the slots build. ⚠️ The flash source itself stays 推: § 10 says why
-an undecoded window and an erased region both give counter 0.
+an undecoded window and an erased region both give counter 0. 🔄 2026-10-25, 量, settled: after `W3` programmed six bits at `0x3F0000` and the kernel's PIO read-back gave `ctr_read 6`, `rlxboot` printed `ctr=6` on the next boot (`bench/2026-10-24/B3-01`), and `ctr=7` after `W7` (`bench/2026-10-25/K1-20`) — two paths reading one byte, one value (`notes/self-update.md` § 9).
 
 ### The test runners could not fail
 

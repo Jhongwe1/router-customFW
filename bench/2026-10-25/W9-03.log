@@ -1,0 +1,8 @@
+cfgstore show | busybox head -3 ; cat /proc/rtl819x-spi-inst | busybox grep -E ^n_writes
+head: invalid option -- 3
+BusyBox v1.13.4 (2026-09-01 00:00:00 UTC) multi-call binary
+
+Usage: head [OPTION]... [FILE]...
+
+n_writes 32
+# 

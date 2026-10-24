@@ -1,0 +1,8 @@
+echo erase cfg0 > /proc/rtl819RxL-spiX
+FW-SI-GO erase cfg0 len=0 pace=0
+RLXFW-SI E 00 390
+RLXFW-SI V 00 460
+RLXFW-SI-END OK rc=0 cmp=1 ms=460 pace=0
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+# 

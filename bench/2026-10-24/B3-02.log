@@ -1,0 +1,17 @@
+cat /proc/rlxfw-boot ; cat /proc/rtl819x-spi-inst | busybox grep -E ^n_writes\|^ctr_
+slot B ver 6
+n_writes 0
+ctr_attempts 1
+ctr_done 1
+ctr_refused 0
+ctr_failed 0
+ctr_ran 1
+ctr_reason OK
+ctr_cur 6
+ctr_malformed 0
+ctr_new 6
+ctr_read 6
+ctr_pp 0
+ctr_ms 0
+ctr_truncated 0
+# 

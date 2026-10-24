@@ -1,0 +1,75 @@
+echo ctrloop show > /proc/rtl819x-spi ; cat /proc/rtl819x-spi-inst
+ctrscratch value=0 malformed=0 erased=1
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+n_writes 12292
+inst_version rtl819x-spi-install 1.2
+img_cap 1179648
+img_len 0
+img_writes 0
+img_resets 0
+img_err none
+inst_attempts 0
+inst_done 0
+inst_refused 0
+inst_failed 0
+inst_ran 0
+inst_verb -
+inst_region -
+inst_base 000000
+inst_size 0
+inst_len 0
+inst_paced 0
+inst_pace_ms 0
+inst_reason OK
+inst_rc 0
+inst_policy 0
+inst_arm_ok 0
+inst_sha_checked 0
+inst_sha_ok 0
+inst_hdr_checked 0
+inst_hdr_ok 0
+inst_erase_op 20
+inst_erase_step 4096
+inst_ops 0
+inst_ops_planned 0
+inst_n_se 0
+inst_n_pp 0
+inst_erased 0
+inst_programmed 0
+inst_committed 0
+inst_phase -
+inst_cmp_ran 0
+inst_cmp_ok 0
+inst_cmp_bytes 0
+inst_cmp_diff 0
+inst_cmp_first -1
+inst_ms 0
+eraseprobe se_bytes=-1 se_polls=0 se_us=0 pp_us=0 clean=-1
+eraseprobe_detail ran=0 m0000=- m1000=- m8000=- se_jiffies=0 pp_polls=0 pp_jiffies=0 cal_polls=0 cal_ticks=0 clean_step=0 clean_ops=0
+inst_truncated 0
+ctr_attempts 0
+ctr_done 0
+ctr_refused 0
+ctr_failed 0
+ctr_ran 0
+ctr_reason OK
+ctr_cur 0
+ctr_malformed 0
+ctr_new 0
+ctr_read 0
+ctr_pp 0
+ctr_ms 0
+loop_ran 1
+loop_reason OK
+loop_passes 3
+loop_done 3
+loop_ops 12292
+loop_ms 790
+ctrscratch_shows 2
+ctrscratch_rc 0
+ctrscratch_value 0
+ctrscratch_malformed 0
+ctrscratch_erased 1
+ctr_truncated 0
+# 

@@ -1,0 +1,15 @@
+brokerd: UPDATE_BEGIN total 1110176 dest A
+brokerd: UPDATE flash: A rollback ver 5, B ok ver 6, ctr 6, running B ver 6
+brokerd: UPDATE refused: rollback
+brokerd: UPDATE_BEGIN total 1141920 dest A
+brokerd: UPDATE flash: A rollback ver 5, B ok ver 6, ctr 6, running B ver 6
+brokerd: UPDATE refused: flash_match
+brokerd: UPDATE_BEGIN total 1141920 dest A
+brokerd: UPDATE flash: A rollback ver 5, B ok ver 6, ctr 6, running B ver 6
+brokerd: UPDATE refused: sig
+brokerd: UPDATE_BEGIN total 1141920 dest A
+brokerd: UPDATE flash: A rollback ver 5, B ok ver 6, ctr 6, running B ver 6
+brokerd: UPDATE refused: digest
+brokerd: UPDATE_BEGIN total 1141920 dest A
+brokerd: UPDATE flash: A rollback ver 5, B ok ver 6, ctr 6, running B ver 6
+brokerd: UPDATE refused: sig

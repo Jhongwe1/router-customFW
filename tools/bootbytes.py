@@ -330,6 +330,34 @@ CUT_SHORT = {
     "bench/2026-10-08c/R02-boot.log": 2008,
 }
 
+#: Images whose boot console this model does not cover, each NAMED by the
+#: `RLXFW-ID0=` it prints -- a name, never a pattern.  量 2026-10-24/25
+#: (`P6r-10`'s bench day): one image read two remainders on two RAM boots --
+#: e7f77c95 1803 (`bench/2026-10-24/C4-02-boot.log`) and 1724
+#: (`bench/2026-10-25/R6-02-boot.log`); 495094ab 2348 (`P12-02-boot.log`) and
+#: 1943 (`P13-02-boot.log`) -- because their userspace races on the console:
+#: dnsfwd reaching brokerd's socket before it exists adds three lines (`FAILING
+#: CLOSED`, its exit, its restart), the bench shell's prompt can come before
+#: the daemons' lines so `--boot-until` stops the capture mid-line, and the
+#: kernel's marks interleave with /init's lines differently on each boot.  A
+#: table of constants cannot hold an image whose remainder is not one; these
+#: captures leave the population, and K11 holds each row to being needed.
+#: 🔴 A row is not a way to make K2 green for an image the model does cover.
+OUT_OF_MODEL = {
+    "E7F77C95": "P6r-10's V, the bench build (BENCH_SHELL=1), recipe e7f77c95",
+    "1029BEAA": "V-armed, V's tree with nc and no mtd nodes, recipe 1029beaa: "
+                "its cfgflash read errors are one more racing writer",
+    "495094AB": "U, recipe 495094ab, in both shapes, which print one "
+                "RLXFW-ID0 (docs/known-issues/v1.0.md): the bench build and "
+                "the shell-less one, whose firstpw prompt is another",
+}
+
+
+def image_id(blob):
+    """The `RLXFW-ID0=` a capture printed, or None."""
+    m = ID0_LINE.search(blob)
+    return m.group(1).decode() if m else None
+
 #: Ash's reply to the capture tool's input, as the capture reads once the
 #: echoed ESCs are taken out: the tool's CR echoed, `sh: <the ESCs>: not
 #: found`, and the prompt ash prints after it.  See ASH'S REPLY TO THAT INPUT.
@@ -631,6 +659,10 @@ def check():
     # reads it, and only K10 reads them (see CUT_SHORT).
     cut = [(p, b, m) for p, b, m in accepted if rel(p) in CUT_SHORT]
     accepted = [(p, b, m) for p, b, m in accepted if rel(p) not in CUT_SHORT]
+    # The named images outside the model leave it next; only K11 reads them.
+    out = [(p, b, m) for p, b, m in accepted if image_id(b) in OUT_OF_MODEL]
+    accepted = [(p, b, m) for p, b, m in accepted
+                if image_id(b) not in OUT_OF_MODEL]
     consts, n, biggest = {}, 0, 0
     # K7's partition and its width histogram.  🔴 The partition is defined by
     # the PRESENCE of the vendor field, never by its width and never by the
@@ -858,6 +890,34 @@ def check():
                               if good else
                               "a named cut-short capture does not fit its row: "
                               "%s" % "; ".join(bad)))
+    ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
+
+    # K11: each OUT_OF_MODEL row held to being needed.  Its image must be in
+    # the corpus (a row for an image with no capture goes red), and at least
+    # one of its captures must land off the declared table -- if every one
+    # lands on it, the model covers the image and the row must go.
+    by_id = {}
+    for p, b, m in out:
+        by_id.setdefault(image_id(b), []).append(normalised_const(b, m))
+    bad, seen = [], []
+    for iid in sorted(OUT_OF_MODEL):
+        vals = by_id.get(iid, [])
+        off = [v for v in vals if v not in DECLARED_CONSTS]
+        if not vals:
+            bad.append("%s has no boot capture" % iid)
+            continue
+        seen.append("%s %d capture(s), %d off the table, reading %s"
+                    % (iid, len(vals), len(off), sorted(set(vals))))
+        if not off:
+            bad.append("%s: every capture lands on a declared constant, so "
+                       "the model covers it and the row must go" % iid)
+    good = not bad
+    print("  %s  %-10s %s" % ("ok  " if good else "FAIL", "K11",
+                              "every image outside the model still needs its "
+                              "row: %s" % "; ".join(seen)
+                              if good else
+                              "an OUT_OF_MODEL row is not needed: %s"
+                              % "; ".join(bad)))
     ok, fails = (ok + 1, fails) if good else (ok, fails + 1)
 
     # Observation, deliberately carrying NO assertion.  What the gate rejected

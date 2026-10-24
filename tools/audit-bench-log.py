@@ -405,6 +405,23 @@ _C23 = (
     "The capture is a frozen record and is never edited (CLAUDE.md); the "
     "exemption is by name, and control A4 turns it red the day the line "
     "stops producing the hit")
+#: 🆕 2026-10-25 (s147): `P6r-10`/`P6r-12`'s bench day.  The SSID/passphrase
+#: pattern fires on the WORD `password` in the bench image's own prompts and in
+#: console-capture's record of the `--until` that waited for one; the disposable
+#: password was typed after the prompt with the tty's echo off and is in no
+#: `.log` of either directory.  The home-path pattern fires on the video card's
+#: host cells, which copy a capture to a work directory outside the repository
+#: and read it back.
+_S147P = (
+    "the bench image's own prompt (`cfgstore passwd`, src/cfgstore/main.c; "
+    "`firstpw`, src/init/firstpw.c) or console-capture's record of the "
+    "`--until` that waited for it: the word, never a password. The exemption "
+    "is by name, and control A4 turns it red the day the line stops "
+    "producing the hit")
+_S147H = (
+    "a host cell of the P5e-6 video card: banner2.py copies a capture to a "
+    "work directory outside the repository and bootslot judge reads the copy; "
+    "this workstation's path, nothing of the unit's. By name, held by A4")
 FILE_EXEMPT = [
     ("bench/2026-09-30/R78-iu1.log", "private IPv4", "10.9.9",
      "ip=10.9.9.9 subnet=255.255.255.0 router=10.9.9.1 dns=10.9.9.53 "
@@ -449,6 +466,33 @@ FILE_EXEMPT = [
      "serial number. The row's SSDP half is UDP and outside this instrumen"
      "t.\",",
      _C23),
+    ("bench/2026-10-24/Vc32.log", "home path / user", _HOME_KEY,
+     "banner2: bench/2026-10-24/Vc31.log: banners build=6395889d at byte 41 "
+     "and build=127a71cf at byte 376; wrote " + _HOME_KEY + "/fwre-work/"
+     "rebuild/video/2026-10-24/Vc31-flash.log, 3781 of 4156 bytes, from byte 375",
+     _S147H),
+    ("bench/2026-10-24/Vc33.log", "home path / user", _HOME_KEY,
+     "bootslot 1.1: " + _HOME_KEY + "/fwre-work/rebuild/video/2026-10-24/"
+     "Vc31-flash.log (rlxboot build 127a71cf, banner line 2)",
+     _S147H),
+    ("bench/2026-10-24/W5-01.log", "SSID / passphrase", "password",
+     "new password:", _S147P),
+    ("bench/2026-10-24/W5-01.meta.json", "SSID / passphrase", "password",
+     '"until": "new password: ",', _S147P),
+    ("bench/2026-10-24/W5-08.log", "SSID / passphrase", "password",
+     "new password:", _S147P),
+    ("bench/2026-10-24/W5-08.meta.json", "SSID / passphrase", "password",
+     '"until": "new password: ",', _S147P),
+    ("bench/2026-10-25/P12-02-boot.log", "SSID / passphrase", "password",
+     "rlxfw: firstpw: no admin password is set; set one on this console "
+     "(8..64 bytes, not echoed)", _S147P),
+    ("bench/2026-10-25/P12-02-boot.log", "SSID / passphrase", "password",
+     "rlxfw: init: first-password step forked pid=17", _S147P),
+    ("bench/2026-10-25/P12-02-boot.log", "SSID / passphrase", "password",
+     "rlxfw: firstpw: new password:", _S147P),
+    ("bench/2026-10-25/P12-02-boot.meta.json", "SSID / passphrase", "password",
+     '"until": "firstpw: new password: |Booting[.][.][.]|---RealTek",',
+     _S147P),
 ]
 
 ROOT = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))

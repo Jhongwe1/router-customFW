@@ -1,0 +1,9 @@
+start 2026-10-25 00:05:15
+login: HTTP 200
+csrf from rlxc: 32 characters
+upload T.rlxu 1110176 B sha256 113f5542...eacc9ba8: curl_rc=0 HTTP 400  body {"ok":false,"error":"update","reason":"rollback"}  wall 11.03 s
+upload V.rlxu 1141920 B sha256 9fd0bb8f...44c71e8d: curl_rc=0 HTTP 400  body {"ok":false,"error":"update","reason":"flash_match"}  wall 9.83 s
+upload U-dev.rlxu 1141920 B sha256 aaa6e495...dee14f4a: curl_rc=0 HTTP 400  body {"ok":false,"error":"update","reason":"sig"}  wall 10.25 s
+upload U-payflip.rlxu 1141920 B sha256 857a9f98...85123434: curl_rc=0 HTTP 400  body {"ok":false,"error":"update","reason":"digest"}  wall 11.23 s
+upload U-hdrflip.rlxu 1141920 B sha256 29c7c77b...e92f1b5a: curl_rc=0 HTTP 400  body {"ok":false,"error":"update","reason":"sig"}  wall 10.25 s
+end 2026-10-25 00:06:09

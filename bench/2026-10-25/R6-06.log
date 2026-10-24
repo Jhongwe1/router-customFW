@@ -1,0 +1,5 @@
+start 2026-10-25 00:12:03
+login: HTTP 200
+csrf from rlxc: 32 characters
+upload U.rlxu 1141920 B sha256 1e521f0f...63a34a6e: curl_rc=0 HTTP 400  body {"ok":false,"error":"update","reason":"handoff"}  wall 0.06 s
+end 2026-10-25 00:12:04

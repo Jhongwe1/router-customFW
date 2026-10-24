@@ -1,0 +1,4 @@
+
+cfgstore: passwd: REFUSED -- the kernel entropy pool is not ready
+  entropy_avail = 0, 128 needed (pool too small).  Nothing was written.
+# 

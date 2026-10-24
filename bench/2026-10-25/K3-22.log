@@ -1,0 +1,9 @@
+cat /proc/rtl819x-spi-inst | busybox grep -E ^n_writes\|^ctrscr\|^ctr_cur
+n_writes 0
+ctr_cur 7
+ctrscratch_shows 2
+ctrscratch_rc 0
+ctrscratch_value 2524
+ctrscratch_malformed 0
+ctrscratch_erased 0
+# 

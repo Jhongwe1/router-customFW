@@ -1,0 +1,4 @@
+busybox grep Uid /proc/13/status /proc/14/status
+/proc/13/status:Uid:	100	100	100	100
+/proc/14/status:Uid:	101	101	101	101
+# 

@@ -1,0 +1,14 @@
+cat /proc/uptime /proc/sys/kernel/random/entropy_avail /proc/rlxfw-entropy
+304.99 297.79
+0
+rlxfw-entropy 1.0
+alive 1 probe_reads 3 tc0data 00007D00 cdbr 03E80000 tccnr F0000000
+per_bit 16 hz 100
+ev_nic 0
+qualifying 0
+repeat 0
+acc 0 nseen 0
+bits 0
+clamped 0
+early 0 badsrc 0
+# 

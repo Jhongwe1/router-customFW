@@ -1,0 +1,6 @@
+echo erase cfg1 > /procR/LrXtlF8W1-9SxI-sp-iGO
+ erase cfg1 len=0 pace=0
+RLXFW-SI E 00 410
+RLXFW-SI V 00 470
+RLXFW-SI-END OK rc=0 cmp=1 ms=480 pace=0
+RLXFW

@@ -1,0 +1,8 @@
+start 2026-10-24 23:50:18
+PING 10.1.1.1 (10.1.1.1) 56(84) bytes of data.
+
+--- 10.1.1.1 ping statistics ---
+6000 packets transmitted, 6000 received, 0% packet loss, time 4868ms
+rtt min/avg/max/mdev = 0.627/0.757/2.547/0.083 ms, ipg/ewma 0.811/0.838 ms
+ping_rc=0
+end 2026-10-24 23:50:23

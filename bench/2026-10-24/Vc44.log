@@ -1,0 +1,3 @@
+ls -l /proc/13/root
+lrwxrwxrwx    1 root     root            0 Jan  1 00:00 /proc/13/root -> /srv/www
+# 

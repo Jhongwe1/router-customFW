@@ -721,6 +721,12 @@ are not counted in `ctr_attempts`, and every dispatched verb, `show` included, e
 records its errno and clears the three values. For `ctr` itself: `SAME` prints no GO line, and
 `ctr_read` is step 7's read-back, `cur` for `SAME`, else 0.
 
+🔄 2026-10-25, 量 on the die (`SPEC.md` `FW-270`): a pass takes about 0.25 s, not the 推 2 s —
+`ctrloop 3` on V from RAM read `loop_ms 790`, `n_writes 12292` (`bench/2026-10-24/C4-08`), and on U
+the 56th pass reached `bit=2304` at 13,810 ms (`bench/2026-10-25/K3-10`). So `ctrloop 30` lasts
+about 8 s, short of a hand-timed cut's 40 s window, and K3 (§ 6.5) ran four rounds of `arm` and
+`ctrloop 64` instead. An equal advance (`SAME`) reads `ctr_reason OK` with `ctr_pp 0`.
+
 ### 2.8 Host test cases to add to `tools/test-spi-install.c` (each refusing and permitting)
 
 In the file's groups (`tools/test-spi-install.c:164`, `:262`, `:431`, `:498`, `:543`, `:643`,
@@ -1193,6 +1199,13 @@ From `busybox reboot -f` to the mainline's prompt about 15.6 s (量 `FW-250`, `F
 child table starts). From the upload's first byte to `lan up`, about 35–45 s: the DoD reads it
 from the captures, between `brokerd: UPDATE_BEGIN` and `rlxfw: lan up`.
 
+🔄 2026-10-25, 量 (`SPEC.md` `FW-271`; `bench/2026-10-25/W6-05`, `W6-06`): `UPDATE_BEGIN` to the
+install's `GO` 11.19 s — the 1,141,920-byte upload and `UPDATE_END`'s checks — the install 11.03 s
+on the console's clock (`ms=11260` by the kernel's, `ms 11590` in `brokerd`'s line), the watchdog
+reset 1.76 s later, `SLOT A` 4.67 s after it, `lan up` 10.15 s after the slot: **38.8 s** from the
+upload's first byte to `lan up`. Each refused upload (R1–R5) took 9.8–11.2 s, the whole body sent
+and checked; the RAM boot's (R6) 0.06 s, refused at `UPDATE_BEGIN`.
+
 ### 4.8 Host tests
 
 `src/brokerd/test_update.c`, with a 4 MiB file standing in for `/dev/mtd2ro` (slots and a bitmap
@@ -1347,6 +1360,13 @@ flash writes are made by `cfgstore` on the device, not by a verb its `--send` na
 boundary `cardcheck` cannot see past (`notes/spi-mtd-driver.md:1742-1745`); the card declares
 them, and `cardcheck` learns that form (§ 2.9).
 
+🔄 2026-10-25, as run, no card (`bench/2026-10-25/`): K1 was cut in its third repetition's erase
+phase (`RLXFW-SI E 04`), and slot B read `bad=magic`, `SLOT A`; K2 after seq 44's install ended and
+before its `written:` line, and `cfgstore show` read `source slot1 seq 44`, the S+1 case; K3, four
+rounds of `arm` and `ctrloop 64` because a pass lasts 0.25 s (§ 2.7), was cut at pass 56 after
+`bit=2304`, and two `ctrloop show` reads both gave `value=2524 malformed=0`, the state block's unit
+unchanged.
+
 ## 7. Threat-model deltas (`docs/threat-model.md` §§ 3, 9, 10)
 
 **`T2`, a LAN peer with valid credentials (§ 3).** Gains the update path: it can install any
@@ -1424,3 +1444,12 @@ operation).
    steps, 53 left (§ 2.9, `FW-267`); the userspace's is open. 🔄 2026-10-24: with it, 1,115 and 1,117 steps, 36 and 34 left (`FW-269`); 1,118 and 33 for the shipped one since `b925ecdb`.
 9. `MemFree` on V with `brokerd` holding a staging (W6).
 10. The time from the upload's first byte to `lan up` (W6/B4).
+
+🔄 2026-10-25, 量 on the bench day (`bench/2026-10-24/`, `bench/2026-10-25/`): 1, `/proc/rlxfw-boot`
+read `slot B ver 6` after B2 and `none` after each RAM boot, and the kernel printed `RLXFW-HANDOFF
+none why=magic`; the rescue boot was not run. 2, that line's `a0=bb804110`. 3, settled: `ctr_read
+6` after W3 and `ctr=6` at B3, `ctr=7` after W7 (`notes/rlxboot.md` D21). 4, `ctrloop`'s read-back
+held over 3 passes and over 56 before K3's cut, and the bit in doubt read the same twice (§ 6.5).
+6, not isolated: `UPDATE_BEGIN` to the install's `GO` is 11.19 s with the upload in it (§ 4.7).
+7, a store write's install line reads 420–490 ms, `n_writes` +32 (W4, W5, K2). 10, 38.8 s (§ 4.7).
+5, 8 and 9 stay open.

@@ -1,0 +1,60 @@
+echo ctrloop 3 > /proc/rtl819x-spi
+RLXFW-SL p=0 erase
+RLXFW-SL p=0 erased ms=30
+RLXFW-SL p=0 bit=256 ms=40
+RLXFW-SL p=0 bit=512 ms=50
+RLXFW-SL p=0 bit=768 ms=60
+RLXFW-SL p=0 bit=1024 ms=70
+RLXFW-SL p=0 bit=1280 ms=90
+RLXFW-SL p=0 bit=1536 ms=100
+RLXFW-SL p=0 bit=1792 ms=110
+RLXFW-SL p=0 bit=2048 ms=120
+RLXFW-SL p=0 bit=2304 ms=130
+RLXFW-SL p=0 bit=2560 ms=150
+RLXFW-SL p=0 bit=2816 ms=160
+RLXFW-SL p=0 bit=3072 ms=170
+RLXFW-SL p=0 bit=3328 ms=180
+RLXFW-SL p=0 bit=3584 ms=200
+RLXFW-SL p=0 bit=3840 ms=210
+RLXFW-SL p=0 bit=4096 ms=220
+RLXFW-SL p=1 erase
+RLXFW-SL p=1 erased ms=260
+RLXFW-SL p=1 bit=256 ms=270
+RLXFW-SL p=1 bit=512 ms=280
+RLXFW-SL p=1 bit=768 ms=290
+RLXFW-SL p=1 bit=1024 ms=310
+RLXFW-SL p=1 bit=1280 ms=320
+RLXFW-SL p=1 bit=1536 ms=330
+RLXFW-SL p=1 bit=1792 ms=340
+RLXFW-SL p=1 bit=2048 ms=360
+RLXFW-SL p=1 bit=2304 ms=370
+RLXFW-SL p=1 bit=2560 ms=380
+RLXFW-SL p=1 bit=2816 ms=390
+RLXFW-SL p=1 bit=3072 ms=410
+RLXFW-SL p=1 bit=3328 ms=420
+RLXFW-SL p=1 bit=3584 ms=430
+RLXFW-SL p=1 bit=3840 ms=440
+RLXFW-SL p=1 bit=4096 ms=450
+RLXFW-SL p=2 erase
+RLXFW-SL p=2 erased ms=490
+RLXFW-SL p=2 bit=256 ms=500
+RLXFW-SL p=2 bit=512 ms=520
+RLXFW-SL p=2 bit=768 ms=530
+RLXFW-SL p=2 bit=1024 ms=540
+RLXFW-SL p=2 bit=1280 ms=550
+RLXFW-SL p=2 bit=1536 ms=570
+RLXFW-SL p=2 bit=1792 ms=580
+RLXFW-SL p=2 bit=2048 ms=590
+RLXFW-SL p=2 bit=2304 ms=600
+RLXFW-SL p=2 bit=2560 ms=610
+RLXFW-SL p=2 bit=2816 ms=630
+RLXFW-SL p=2 bit=3072 ms=640
+RLXFW-SL p=2 bit=3328 ms=650
+RLXFW-SL p=2 bit=3584 ms=660
+RLXFW-SL p=2 bit=3840 ms=680
+RLXFW-SL p=2 bit=4096 ms=690
+RLXFW-SL p=3 erase
+RLXFW-SL p=3 erased ms=730
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+# 

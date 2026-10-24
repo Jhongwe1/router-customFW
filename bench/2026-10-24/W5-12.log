@@ -1,0 +1,6 @@
+start 2026-10-24 23:52:07
+status: {"ok":true,"uptime_s":434,"version":"rlxfw-brokerd-1","auth_ready":true}
+login good: HTTP 200  body {"ok":true,"csrf":"91b30efb2e9599c433b4fdf1299146f2","ttl_s":900}  cookies: rlxs= rlxc= 
+login wrong: HTTP 401  body {"ok":false,"error":"auth"}  cookies: 
+status: {"ok":true,"uptime_s":436,"version":"rlxfw-brokerd-1","auth_ready":true}
+end 2026-10-24 23:52:09

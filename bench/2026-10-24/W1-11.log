@@ -1,0 +1,10 @@
+echo install rlxboot sha=d5ab61762a97132c7605ad701bcbd0d71d3a381330da5178a0d5dae054030b21 > /pRrLoXcF/Wrtl-81S9Ix--spiGO
+ install rlxboot len=18802 pace=0
+RLXFW-SI E 00 400
+RLXFW-SI P 00 440
+RLXFW-SI H 00 450
+RLXFW-SI V 00 510
+RLXFW-SI-END OK rc=0 cmp=1 ms=520 pace=0
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+# 

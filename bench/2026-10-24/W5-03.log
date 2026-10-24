@@ -1,0 +1,23 @@
+cfgstore show ; cat /proc/rtl819x-spi-inst | busybox grep -E ^n_writes
+store  /dev/mtd2ro  bytes 4096  source slot0  seq 1
+slot0  ok (seq 1)   slot1  too few bytes for the record (seq 0)
+
+NAME           VALUE              SOURCE   SEQ
+sys.hostname   rlxfw              slot0    1
+lan.ipaddr     10.1.1.1           slot0    1
+lan.netmask    255.255.255.0      slot0    1
+dhcpd.enable   1                  slot0    1
+dhcpd.start    10.1.1.100         slot0    1
+dhcpd.end      10.1.1.199         slot0    1
+dhcpd.lease    86400              slot0    1
+dns.upstream   10.1.1.2           slot0    1
+wan.mode       0                  slot0    1
+wan.ipaddr     0.0.0.0            slot0    1
+wan.netmask    0.0.0.0            slot0    1
+wan.gateway    0.0.0.0            slot0    1
+fw.nat         0                  slot0    1
+fw.lan_icmp    1                  slot0    1
+http.port      80                 slot0    1
+admin.pwhash   <unset>            default  0
+n_writes 32
+# 

@@ -1,0 +1,6 @@
+  ok    rescue transcript for 10.1.1.1 shows AutoBurning=0 (0 minutes old)
+  ok    the transcript records the loader's load address as 0x81000000, which is what J must be given
+ ==>   upload 1114272 bytes, sha256 10ef4fae6e801d3ea6bffe9b3b2a71c34c33689f4c4e37da64bfa317d5b3ad1b
+        With autoburn off this lands at the loader's LOADADDR in RAM and writes no flash. That is the whole point of the row: an image the device has never seen, executed, with the part unmodified
+  ok    1114272 bytes in 2177 blocks to 10.1.1.1:2099 in 1.99s
+        Next is `J <LOADADDR>` on the console, and this tool does not send it: a jump is a state change on the only unit there is, and it belongs where a human is watching the console

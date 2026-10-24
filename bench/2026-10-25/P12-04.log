@@ -1,0 +1,6 @@
+start 2026-10-25 00:36:32
+status (no session): {"ok":true,"uptime_s":278,"version":"rlxfw-brokerd-1","auth_ready":true}
+login good: HTTP 401  body {"ok":false,"error":"auth"}  cookies: 
+status (session): {"ok":true,"uptime_s":279,"version":"rlxfw-brokerd-1","auth_ready":true}
+login wrong: HTTP 401  body {"ok":false,"error":"auth"}  cookies: 
+end 2026-10-25 00:36:34

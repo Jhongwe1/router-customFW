@@ -1,0 +1,24 @@
+cfgstore show ; cat /proc/rtl819x-spi-inst | busybox grep -E ^n_writes\|^ctr_pp
+store  /dev/mtd2ro  bytes 8192  source slot1  seq 44
+slot0  ok (seq 43)   slot1  ok (seq 44)
+
+NAME           VALUE              SOURCE   SEQ
+sys.hostname   h41                slot1    44
+lan.ipaddr     10.1.1.1           slot1    44
+lan.netmask    255.255.255.0      slot1    44
+dhcpd.enable   1                  slot1    44
+dhcpd.start    10.1.1.100         slot1    44
+dhcpd.end      10.1.1.199         slot1    44
+dhcpd.lease    86400              slot1    44
+dns.upstream   10.1.1.2           slot1    44
+wan.mode       0                  slot1    44
+wan.ipaddr     0.0.0.0            slot1    44
+wan.netmask    0.0.0.0            slot1    44
+wan.gateway    0.0.0.0            slot1    44
+fw.nat         0                  slot1    44
+fw.lan_icmp    1                  slot1    44
+http.port      80                 slot1    44
+admin.pwhash   <set>              slot1    44
+n_writes 0
+ctr_pp 0
+# 

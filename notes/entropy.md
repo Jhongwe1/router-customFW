@@ -532,3 +532,16 @@ resolved from `random.o` and not from anywhere else. The witness string
 `CONFIG_INITRAMFS_SOURCE` names `usr/rlxfw-initramfs.spec`. The control failing
 the same way is what identified it as an invocation error rather than a defect
 in this change.
+
+## 9. On the die with `P6r-10`'s images, 2026-10-24/25 (`SPEC.md` `FW-272`)
+
+量: V booted from flash had 305 s of uptime and no host traffic: `ev_nic 0`, `bits 0`,
+`entropy_avail 0` (`bench/2026-10-24/W5-05`), and `cfgstore passwd` refused before the store was
+touched (`W5-02`: `entropy_avail = 0, 128 needed`). A 6,000-ping flood from the host, 4.87 s with
+no loss (`W5-06`), gave `ev_nic 12004`, `qualifying 11947`, `bits 488`, `clamped 4139` and
+`entropy_avail 360` (`W5-07`) — 128 below `bits`, the shape of `FW-180`'s two drops, cause still
+not found. The second `passwd` printed `entropy_avail was 232`. The pool fills only from the NIC,
+so on a unit with no LAN traffic no password is set and no login succeeds until traffic arrives:
+`firstpw` waits, `cfgstore passwd` refuses, `brokerd` answers `NOENTROPY`. Every bench step that
+needed entropy that night was preceded by a flood. Not established: how much traffic an idle LAN
+supplies, which no capture measured.

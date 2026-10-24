@@ -1,0 +1,7 @@
+cfgstore show | busybox head -n 4 ; cat /proc/rlxfw-boot
+store  /dev/mtd2ro  bytes 4096  source slot0  seq 1
+slot0  ok (seq 1)   slot1  too few bytes for the record (seq 0)
+
+NAME           VALUE              SOURCE   SEQ
+slot A ver 7
+# 

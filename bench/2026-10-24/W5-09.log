@@ -1,0 +1,16 @@
+
+RLXFW-SW-DISARM
+RLXFW-SI-IMGRESET
+RLXFW-SW-ARM=00010000
+RLXFW-SI-GO install cfg1 len=4096 pace=0
+RLXFW-SI E 00 350
+RLXFW-SI P 00 360
+RLXFW-SI H 00 360
+RLXFW-SI V 00 430
+RLXFW-SI-END OK rc=0 cmp=1 ms=430 pace=0
+RLXFW-SW-DISARM
+RLXFW-SI-RC=00000000
+RLXFW-SI-IMGRESET
+written: slot 1, seq 2
+admin.pwhash set: scrypt log2N=12 r=7 p=1, entropy_avail was 232
+# 
