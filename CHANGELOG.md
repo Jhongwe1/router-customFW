@@ -18,7 +18,42 @@ release that carries an image names it by sha256 in its section
 
 ## Unreleased
 
-2026-10-09, after the tag: the 46 hits in the public `upstream/` ruled known and accepted (`SPEC.md` `FLS-32`).
+Nothing yet.
+
+---
+
+## v1.1 — 2026-10-29
+
+The device updates itself. Defined by `P6r-10`, `P6r-11` and `P6r-12`; their gate, `P6r`,
+is still open, and `P5e` runs beside it.
+
+**Image:** `mainline-495094ab.img`, sha256
+`a016a5c0354b2350dc72eb67e1a03fd98e457e66d4908487c2c75ce964e2adb8`; no container.
+
+- `P6r-10`: the running firmware installs a signed `.rlxu` uploaded to `httpd` in an
+  authenticated session — `brokerd` runs `rlxboot`'s checks, writes the slot `rlxboot`
+  did not boot, reads it back, and the watchdog resets into it, 38.8 s from the upload's
+  first byte to `lan up` (`SPEC.md` `FW-271`); and a fail-closed config store in two flash
+  slots, which survived a cold power cycle.
+- `P6r-11`: the anti-rollback counter at `0x3F0000` advances from flash, and `rlxboot`
+  reads it and refuses a lower version (`notes/rlxboot.md` D21); a power cut during a
+  slot write, a store write and a counter advance each left a bootable unit (`FW-270`).
+- `P6r-12`: the shipped build has no console shell, and on a store with no password the
+  console asks for one. TLS is ⊘.
+- `rlxboot` passes the slot and version it booted to the kernel at the jump
+  (`config/host-compat/0011`, `kernel/linux-2.6.30/arch/rlx/kernel/rlxfw-boot.c`).
+- `P5e`, so far: rlxfw's kernel sources moved to `kernel/`; entry pages under `docs/`,
+  a page per driver and ten ADRs; `README.md` rewritten with `docs/architecture.md`; CI
+  builds and tests the code, and `make test` runs from a clean clone.
+- `P6r-1` to `P6r-4`: `make run` on an emulated board (`docs/run.md`), `REPRODUCE.md`,
+  five defects told as cases (`docs/cases/`), and `docs/disclosure.md`.
+- 2026-10-09, after `v1.0`'s tag: the 46 hits in the public `upstream/` ruled known and
+  accepted (`SPEC.md` `FLS-32`).
+- The weakest part: the released bytes booted only from RAM; the update, the store and
+  the counter were measured on builds of the same code with the bench shell.
+
+[release](https://github.com/Jhongwe1/router-customFW/releases/tag/v1.1) · not
+established: [`docs/known-issues/v1.1.md`](docs/known-issues/v1.1.md)
 
 ---
 

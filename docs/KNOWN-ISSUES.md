@@ -6,12 +6,13 @@ This is that list, and it is written to the same standard as everything else
 here: each entry names what is *not* true, what was measured instead, and which
 gate changes it. Nothing below is a plan; the plan is `PROGRESS.md`'s gate board.
 
-⚠️ **This file on `main` is the CURRENT list, not `v1.0`'s.** A release's list is the copy
+⚠️ **This file on `main` is the CURRENT list, not `v1.1`'s.** A release's list is the copy
 at that release's tag, which is frozen; this one keeps moving. It is an index: each open
 entry is a page of its own under `docs/known-issues/`, and so is each release's list of what
-it does not establish (`docs/known-issues/vX.Y.md`). Entries that have since closed, and the
-`v0.5` and `v0.6` lists, are in `docs/history/known-issues-closed.md`; what single segments
-did not establish is in `docs/history/known-issues-segment-limits.md`.
+it does not establish (`docs/known-issues/vX.Y.md`). Entries that have since closed, the
+`v0.5` and `v0.6` lists, and `v1.0`'s lines in this index are in
+`docs/history/known-issues-closed.md`; what single segments did not establish is in
+`docs/history/known-issues-segment-limits.md`.
 
 Marked the same way as the rest of the repository: **量** measured on the device
 · **讀** read out of code, a dump or a document · **推** inferred, pending a
@@ -19,27 +20,27 @@ measurement.
 
 ---
 
-## What `v1.0` does not establish
+## What `v1.1` does not establish
 
 One line per limit; the full text, and the image it names by sha256, is
+[`docs/known-issues/v1.1.md`](known-issues/v1.1.md). `v1.0`'s list is
 [`docs/known-issues/v1.0.md`](known-issues/v1.0.md).
 
-- Every reading of this image is one unit, one loader build, and one boot per path. ([full text](known-issues/v1.0.md))
-- The image opens a root shell on the serial console with no login, so anyone with the serial header has root. ([full text](known-issues/v1.0.md))
-- `RLXFW-ID0` names the kernel recipe, not the image. ([full text](known-issues/v1.0.md))
-- The device cannot update itself, and nothing the running firmware writes persists. ([full text](known-issues/v1.0.md))
-- Rollback is not refused from flash. ([full text](known-issues/v1.0.md))
-- Power cuts were survived at ten points of paced writes, and nowhere else. ([full text](known-issues/v1.0.md))
-- Booted from flash, the Ethernet rests on two boots and on a write set shown sufficient, not necessary. ([full text](known-issues/v1.0.md))
-- rlxfw has no WAN: switch ports 0–5, the jack labelled WAN among them, are in one VLAN. ([full text](known-issues/v1.0.md))
-- None of it is secure boot. ([full text](known-issues/v1.0.md))
-- Carried from `v0.6`, unchanged: no TLS, four unbounded ramfs mounts, an entropy result that is accounting and not strength, and an `rlxboot` cache flush not shown necessary. ([full text](known-issues/v1.0.md))
-- `R9`'s table does not say rlxfw is more secure. ([full text](known-issues/v1.0.md))
-- The bring-up report's power tree is a desk reconstruction, and no interrupt latency was taken by logic analyser. ([full text](known-issues/v1.0.md))
-- The corresponding source rebuilds the image bit for bit on the machine that built it, on the host and in a container pinned by digest, and two parts of it are missing. ([full text](known-issues/v1.0.md))
-- `iperf3` rebuilds to the shipped bytes only at the path it was first built at. ([full text](known-issues/v1.0.md))
-- The tag is unsigned. ([full text](known-issues/v1.0.md))
-- Flash: three seatings wrote slots through the armed image's install path, each under the owner's dated yes; the `FLR` bracket stays at 1,024 of 4,194,304 bytes. ([full text](known-issues/v1.0.md))
+- The released bytes booted twice, both from RAM, never from a flash slot; the update, the store and the counter were measured on V and U, the same code built with the bench shell. ([full text](known-issues/v1.1.md))
+- The sha256 the two uploads were checked against is in the session's command lines, not in `bench/`. ([full text](known-issues/v1.1.md))
+- `RLXFW-ID0` names the kernel recipe, not the image: U, the bench build with the console root shell, prints the same one. ([full text](known-issues/v1.1.md))
+- The update path needs `rlxboot`'s new build, which is not an asset; no update from a WAN, no secret upload, no resistance to root on the device. ([full text](known-issues/v1.1.md))
+- Persistence was read at the seatings' writes; that one erased slot leaves the other loading is read from the final boot. ([full text](known-issues/v1.1.md))
+- Rollback is refused from flash and the floor is permanent: on this unit `v1.0`'s `T.rlxu` never boots from flash again. ([full text](known-issues/v1.1.md))
+- Power cuts during the new writes: one round per kind, none aimed inside a sub-phase. ([full text](known-issues/v1.1.md))
+- The console has no shell, and the loader's unauthenticated flash commands still come first. ([full text](known-issues/v1.1.md))
+- Booted from RAM, the image still writes flash when a setting is stored: the store's blocks at `0x3C0000` and `0x3D0000`. ([full text](known-issues/v1.1.md))
+- Entropy waits for host traffic. ([full text](known-issues/v1.1.md))
+- After a RAM boot a ping flood lost packets, after a flash boot it did not, and the cause is undetermined. ([full text](known-issues/v1.1.md))
+- Three of the design's own open questions stay open. ([full text](known-issues/v1.1.md))
+- `REPRODUCE.md`'s layers were run on `v1.0`'s archive, not `v1.1`'s, and the archive's two gaps are unchanged. ([full text](known-issues/v1.1.md))
+- Carried from `v1.0`, unchanged: one unit, no TLS, no WAN, the vendor's WLAN driver, no secure boot, unbounded ramfs mounts, and the rest of that list. ([full text](known-issues/v1.1.md))
+- Flash: the bench day's fourteen sets of writes, each after the owner's yes at the bench; the `FLR` bracket stays at 1,024 of 4,194,304 bytes. ([full text](known-issues/v1.1.md))
 
 ## Open entries
 
@@ -72,5 +73,5 @@ entry's heading, or else the day its heading entered this file.
 
 - [What single segments and seatings did not establish](history/known-issues-segment-limits.md):
   the eighteen dated lists of 2026-09-16 to 2026-09-25, moved there verbatim on 2026-10-17.
-- [Closed entries, and the `v0.5` and `v0.6` lists](history/known-issues-closed.md), moved
-  verbatim on 2026-10-09.
+- [Closed entries, the `v0.5` and `v0.6` lists, and `v1.0`'s lines in this index](history/known-issues-closed.md),
+  moved verbatim on 2026-10-09 and 2026-10-29.

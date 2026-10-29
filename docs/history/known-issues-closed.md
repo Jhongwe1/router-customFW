@@ -472,3 +472,41 @@ and one cold flash boot, no load, one port, and which part of the written group 
 |---|---|
 | 🟢 **CLOSED 2026-09-01 — the per-gate ledger is public.** *(was: `study/weekly-results.md` is not in the public repository)* | 量: `.gitignore:17` is `study/`, and `git ls-files study/` returns nothing. `CHARTER.md` §110 rule 3 asks for one entry per closed gate in that file, and four are owed (`R2a/b/d`, `R1h`, `R3`, `P4a`). **Owner's ruling 2026-09-01: leaving it ignored is acceptable for now.** `P4b-gate` ③ owns the decision. 🟢 **2026-09-01, `P4b-2`:** the file moved to `docs/GATE-RESULTS.md` — committed, English, one entry per closed gate, and its name now says what its unit is. `study/` stays gitignored; the owner's ruling about the directory and the requirement on this artefact turned out not to be in conflict once the artefact stopped living in that directory. Five entries: `R1-gate`, `R2a/b/d`, `R1h`, `R3`, `P4a`. `S0` and `R0` are deliberately not backfilled, with the reason at the top of that file. |
 | 🟢 **CLOSED 2026-09-01 — version → contents has one committed owner.** *(was: two owners disagreeing on six of six shared rows)* | `plan/CHARTER.md` §88 is authoritative and is **gitignored**, so a public reader cannot follow a pointer to it; `PROGRESS.md`'s Release clock restates it and is stale. This file and `CHANGELOG.md` now own the contents of the versions that have actually been released; the map of *future* versions still has the defect. `P4b-gate` ① owns it. 🟢 **2026-09-01, `P4b-1`:** `README.md` § *Which gates make which version* is the owner. `PROGRESS.md`'s Release clock dropped both restated columns and keeps only `Shipped`; the planning material's table dropped its contents column and keeps only its estimates; and `CHANGELOG.md`'s `v0.2` section stopped pointing at a gitignored file. 🔴 **The repair also found that the `Target` column beside `Contents` was a restatement too** — it carries the planning material's own ×1.8 multiplier — and it agreed on only two of six rows while never having been flagged. |
+
+## The index's head paragraph, `v1.0`'s lines and its Records, as they stood at `c95d3334` — moved here verbatim on 2026-10-29, when `v1.1`'s replaced them
+
+⚠️ **This file on `main` is the CURRENT list, not `v1.0`'s.** A release's list is the copy
+at that release's tag, which is frozen; this one keeps moving. It is an index: each open
+entry is a page of its own under `docs/known-issues/`, and so is each release's list of what
+it does not establish (`docs/known-issues/vX.Y.md`). Entries that have since closed, and the
+`v0.5` and `v0.6` lists, are in `docs/history/known-issues-closed.md`; what single segments
+did not establish is in `docs/history/known-issues-segment-limits.md`.
+
+## What `v1.0` does not establish
+
+One line per limit; the full text, and the image it names by sha256, is
+[`docs/known-issues/v1.0.md`](known-issues/v1.0.md).
+
+- Every reading of this image is one unit, one loader build, and one boot per path. ([full text](known-issues/v1.0.md))
+- The image opens a root shell on the serial console with no login, so anyone with the serial header has root. ([full text](known-issues/v1.0.md))
+- `RLXFW-ID0` names the kernel recipe, not the image. ([full text](known-issues/v1.0.md))
+- The device cannot update itself, and nothing the running firmware writes persists. ([full text](known-issues/v1.0.md))
+- Rollback is not refused from flash. ([full text](known-issues/v1.0.md))
+- Power cuts were survived at ten points of paced writes, and nowhere else. ([full text](known-issues/v1.0.md))
+- Booted from flash, the Ethernet rests on two boots and on a write set shown sufficient, not necessary. ([full text](known-issues/v1.0.md))
+- rlxfw has no WAN: switch ports 0–5, the jack labelled WAN among them, are in one VLAN. ([full text](known-issues/v1.0.md))
+- None of it is secure boot. ([full text](known-issues/v1.0.md))
+- Carried from `v0.6`, unchanged: no TLS, four unbounded ramfs mounts, an entropy result that is accounting and not strength, and an `rlxboot` cache flush not shown necessary. ([full text](known-issues/v1.0.md))
+- `R9`'s table does not say rlxfw is more secure. ([full text](known-issues/v1.0.md))
+- The bring-up report's power tree is a desk reconstruction, and no interrupt latency was taken by logic analyser. ([full text](known-issues/v1.0.md))
+- The corresponding source rebuilds the image bit for bit on the machine that built it, on the host and in a container pinned by digest, and two parts of it are missing. ([full text](known-issues/v1.0.md))
+- `iperf3` rebuilds to the shipped bytes only at the path it was first built at. ([full text](known-issues/v1.0.md))
+- The tag is unsigned. ([full text](known-issues/v1.0.md))
+- Flash: three seatings wrote slots through the armed image's install path, each under the owner's dated yes; the `FLR` bracket stays at 1,024 of 4,194,304 bytes. ([full text](known-issues/v1.0.md))
+
+## Records
+
+- [What single segments and seatings did not establish](history/known-issues-segment-limits.md):
+  the eighteen dated lists of 2026-09-16 to 2026-09-25, moved there verbatim on 2026-10-17.
+- [Closed entries, and the `v0.5` and `v0.6` lists](history/known-issues-closed.md), moved
+  verbatim on 2026-10-09.

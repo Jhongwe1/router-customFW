@@ -73,8 +73,9 @@ configuration sets it, so every image from the next build compiles
 The 12 compiled sources are `rlxfw-devices`, `rlxfw_mark`, `rlxfw-entropy`,
 `rtl819x-timer`, `rtl819x-gpio`, `rtl819x-keys`, `rtl819x-spi`, `rtl819x-wdt`,
 `rtl819x-nic`, `rtl819x-switch`, `rtl819x-view` and `rlxfw-seam`
-(`docs/sbom.md` row `K6`, which describes `v1.0`'s image). From the next build
-there are 14: those, `rtl819x-spi-write` and `rlxfw-boot` (`P6r-10`).
+(`docs/sbom.md` row `K6`, which describes `v1.0`'s image). In `v1.1`'s image
+there are 14: those, `rtl819x-spi-write` and `rlxfw-boot` (`P6r-10`;
+`docs/sbom.md` Appendix C).
 
 **Why GPL-2.0-*only* and not "or later".**
 
@@ -344,9 +345,9 @@ its second gap: the archive cannot supply it.
 - **It does not make the image distributable, and it discharges nothing.** 量
   0 of the 17 `file` rows in `config/rlxfw-initramfs.tsv` is a notice, so the
   image carries none. `v0.2`–`v0.6` carry no binary (量 2026-10-08, no assets);
-  the binaries `v1.0` is made with travel only with their corresponding-source
-  archive and the licence texts — this file among them — beside them, as assets
-  of the same release (`offer.md` § 0). `offer.md` also names the two gaps
+  the binaries `v1.0` and `v1.1` are made with travel only with each release's
+  own corresponding-source archive and the licence texts — this file among them
+  — beside them, as assets of the same release (`offer.md` § 0). `offer.md` also names the two gaps
   (`SBOM-3`, `SBOM-4`) still open; `docs/release-process.md` is the order in
   which the release is made.
 - **It does not close `SBOM-2`.** 35 Realtek-directory sources plus 3 in the

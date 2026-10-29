@@ -1,6 +1,6 @@
-# Software bill of materials — `mainline-9bb2bec7.img`, the `v1.0` image, as cell `s128p-r6c-mA` built it
+# Software bill of materials — `mainline-9bb2bec7.img`, the `v1.0` image, as cell `s128p-r6c-mA` built it; `mainline-495094ab.img`, the `v1.1` image, by difference (Appendix C)
 
-**`P4b`, desk, 2026-10-08, and `SBOM-R5`'s rebuild on 2026-10-09. No power, no flash byte, and no device reading taken for it.** Derived with the repository at `HEAD` `28a490c7`, whose build inputs are `034b5a7d`'s (§ 10). The edition this replaces described cell `f184a` and was derived at `d4d0dbcc` on 2026-10-04 (`R9-10`); § 10.1 lists what moved between the two images and § 10.2 what was re-derived.
+**`P4b`, desk, 2026-10-08, and `SBOM-R5`'s rebuild on 2026-10-09. No power, no flash byte, and no device reading taken for it.** Derived with the repository at `HEAD` `28a490c7`, whose build inputs are `034b5a7d`'s (§ 10). The edition this replaces described cell `f184a` and was derived at `d4d0dbcc` on 2026-10-04 (`R9-10`); § 10.1 lists what moved between the two images and § 10.2 what was re-derived. 🔄 **`v1.1`, desk, 2026-10-29**: Appendix C describes `mainline-495094ab.img` by difference from `9bb2bec7`, re-derives what its composition rests on, and names what it carries over; every other section describes `9bb2bec7`.
 
 **Owner of:** which components are in the image `rlxfw` builds and boots; each one's version, licence and source location; and which of those are not established. It does not own the programs' designs (the notes under `notes/`), what the image does on the die (`docs/GATE-RESULTS.md`), or the image's declaration (`config/rlxfw-initramfs.tsv`).
 
@@ -10,7 +10,7 @@
 
 ## 1. What "the image" is, and which one this covers
 
-**Which image this file describes, and which release carries it.** 量 2026-10-08 (`gh release view`): `v0.2`–`v0.6` have no assets. This file describes `mainline-9bb2bec7.img` (1,110,016 bytes, sha256 `295d4f6a…86bd`, `RECIPE_ID` `9bb2bec7`), the image `v1.0` is made with, alone and inside the signed container `T.rlxu`; it travels with its corresponding-source archive beside it or not at all (`docs/offer.md` § 0). The image boots from RAM after a TFTP upload to `0x80500000`, and since `R8b` also from flash slot A, inside T (below), through `rlxboot` (§ 7, `X1`); the config store is on ramfs and does not outlive a power cycle (讀 `README.md`, the *Status* row). So "ships" in this file means *is in that image*. Nothing below discharges an obligation (§ 8).
+**Which image this file describes, and which release carries it.** 量 2026-10-08 (`gh release view`): `v0.2`–`v0.6` have no assets. This file describes `mainline-9bb2bec7.img` (1,110,016 bytes, sha256 `295d4f6a…86bd`, `RECIPE_ID` `9bb2bec7`), the image `v1.0` is made with, alone and inside the signed container `T.rlxu`; it travels with its corresponding-source archive beside it or not at all (`docs/offer.md` § 0). The image boots from RAM after a TFTP upload to `0x80500000`, and since `R8b` also from flash slot A, inside T (below), through `rlxboot` (§ 7, `X1`); the config store is on ramfs and does not outlive a power cycle (讀 `README.md`, the *Status* row). So "ships" in this file means *is in that image*. Nothing below discharges an obligation (§ 8). 🔄 2026-10-29: `v1.1` is made with `mainline-495094ab.img` alone, with no container; Appendix C covers it.
 
 What is uploaded to `0x80500000` and jumped to is `nfjrom`, and it has three layers.
 
@@ -330,7 +330,7 @@ Residuals on rows that are otherwise resolved:
 ## 11. What this does not establish
 
 - **It is not a legal opinion.** The classifier reads header text; the readings in § 8 and § 2.4 are marked 推 and need counsel before they are acted on.
-- **It is not the corresponding source, and it discharges nothing.** The release that carries a binary carries the corresponding-source archive and the licence texts as assets beside it (§ 1, § 8, `docs/offer.md`) — for `v1.0`, uploaded with its binaries or not at all — and this file travels with them as one more asset, not as the source; the image itself carries no notice.
+- **It is not the corresponding source, and it discharges nothing.** The release that carries a binary carries the corresponding-source archive and the licence texts as assets beside it (§ 1, § 8, `docs/offer.md`) — for `v1.0` and `v1.1`, uploaded with their binaries or not at all — and this file travels with them as one more asset, not as the source; the image itself carries no notice.
 - **It does not establish that the device runs the bytes described.** At the desk the chain is measured: `nfjrom` holds the LZMA stream of `vmlinux_img`, which holds the kernel's initramfs, whose 17 files are the record's (§ 3). On the device nothing was read back here: the board printed `RLXFW-ID0=9BB2BEC7` from RAM and from slot A (§ 1), but `RECIPE_ID` cannot see the binaries under `build/` (`notes/iperf3-port.md` § 8), so the printed id does not pin the userspace. What pins the bytes is `looprun`'s digest check before the RAM upload (`bench/2026-10-08c/R02.log`) and, for slot A, T's payload digest, which `rlxboot` checks before the jump — both read, not re-read here.
 - **It does not establish that the build reproduces on a clean clone.** `build/` is untracked; five of the 17 files are copies admitted by digest, of which four were not rebuilt by the build — three rebuild from the committed sources byte for byte, and `iperf3` only at its original source path (`SBOM-R5`); the iperf3 source is outside the repository; the harness that built the release image, `$FWRE_WORK/rebuild/s128/p/build-r6c.sh`, is outside it too; and `P4a`'s Level 2 residual stands (`notes/reproducible-build.md` § 6).
 - **It covers one variant.** `loud` and `quiet-swcore` are other kernels; `quiet-swcore` adds the vendor Ethernet tree, whose licences were not surveyed. The `armed` image built in the same run (`8dce09c5`) differs in `CONFIG_MTD_RTL819X_WRITE`, busybox's `nc` and the three `/dev/mtd*ro` nodes (讀 `build-r6c.sh`), and is not covered.
@@ -376,3 +376,56 @@ Residuals on rows that are otherwise resolved:
 | `drivers/mtd/chips/rtl819x` | 1 | `spi_cmd` | none |
 
 Two more compiled Realtek-directory sources carry `MODULE_LICENSE("GPL")` and no header text: `fastpath_common` and the flash map `rtl819x_flash`. One carries a third party's licence in full: `1x_rc4` (K3a).
+
+## Appendix C. The `v1.1` image, `495094ab`, by difference from `9bb2bec7`
+
+**Desk, 2026-10-29. No power, no flash byte, and no device reading taken for it.** `v1.1` is made with `mainline-495094ab.img` and no container. §§ 1–11 and Appendices A and B describe `9bb2bec7`, and hold for `495094ab` only where this appendix says the input is unchanged.
+
+| layer | identity, 量 from the records of cell `s148r` |
+|---|---|
+| `nfjrom` | 1,144,832 bytes, sha256 `a016a5c0354b2350dc72eb67e1a03fd98e457e66d4908487c2c75ce964e2adb8`; published as `mainline-495094ab.img` |
+| `vmlinux` | 4,759,230 bytes, sha256 `0955b99e389356317da5abc232e3cc28cbd418d35e3ae520228cd09385d7710f`, recipe id `495094ab`, variant `quiet`, 29 marks, 11 patches, verdict `green`; the banner string reads as `9bb2bec7`'s |
+| initramfs | 55 rows, 17 of them files, 1,358,257 bytes of file content |
+
+Cell `s148r` was built on 2026-10-29 from `c95d3334` in a fresh ext4 clone by `$FWRE_WORK/rebuild/s144/b/bld.sh`, unchanged (sha256 `ddfba185…`), with `BENCH_SHELL=0` and the cell kept: records under `$FWRE_WORK/rebuild/s144/b/art/s148r/` and `…/s144/b/shr/rebuild/r3-4/out/s148r.*`, the staged tree at `…/r3-4/cells/s148r/top/`; none is committed. Cell `s146u0`, built on 2026-10-24 from `a1dc141c`, whose `src/`, `config/`, `kernel/` and build tools equal `c95d3334`'s (量 `git diff`), wrote the same `nfjrom` and `vmlinux`; its initramfs record differs only in the header line that names the clone. The board ran these bytes from RAM, twice: `bench/2026-10-25/P12-02-boot` and `P13-02-boot` print `RLXFW-ID0=495094AB` and `console shell DISABLED in this build`, after uploads `looprun` checked against `a016a5c0…` (the pin is in the session's command lines, not in the captures: `docs/known-issues/v1.1.md`).
+
+**The composition, re-derived on this image.** 量 the cpio read as newc out of `vmlinux`'s `.init.ramfs` holds 55 entries — 16 `dir`, 17 `file`, 11 `slink`, 11 `nod` — and its 17 files have the record's sizes and sha256 (the table at the end); the LZMA stream sits in `nfjrom` at offset 11,264, behind the same 8-byte prefix, and decodes to the 4,261,376-byte `vmlinux_img`, which holds that section byte for byte; the stream with one bit flipped is refused by the decoder. Control: the same parser over `9bb2bec7`'s `vmlinux` and `nfjrom` gives § 3's 55 entries, 1,258,554 bytes and 4,128,768 bytes.
+
+**What moved.** 量 the two cells' staged trees, every source and build script hashed (18,153 and 18,155 files; generated headers excluded; the BSP, a directory inside each tree, hashes equal): two files are new, `arch/rlx/kernel/rlxfw-boot.c` and `include/linux/rlxfw-handoff.h`, and every file whose content differs is rlxfw's own under `kernel/`, or one of four vendor files rlxfw's declarations change — `arch/rlx/kernel/Makefile` (`obj-y += rlxfw-boot.o`), `drivers/mtd/devices/Kconfig` and `Makefile` (`rtl819x-spi-write.o` built in every image, `MK5`) and `rtkload/start.S` (`config/host-compat/0011`). The build log's `CC` and `AS` lines are 625 against 622; the three new objects are `rlxfw-boot.o`, `rtl819x-spi-write.o` and `fs/locks.o`. The `.config` differs in two symbols besides its timestamp, `CONFIG_MTD_RTL819X_WRITE=y` and `CONFIG_FILE_LOCKING=y` (`config/rlxfw-kernel.delta`; `SPEC.md` `FW-266`). Since none of the 117 vendor sources Appendix B counts is among the changed files, Appendix B carries over.
+
+| row | in `495094ab` | status |
+|---|---|---|
+| W1 | `start.S` carries `0011`, the boot handoff (51 lines of difference); the link line in `make.log` names the same objects as `9bb2bec7`'s | 未定 `SBOM-2`, unchanged |
+| W2, K2–K5 | sources byte-identical to `9bb2bec7`'s. K3a: `RC4`, `RC4_options` and `RC4_set_key` are at `80180920`, `80180ee0` and `80180eec` in this image's `System.map` | unchanged |
+| K1 | 490 compiled sources: the 489, and `fs/locks.c`, which the delta's `CONFIG_FILE_LOCKING` row compiles for `flock(2)`; its first 80 lines carry no licence or copyright text, so `COPYING` conveys it | resolved; 殘留 `SBOM-R4` |
+| K6 | 14 compiled sources: the 12, `rtl819x-spi-write` and `rlxfw-boot`; 20 files under `kernel/` at `c95d3334`. 量 of the 12 objects, 11 are byte-identical to `9bb2bec7`'s — their sources' changes are comments (`P5e-3` ③) — and `rtl819x-spi.o` differs: the install path's store, counter and image verbs (`P6r-10`, `P6r-11`). The three headers compiled only under `CONFIG_MTD_RTL819X_WRITE` are now compiled in | resolved |
+| K7 | 29 marks rows and 11 patches (`s148r.manifest`); `0011` is new; the delta's two rows above | resolved |
+| U1 | `/init`, 124,216 bytes, `4e0c142a`, built with `BENCH_SHELL=0`: no console shell, and the console's first-password step | resolved |
+| U3, U4, U6 | `/usr/sbin/brokerd` 138,764 bytes, `b793e4aa`; `/usr/sbin/httpd` 87,972, `cf78f580`; `/usr/sbin/cfgstore` 95,264, `3caafb25` | resolved |
+| U13 | `/bin/mfgtest`, 32,619 bytes, `6d7cea6b`; equal to the git object at `c95d3334` | resolved |
+| U2, U5, U8–U12, U14, U15 | the same bytes as `9bb2bec7`'s record: 12 of the 17 files | unchanged |
+| L1–L3 | the same libraries; the per-program symbol counts are `9bb2bec7`'s, and were not re-derived for U1, U3, U4 and U6 | unchanged |
+
+U1, U3, U4 and U6 come from `src/` at `a1dc141c`, which `c95d3334` leaves unchanged; 量 built twice byte-equal, in two clones and two run directories. No component is added or removed, so § 4's 31 rows stand, 24 resolved and 7 未定. `rlxboot` is still not in the image (§ 7, `X1`); the build that has run on the unit since 2026-10-24, `3b7474de`, passes the boot handoff this image's update path reads, and it is not an asset of `v1.1`.
+
+**Not re-derived for this image:** the header scans and licence readings of §§ 2 and 4 for every input called unchanged above; § 4's symbol counts for the four programs that changed; §§ 5–7, which read `9bb2bec7` and `f184a`.
+
+| path | bytes | sha256 | component |
+|---|---:|---|---|
+| `/init` | 124,216 | `4e0c142a98f7212cf6da98d2e3a6c537a0421fb9fd00f616e6b81c2f6901f73e` | U1 |
+| `/bin/uprobe` | 29,184 | `f3bf56ee6d97712e55307d57f5e005ea3588a1aa14b3671a6f85c5502203cebb` | U10 |
+| `/bin/ucost` | 16,692 | `76c7e2318021484967ccc0e8c5a2eadd992c5bee372a2a7bcd10d0a1ebe3c6db` | U11 |
+| `/bin/mfgtest` | 32,619 | `6d7cea6b0e9461a32b6cffecd3444f228872ab27b5066314693b6d066c9f606a` | U13 |
+| `/bin/busybox` | 447,684 | `ef057f6ee7a4ead58d8b2028dbaaf0899b65d9c8ad41ec8e8e7c143f567fec60` | U8 |
+| `/bin/iperf3` | 252,644 | `3144db60bd3895f582f84e61da306f96f6e668f07cf9a84fef0ebc6b971a97e8` | U9 |
+| `/bin/linkprobe` | 16,240 | `071c8f81a47cc8ed84ad9d6ddce8a7e5b4db45ca1ba35fd457a1d9f47bd3d723` | U12 |
+| `/sbin/ifupd` | 23,164 | `9bd95a79f7c3ac500644cbb27f0e7708fd39dcf12bc92194daa1ce20561d3346` | U2 |
+| `/usr/sbin/brokerd` | 138,764 | `b793e4aab98839ccaba5f419b1c8b00c115029934520c6e83e12b3ae26318b14` | U3 |
+| `/usr/sbin/httpd` | 87,972 | `cf78f58041de71d0a5b0bc64ea93ba2e33d90a040036a8aaf91e9fa2d0797dd6` | U4 |
+| `/usr/sbin/dnsfwd` | 73,908 | `ced6956e941e3aabf1909b4287126e5c228cfe08eb5f3be127e265366bff9365` | U5 |
+| `/usr/sbin/cfgstore` | 95,264 | `3caafb25657b04beb6cbc364944e8f73d2c7111c497ccfc4a673186bd6403853` | U6 |
+| `/srv/www/index.html` | 3,850 | `f7afe413de1c8b3ff02733c2cb4eb208436fce1392abcc4ab2afdab27a9a9832` | U14 |
+| `/srv/www/static/style.css` | 3,430 | `730ef34fd5d653966e0fdd3f0516dd6454c71e5c01fe0a04e43a23b594507999` | U14 |
+| `/srv/www/static/app.js` | 12,488 | `5907e45d6d2771102c51b25e1cc7ffaf8de7a99dfbab69098c65672c5940e6d8` | U14 |
+| `/etc/passwd` | 101 | `dcb10945dae12445965cb6027e00be023e01928d92758d2fced76a9128a42d79` | U15 |
+| `/etc/group` | 37 | `abe982457adea0cdfeb1f003b31c7022f8898e9d7110ae76f8c1418be3573057` | U15 |

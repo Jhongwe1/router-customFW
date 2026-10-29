@@ -16,13 +16,13 @@ flowchart LR
     K --> U["rlxfw's six programs<br/>init as PID 1"]
 ```
 
-**Measured on the device.** Release [`v1.0`](https://github.com/Jhongwe1/router-customFW/releases/tag/v1.0)
-boots from a flash slot through `rlxboot`, rlxfw's signed-update verifier, and pings both ways. `rlxboot` refused a
-payload with one bit flipped and a version below its counter, and ten power cuts during slot writes each booted
-the other slot. rlxfw's own drivers carry the Ethernet, and its six programs run privilege-separated.
+**Measured on the device.** rlxfw boots from a flash slot through `rlxboot`, its signed-update verifier, and
+updates itself: an uploaded image passes `rlxboot`'s checks, goes to the other slot and boots, and a flipped bit, a
+wrong key or an older version is refused. Its configuration survives power-off, and its own drivers carry the Ethernet.
 
-**Not established.** The device cannot update itself, its configuration is lost at power-off, and the
-serial console opens a root shell without a login. The full list is [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md);
+**Not established.** Release [`v1.1`](https://github.com/Jhongwe1/router-customFW/releases/tag/v1.1) ships the
+build with no console shell, which booted from RAM only; the update, the store and the counter were measured on the
+bench build. The full list is [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md);
 what was found along the way is [`docs/FINDINGS.md`](docs/FINDINGS.md).
 
 **To check it.** `make test` runs the host suites CI runs on every push to `main`, and the claims about the
@@ -35,30 +35,33 @@ Measured on the device unless the row says otherwise; each gate's result, with w
 
 | Layer | rlxfw's own | Measured | Gate |
 |---|---|---|---|
-| Boot | `rlxboot`, a second-stage loader: Ed25519 over the header, SHA-256 over the payload, an anti-rollback version, two slots and a read-only rescue copy | boots slot A or B from flash; refused a flipped payload bit and a lower version; ten power cuts mid-write each booted the other slot | `R8a`, `R8b` |
-| Kernel | eight drivers on the vendor's Linux 2.6.30 — timer, GPIO, buttons, watchdog, SPI flash, Ethernet DMA, switch, entropy — and no vendor Ethernet driver in the image | the release image boots from flash and pings both ways, after a watchdog reset and after a cold power-on | `R5`, `R6`, `R6b`, `R6c` |
-| Userspace | six programs: `init` as PID 1, a config store, a privileged broker, a web server, a DNS forwarder, a DHCP-lease handler; busybox rebuilt to a chosen applet set | booted from RAM, each answered: `httpd` as uid 100 in a chroot, `dnsfwd` as uid 101 | `R7` |
+| Boot | `rlxboot`, a second-stage loader: Ed25519 over the header, SHA-256 over the payload, an anti-rollback version, two slots and a read-only rescue copy | boots slot A or B from flash; refused a flipped payload bit and a version below the counter, which rlxfw now advances in flash; power cuts mid-write each left a slot that boots | `R8a`, `R8b`, `P6r-11` |
+| Kernel | eight drivers on the vendor's Linux 2.6.30 — timer, GPIO, buttons, watchdog, SPI flash, Ethernet DMA, switch, entropy — and no vendor Ethernet driver in the image | booted from flash, it pings both ways after a watchdog reset and after a cold power-on | `R5`, `R6`, `R6b`, `R6c` |
+| Userspace | six programs: `init` as PID 1, a config store kept in flash, a privileged broker that also installs updates, a web server, a DNS forwarder, a DHCP-lease handler; busybox rebuilt to a chosen applet set | each answered, `httpd` as uid 100 in a chroot and `dnsfwd` as uid 101; an update uploaded to `httpd` was installed and booted, and the store survived a cold power cycle | `R7`, `P6r-10`, `P6r-12` |
 | Instruction set | a bare-metal census under rlxfw's own exception handler | 75 encodings on the die; it executes `lwl`, `lwr`, `swl` and `swr`, which its family's public record says it lacks | `R1-pub` |
 | Production test | `mfgtest`, eleven checks | 11 of 11 on a good unit; five checks turned red by physical fault injection | `P1` |
 | Comparison | one instrument run on both firmwares | 16 published rows against the vendor firmware, each with a mechanism class and a check that would show the opposite | `R9` |
 | Build, on a host | the kernel configuration, every change to vendor source and the initramfs, each declared in a table | the same tree built twice gives the same image, on one machine | `P4a` |
-| Release, on a host | the image and its signed container, beside the corresponding source and the licence texts | the image is the bytes the device ran; the source archive built twice, byte-identical | `P4b` |
+| Release, on a host | the image beside its corresponding source and the licence texts; `v1.0` also shipped its signed container | the image is the bytes the device ran, rebuilt byte for byte in another clone; the source archive built twice, byte-identical | `P4b` |
 
 ## What does not work
 
-- The device cannot update itself: every slot write was made by an install image started from RAM at the
-  loader's prompt, and the anti-rollback counter has never advanced.
-- Nothing the running firmware writes survives a power cycle; the config store is in RAM.
-- The console opens a root shell without a login; nothing serves TLS; the WLAN driver is the vendor's.
+- The release image booted from RAM only. The update, the store and the counter were measured on a bench build
+  of the same code, and one power cut was made per kind of write.
+- The console has no shell, but the stock loader answers on it first, and its commands write flash without
+  authentication.
+- Nothing serves TLS: a password crosses the LAN in clear, and an update is signed but not secret. The WLAN driver
+  is the vendor's.
 - There is no WAN: switch ports 0–5, the jack labelled WAN among them, share one VLAN.
-- None of it is secure boot: whoever can write the flash can replace `rlxboot`. Every reading of the release
-  image is one unit, one loader build and one boot per path ([`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md)).
+- None of it is secure boot: whoever can write the flash can replace `rlxboot`. Every reading is one unit and one
+  loader build ([`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md)).
 
 ## Numbers
 
 | | |
 |---|---|
-| Release image | 1,110,016 bytes; a slot holds 1,179,648 |
+| Release image | 1,144,832 bytes; a slot holds 1,179,648 |
+| An update through `httpd` | 38.8 s from the upload's first byte to the new image's `lan up` (`P6r-10`) |
 | Kernel boot, cold | rlxfw 9.4 s, the vendor's 7.1 s; the vendor's userspace then takes 18.7 s (`P2`'s images, one script for both) |
 | TCP through rlxfw's Ethernet driver | 16.9 Mbit/s received by the board, 21.6–22.4 sent, three runs each (`R6b`); the vendor's driver on the same kernel, 24.6 and 26.1 (`P2`) |
 | Traffic with no stall | 31 minutes, 2,363,511 frames of every length from 60 to 1,514 bytes; the driver's recovery fired 0 times (`R6b`) |
@@ -119,20 +122,21 @@ reaches a committed file only with its source marked and its refutation conditio
 
 ## Versions
 
-This table owns which gates define each version; `PROGRESS.md` owns which have shipped, `CHANGELOG.md` their contents.
+<a id="which-gates-make-which-version"></a>This table owns which gates define each version; `PROGRESS.md` owns which have shipped, `CHANGELOG.md` their contents.
 
 | version | the gates that define it | version | the gates that define it |
 |---|---|---|---|
-| `v0.0` | the instruments and the desk analysis | `v0.4` | `R1-pub` + `P1` |
-| `v0.1` | `R0` + `rlxprobe` executing on the silicon + `R1-gate` | `v0.5` | `R6` + `P2` |
-| `v0.2` | `R3`, with a 60-second take + `P4a` | `v0.6` | `R7` |
-| `v0.3` | `R4` + `R5` | `v1.0` | `R6c` + `R8` + `R8b` + `R9` + `P3` + `P4b` |
+| `v0.0` | the instruments and the desk analysis | `v0.5` | `R6` + `P2` |
+| `v0.1` | `R0` + `rlxprobe` executing on the silicon + `R1-gate` | `v0.6` | `R7` |
+| `v0.2` | `R3`, with a 60-second take + `P4a` | `v1.0` | `R6c` + `R8` + `R8b` + `R9` + `P3` + `P4b` |
+| `v0.3` | `R4` + `R5` | `v1.1` | `P6r-10` + `P6r-11` + `P6r-12`, three steps of `P6r` |
+| `v0.4` | `R1-pub` + `P1` | | |
 
 ## Licences
 
 [`LICENSE`](LICENSE) is the MIT text and covers rlxfw's own userspace, tools and documents; [`kernel/LICENSE`](kernel/LICENSE)
 covers rlxfw's own kernel files, which are `GPL-2.0-only` because the kernel they link into is. [`NOTICE`](NOTICE) says
 what is under which licence and why, and [`docs/offer.md`](docs/offer.md) how corresponding source travels: as an asset
-of the same release as the binary. `v0.2`–`v0.6` carry no binary; `v1.0`'s binaries travel only with their
-corresponding-source archive. No vendor material is committed: `SOURCES.json` records every external input with its
+of the same release as the binary. `v0.2`–`v0.6` carry no binary; `v1.0`'s and `v1.1`'s travel only with their
+own corresponding-source archives. No vendor material is committed: `SOURCES.json` records every external input with its
 URL and sha256, and the flash dump, which identifies this unit, stays out.

@@ -35,10 +35,18 @@ uploads none of them. The archive's own sha256 is in `v1.0`'s release notes and
 not here, because the archive contains this file (`docs/release-process.md`,
 *Which records carry which digest*).
 
+The binary `v1.1` is made with is the image `mainline-495094ab.img` alone —
+1,144,832 bytes, sha256
+`a016a5c0354b2350dc72eb67e1a03fd98e457e66d4908487c2c75ce964e2adb8`, `RECIPE_ID`
+`495094ab` — with no signed container. Phase C uploads it with its own
+corresponding-source archive, built from `v1.1`'s commit, and the files § 1
+lists, as assets of `v1.1`, or uploads none of them; that archive's sha256 is in
+`v1.1`'s release notes.
+
 量 2026-10-08: `v0.0` is an annotated tag with no release at all, which is why
 the releases above are named and not counted. No tag of this repository is
-signed — `docs/release-process.md` makes `v1.0`'s unsigned like the six before
-it — and 量 no `user.signingkey` is configured, so a recipient cannot establish
+signed — `docs/release-process.md` makes `v1.0`'s and `v1.1`'s unsigned like
+the six before them — and 量 no `user.signingkey` is configured, so a recipient cannot establish
 from a tag that it is the owner's: an archive tied to a release is tied to
 something unsigned. What a recipient can check is the commit id and the sha256
 of every asset, which the release notes list (`docs/release-process.md`).
@@ -65,7 +73,8 @@ and `docs/sbom.md` at that release's commit, and `SHA256SUMS`, written at
 release time over every other asset, so that `sha256sum -c SHA256SUMS` checks
 the whole release. For `v1.0` the binaries are the image and `T.rlxu` (§ 2,
 row 10); the armed image, `rlxboot`, its rescue copy and container S are not
-assets. `docs/release-process.md` lists the assets and the tool that produces
+assets. For `v1.1` the binary is the image alone; `rlxboot`, its rescue copy and
+the slot containers V and U are not assets. `docs/release-process.md` lists the assets and the tool that produces
 or checks each.
 
 **Building it.** 讀 The build driver refuses to build unless every `--absent`
@@ -97,14 +106,14 @@ from.
 |---|---|---|---|---|
 | 1 | the kernel inside `nfjrom`: Realtek's `linux-2.6.30` tree, `arch/rlx`, the board BSP, the `rtl8192cd` WLAN driver, the NAT fast path, the MTD/SPI and GPIO code (`docs/sbom.md` `K1`–`K5`) | GPL-2.0 | the kernel tree and the board BSP the build compiles, every file rlxfw's declarations change included, **plus the scripts that control compilation**: the repository at the release commit, which holds the build driver `tools/rlxfw-kbuild.sh` and everything it calls, the declarations under `config/`, and `tools/modrecord.py`'s generated per-file modification record | `SOURCES.json` `rtl819x-toolchain` at pin `5c9be5d943318fdb4d048ae22078129594eb5a10` — its `linux-2.6.30/`, `boards/rtl8196e/bsp/` and the board template — read at the pin and packed; the declarations are in this repository |
 | 2 | the loader stub in `nfjrom`: `rtkload` (`W1`) and the LZMA decoder (`W2`) | GPL-2.0; LZMA LGPL or CPL 讀 | that directory's source, with `tools/rtkimage.py` as the script that wraps it. ⚠️ The two host programs that pipeline runs, `rtkload/lzma-26` and `rtkload/cvimg`, are prebuilt binaries in the drop; the archive leaves them out and lists them with their sha256 | the same drop, `linux-2.6.30/rtkload/` |
-| 3 | rlxfw's own 12 compiled kernel sources (`K6`) | GPL-2.0-only (`NOTICE` § 2) | every file under `kernel/` at the release's commit; for `v1.0`, which predates `kernel/`, the same files under `config/` at `2eb1a3d6` | this repository |
+| 3 | rlxfw's own compiled kernel sources (`K6`): 12 in `v1.0`'s image, 14 in `v1.1`'s (`docs/sbom.md` Appendix C) | GPL-2.0-only (`NOTICE` § 2) | every file under `kernel/` at the release's commit; for `v1.0`, which predates `kernel/`, the same files under `config/` at `2eb1a3d6` | this repository |
 | 4 | `/bin/busybox` (`U8`) and its 11 applet symlinks | GPL-2.0-only | the drop's `busybox-1.13`, plus `config/busybox-patches/`, `config/rlxfw-busybox.config` and `tools/mkbusybox.sh` | the same drop, read at the pin and packed; the recipe is in this repository |
 | 5 | uClibc 0.9.30, statically linked into all 11 ELF files (`L1`, `L2`) | LGPL-2.1 | the library's complete source **and the relink path**: each program's own sources and Makefiles, so a recipient can modify uClibc and relink (讀 LGPL-2.1 § 6(a); `NOTICE` § 5) | the drop's `toolchain/rsdk-1.3.6-4181-EB-2.6.30-0.9.30/config/uclibc/`, packed without the prebuilt objects the drop keeps beside its sources; the programs are in this repository |
 | 6 | rlxfw's six userspace programs, the probes, `mfgtest`, the web UI and the configuration files (`U1`–`U7`, `U10`–`U15`) | MIT (`NOTICE` § 4) | this repository at the release's commit | this repository |
 | 7 | `src/lib/ed25519.c` and `src/lib/sha512.c` (`X1a`) | public domain | the two files, and the upstream file `src/rlxboot/test/mk-import.sh` regenerates them from; `check-import.sh` fails on a one-byte difference | `SOURCES.json` `tweetnacl`, checked against its sha256 and packed |
 | 8 | `/bin/iperf3` (`U9`) | LBNL three-clause BSD, with bundled MIT / BSD / NCSA / public-domain notices 讀 | the upstream tarball iperf 3.1.3, whose `LICENSE` carries every bundled notice; **see § 4, gap 1** for what it does not give | `SOURCES.json` `iperf3`, checked against its sha256 and packed |
 | 9 | `libgcc.a` of gcc 3.4.6-1.3.6, statically linked into 7 of the 11 ELFs (`L3`) | 推 GPL-2.0-or-later with the libgcc linking exception | **see § 4, gap 2** — nothing | no pinned tree holds gcc or binutils source |
-| 10 | `T.rlxu`, the signed update container: the image (rows 1–6, 8 and 9) byte for byte, behind a 96-byte header written by `tools/mkfw2.py` and the owner's 64-byte signature | the image's; the header and the signature add no component | nothing beyond the image's: T's corresponding source is the image's, in the same archive, and `tools/mkfw2.py` is in the repository at the release commit (row 1). The owner's private key, which made the signature, is not source and is not in the repository | this repository (`tools/mkfw2.py`); the signature, the owner's key |
+| 10 | `v1.0` only: `T.rlxu`, the signed update container: the image (rows 1–6, 8 and 9) byte for byte, behind a 96-byte header written by `tools/mkfw2.py` and the owner's 64-byte signature | the image's; the header and the signature add no component | nothing beyond the image's: T's corresponding source is the image's, in the same archive, and `tools/mkfw2.py` is in the repository at the release commit (row 1). The owner's private key, which made the signature, is not source and is not in the repository | this repository (`tools/mkfw2.py`); the signature, the owner's key |
 
 **What the archive no longer depends on, and what still does.** 讀
 `docs/sbom.md` § 2.4: `SOURCES.json` records a URL and a pin on a **third
@@ -217,10 +226,11 @@ the list (`P4b`, closed 2026-10-09); `docs/release-process.md` B7 runs it.
   LGPL-2.1 § 6. Every 讀 above is a quotation of a licence's own words; every
   conclusion drawn from one is marked 推.
 - **It discharges nothing by itself.** § 0 says which release carries which
-  binary: `v0.2`–`v0.6` carry none and owe nothing, and whatever `v1.0` owes
-  for its binaries is met, if it is, by its own assets — the archive, its
-  manifest and the licence texts beside them — and not by a sentence here.
-- **It does not establish that `v1.0` meets § 5.** `docs/release-process.md`
+  binary: `v0.2`–`v0.6` carry none and owe nothing, and whatever `v1.0` and
+  `v1.1` owe for their binaries is met, if it is, by each release's own assets —
+  its archive, its manifest and the licence texts beside them — and not by a
+  sentence here.
+- **It does not establish that a release meets § 5.** `docs/release-process.md`
   B7 reads each line of § 5 against the release commit and the release itself;
   this file states the condition, not the reading.
 - **It does not settle `SBOM-2`** — the 35 Realtek-directory sources with no
