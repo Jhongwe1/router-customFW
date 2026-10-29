@@ -21,8 +21,8 @@ updates itself: an uploaded image passes `rlxboot`'s checks, goes to the other s
 wrong key or an older version is refused. Its configuration survives power-off, and its own drivers carry the Ethernet.
 
 **Not established.** Release [`v1.1`](https://github.com/Jhongwe1/router-customFW/releases/tag/v1.1) ships the
-build with no console shell, which booted from RAM only; the update, the store and the counter were measured on the
-bench build. The full list is [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md);
+build with no console shell, which booted from RAM only; the update, the store and the counter were measured on
+bench builds. The full list is [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md);
 what was found along the way is [`docs/FINDINGS.md`](docs/FINDINGS.md).
 
 **To check it.** `make test` runs the host suites CI runs on every push to `main`, and the claims about the
@@ -46,8 +46,8 @@ Measured on the device unless the row says otherwise; each gate's result, with w
 
 ## What does not work
 
-- The release image booted from RAM only. The update, the store and the counter were measured on a bench build
-  of the same code, and one power cut was made per kind of write.
+- The release image booted from RAM only. The update, the store and the counter were measured on bench builds
+  of the same code, and each new kind of write was cut by power once.
 - The console has no shell, but the stock loader answers on it first, and its commands write flash without
   authentication.
 - Nothing serves TLS: a password crosses the LAN in clear, and an update is signed but not secret. The WLAN driver
