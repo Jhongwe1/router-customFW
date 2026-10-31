@@ -1691,3 +1691,35 @@ D2 是這一則與它的 commit：`PROGRESS.md` 的 Release clock `v1.1` 列與 
 **做錯的事。** ① 這一段第一則訊息進來時我沒有讀鐘，以為還是凌晨一點：WSL 印 16:51，我說它「跟現在的本地時間對不上」，讀 Windows 的鐘才知道是 16:52 —— 記憶裡寫過的「報自己的時鐘卻用心算」。② 刪除之前沒查追蹤檔的文字引用（上面）。③ 讀卡片 c 的 `Vc31`：`mkdir -p '//wsl.localhost/…'` 在 Git Bash 試著建 UNC 的根而失敗，同一行 `&&` 後面的 `cd` 沒跑、grep 落在 repo 根目錄讀不到檔（沒有副作用）；分開重做。④ 用 `awk` 拿空白切表格列，印出一長串單字，白花一次輸出；改用 Python 切 ` | `。⑤ `bash -c` 裡的 `${PIPESTATUS[0]}` 讀成空字串；之後 rc 一律在腳本檔裡讀。⑥ 刪第一次 sweep 的複製品時，又把 `$p` 直接寫在 `wsl … bash -c '…'` 的參數裡（`CLAUDE.md` 寫過的坑）：到 WSL 時 `$p` 是空的，`[ -d "$p" ]` 的守衛讀成假、`rm -rf` 一次都沒跑，而印出來的 `rm rc=0` 與「gone:」都是假的 —— 列目錄才看出 `sweep-dest` 還在；寫成 `s149/rmdest.sh` 照路徑跑才刪掉。這一次救了它的是守衛，不是做法。⑦ 查 sweep 有沒有開始時，`pgrep -af "sweep.sh|desk-sweep"` 放在 wsl 參數裡，`|` 被當成管線，rc 127、什麼都沒查到；改成 `s149/swstat.sh`。
 
 **沒做、接下來。** 這一則寫在關閉的 commit 之前：commit 之後的 `citecheck`、整棵樹的收工掃描、推送（要擁有者的 yes）、推送觸發的兩輪 CI、`entrycheck check` 加上連網的輸入（E8w 讀 HEAD 的 blob 頁、E14w 讀 HEAD 的 CI log），都在下一則。`wsl --shutdown` 後壓縮 vhdx 把 12 GB 還給 C:，等擁有者決定。`shibajee/linux-rtl8196e#1` 留在對方那裡。
+
+## 2026-10-30 — 第一百四十九段之二（關閉的 commit 之後，跨到 11-01；桌面；零次電源動作，零次 flash 寫入，零次 `FLW`／`EW`／`EB`／非零 `AUTOBURN`／`FLR`）：關閉的 commit `60758038` 推上去了，兩輪 CI 都是 success；`entrycheck check` 加上三份連網的輸入，23 列全部 PASS
+
+**上一則寫在關閉的 commit 之前，這一則記它之後的事。** K ＝ `607580385bd867b6c720e5f40e5c4e7d16940b77`，2026-10-31 19:59:47（`git log %ci`），16 個檔、468+／147−，父 `c0103a4c`。上一則記了 desk-sweep 之前的兩輪文件檢查；sweep 之後、commit 之前，在最後的樹上又跑了一輪（`s149/doc3/`，19:53:40–19:59:07），沒有寫進上一則：`spec-check`、`citecheck`、`docsize`、`cfcensus` 三個、`entrycheck report --offline`（23 列 19 PASS、0 RED、4 UNMEASURED：E8w、E12、E13、E14w）、`modrecord check`、`ledgerscan` 兩個、`test-file-modes` 都 rc 0；`flashwin` 對 16 個改動檔 CLEAN；`digestscan scan` 0 findings、16 exempt；`git diff --check` 0 行。
+
+**K 上的收工掃描（`s149/closeout-scan.sh`，輸出在 `s149/close/`）。** 在乾淨的 K 上跑，20:00:56–20:12:38，`upstream` 在 `4d3ff26`；九個工具的 rc 都是 0，每一個都在腳本裡讀。commit 之後的 `citecheck`：48 passed／0 failed 與 8 passed／0 failed，C3 0 new／42 known，C4 33 列、0 suspended。`flashwin scan --dump` 掃 19,083 個檔、113 個探針，CLEAN；`digestscan scan` 讀 18,309／18,310 個檔（1 個 submodule gitlink 不讀），0 findings、16 exempt；`digestscan check` 2 passed。`xcheck sweep` 4,940 個產物、3 個恆等式、0 不一致；`capdate` 95 張卡，0 RED、0 STALE；`ledgerscan check` 與 `quarantine` 通過；`test-file-modes` 190 個可執行檔、5 passed。掃完 porcelain 0 行，HEAD 仍是 `60758038`。上一則把 `P5e-2` 記 ✅ 的時候，它的 DoD 要的「commit 之後 0 failed、0 suspended」還讀不到，因為這只能在 commit 之後讀；讀到的就是它要的值。
+
+**推送。** push 的 yes 是在掃描還在跑的時候問的，條件寫明：掃描通過才推，不通過就不推。擁有者回「yes」（2026-11-01 00:26:03，時間取自 session 紀錄的時間戳）。推之前：porcelain 0 行；`git ls-remote origin refs/heads/main` 讀到 `c0103a4c`，與 `origin/main` 相同；`git merge-base --is-ancestor origin/main HEAD` 成立，只差一個 commit。`git push origin main` 在 00:27:12 與 00:27:33 兩次讀時鐘之間跑完：`c0103a4c..60758038  main -> main`。
+
+**CI。** 兩輪都在 2026-10-31T16:27:30Z（本地 00:27:30）建立，結論用 `gh run list --commit` 讀：`build` run `41219773245` success，16:33:38Z 結束；`instruments` run `41219773149` success，17:00:59Z 結束，四個 job 都是 success：`lint`（16:27:33Z–16:27:57Z）、`text`（16:27:33Z–17:00:41Z）、`instruments`（16:27:33Z–16:59:18Z），以及排在 `text` 之後的 `census`（17:00:44Z–17:00:56Z）。上一輪（`c0103a4c`）的 `text` 跑 28.5 分、`instruments` 29.5 分，這一輪是 33.1 分與 31.8 分。
+
+**`entrycheck check` 加上連網的輸入（`s149/online.sh`，輸出在 `s149/online/`）。** 三份輸入都取在 HEAD `60758038`：
+- 七個根目錄 `.md` 的 blob 頁：Git Bash 的 `curl -sL`，00:28:40–00:28:49，七個都回 HTTP 200。
+- `gh repo view Jhongwe1/router-customFW --json nameWithOwner,primaryLanguage,repositoryTopics`：00:28:49。比工具說明多要了 `nameWithOwner`，讓工具核對它描述的是這個 repo。
+- `gh run view 41219773245 --log`：00:34:01，314,122 位元組，HEAD 的完整 sha 在裡面出現 3 次。
+
+第一次只給前兩份（00:29:19–00:31:00）：22 PASS、0 RED、1 UNMEASURED（E14w，因為沒有 log），`check` rc 1。少了它的輸入，這一列不會讀成 PASS。第二次三份都給（00:34:09–00:35:52）：23 列 23 PASS、0 RED、0 WAIVED、0 UNMEASURED，`check` rc 0。各列的讀數：
+- E8w 0 of 7 not shown。每一頁都是那個檔，也都是 HEAD（看頁面的 `refInfo.currentOid`）。`LOG.md`（448,189 位元組）與 `SPEC.md`（1,732,333 位元組）顯示為原始碼，其餘五個顯示為 markdown。
+- E12 `C`；E13 10 個 topics。
+- E14w 兩行都在 HEAD 的 log 裡：`test: 6 of 6 program suites ran and passed` 與 `host suite: PASS`。
+
+`SPEC.md` `FW-276` 的殘留寫「E8w、E14w 只能在推上去之後讀」，這一則的 commit 在那一格接上讀到的值。這幾列是 `P5e` 的 DoD 的一部分，但 `P5e` 仍是 ⊘ *Traded away*：它的外部讀者測試沒有跑，這幾列綠了也不改變這件事。
+
+**這不是十一月的第一次收工。** `CLAUDE.md` 要在「一個月的第一次收工」把上個月的 `LOG.md` 各則搬進 `docs/log/`。這一則在 11-01 寫，但它屬於 10-30 開場那一段的收工。前例是第一百四十八段之二：它跨到 10-30，在 10-30 00:18:42 commit（`c0103a4c`），標題標的是那一段的日期 10-29；這一則照它標 10-30。照標題的日期選，`LOG.md` 的 36 則都是十月的，現在搬會讓 `LOG.md` 只剩檔頭。專案已經關了，不會有在十一月開場的一段，所以十月的各則留在 `LOG.md`，`docs/log/README.md` 也不加列。
+
+**其他狀態。** `shibajee/linux-rtl8196e#1`（`P5e-7` 的回報）在 2026-11-01 01:01:22–01:01:25 讀：OPEN、0 則留言，最後更新 2026-10-18T17:59:46Z。§ Now「Blocked on」那一列說的仍然成立，所以 `PROGRESS.md` 這次不改。
+
+**沒有驗證的。** 文件檢查（`s149/doc4/`）要等這一則與 `FW-276` 的修改都寫好，才在最後的樹上跑，所以它的結果不在這一則裡，只在對話裡回報。
+
+**做錯的事。** 這一則的工作裡沒有抓到。
+
+**沒做、接下來。** 這一則的 commit 要推上去，要擁有者那一步的 yes。推送觸發的兩輪 CI 不會再有下一則記，結論只在對話裡回報。`wsl --shutdown` 之後壓縮 vhdx、把約 12 GB 還給 C:，等擁有者決定。`shibajee/linux-rtl8196e#1` 留在對方那裡。
