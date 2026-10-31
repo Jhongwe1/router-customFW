@@ -756,7 +756,7 @@ when it names `B` or is `none`; `repeat=3` writing the region three times; `ctrl
 🔄 2026-10-23: `CTR_HANDOFF` is not glue-only (above), and `n_writes` counts programs (§ 2.4.2). 量
 `tools/test-spi-install.sh` at `948ff614`'s code: 930 pure + 710 shipped + 302 glue + 300 shipped
 glue cases, the glue built against both region tables because the shipped one is what the device
-will run (1B v3, `$FWRE_WORK/rebuild/s144/1b/`; `948ff614`'s message records the same four counts).
+will run (1B v3, `$FWRE_WORK/rebuild/s144/1b/`, deleted on 2026-10-30; `948ff614`'s message records the same four counts).
 
 ### 2.9 Shipping the install path: the blast radius
 

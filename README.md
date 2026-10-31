@@ -4,7 +4,8 @@
 
 An independent firmware for the TOTOLINK N150RT, a router built on the Realtek RTL8196E — a big-endian
 Lexra core, 4 MiB of SPI flash, 32 MiB of RAM — whose vendor never released its source. It is built from
-GPL drops of Realtek's SDK and a leaked draft datasheet, on one unit with no spare.
+GPL drops of Realtek's SDK and a leaked draft datasheet, on one unit with no spare. The project is closed;
+`v1.1` is its last release.
 
 ```mermaid
 flowchart LR
@@ -20,14 +21,16 @@ flowchart LR
 updates itself: an uploaded image passes `rlxboot`'s checks, goes to the other slot and boots, and a flipped bit, a
 wrong key or an older version is refused. Its configuration survives power-off, and its own drivers carry the Ethernet.
 
-**Not established.** Release [`v1.1`](https://github.com/Jhongwe1/router-customFW/releases/tag/v1.1) ships the
+**On video.** [A minute of `v1.0` on the device](https://www.youtube.com/watch?v=WOBuOcHn2t0), filmed live;
+more in [`docs/media.md`](docs/media.md).
+
+**Not established.** [`v1.1`](https://github.com/Jhongwe1/router-customFW/releases/tag/v1.1) ships the
 build with no console shell, which booted from RAM only; the update, the store and the counter were measured on
 bench builds. The full list is [`docs/KNOWN-ISSUES.md`](docs/KNOWN-ISSUES.md);
 what was found along the way is [`docs/FINDINGS.md`](docs/FINDINGS.md).
 
-**To check it.** `make test` runs the host suites CI runs on every push to `main`, and the claims about the
-device trace to console captures committed unedited under `bench/`. [`REPRODUCE.md`](REPRODUCE.md) rebuilds
-the release image from its corresponding source, byte for byte.
+**To check it.** `make test` runs CI's host suites; each device claim traces to an unedited
+console capture under `bench/`; [`REPRODUCE.md`](REPRODUCE.md) rebuilds a release image from its source.
 
 ## What works
 
@@ -98,6 +101,10 @@ show it can fail, because a tool reporting 0 is making a claim. On every push to
 and `instruments` the tools' self-tests, mutation suites and text checks. The rules are [`CLAUDE.md`](CLAUDE.md)'s; the
 reader's version is [`docs/method.md`](docs/method.md). Five defects, each told from its dated record — the first
 hypothesis, the cut, the cause and the check left behind — are in [`docs/cases/`](docs/cases/README.md).
+
+The video is one bench session in two cuts, [one minute](https://www.youtube.com/watch?v=WOBuOcHn2t0) and
+[a longer one](https://www.youtube.com/watch?v=a2rwQovBzcw), filmed live while a bench card ran; [`docs/media.md`](docs/media.md)
+names the capture behind each shot, and what the cuts do not show.
 
 ## Hardware
 

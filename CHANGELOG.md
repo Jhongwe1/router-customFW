@@ -18,7 +18,10 @@ release that carries an image names it by sha256 in its section
 
 ## Unreleased
 
-Nothing yet.
+2026-10-30, after `v1.1`: the project closed. `P6r` closed, and `P5e` was traded away with its
+outside-reader test never run (`docs/GATE-RESULTS.md` entries 24 and 25). The video of `v1.0`,
+filmed live, is linked from `README.md` and described shot by shot in `docs/media.md`. No
+release follows: `v1.1` is the last.
 
 ---
 

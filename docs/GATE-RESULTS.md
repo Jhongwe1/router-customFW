@@ -5000,7 +5000,183 @@ build of the image without the console shell (ruling 6).
 
 ---
 
-## The operating clause, re-run at twenty-three entries
+## 2026-10-30 — `P5e` (⊘ *Traded away*: the repository's entry points rebuilt for a reader with no context and every `entrycheck` row read before the push green, while the gate's own test, one reader from outside, never ran — the owner closed the project)
+
+### One line
+
+**v1.0+, ten segments — the 132nd, which opened it; the 133rd to the 138th, which closed `P5e-1`
+to `P5e-4` and landed `P5e-5`; the 139th, which closed `P5e-5`, sent `P5e-7` and built the
+video's toolkit; the 147th, which filmed `P5e-6` on the bench day; and the 149th, for this
+closing.** It closes ⊘ *Traded away* ([`docs/method.md`](method.md) § *Deliberately not done*),
+by the owner's decision of 2026-10-30 to close the project, and not `✓`. Its list closes *when
+every step reads its DoD* and allows ⊘ only for ③ of `P5e-3`, ③ of `P5e-6`, the optional parts
+of `P5e-7` and `P5e-1`'s stop-loss route, and three things read none of that: `P5e-6`'s replay
+and its 18 pt, `P5e-7`'s outcome, whose 30 days end on 2026-11-18, and the refutation condition
+itself, one reader from outside given only the URL. The owner ruled on all three that day: the
+reader test is not run and is recorded as not run, `P5e-7` is not waited for, and the 18 pt is
+not known. Each row the decision reaches says so in `docs/history/steps-P5e.md`, which this
+commit writes.
+
+**The weakest thing here is that the gate's whole claim — readable and checkable by a reader with
+no context — was never tried on one.** Every reading below is the author's or a tool's, which is
+the reading the refutation condition was written to distrust.
+
+### Three claims that stand
+
+**① The first screen answers the five questions within its budget, and every page under `docs/`
+and `notes/` is two links from `docs/README.md`.** 量 2026-10-30, `tools/entrycheck.py report
+--offline` on the closing tree: `README.md` 149 lines (E1, ≤ 150), 200 words before its first
+heading (E2, ≤ 200), no date (E3), no status emoji (E4), a diagram (E6), a build section of 6
+lines linking `docs/build.md` (E7); 0 of 188 pages unreachable (E15); 0 references to the
+planning directory (E16), 0 personal paths (E19), 0 framing terms (E21); the first `#include` of
+11 drivers by line 54 at worst (E17), and 0 of 143 C and H files with a mark or an emoji (E18).
+The first screen now carries the video, filmed live (`docs/media.md`), and it is not `v0.2`'s
+replay (E20).
+
+**② CI builds and tests the code, not only the tools.** 量: E14 reads the `build-host` job wired
+(`.github/workflows/build.yml`: the six programs' suites and `rlxboot`'s host suite); on
+2026-10-30 `gh repo view` reads the primary language `C` (E12) and 10 topics (E13, ≥ 8); and the
+last two pushes before this commit ran `build` and `instruments` to `success` — `b3448437`'s
+(`40877125030`, `40877125190`) and `c0103a4c`'s (`40912717707`, `40912718117`).
+
+**③ The large files are split and indexed, every move proven verbatim.** 量 on the closing tree:
+`LOG.md` 434,570 bytes, every month before October in `docs/log/` (E8, ≤ 1,000,000);
+`RUNSHEET.md` off the root (E9); `CHANGELOG.md` 183 lines, its longest version section 35 (E10);
+`PROGRESS.md` 151 lines (E11, ≤ 200) once this commit moves the two step lists out.
+`tools/docmove.py check --before HEAD:PROGRESS.md --after PROGRESS.md docs/history/steps-P5e.md
+docs/history/steps-P6r.md` reads `CONSERVED`: of 126 checked blocks, 107 conserved and 19 declared,
+each declared block a state row rewritten here or a step row whose mark and one closing sentence
+are its only change — which `$FWRE_WORK/rebuild/s149/rowproof.py` shows byte for byte for the ten
+step rows and `NAME-1`, and which catches a one-word mutation of one row.
+
+### The steps' DoD, read one row at a time
+
+| step | mark | how it reads |
+|---|---|---|
+| `P5e-0` | ✅ 2026-10-09 | `tools/entrycheck.py`, its self-test and mutation suite in CI |
+| `P5e-1` | ✅ 2026-10-17 | `kernel/`, by the move rather than the stop-loss route |
+| `P5e-2` | ✅ 2026-10-30 | ④ lands with this commit: E8–E11 green, `docmove` rc 0 for this move, `docsize`'s budget lowered to 48,900 (`tools/docsize.py`); `citecheck` after the commit is read in the next `LOG.md` entry |
+| `P5e-3` | ✅ 2026-10-18 | ③ done, not ⊘: E17 and E18 green, eleven driver histories under `docs/drivers/` |
+| `P5e-4` | ✅ 2026-10-17 | the `build-host` job |
+| `P5e-5` | ✅ 2026-10-19 | `README.md` rewritten |
+| `P5e-6` | ⊘ 2026-10-30 | both links in `README.md`, ① on the first screen; `docs/media.md` names each take's captures and the `RLXFW-ID0` that `bootslot judge` and `looprun` compared. Not met: the replay and ④, never recorded, and the 18 pt, not measured; ③ not filmed, which the list allowed |
+| `P5e-7` | ⊘ 2026-10-30 | sent 2026-10-19 as `shibajee/linux-rtl8196e#1`; on 2026-10-30 open, with no comment and no review; its outcome not waited for |
+| `P5e-8` | ✅ 2026-10-30 | this entry, § Now, a `LOG.md` entry, `CHANGELOG.md`'s Unreleased section and the list to `docs/history/steps-P5e.md`; the desk-sweep its DoD names runs before the commit, CI and `entrycheck check` after the push, and all three are read in `LOG.md` |
+
+### What `P5e` did not establish
+
+- **Its own claim.** No reader from outside the project read the repository: the refutation
+  condition, written before any step, never ran.
+- **E8w and E14w**, which read GitHub's blob pages and a CI log at HEAD and so exist only after
+  this commit is pushed; `entrycheck check` with every input is read in the next `LOG.md` entry.
+- **`P5e-6`**: which shots each cut keeps, since no tool compared a cut with its take; the 18 pt;
+  the replay of `R8b`'s power cut and the reel that would regenerate it; a power cut filmed live.
+  The video shows `v1.0`'s image, not `v1.1`'s.
+- **`P5e-7`'s outcome**, and whether the defect is fixed upstream.
+- **That the ADRs, the driver pages and the case pages say what a newcomer needs**: their checks
+  are their counts and their links.
+
+### The main session's rulings in this gate, which the owner may override
+
+1. **⊘, not `✓`.** The list's ⊘ clause names four parts; the owner's decision reaches three
+   others and the refutation condition, so the gate is recorded as traded away rather than
+   passed, and each row the decision reaches says so.
+2. **`NAME-1` closes ✅** in the second of the two forms `P5e-3` was given: the names stay, and
+   `config/README.md` § *`host-compat/` holds more than its name says* (`3a19d8ec`) and
+   `tools/README.md`'s row for `test-kbuild-cflags.sh` say what each holds. § Carried forward is
+   left with no row a gate owns.
+3. **`P5e-8` is ✅ on the closing commit**, with the readings its DoD names after the push owed to
+   the next `LOG.md` entry, as `P4b`'s `✓` owed A6.
+
+### The booking: what moved to another gate, and what was declined
+
+Nothing moves: no gate is open after this one and `P6r`, and the owner closed the project.
+`P5e-7`'s pull request stays open on the maintainer's side, and § Carried forward's open rows stay
+under the standing instructions they name.
+
+---
+
+## 2026-10-30 — `P6r` (what the project held after `v1.0`, closed row by row: self-update, persistence and anti-rollback measured on the die and released as `v1.1`, the console's shell gone from the shipped build, four desk deliverables, and the `R10` extensions and WiFi traded away)
+
+### One line
+
+**v1.1, nine segments — the 140th, which opened it on the owner's decision in the 139th; the
+141st, which closed `P6r-1` to `P6r-4`; the 142nd to the 146th, which designed, built and staged
+`P6r-10` and `P6r-11` and traded away `P6r-5`, `P6r-6`, `P6r-8` and `P6r-9`; the 147th, the bench
+day, which measured `P6r-10`, `P6r-11` and `P6r-12` on the die and traded away `P6r-16`; and the
+149th, for this closing.** The 148th released `v1.1` from `b3448437` under
+`docs/release-process.md`, whose outward acts no gate holds. Every row reads ✅ with its evidence
+or ⊘ with a reason and a category; the five rows that read *not scheduled* are marked ⊘ at the
+close, their sentences being the reasons (ruling 1).
+
+**The weakest thing here is that the image `v1.1` ships was never booted from a flash slot.** It
+booted twice from RAM; the update, the store and the counter were measured on V and U, the same
+code built with the bench shell ([`docs/known-issues/v1.1.md`](known-issues/v1.1.md)).
+
+### Three claims that stand
+
+**① rlxfw updates itself from its own web server and keeps its configuration in flash.** 量 on the
+bench day (`bench/2026-10-24/`, `bench/2026-10-25/`; `SPEC.md` `FW-270`–`FW-274`): an update
+uploaded to `httpd` passed `rlxboot`'s checks, was written to the other slot and booted, 38.8 s
+from the upload's first byte to the new image's `lan up`, and the store survived a cold power
+cycle (`P6r-10`).
+
+**② A rollback is refused from flash as well as in a slot.** 量 the same days: the counter at
+`0x3F0000` advances, by programming bits only, to the booted image's version, and a validly
+signed container below it is refused; a power cut during each new kind of write — a slot write, a
+store write, a counter advance — left a valid image booting (`K1`–`K3`, one round per kind)
+(`P6r-11`). On this unit the counter's floor is 7, and permanent.
+
+**③ The shipped build has no console shell.** 量 `bench/2026-10-25/` `P12`, `P13`, `P12-04`: built
+`BENCH_SHELL=0`, it prints `console shell DISABLED in this build` and the first-password prompt,
+and no shell answers; `/api/login` answers 200 with the password set there and 401 with another
+(`P6r-12`). TLS was traded away (`FW-269`).
+
+### The rows, read one at a time
+
+| row | mark | evidence, or the reason |
+|---|---|---|
+| `P6r-1` | ✅ 2026-10-20 | `docs/run.md`, `make run-test` |
+| `P6r-2` | ✅ 2026-10-20 | `REPRODUCE.md`, three layers, run on `v1.0`'s archive |
+| `P6r-3` | ✅ 2026-10-20 | `docs/cases/`, five pages |
+| `P6r-4` | ✅ 2026-10-20 | `docs/disclosure.md` |
+| `P6r-5`, `P6r-6` | ⊘ 2026-10-24 | *Traded away*: rlxfw's drivers, DT and an irqchip on a modern kernel; `P6r-6` folded in |
+| `P6r-7` | ⊘ 2026-10-19 | *Traded away*: WiFi, whose calibration is `H601` content |
+| `P6r-8`, `P6r-9` | ⊘ 2026-10-24 | *Traded away*: DSA, and WAN with routing and NAT |
+| `P6r-10`, `P6r-11`, `P6r-12` | ✅ 2026-10-25 | claims ① to ③ |
+| `P6r-13`, `P6r-15`, `P6r-17`, `P6r-18`, `P6r-21` | ⊘ 2026-10-30 | *Traded away* at the close, for the reasons their rows wrote when they were not scheduled (ruling 1) |
+| `P6r-14` | ✅ 2026-10-17 | by `P5e-4` |
+| `P6r-16` | ⊘ 2026-10-25 | *Traded away*: the analyser on hand and not connected (`LA-1`) |
+| `P6r-19` | ✅ 2026-10-17 | the board's `Est.` column, deleted by `P5e-2` ④ |
+| `P6r-20` | ✅ 2026-10-30 | with `P5e-2`, on this commit |
+
+### What `P6r` did not establish
+
+- **That `v1.1`'s released bytes boot from a flash slot**; and `RLXFW-ID0` names the recipe, so the
+  bench build printed the same id.
+- **`REPRODUCE.md`'s layers on `v1.1`'s archive**: they ran on `v1.0`'s, at the desk, and nobody
+  outside the project has run them.
+- **A cut aimed inside a sub-phase** of a write: one round per kind.
+- **The cause of `FW-273`**, a ping flood that lost packets after a RAM boot and not after a flash
+  boot, and `notes/self-update.md` § 9's items 5, 8 and 9.
+- **What was traded away**: a modern kernel, DSA, WAN, WiFi, TLS and `LA-1`'s latency; and the
+  five rows marked ⊘ at the close, each still under the owner its row names.
+
+### The main session's rulings in this gate, which the owner may override
+
+1. **The five *not scheduled* rows are marked ⊘ at the close.** The closing rule accepts *not
+   scheduled with one sentence* as a reading, and `tools/cfcensus.py`'s `L6` reads a step of a
+   closed gate as closed only on ✅ or ⊘ in its first cell; ⊘ *Traded away* with the sentence as
+   the reason meets both, and `cfcensus check` reads 0 findings on the closing tree.
+2. **`P6r-20` is ✅ on the commit that closes `P5e-2`**, which is this one.
+
+### The booking: what moved to another gate, and what was declined
+
+Nothing moves: the owner closed the project.
+
+---
+
+## The operating clause, re-run at twenty-five entries
 
 **Rule:** two consecutive entries whose *what it did not establish* is the same
 thing make that thing the next gate.
@@ -6208,6 +6384,59 @@ outside the `D`-row population:
   one an enforcer could not have caught without knowing what the tool cannot see.
 
 ⚠️ **The weaker class stays at two.**
+
+### 🆕 At twenty-four entries the clause does not fire — `P4b`'s first item closed the day it was written, and the nearest pair is two objects
+
+**`P4b` → `P5e`.** `P4b`'s first item, *that `v1.0` is released*, was closed the day it was
+written, when `v1.0` was published (`LOG.md`, the 131st segment's second entry), so it cannot
+repeat forward: *a residual that a later gate closes is removed from the clause's input by being
+closed* (the seven-entry run). ⚠️ **The nearest candidate is a person outside the project.**
+`P4b` carries *that a recipient can use T* and the archive's sufficiency for a rebuild by someone
+else; `P5e` carries the reader from outside who never read the repository. Declined as two
+objects, for the reason `R6c` → `P4b` gave its pair of an update: one is a recipient installing or
+rebuilding a release asset, the other a reader answering five questions from a page. What `P4b`
+carries that `P5e` does not — the two gaps, the legal readings, the scan's blind spots, the
+unsigned tag, the console's root shell, which `P6r-12` removed from the shipped build — has no
+later entry to repeat in.
+
+### 🆕 At twenty-five entries the clause FIRES, on a check by anyone outside the project — and the project closes on it
+
+**`P5e` → `P6r` share one counted item: that anyone outside the project has checked what it
+states.** `P5e`'s is its own refutation condition, a reader from outside, never run; `P6r`'s is
+`REPRODUCE.md`, whose layers ran on `v1.0`'s archive at the desk and have been run by nobody
+outside. Counted as one thing, unlike the pair at twenty-four entries, because both are the same
+act — a person outside the project, holding only what the repository publishes, reproducing a
+claim it makes — and `P4a`'s Level 2, a third party rebuilding the recipe to the same sha256, has
+carried the same shape since 2026-09-01.
+
+🔴 **What the firing instructs is not carried out.** *That thing is the next gate* names an outside
+check, and the owner closed the project on 2026-10-30: no gate opens. The clause's result is
+recorded whether or not it agrees with the plan, and this is the first firing whose instruction is
+declined by the plan's end rather than already being done. It is the residual the project ends on.
+
+⚠️ **The honest deduction.** If the twenty-one-entry run's reason governs — *a report that quotes
+a limit has not set out to establish its opposite* — `P6r` never set out to have anyone outside
+run `REPRODUCE.md`, only to give one the means, and this pair does not fire; the last pair then
+closes on a decline, as the last before an empty board did at twenty-three entries.
+
+### 🆕 The census re-run at twenty-five entries — unchanged, because neither new list uses the form
+
+量 2026-10-30, in the 149th segment, with the unchanged thirteen-entry script
+(`$FWRE_WORK/rebuild/s111/land/gate/census.py`, read only; sha256 `1e81ac1a…`) and the
+twenty-three-entry run's three arms (`$FWRE_WORK/rebuild/s149/census25.sh`), pointed at the closing
+working tree — its `PROGRESS.md` and all twenty-two `docs/history/steps-*.md`, `steps-P5e.md` and
+`steps-P6r.md` among them — exit codes read inside one script file:
+
+* **on `PROGRESS.md` alone**, which holds no step list, it refuses, rc 1, with all eight control
+  gates reading 0;
+* **on a scratch root whose `PROGRESS.md` is that file followed by all twenty-two lists** it
+  reproduces **44 clauses across 8 gates** and exits 0, and the `D`-row form reads **66 clauses
+  across eleven gates** with every per-gate figure unchanged;
+* **on the same root with one of `P1`'s `D` rows un-bolded** it exits 1 and names `P1: (3, 4)`.
+
+**79 clauses, unchanged.** `P5e` and `P6r` bring step lists, and each holds 0 bold `D` rows: their
+DoDs are table cells. **No sixth instance.** ⚠️ The census reads the lists only; `P5e`'s `E` rows,
+read by `tools/entrycheck.py`, are outside it.
 
 ### Carried unchanged from the seven-entry run
 

@@ -36,6 +36,8 @@ fourteen by `R1y-4` on 2026-09-30 from `e274ccb`, each later one in its gate's c
 | [steps-R9.md](steps-R9.md) | `R9`, 2026-10-04 | in its closing commit |
 | [steps-R8b.md](steps-R8b.md) | `R8b`, 2026-10-08 | in its closing commit |
 | [steps-R6c.md](steps-R6c.md) | `R6c`, 2026-10-09 | in its closing commit |
+| [steps-P5e.md](steps-P5e.md) | `P5e`, 2026-10-30, ⊘ *Traded away* | in its closing commit |
+| [steps-P6r.md](steps-P6r.md) | `P6r`, 2026-10-30 | in its closing commit |
 
 ## `PROGRESS.md`'s history
 
