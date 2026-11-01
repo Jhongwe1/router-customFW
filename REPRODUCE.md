@@ -136,7 +136,7 @@ from the release build's in 0 of 4,621,952 bytes (`tools/repdiff.py`), so
 to the released ones, five of which the release build had copied in by digest
 rather than built. Every tripwire verdict was CLEAN, and a run took between 2
 min 17 s and 3 min 18 s. The controls: `pincheck` refused the shared drop on this desk, which
-is at the pin with three tracked files deleted (`SPEC.md` `FW-235`), and a
+was then at the pin with three tracked files deleted (`SPEC.md` `FW-235`; restored on 2026-11-02, `FW-277`), and a
 tree at another commit; before the build no file of the archive or the clones
 held a released program's bytes (6 matched a released file's sha256, all of
 them text files the repository tracks); and `--control-iperf3-path`, which

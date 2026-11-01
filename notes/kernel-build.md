@@ -4739,6 +4739,21 @@ initramfs declaration, tool or script names `miniigd` as a path
 into the vendor's own root filesystem — but that was not measured as a negative on
 a build. `SPEC.md` `FW-235`.
 
+**🔄 2026-11-02 (150th segment): restored, and the refutation condition above fired.** The owner
+handed this segment its decisions, and the three files were restored with `git checkout --
+users/miniigd/…`, run by path from `$FWRE_WORK/rebuild/s150/restore.sh`, which first read `HEAD`
+at the pin and the porcelain as exactly those three ` D` lines, refusing otherwise. 量 after it:
+porcelain 0 lines; each file's `git hash-object` equals its index blob, mode `100755`, 113,493,
+117,333 and 104,319 bytes; `tools/vendor-tripwire.sh --check`, from a scratch directory, exits
+**0** — `VENDOR-TRIPWIRE: CLEAN  6 tree(s) watched` — so every tripwire-wrapped build on the
+default tree set runs again; and `tools/test-vendor-tripwire.sh` from the repository root reads
+`30 passed, 0 failed`, `T13`'s two cases among them, where the 2026-10-31 desk sweep had read
+`28 passed, 2 failed`. Before the write, the sibling checkout's tracked text was read: none of
+its `.md`, `.sh`, `.py` or `.json` files names `users/miniigd` or `rtl819x-toolchain` (0 files),
+so no recorded decision of its own is undone. **Not established**: the cause of the deletion,
+which stays unknown; the three files' mtimes are now 2026-11-02, not the clone's; `T10`
+(`--live`) did not run. `SPEC.md` `FW-277`.
+
 **Why this file.** The tree is the build's input, and this file owns the build
 environment: staging, the tripwire's use, `RECIPE_ID`, and the drop's recorded
 state in § 18.5 — which is the same field this reading finds changed.

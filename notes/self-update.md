@@ -81,7 +81,7 @@ shell (§ 3.8); no card publishes the working admin password (§ 6.4).
 - 讀 `rlxboot` zeroes a0–a3 at the jump: `src/rlxboot/jump.S:57-62` moves the entry to t0, zeroes
   a0, a1, a2 and fills `jr`'s delay slot with `a3 = 0`. Until `948ff614` the file had one commit,
   `457b2314` (`git log -- src/rlxboot/jump.S`), so build `127a71cf` at `0x010000` and `0x020000`
-  does the same (`LOG.md:945`, `:971`; `notes/rlxboot.md:746-748`). 🔄 2026-10-23: that entry,
+  does the same (`docs/log/2026-10.md:939`, `:965`; `notes/rlxboot.md:746-748`). 🔄 2026-10-23: that entry,
   `rlxboot_jump`, is what `BOOT=ram` still takes; a slot boot takes `rlxboot_jump_handoff` (§ 1.2).
 - 讀 `rlxboot` does not enter the kernel: it enters `rtkload`, the decompressor at the head of the
   image, at `0x80500000` (`notes/update-chain.md:490-493`, `FW-23`).
@@ -829,7 +829,7 @@ row a guess:
 
 | addition | uncompressed | in the image (LZMA) | source |
 |---|---|---|---|
-| install path + write TU in the shipped kernel | `rtl819x-spi.o` `.text` 10,208 → 22,608 B (objects read at the desk, `notes/spi-mtd-driver.md:1562`), plus the write TU | about 6 KB | 讀 the artefacts: armed `8dce09c5` 1,117,184 B − `9bb2bec7` 1,110,016 B = 7,168 B (`LOG.md:1045`), which also carries busybox `nc` (+2,232 B uncompressed, `notes/update-chain.md:525-526`) and three fewer nodes |
+| install path + write TU in the shipped kernel | `rtl819x-spi.o` `.text` 10,208 → 22,608 B (objects read at the desk, `notes/spi-mtd-driver.md:1562`), plus the write TU | about 6 KB | 讀 the artefacts: armed `8dce09c5` 1,117,184 B − `9bb2bec7` 1,110,016 B = 7,168 B (`docs/log/2026-10.md:1039`), which also carries busybox `nc` (+2,232 B uncompressed, `notes/update-chain.md:525-526`) and three fewer nodes |
 | handoff TU, `ctr`, `ctrloop`, `K_CFG`, fence, `repeat` | 3–4 KB | 1.5–2 KB | 推 |
 | `rtkload` patch | 12 more instructions (48 B; 🔄 2026-10-23, this read 13 and 52 B), 27 B of `.data` | 0 or 1,024 B (the step); 量 0 for `v1.0`'s kernel | § 1.3 |
 | `brokerd`: `container.c`, `slots.c`, `sha256b.c`, `ed25519.c`, `sha512.c` | 13–15 KB | 6–8 KB | 推 from `rlxboot`'s `.text` 13,808 B (`notes/rlxboot.md:524-526`), which is mostly this code |
